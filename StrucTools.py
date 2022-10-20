@@ -1,4 +1,3 @@
-from msilib.schema import Feature
 from pymatgen.core.structure import Structure
 from pymatgen.analysis.magnetism.analyzer import CollinearMagneticStructureAnalyzer
 #from pymatgen.analysis.magnetism.analyzer import MagneticStructureEnumerator
@@ -6,65 +5,83 @@ from CompTools import CompTools
 from MPQuery import MPQuery
 from pymatgen.core.structure import Structure
 from pymatgen.transformations.standard_transformations import OrderDisorderedStructureTransformation
-from pymatgen.transformations.advanced_transformations import MagOrderingTransformation
 from pymatgen.analysis.structure_matcher import StructureMatcher
 from pymatgen.transformations.site_transformations import ReplaceSiteSpeciesTransformation
-
 import itertools
 
-"""
-enumeration (for site ordering + mag ordering) requires enumlib. here's how I installed it:
-    - for MAC: 
-        - install gfortran for MacOS (https://github.com/fxcoudert/gfortran-for-macOS/releases)
-        - install xcode-select ($ xcode-select --install)
-        - follow instructions on https://github.com/msg-byu/enumlib
-        - ran into insurmountable OS Error related to subprocess issue exectuing makeStr.py
-    - for MSI:
-        - follow instructions on https://github.com/msg-byu/enumlib
-        - add enumlib to path
-"""
 class StrucTools(object):
+    """
+    Purpose: to manipulate crystal structures for DFT calculations
+    """
     
     def __init__(self, structure):
+        """
+        Args:
+            structure (Structure): pymatgen structure object
+                
+        """
         
         self.s = structure
         
     @property
     def compact_formula(self):
+        """
+        "clean" (reduced, systematic) formula for structure
+        """
         return CompTools(self.s.formula).clean
     
     @property
-    def pretty_formula(self):
+    def formula(self):
+        """
+        pretty (unreduced formula) for structure
+        
+        """
         return self.s.formula
     
     @property
     def els(self):
+        """
+        list of unique elements (str) in structure
+        """
         return CompTools(self.compact_formula).els
     
-    @property
-    def magnetic_ions_in_struc(self):
-        els = self.els
-        magnetic_ions = self.magnetic_ions
-        return sorted(list(set([el for el in els if el in magnetic_ions])))
-        
+
     @property
     def magnetic_ions(self):
-        # from https://github.com/materialsproject/pymatgen/blob/master/pymatgen/analysis/magnetism/default_magmoms.yaml
+        """
+        taken from what pymatgen uses to guess ox states
+            from https://github.com/materialsproject/pymatgen/blob/master/pymatgen/analysis/magnetism/default_magmoms.yaml
+
+        """
         return sorted(list(set(['Co', 'Cr', 'Fe', 'Mn', 'Mo', 'Ni', 'V', 
                                 'W', 'Ce', 'Eu', 'Ti', 'V', 'Cr', 'Mn', 
                                 'Fe', 'Co', 'Ni', 'Cu', 'Pr', 'Nd', 'Pm', 
                                 'Sm', 'Gd', 'Tb', 'Dy', 'Ho', 'er', 'Tm', 
                                 'Yb', 'Np', 'Ru', 'Os', 'Ir', 'U' ])))
-    
+    @property
+    def magnetic_ions_in_struc(self):
+        """
+        list of elements (str) in structure that are magnetic
+        """
+        els = self.els
+        magnetic_ions = self.magnetic_ions
+        return sorted(list(set([el for el in els if el in magnetic_ions])))
+        
     @property
     def get_nonmagnetic_structure(self):
-        
+        """
+        Returns nonmagnetic Structure with all magnetic ions ordered ferromagnetically
+        """       
         s = self.s
         cmsa = CollinearMagneticStructureAnalyzer(s)
         return cmsa.get_nonmagnetic_structure()
     
     @property
     def get_ferromagnetic_structure(self):
+        """
+        Returns Structure with all magnetic ions ordered ferromagnetically
+            - according to pymatgen convention
+        """
         magnetic_ions_in_struc = self.magnetic_ions_in_struc
         if len(magnetic_ions_in_struc) == 0:
             return None
@@ -74,13 +91,39 @@ class StrucTools(object):
     
     @property
     def get_antiferromagnetic_structures(self):
+        """
+        This is a chaotic way to get antiferromagnetic configurations 
+            - but it doesn't require enumlib interaction with pymatgen
+            - it seems reasonably efficient, might break down for large/complex structures
+            - note: it has no idea which configurations are "most likely" to be low energy
+        
+        Basic workflow:
+            - start from a the FM structure
+            - for all sites containing ions in magnetic_ions
+                - generate all possible combinations of 0 (spin down) or 1 (spin up) for each site
+                    - if I had four sites w/ mag ions this might be: [(0,0,0,1), (0,0,1,1), ...]
+                - retain only the combinations that sum to 0.5 (ie half spin down, half spin up) 
+            - now apply all these combinations to the structure
+                - generate a new structure for each combination that puts max(spin) on sites with 1 and min(spin) on sites with 0
+            - now figure out which newly generated structures are symmetrically distinct
+                - change the identities of sites that are spin up/down using oxidation state surrogate
+                    - these ox states aren't physically meaningful, just a placeholder
+                    - spin up: 2+, spin down: +
+            - now use StructureMatcher to find unique structures to return
+                 
+        Returns:
+            list of unique Structure objects with antiferromagnetic ordering
+                - exhaustive
+                - no idea which are most likely to be low energy
+                - reasonable to randomly sample if a very large list
+        """
+        spins = (-5,5)
         magnetic_ions_in_struc = self.magnetic_ions_in_struc
         if len(magnetic_ions_in_struc) == 0:
             return None
         
         s = self.get_ferromagnetic_structure
         magnetic_sites = [i for i in range(len(s)) if s[i].species_string in magnetic_ions_in_struc]
-        spins = (-5, 5)
         combos = itertools.product(range(len(spins)), repeat=len(magnetic_sites))
         combos = list(combos)
         combos = [c for c in combos if sum(c) == 0.5*len(magnetic_sites)]
@@ -91,11 +134,11 @@ class StrucTools(object):
             for i in range(len(magnetic_sites)):
                 site = s[magnetic_sites[i]]
                 if c[i] == 0:
-                    site.properties['magmom'] = -5
-                    strucs[0]['spin_down_indices'].append(magnetic_sites[i])
+                    site.properties['magmom'] = min(spins)
+                    strucs[j]['spin_down_indices'].append(magnetic_sites[i])
                 elif c[i] == 1:
-                    site.properties['magmom'] = 5
-                    strucs[0]['spin_up_indices'].append(magnetic_sites[i])
+                    site.properties['magmom'] = max(spins)
+                    strucs[j]['spin_up_indices'].append(magnetic_sites[i])
             strucs[j]['s'] = s
         
         fake_strucs = []
@@ -105,48 +148,45 @@ class StrucTools(object):
             spin_down = strucs[i]['spin_down_indices']
             indices_species_map = {}
             for idx in spin_up:
-                el = struc[i].species_string
+                el = struc[idx].species_string
                 indices_species_map[idx] = el+'2+'
             for idx in spin_down:
-                el = struc[i].species_string
+                el = struc[idx].species_string
                 indices_species_map[idx] = el+'1+'               
             rsst = ReplaceSiteSpeciesTransformation(indices_species_map)
             fake_strucs.append(rsst.apply_transformation(struc))
-        
+
         unique_fake_strucs = [fake_strucs[0]]
         sm = StructureMatcher(attempt_supercell=True)
         for i in range(len(fake_strucs)):
             same = False
+            check = 0
             for j in range(len(unique_fake_strucs)):
+                if check > 0:
+                    continue
                 if i == j:
                     continue
-                s1, s2 = fake_strucs[i], fake_strucs[j]
+                s1, s2 = fake_strucs[i], unique_fake_strucs[j]
                 same = sm.fit(s1, s2)
-
-
-        
-        
-        
-                
-        ### PICK UP HERE
-
-        
-        
-        fake_strucs = []
-        for i in range(len(strucs)):
-            s_tmp = strucs[i]
-            for site in s_tmp:
-                if site.properties['magmom'] == 5:
-                    site.species = 'Xe'
-                elif site.properties['magmom'] == -5:
-                    site.species = 'Kr'
-        unique_strucs = []       
-        
-        return strucs          
+                if same:
+                    check += 1
+            if check == 0:
+                print('adding you %s' % i)
+                unique_fake_strucs.append(fake_strucs[i])
+                            
+        out = []
+        for struc in unique_fake_strucs:
+            struc.remove_oxidation_states()
+            out.append(struc)
+        return out
     
+    
+    def get_ordered_strucs(self):
+        return 'TO DO'
+            
 def main():
     mpq = MPQuery('***REMOVED***')
-    s = mpq.get_structure_by_material_id('mp-22584')
+    s = mpq.get_structure_by_material_id('mp-1301329')
     #s.make_supercell([3,3,3])
     st = StrucTools(s)
     
