@@ -44,7 +44,37 @@ class SubmitTools(object):
     def partitions(self):
         
         partitions = {}
-        partitions['agate'] = {''}
+        partitions['agate'] = {}
+        partitions['agate']['agsmall'] = {'cores_per_node' : 128,
+                                            'sharing' : True,
+                                            'max_walltime' : 96,
+                                            'mem_per_core' : 4, # GB
+                                            'max_nodes' : 1}
+        
+        partitions['agate']['aglarge']  = {'cores_per_node' : 128,
+                                            'sharing' : False,
+                                            'max_walltime' : 24,
+                                            'mem_per_core' : 4, # GB
+                                            'max_nodes' : 32}
+        
+        partitions['agate']['a100-4']  = {'cores_per_node' : 64,
+                                            'sharing' : True,
+                                            'max_walltime' : 24,
+                                            'mem_per_core' : 4, # GB
+                                            'max_nodes' : 4}
+        
+        partitions['agate']['a100-8']  = {'cores_per_node' : 128,
+                                            'sharing' : True,
+                                            'max_walltime' : 24,
+                                            'mem_per_core' : 7.5, # GB
+                                            'max_nodes' : 4}
+        
+        partitions['mesabi'] = {}
+        partitions['mesabi']['amdsmall'] = {'cores_per_node' : 128,
+                                            'sharing' : True,
+                                            'max_walltime' : 24,
+                                            'mem_per_core' : 7.5, # GB
+                                            'max_nodes' : 4}
     @property
     def options(self):
         options = self.base_options
@@ -56,7 +86,6 @@ class SubmitTools(object):
                 raise NotImplementedError('Machine not supported')
         machine = self.machine
         
-        if machine == 'agate'
     @property
     def vasp_dir(self):
         if self.machine in self.msi_machines:
