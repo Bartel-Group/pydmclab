@@ -38,9 +38,6 @@
 - for retrieving typical data from Materials Project
 
 #### TO DO:
-- get hull-relevant data
-- get list of queryable properties
-- get input files (INCAR, KPOINTS, POTCAR, POSCAR)
 - unit tests
 
 ## VASPTools
