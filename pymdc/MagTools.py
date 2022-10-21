@@ -1,0 +1,202 @@
+from StrucTools import StrucTools 
+import itertools
+import random
+random.seed(9)
+from pymatgen.core.structure import Structure
+from pymatgen.transformations.site_transformations import ReplaceSiteSpeciesTransformation
+
+"""
+Using enumlib:
+    - install enumlib from https://github.com/msg-byu/enumlib
+    - for MAC
+        - install xcode ($ xcode-select --install)
+        - install gfortran (https://github.com/fxcoudert/gfortran-for-macOS/releases)
+    - follow enumlib instructions
+    - mkdir */enumlib.bin
+    - move */enumlib/src/enum.x and */enumlib/aux_src/makeStr.py to */enumlib/bin
+    - add #! /usr/bin/env python to top of */enumlib/bin/makeStr.py
+    - add */enumlib/bin to PATH (PATH=$PATH:*/enumlib/bin)
+"""  
+
+class MagTools(object):
+    
+    def __init__(self, structure):
+        """
+        Args:
+            structure (Structure): pymatgen Structure object
+                
+        """        
+        self.s = structure
+        
+    @property
+    def magnetic_ions(self):
+        """
+        Aggregated from MP + matminer (**propably a better list to use somewhere**)
+        
+        from_MP = https://github.com/materialsproject/pymatgen/blob/master/pymatgen/analysis/magnetism/default_magmoms.yaml
+        from_matminer = https://github.com/hackingmaterials/matminer/blob/main/matminer/featurizers/composition/element.py
+        """
+        from_matminer = ["Ti","V","Cr", "Mn", "Fe", "Co", 
+                         "Ni", "Cu", "Nb", "Mo", "Tc", 
+                         "Ru", "Rh", "Pd", "Ag", "Ta", 
+                         "W", "Re", "Os", "Ir", "Pt"]
+        from_MP =  ['Co', 'Cr', 'Fe', 'Mn', 'Mo', 'Ni', 'V', 
+                                'W', 'Ce', 'Eu', 'Ti', 'V', 'Cr', 'Mn', 
+                                'Fe', 'Co', 'Ni', 'Cu', 'Pr', 'Nd', 'Pm', 
+                                'Sm', 'Gd', 'Tb', 'Dy', 'Ho', 'er', 'Tm', 
+                                'Yb', 'Np', 'Ru', 'Os', 'Ir', 'U']
+        return sorted(list(set(from_matminer + from_MP))
+                      )
+    @property
+    def magnetic_ions_in_struc(self):
+        """
+        list of elements (str) in structure that are magnetic
+        """
+        els = self.els
+        magnetic_ions = self.magnetic_ions
+        return sorted(list(set([el for el in els if el in magnetic_ions])))
+        
+    @property
+    def get_nonmagnetic_structure(self):
+        """
+        Returns nonmagnetic Structure with magmom of zeros
+        """       
+        s = self.s
+        magmom = [0 for i in range(len(s))]
+        s_tmp = s.copy()
+        s_tmp.add_site_property('magmom', magmom)
+        return s_tmp
+    
+    @property
+    def get_ferromagnetic_structure(self):
+        """
+        Returns Structure with all magnetic ions ordered ferromagnetically
+            - nonmagnetic ions are given spin = spins[0] (default: 0.6)
+            - magnetic ions are given spin = spins[1] (default: 5)
+        """
+        spins = (0.6, 5)
+        magnetic_ions_in_struc = self.magnetic_ions_in_struc
+        if len(magnetic_ions_in_struc) == 0:
+            return None
+        s = self.s
+        magnetic_sites = [i for i in range(len(s)) if s[i].species_string in magnetic_ions_in_struc]
+        magmom = [spins[0] if s[i].species_string not in magnetic_ions_in_struc else spins[1] for i in range(len(s))]
+        s_tmp = s.copy()
+        s_tmp.add_site_property('magmom', magmom)
+        return s_tmp
+    
+    @property
+    def get_antiferromagnetic_structures(self):
+        """
+        This is a chaotic way to get antiferromagnetic configurations 
+            - but it doesn't require enumlib interaction with pymatgen
+            - it seems reasonably efficient, might break down for large/complex structures
+            - note: it has no idea which configurations are "most likely" to be low energy
+        
+        Basic workflow:
+            - start from a the NM structure
+            - for all sites containing ions in magnetic_ions
+                - generate all possible combinations of 0 (spin down) or 1 (spin up) for each site
+                    - if I had four sites w/ mag ions this might be: [(0,0,0,1), (0,0,1,1), ...]
+                - retain only the combinations that sum to 0.5 (ie half spin down, half spin up) 
+            - now apply all these combinations to the structure
+                - generate a new structure for each combination that puts max(spin) on sites with 1 and min(spin) on sites with 0
+            - now figure out which newly generated structures are symmetrically distinct
+                - change the identities of sites that are spin up/down using oxidation state surrogate
+                    - these ox states aren't physically meaningful, just a placeholder
+                    - spin up: 8+, spin down: 8-
+            - now use StructureMatcher to find unique structures to return
+                 
+        Returns:
+            list of unique Structure objects with antiferromagnetic ordering
+                - exhaustive (if len(combos) < max_combos)
+                - no idea which are most likely to be low energy
+                - reasonable to randomly sample if a very large list
+        """
+        
+        # parameters that could be args...
+        spins = (-5,5) # magnitudes of high/low spin
+        max_combos = 100 # max number of combinations to try (for cases with very many possible combos)
+        
+        # which ions in structure are magnetic:
+        magnetic_ions_in_struc = self.magnetic_ions_in_struc
+        if len(magnetic_ions_in_struc) == 0:
+            return None
+        
+        strucs_with_magmoms = []
+        s = self.get_nonmagnetic_structure
+        
+        # get sites w/ magnetic ions
+        magnetic_sites = [i for i in range(len(s)) if s[i].species_string in magnetic_ions_in_struc]
+        
+        # enumerate all possible ways to yield afm ordering
+        combos = itertools.product(range(len(spins)), repeat=len(magnetic_sites))
+        combos = list(combos)
+        print('%i combos'% len(combos))
+        combos = [c for c in combos if sum(c) == 0.5*len(magnetic_sites)]
+        print('%i afm combos' % len(combos))
+        
+        # randomly reduce list if too big for practical usage
+        if len(combos) > max_combos:
+            combos = random.sample(combos, max_combos)
+            print('%i afm combos' % len(combos))
+            
+        # decorate structures w/ magmoms for all afm orderings
+        for j in range(len(combos)): 
+            c = combos[j]
+            magnetic_moments = [spins[c[i]] for i in range(len(c))]
+            site_idxs_to_magmom = dict(zip(magnetic_sites, magnetic_moments))
+            for i in range(len(s)):
+                if i not in magnetic_sites:
+                    site_idxs_to_magmom[i] = 0
+            magmom = [site_idxs_to_magmom[i] for i in range(len(s))]
+            s_tmp = s.copy()
+            s_tmp.add_site_property('magmom', magmom)
+            #print(s_tmp.site_properties)
+            strucs_with_magmoms.append(s_tmp)
+        print('made strucs')
+        
+        # replace spin-up and spin-down sites with new species for symmetry matching
+        fake_strucs = []
+        for struc in strucs_with_magmoms:
+            magmom = struc.site_properties['magmom']
+            spin_up = [i for i in magnetic_sites if magmom[i] == spins[1]]
+            spin_down = [i for i in magnetic_sites if magmom[i] == spins[0]]
+            indices_species_map = {idx : struc[idx].species_string+'8+' if idx in spin_up 
+                                                        else struc[idx].species_string+'8-' 
+                                                        for idx in spin_up+spin_down}     
+            rsst = ReplaceSiteSpeciesTransformation(indices_species_map)
+            s_tmp = rsst.apply_transformation(struc)
+            fake_strucs.append(s_tmp)
+        fake_strucs_dict = dict(zip(list(range(len(fake_strucs))), fake_strucs))
+        
+        # get rid of symmetrically identical structures
+        unique_fake_strucs_indices = [0]
+        duplicates = []
+        sm = StructureMatcher(attempt_supercell=True)
+        for i in fake_strucs_dict:
+            s1 = fake_strucs_dict[i]
+            while (i not in duplicates) and (i not in unique_fake_strucs_indices):
+                for j in unique_fake_strucs_indices:
+                    s2 = fake_strucs_dict[j]
+                    if s1.site_properties['magmom'] == s2.site_properties['magmom']:
+                        print('found a magmom match')
+                        duplicates.append(i)
+                    elif i not in duplicates:
+                        if sm.fit(s1, s2):
+                            print('found a symmetry match')
+                            duplicates.append(i)
+                if i not in duplicates:
+                    print('adding you %s' % i)
+                    unique_fake_strucs_indices.append(i)
+        print(duplicates)  
+        
+        # remove "fake" oxidation states and make a list of unique afm orderings
+        out = []
+        for j in unique_fake_strucs_indices:
+            struc = fake_strucs_dict[j]
+            struc.remove_oxidation_states()
+            out.append(struc)
+            
+        print('made %i unique afm structures' % len(out))
+        return out
