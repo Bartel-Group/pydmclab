@@ -1,9 +1,12 @@
 from StrucTools import StrucTools 
 import itertools
 import random
-random.seed(9)
 from pymatgen.core.structure import Structure
 from pymatgen.transformations.site_transformations import ReplaceSiteSpeciesTransformation
+from pymatgen.analysis.structure_matcher import StructureMatcher
+
+random.seed(9)
+
 
 """
 Using enumlib:
@@ -52,9 +55,16 @@ class MagTools(object):
         """
         list of elements (str) in structure that are magnetic
         """
-        els = self.els
+        els = StrucTools(self.s).els
         magnetic_ions = self.magnetic_ions
         return sorted(list(set([el for el in els if el in magnetic_ions])))
+    
+    @property
+    def could_be_magnetic(self):
+        """
+        True if any magnetic ions are in structure else False
+        """
+        return True if len(self.magnetic_ions_in_struc) > 0 else False
         
     @property
     def get_nonmagnetic_structure(self):

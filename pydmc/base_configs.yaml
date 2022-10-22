@@ -1,0 +1,53 @@
+# HPC-related
+machine: agate
+partition: agsmall
+vasp: vasp_std
+vasp_dir: /home/cbartel/shared/bin/vasp/
+mpi_command: mpirun
+manager: '#SBATCH'
+
+# slurm options (left as dict to get em all at once)
+SLURM:
+  nodes: 1
+  ntasks: 24
+  walltime: 24:00:00
+  mem: None
+  error: log.e
+  output: log.o
+  constraint: None
+  qos: None
+  account: cbartel
+  job-name: my-job
+
+# VASPSetUp (general)
+standard: dmc
+xc: gga
+fun: default
+mag: fm
+calc: relax
+potcar_functional: PBE_54
+validate_magmom: False
+
+# loose calculations
+loose_INCAR: {}
+loose_KPOINTS: 
+loose_POTCAR:
+
+# relax calculations
+relax_INCAR: {}
+relax_KPOINTS: 
+relax_POTCAR:
+
+# static calculations
+static_INCAR: {}
+static_KPOINTS:
+static_POTCAR:
+
+# related to job submission
+fsub: sub.sh
+fvaspout: vasp.o
+fstatus: status.o
+fresh_restart: False
+copy_CONTCAR: True
+calc_sequence: True
+xc_sequence: True
