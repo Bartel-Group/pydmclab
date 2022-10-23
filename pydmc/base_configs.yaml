@@ -10,7 +10,7 @@ manager: '#SBATCH' # probably won't change
 SLURM:
   nodes: 1 # how many nodes do you want
   ntasks: 24 # how many TOTAL CORES do you want
-  walltime: 24:00:00 # how long do you want to run HH:MM:SS or S
+  time: 24:00:00 # how long do you want to run HH:MM:SS or S
   mem: None # None = node default; can specify as e.g., 16GB
   error: log.e # file to write slurm errors to in calc_dir
   output: log.o # file to write slurm output to in calc_dir

@@ -53,6 +53,7 @@ class SubmitTools(object):
             copyfile(pydmc_yaml, fyaml)
         
         base_configs = read_yaml(fyaml)
+        base_configs['SLURM']['time'] = int(base_configs['SLURM']['time'] / 60)
         if 'job-name' in user_configs:
             base_configs['SLURM']['job-name'] = user_configs['job-name']
             del user_configs['job-name']
