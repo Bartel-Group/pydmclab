@@ -1,33 +1,38 @@
 # HPC-related
-machine: agate
-partition: agsmall
-vasp: vasp_std
-vasp_dir: /home/cbartel/shared/bin/vasp/
-mpi_command: mpirun
-manager: '#SBATCH'
+machine: agate # agate, mesabi, mangi, msi so far
+partition: agsmall # lots of options
+vasp: vasp_std # use vasp_gam for "loose" calcs (NotImpelemented yet)
+vasp_dir: /home/cbartel/shared/bin/vasp/ # path to vasp executables
+mpi_command: mpirun # may be srun on some machines
+manager: '#SBATCH' # probably won't change 
 
 # slurm options (left as dict to get em all at once)
 SLURM:
-  nodes: 1
-  ntasks: 24
-  walltime: 24:00:00
-  mem: None
-  error: log.e
-  output: log.o
-  constraint: None
-  qos: None
-  account: cbartel
-  job-name: my-job
+  nodes: 1 # how many nodes do you want
+  ntasks: 24 # how many TOTAL CORES do you want
+  walltime: 24:00:00 # how long do you want to run HH:MM:SS or S
+  mem: None # None = node default; can specify as e.g., 16GB
+  error: log.e # file to write slurm errors to in calc_dir
+  output: log.o # file to write slurm output to in calc_dir
+  constraint: None # may need this on some machines
+  qos: None # may need this on some machines
+  account: cbartel # may change on different machines
+  job-name: my-job # **change** to a unique identifier so you can easily cancel a certain job
 
 # VASPSetUp (general)
-standard: dmc
-xc: gga
-fun: default
-mag: fm
-calc: relax
-potcar_functional: PBE_54
-validate_magmom: False
+# see VASPTools.VASPSetUp for what these mean
+standard: dmc # make mp if comparing to MP data
+xc: gga # gga, ggau, or metagga
+fun: default # usually this is fine
+mag: fm # **change** as desired
+calc: relax # usually this is what we want unless you want an independent "static" or "loose" calc
+potcar_functional: PBE_54 # probably don't change
+validate_magmom: False # probably don't change
 
+# may be desirable to pass various configs for each type of calculation
+# INCARs should be {INCAR_FLAG : value}
+# KPOINTs should be Kpoints object
+# POTCARs should be {el (str) : potcar flag (str)}
 # loose calculations
 loose_INCAR: {}
 loose_KPOINTS: 
@@ -44,10 +49,10 @@ static_KPOINTS:
 static_POTCAR:
 
 # related to job submission
-fsub: sub.sh
-fvaspout: vasp.o
-fstatus: status.o
-fresh_restart: False
-copy_CONTCAR: True
-calc_sequence: True
-xc_sequence: True
+fsub: sub.sh # what to call submission file in calc_dir ($ sbatch FSUB will launch job)
+fvaspout: vasp.o # where VASP output will go in calc_dir
+fvasperrors: errors.o # where VASP errors will go in calc_dir
+fstatus: status.o # where you will get info on what jobs launched,etc in calc_dir
+fresh_restart: False # True if you want to re-run all calculations; False if you want to pick up where you left off
+calc_sequence: True # True if you want to run calculations in sequence (eg loose --> relax --> static)
+xc_sequence: True # True if you want to run functionals in sequence (gga --> metagga)

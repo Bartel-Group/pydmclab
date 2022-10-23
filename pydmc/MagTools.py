@@ -1,4 +1,4 @@
-from StrucTools import StrucTools 
+from pydmc.StrucTools import StrucTools 
 import itertools
 import random
 from pymatgen.core.structure import Structure

@@ -1,11 +1,10 @@
 from unittest.mock import MagicMixin
-from CompTools import CompTools
+from pydmc.CompTools import CompTools
 import os
 from pymatgen.io.vasp.sets import MPRelaxSet, MPStaticSet, MPScanRelaxSet, MPScanStaticSet, MPHSERelaxSet, MPHSEBSSet, MVLSlabSet, LobsterSet
 from pymatgen.io.vasp.outputs import Vasprun
 from pymatgen.core.structure import Structure
-from MPQuery import MPQuery
-from MagTools import MagTools
+from pydmc.MagTools import MagTools
 from pymatgen.io.vasp.inputs import Kpoints, Incar
 import warnings
 from handy import read_json, write_json
@@ -46,7 +45,7 @@ class VASPSetUp(object):
         self.magmom = magmom
 
         
-    def prepare_calc(self,
+    def get_vasp_input(self,
                       standard='mp',
                       xc='gga',
                       calc='relax',
@@ -200,9 +199,116 @@ class VASPSetUp(object):
                              validate_magmom=validate_magmom,
                              **kwargs)
         
+        return vasp_input
+    
+    def prepare_calc(self, **kwargs):
+        vasp_input = self.get_vasp_input(**kwargs)
         vasp_input.write_input(self.calc_dir)
         return vasp_input
+    
+    def error_msgs(self):
+        return {
+            "tet": ["Tetrahedron method fails for NKPT<4",
+                    "Fatal error detecting k-mesh",
+                    "Fatal error: unable to match k-point",
+                    "Routine TETIRR needs special values",
+                    "Tetrahedron method fails (number of k-points < 4)"],
+            "inv_rot_mat": ["inverse of rotation matrix was not found (increase "
+                            "SYMPREC)"],
+            "brmix": ["BRMIX: very serious problems"],
+            "subspacematrix": ["WARNING: Sub-Space-Matrix is not hermitian in "
+                               "DAV"],
+            "tetirr": ["Routine TETIRR needs special values"],
+            "incorrect_shift": ["Could not get correct shifts"],
+            "real_optlay": ["REAL_OPTLAY: internal error",
+                            "REAL_OPT: internal ERROR"],
+            "rspher": ["ERROR RSPHER"],
+            "dentet": ["DENTET"],
+            "too_few_bands": ["TOO FEW BANDS"],
+            "triple_product": ["ERROR: the triple product of the basis vectors"],
+            "rot_matrix": ["Found some non-integer element in rotation matrix"],
+            "brions": ["BRIONS problems: POTIM should be increased"],
+            "pricel": ["internal error in subroutine PRICEL"],
+            "zpotrf": ["LAPACK: Routine ZPOTRF failed"],
+            "amin": ["One of the lattice vectors is very long (>50 A), but AMIN"],
+            "zbrent": ["ZBRENT: fatal internal in",
+                       "ZBRENT: fatal error in bracketing"],
+            "pssyevx": ["ERROR in subspace rotation PSSYEVX"],
+            "eddrmm": ["WARNING in EDDRMM: call to ZHEGV failed"],
+            "edddav": ["Error EDDDAV: Call to ZHEGV failed"],
+            "grad_not_orth": [
+                "EDWAV: internal error, the gradient is not orthogonal"],
+            "nicht_konv": ["ERROR: SBESSELITER : nicht konvergent"],
+            "zheev": ["ERROR EDDIAG: Call to routine ZHEEV failed!"],
+            "elf_kpar": ["ELF: KPAR>1 not implemented"],
+            "elf_ncl": ["WARNING: ELF not implemented for non collinear case"],
+            "rhosyg": ["RHOSYG internal error"],
+            "posmap": ["POSMAP internal error: symmetry equivalent atom not found"],
+            "point_group": ["Error: point group operation missing"]
+        }
         
+    @property
+    def error_log(self):
+        error_msgs = self.error_msgs
+        out_file = os.path.join(self.calc_dir, self.configs.fvaspout)
+        errors = []
+        with open(out_file) as f:
+            contents = f.read()
+        for e in error_msgs:
+            for t in error_msgs[e]:
+                if t in contents:
+                    errors.append(e)
+        return errors
+    
+    @property
+    def is_clean(self):
+        if VASPAnalysis(self.calc_dir).is_converged:
+            return True
+        if not os.path.exists(os.path.join(self.calc_dir, self.configs.fvaspout)):
+            return True
+        errors = self.error_log
+        if len(errors) == 0:
+            return True
+        with open(os.path.join(self.calc_dir, self.configs.fvasperrors), 'w') as f:
+            for e in errors:
+                f.write(e+'\n')
+        return False
+    
+    @property
+    def incar_changes_from_errors(self):
+        errors = self.error_log
+        chgcar = os.path.join(self.calc_dir, 'CHGCAR')
+        wavecar = os.path.join(self.calc_dir, 'WAVECAR')
+        
+        incar_changes = {}
+        if 'grad_not_orth' in errors:
+            incar_changes['SIGMA'] = 0.05
+            if os.path.exists(wavecar):
+                os.remove(wavecar)
+            incar_changes['ALGO'] = 'Exact'
+        if 'edddav' in errors:
+            incar_changes['ALGO'] = 'All'
+            if os.path.exists(chgcar):
+                os.remove(chgcar)
+        if 'eddrmm' in errors:
+            if os.path.exists(wavecar):
+                os.remove(wavecar)
+        if 'subspacematrix' in errors:
+            incar_changes['LREAL'] = 'FALSE'
+            incar_changes['PREC'] = 'Accurate'
+        if 'inv_rot_mat' in errors:
+            incar_changes['SYMPREC'] = 1e-8
+        if 'zheev' in errors:
+            incar_changes['ALGO'] = 'Exact'
+        if 'zpotrf' in errors:
+            incar_changes['ISYM'] = -1
+        if 'zbrent' in errors:
+            incar_changes['IBRION'] = 1
+        if 'brmix' in errors:
+            incar_changes['IMIX'] = 1
+        
+        return incar_changes
+            
 class VASPAnalysis(object):
     
     def __init__(self, calc_dir):
@@ -222,6 +328,9 @@ class VASPAnalysis(object):
         
         
 def main():
+    from pydmc.MPQuery import MPQuery
+
+    
     remake = False
     mpid = 'mp-770495'
     calc_dir = os.path.join(os.getcwd(), '..', 'dev', mpid)

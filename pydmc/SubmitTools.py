@@ -1,8 +1,10 @@
 import os
 from shutil import copyfile
-from VASPTools import VASPSetUp, VASPAnalysis
+from pydmc.VASPTools import VASPSetUp, VASPAnalysis
 from handy import read_yaml, write_yaml, dotdict
 from pymatgen.core.structure import Structure
+
+HERE = os.path.dirname(os.path.abspath(__file__))
 
 class SubmitTools(object):
     
@@ -17,16 +19,29 @@ class SubmitTools(object):
         Args:
             launch_dir (str) - directory to launch calculations from
                 - assumes initial structure is POSCAR in launch_dir
+                - this might be LiMn2O4_mp-123456
+                    - then within this directory, you might generate a set of calc_dirs
+                        - gga-loose, gga-relax, gga-static, etc
             config_yaml (str) - path to yaml file containing base configs
+                if None:
+                    - get them from pydmc
             user_configs (dict) - dictionary of user configs to override base configs
                 common ones:
                     {'mag' : 'afm',
                     'standard' : 'mp',
                     'nodes' : 2,
-                    'walltime' : '96:00:00'}
+                    'walltime' : '96:00:00',
+                    'job-name' : SOMETHING_SPECIFIC}
                     
-            magmom (list) - list of magnetic moments for each atom in structure (only specify if mag='afm')
+            magmom (list) - list of magnetic moments for each atom in structure
+                - only specify if mag='afm'
+                
             files_to_inherit (list) - list of files to copy from calc to calc
+        
+        Returns:
+            self.launch_dir (os.pathLike) - directory to launch calculations from
+            self.configs (dict) - dictionary of configs (in format similar to yaml)
+            self.files_to_inherit (list) - list of files to copy from calc to calc
         """
         
         self.launch_dir = launch_dir
@@ -37,70 +52,57 @@ class SubmitTools(object):
         else:
             self.structure = Structure.from_file(fpos)
         
-        base_configs = read_yaml(os.path.join(launch_dir, 'base_configs.yaml'))
+        fyaml = os.path.join(self.launch_dir, 'base_configs.yaml')
+        if not fyaml:
+            fyaml = os.path.join(HERE, 'base_configs.yaml')
+        base_configs = read_yaml(fyaml)
         configs = {**base_configs, **user_configs}
+        
         self.configs = dotdict(configs)
-        
         self.files_to_inherit = files_to_inherit
-        
-        self.magmom = magmom
-        
-        print(self.configs)
+        self.magmom = magmom        
 
     @property
     def slurm_manager(self):
+        """
+        Returns slurm manager (eg #SBATCH)
+        """
         return self.configs.manager
     
     @property
     def partitions(self):
+        """
+        Returns dictionary of partition info.
+            e.g., partitions['agate']['agsmall']['cores_per_node'] = 128
         
-        partitions = {}
-        partitions['agate'] = {}
-        partitions['agate']['agsmall'] = {'cores_per_node' : 128,
-                                            'sharing' : True,
-                                            'max_walltime' : 96,
-                                            'mem_per_core' : 4, # GB
-                                            'max_nodes' : 1}
+        """
         
-        partitions['agate']['aglarge']  = {'cores_per_node' : 128,
-                                            'sharing' : False,
-                                            'max_walltime' : 24,
-                                            'mem_per_core' : 4, # GB
-                                            'max_nodes' : 32}
-        
-        partitions['agate']['a100-4']  = {'cores_per_node' : 64,
-                                            'sharing' : True,
-                                            'max_walltime' : 24,
-                                            'mem_per_core' : 4, # GB
-                                            'max_nodes' : 4}
-        
-        partitions['agate']['a100-8']  = {'cores_per_node' : 128,
-                                            'sharing' : True,
-                                            'max_walltime' : 24,
-                                            'mem_per_core' : 7.5, # GB
-                                            'max_nodes' : 4}
-        
-        partitions['mesabi'] = {}
-        partitions['mesabi']['amdsmall'] = {'cores_per_node' : 128,
-                                            'sharing' : True,
-                                            'max_walltime' : 24,
-                                            'mem_per_core' : 7.5, # GB
-                                            'max_nodes' : 4}
-        
-        # @CHRIS - keep working on this
+        return read_yaml(os.path.join(HERE, 'partitions.yaml'))
         
     @property
     def slurm_options(self):
+        """
+        Returns dictionary of slurm options
+            - nodes, ntasks, walltime, etc
+        """
         return self.configs.SLURM
         
     @property
     def vasp_command(self):
+        """
+        Returns command used to execute vasp
+            e.g., 'mpirun -n 24 PATH_TO_VASP/vasp_std > vasp.o'
+        """
         configs = self.configs
         vasp_exec = os.path.join(configs.vasp_dir, configs.vasp)
         return '\n%s -n %s %s > %s' % (configs.mpi_command, str(self.slurm_options['ntasks']), vasp_exec, configs.fvaspout)
     
     @property
     def calcs(self):
+        """
+        Returns list of calcs to run 
+            - (eg ['loose', 'relax', 'static'])
+        """
         configs = self.configs
         calc = configs.calc
         calc_sequence = configs.calc_sequence
@@ -112,6 +114,10 @@ class SubmitTools(object):
     
     @property
     def xcs(self):
+        """
+        Returns list of exchange-correlation approaches to run
+            - eg ['gga', 'metagga']
+        """
         configs = self.configs
         xc = configs.xc
         xc_sequence = configs.xc_sequence
@@ -123,6 +129,38 @@ class SubmitTools(object):
           
     @property
     def prepare_directories(self):
+        """
+        A lot going on here. The objective is to prepare a set of directories for all calculations 
+            - for a given initial crystal structure (material)
+                - */launch_dir/POSCAR 
+            - at a given magnetic ordering
+                - user_configs['mag'] = 'nm', 'fm', OR 'afm'
+                - if 'afm', must supply self.magmom
+        
+        When to call this:
+            - when you are setting up a set of calculations for the first time
+            - when you want to loop through a set of calculations that have partially finished
+                - to run the ones that haven't started/finished yet (fresh_restart=False)
+                - to re-run them all (fresh_restart=True)
+        
+        1) For each xc-calc pair, create a directory (calc_dir)
+            - */launch_dir/xc-calc
+        2) Check if that calc_dir has a converged VASP job
+            - if it does
+                - if fresh_restart = False --> label calc_dir as status='DONE' and move on
+                - if fresh_restart = True --> remove prev calc in that dir
+        3) Put */launch_dir/POSCAR into */launch_dir/xc-calc/POSCAR if there's not a POSCAR there already
+        4) Check if */calc_dir/CONTCAR exists and has data in it,
+            - if it does, copy */calc_dir/CONTCAR to */calc_dir/POSCAR and label status='CONTINUE' (ie continuing job)
+            - if it doesn't, label status='NEW' (ie new job)
+        5) Initialize VASPSetUp for calc_dir
+            - modifies vasp_input_set with self.configs as requested in **kwargs and configs.yaml
+        6) If status='CONTINUE',
+            - check for errors using vsu
+                - may remove WAVECAR/CHGCAR
+                - may make edits to INCAR
+        7) prepare calc_dir to launch        
+        """
         prepare_calc_options = ['potcar_functional',
                                 'validate_magmom',
                                 'mag',
@@ -137,28 +175,26 @@ class SubmitTools(object):
         for xc in xcs:
             for calc in calcs:
                 
+                # (1) create calc_dir
                 tag = '%s-%s' % (xc, calc)
                 calc_dir = os.path.join(self.launch_dir, tag)
                 if not os.path.exists(calc_dir):
                     os.mkdir(calc_dir)
-                    
+                
+                # (2) check convergence
                 convergence = VASPAnalysis(calc_dir).is_converged(calc)
                 if convergence and not fresh_restart:
                     print('%s is already converged; skipping' % tag)
                     status = 'DONE'
                     tags.append('%s_%s' % (status, tag))
+                    continue
+                
+                # (3) check for POSCAR       
                 fpos_dst = os.path.join(calc_dir, 'POSCAR')
                 if not os.path.exists(fpos_dst):
                     copyfile(fpos_src, fpos_dst)
-                    
-                vsu = VASPSetUp(calc_dir=calc_dir, 
-                                magmom=self.magmom) 
-                   
-                calc_configs = {'modify_%s' % input_file.lower() : 
-                    configs['%s_%s' % (calc, input_file)] for input_file in ['INCAR', 'KPOINTS', 'POTCAR']}
-                for key in prepare_calc_options:
-                    calc_configs[key] = configs[key]
                 
+                # (4) check for CONTCAR
                 fcont_dst = os.path.join(calc_dir, 'CONTCAR')
                 if os.path.exists(fcont_dst):
                     contents = open(fcont_dst, 'r').readlines()
@@ -169,9 +205,26 @@ class SubmitTools(object):
                 else:
                     status = 'NEWRUN'
 
+                # (5) initialize VASPSetUp with configs
+                vsu = VASPSetUp(calc_dir=calc_dir, 
+                                magmom=self.magmom) 
+                
+                calc_configs = {'modify_%s' % input_file.lower() : 
+                    configs['%s_%s' % (calc, input_file)] for input_file in ['INCAR', 'KPOINTS', 'POTCAR']}
+                for key in prepare_calc_options:
+                    calc_configs[key] = configs[key]
+                
+                # (6) check for errors in continuing jobs
+                if status == 'CONTINUE':
+                    has_errors = vsu.is_clean
+                    if has_errors:
+                        incar_changes = vsu.incar_changes_from_errors
+                        calc_configs['modify_incar'] = {**calc_configs['modify_incar'], **incar_changes}
+                      
+                # (7) prepare calc_dir to launch  
                 vsu.prepare_calc(calc=calc,
-                                 xc=xc,
-                                 **calc_configs)
+                                xc=xc,
+                                **calc_configs)
                 
                 print('prepared %s' % calc_dir)
                 tags.append('%s_%s' % (status, tag))
@@ -179,6 +232,12 @@ class SubmitTools(object):
    
     @property
     def write_sub(self):
+        """
+        A lot going on here. The objective is to write a submission script for each calculation
+            - so that I can iterate through a for loop and launch all calcs
+            - each submission script will launch a chain of jobs
+        
+        """
         configs = self.configs
         fsub = os.path.join(self.launch_dir, configs.fsub)
         fstatus = os.path.join(self.launch_dir, configs.fstatus)
@@ -195,7 +254,6 @@ class SubmitTools(object):
                     f.write('%s --%s=%s\n' % (manager, key, str(option)))
             f.write('\n\n')
             tags = self.prepare_directories
-            lines_to_write_to_sub = []
             for tag in tags:
                 status = tag.split('_')[0]
                 xc, calc = tag.split('_')[1].split('-')
@@ -221,11 +279,22 @@ class SubmitTools(object):
                             src_dir = os.path.join(self.launch_dir, '-'.join([xc_prev, calc_prev]))
                         else:
                             src_dir = os.path.join(self.launch_dir, '-'.join([xc, calc_prev]))
+                        f.write('isInFile=$(cat %s | grep -c %s)\n' % (os.path.join(src_dir, 'OUTCAR'), 'Elaps'))
+                        f.write('if [ $isInFile -eq 0 ]; then\n')
+                        f.write('   echo %s is not done yet; gotta exit >> %s\n' % (calc_prev, fstatus))
+                        f.write('   scancel $SLURM_JOB_ID\n')
                     else:
                         src_dir = None
                     if src_dir:
                         for file_to_inherit in files_to_inherit:
-                            f.write('cp %s %s\n' % (os.path.join(src_dir, file_to_inherit), os.path.join(calc_dir, file_to_inherit)))
+                            fsrc = os.path.join(src_dir, file_to_inherit)
+                            if file_to_inherit == 'CONTCAR':
+                                fdst = os.path.join(calc_dir, 'POSCAR')
+                            else:
+                                fdst = os.path.join(calc_dir, file_to_inherit)
+                            
+                            f.write('cp %s %s\n' % (fsrc, fdst))
+                    
                     f.write('cd %s\n' % calc_dir)
                     f.write('%s\n' % vasp_command)
                     f.write('\necho launched %s-%s >> %s\n' % (xc, calc, fstatus))

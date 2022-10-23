@@ -1,6 +1,5 @@
 from pymatgen.core.structure import Structure
-from CompTools import CompTools
-from MPQuery import MPQuery
+from pydmc.CompTools import CompTools
 from pymatgen.core.structure import Structure
 from pymatgen.transformations.standard_transformations import OrderDisorderedStructureTransformation
 from pymatgen.analysis.structure_matcher import StructureMatcher
@@ -49,6 +48,8 @@ class StrucTools(object):
 
             
 def main():
+    from pydmc.MPQuery import MPQuery
+
     mpq = MPQuery('***REMOVED***')
     mpid = 'mp-22584' # LiMn2O4
     #mpid = 'mp-1301329' # LiMnTiO4
