@@ -111,7 +111,7 @@ class SubmitTools(object):
         """
         configs = self.configs
         vasp_exec = os.path.join(configs.vasp_dir, configs.vasp)
-        return '\n%s --ntasks=%s %s > %s' % (configs.mpi_command, str(self.slurm_options['ntasks']), vasp_exec, configs.fvaspout)
+        return '\n%s --ntasks=%s --mpi=pmi2 %s > %s' % (configs.mpi_command, str(self.slurm_options['ntasks']), vasp_exec, configs.fvaspout)
     
     @property
     def calcs(self):
