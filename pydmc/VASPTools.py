@@ -1,13 +1,14 @@
-from unittest.mock import MagicMixin
 from pydmc.CompTools import CompTools
+from pydmc.handy import read_json, write_json
+from pydmc.MagTools import MagTools
+
 import os
+import warnings
+
 from pymatgen.io.vasp.sets import MPRelaxSet, MPStaticSet, MPScanRelaxSet, MPScanStaticSet, MPHSERelaxSet, MPHSEBSSet, MVLSlabSet, LobsterSet
 from pymatgen.io.vasp.outputs import Vasprun
 from pymatgen.core.structure import Structure
-from pydmc.MagTools import MagTools
 from pymatgen.io.vasp.inputs import Kpoints, Incar
-import warnings
-from handy import read_json, write_json
 
 """
 Holey Moley, getting pymatgen to find your POTCARs is not trivial...

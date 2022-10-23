@@ -1,5 +1,7 @@
-from pymatgen.ext.matproj import MPRester
 from pydmc.CompTools import CompTools
+
+from pymatgen.ext.matproj import MPRester
+
 import itertools
 
 class MPQuery(object):

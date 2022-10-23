@@ -1,5 +1,5 @@
-from pymatgen.core.structure import Structure
 from pydmc.CompTools import CompTools
+
 from pymatgen.core.structure import Structure
 from pymatgen.transformations.standard_transformations import OrderDisorderedStructureTransformation
 from pymatgen.analysis.structure_matcher import StructureMatcher
