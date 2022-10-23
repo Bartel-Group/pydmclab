@@ -1,2 +1,2 @@
-recursive-include pydmc/*.yaml
+recursive-include pydmc/ *.yaml
 include README.md
