@@ -1,4 +1,4 @@
-import json, os, yaml
+import json, os, yaml, subprocess, 
 
 def read_json(fjson):
     """
@@ -53,3 +53,16 @@ class dotdict(dict):
     __getattr__ = dict.get
     __setattr__ = dict.__setitem__
     __delattr__ = dict.__delitem__
+    
+def is_slurm_job_in_queue(job_name, user_name='cbartel', fqueue='q.o'):
+    with open(fqueue, 'w') as f:
+        subprocess.call(['squeue','-u', user_name, '--name=%s' % job_name], stdout=f)
+    names_in_q = []
+    with open(fqueue) as f:
+        for line in f:
+            if 'PARTITION' not in line:
+                names_in_q.append([v for v in line.split(' ') if len(v) > 0][2])
+    if len(names_in_q) == 0:
+        return False
+    else:
+        return True
