@@ -47,20 +47,24 @@ class SubmitTools(object):
         """
         
         self.launch_dir = launch_dir
-        copyfile(os.path.join(config_yaml), os.path.join(self.launch_dir, 'base_configs.yaml'))
+        
+        fyaml = os.path.join(self.launch_dir, 'base_configs.yaml')
+        if not os.path.exists(fyaml):
+            fyaml = os.path.join(HERE, 'base_configs.yaml')
+        
+        copyfile(fyaml, os.path.join(self.launch_dir, 'base_configs.yaml'))
+        
+        fyaml = os.path.join(self.launch_dir, 'base_configs.yaml')
+        base_configs = read_yaml(fyaml)
+        configs = {**base_configs, **user_configs}
+        self.configs = dotdict(configs)
+        
         fpos = os.path.join(launch_dir, 'POSCAR')
         if not os.path.exists(fpos):
             raise FileNotFoundError('Need a POSCAR to initialize setup; POSCAR not found in {}'.format(self.launch_dir))
         else:
             self.structure = Structure.from_file(fpos)
-        
-        fyaml = os.path.join(self.launch_dir, 'base_configs.yaml')
-        if not fyaml:
-            fyaml = os.path.join(HERE, 'base_configs.yaml')
-        base_configs = read_yaml(fyaml)
-        configs = {**base_configs, **user_configs}
-        
-        self.configs = dotdict(configs)
+    
         self.files_to_inherit = files_to_inherit
         self.magmom = magmom        
 
