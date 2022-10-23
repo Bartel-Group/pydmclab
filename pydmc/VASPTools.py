@@ -119,6 +119,7 @@ class VASPSetUp(object):
         
         if standard and modify_incar:
             warnings.warn('You are attempting to generate consistent data, but modifying things in the INCAR')
+            print('e.g., %s' % str(modify_incar))
         if standard and modify_kpoints:
             warnings.warn('You are attempting to generate consistent data, but modifying things in the KPOINTS')
         if standard and modify_potcar:
