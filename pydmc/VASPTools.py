@@ -191,7 +191,7 @@ class VASPSetUp(object):
             modify_incar['NSW'] = 0
             modify_incar['LORBIT'] = 0
             modify_incar['LVHAR'] = True
-            modify_incar['ICHARG'] = 11
+            modify_incar['ICHARG'] = 0
             
         modify_incar['LWAVE'] = True
                 
