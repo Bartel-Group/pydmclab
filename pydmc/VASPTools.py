@@ -15,9 +15,10 @@ Holey Moley, getting pymatgen to find your POTCARs is not trivial...
 Here's the workflow I used:
     1) Download potpaw_LDA_PBE_52_54_orig.tar.gz from VASP
     2) Extract the tar into a directory, we'll call it ~/bin/pp
-    3) $ pmg config -p ~/bin/pp pymatgen_pot
-    4) $ pmg config -p PMG_VASP_PSP_DIR ~/bin/pymatgen_pot
-    5) $ pmg config --add PMG_DEFAULT_FUNCTIONAL PBE_54
+    3) $ cd ~/bin
+    4) $ pmg config -p ~/bin/pp pymatgen_pot
+    5) $ pmg config -add PMG_VASP_PSP_DIR ~/bin/pymatgen_pot
+    6) $ pmg config --add PMG_DEFAULT_FUNCTIONAL PBE_54
 
 """
 

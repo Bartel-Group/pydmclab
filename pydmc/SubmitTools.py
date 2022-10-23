@@ -53,6 +53,9 @@ class SubmitTools(object):
             copyfile(pydmc_yaml, fyaml)
         
         base_configs = read_yaml(fyaml)
+        if 'job-name' in user_configs:
+            user_configs['SLURM']['job-name'] = user_configs['job-name']
+            del user_configs['job-name']
         configs = {**base_configs, **user_configs}
         self.configs = dotdict(configs)
         
