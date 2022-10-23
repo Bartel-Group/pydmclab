@@ -33,7 +33,7 @@ def read_yaml(fyaml):
         dictionary stored in fjson
     """
     with open(fyaml) as f:
-        return yaml.load(f)
+        return yaml.safe_load(f)
     
 def write_yaml(d, fyaml):
     """
