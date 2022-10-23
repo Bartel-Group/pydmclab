@@ -187,6 +187,8 @@ class SubmitTools(object):
                 # (1) create calc_dir
                 tag = '%s-%s' % (xc, calc)
                 calc_dir = os.path.join(self.launch_dir, tag)
+                if fresh_restart:
+                    os.remove(calc_dir)
                 if not os.path.exists(calc_dir):
                     os.mkdir(calc_dir)
                 
