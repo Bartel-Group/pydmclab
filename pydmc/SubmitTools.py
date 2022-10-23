@@ -54,9 +54,16 @@ class SubmitTools(object):
         
         base_configs = read_yaml(fyaml)
         base_configs['SLURM']['time'] = int(base_configs['SLURM']['time'] / 60)
-        if 'job-name' in user_configs:
-            base_configs['SLURM']['job-name'] = user_configs['job-name']
-            del user_configs['job-name']
+        
+        slurm_options = ['nodes', 'time', 'job-name', 'partition',
+                         'account', 'error', 'output', 'mem',
+                         'time', 'ntasks', 'qos', 'constraint']
+        
+        for slurm_option in slurm_options:
+            if slurm_option in user_configs:
+                base_configs['SLURM'][slurm_option] = user_configs[slurm_option]
+                del user_configs[slurm_option]
+
         configs = {**base_configs, **user_configs}
         self.configs = dotdict(configs)
         
