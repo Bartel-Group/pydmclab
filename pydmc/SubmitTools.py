@@ -161,7 +161,7 @@ class SubmitTools(object):
         3) Put */launch_dir/POSCAR into */launch_dir/xc-calc/POSCAR if there's not a POSCAR there already
         4) Check if */calc_dir/CONTCAR exists and has data in it,
             - if it does, copy */calc_dir/CONTCAR to */calc_dir/POSCAR and label status='CONTINUE' (ie continuing job)
-            - if it doesn't, label status='NEW' (ie new job)
+            - if it doeqmsn't, label status='NEW' (ie new job)
         5) Initialize VASPSetUp for calc_dir
             - modifies vasp_input_set with self.configs as requested in **kwargs and configs.yaml
         6) If status='CONTINUE',
@@ -256,7 +256,7 @@ class SubmitTools(object):
         xcs, calcs = self.xcs, self.calcs
         files_to_inherit = self.files_to_inherit
         with open(fsub, 'w') as f:
-            f.write('#!/bin/bash\n')
+            f.write('#!/bin/bash -l\n')
             for key in options:
                 option = options[key]
                 if option:

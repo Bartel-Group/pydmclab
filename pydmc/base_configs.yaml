@@ -3,7 +3,7 @@ machine: agate # agate, mesabi, mangi, msi so far
 partition: agsmall # lots of options
 vasp: vasp_std # use vasp_gam for "loose" calcs (NotImpelemented yet)
 vasp_dir: /home/cbartel/shared/bin/vasp/ # path to vasp executables
-mpi_command: mpirun # may be srun on some machines
+mpi_command: srun # may be mpirun on some machines
 manager: '#SBATCH' # probably won't change 
 
 # slurm options (left as dict to get em all at once)
