@@ -264,6 +264,7 @@ class SubmitTools(object):
                 if option:
                     f.write('%s --%s=%s\n' % (manager, key, str(option)))
             f.write('\n\n')
+            f.write('ulimit -s unlimited\n')
             tags = self.prepare_directories
             for tag in tags:
                 status = tag.split('_')[0]
