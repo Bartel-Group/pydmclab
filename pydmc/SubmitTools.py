@@ -3,7 +3,7 @@ from pydmc.handy import read_yaml, write_yaml, dotdict
 from pymatgen.core.structure import Structure
 
 import os
-from shutil import copyfile
+from shutil import copyfile, rmtree
 
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -188,7 +188,7 @@ class SubmitTools(object):
                 tag = '%s-%s' % (xc, calc)
                 calc_dir = os.path.join(self.launch_dir, tag)
                 if fresh_restart:
-                    os.remove(calc_dir)
+                    rmtree(calc_dir)
                 if not os.path.exists(calc_dir):
                     os.mkdir(calc_dir)
                 
