@@ -1,4 +1,4 @@
-import json, os, yaml, subprocess, 
+import json, os, yaml, subprocess
 
 def read_json(fjson):
     """
