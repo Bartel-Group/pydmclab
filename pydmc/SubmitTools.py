@@ -280,7 +280,7 @@ class SubmitTools(object):
                 calc_dir = os.path.join(self.launch_dir, '-'.join([xc, calc]))
                 if status == 'DONE':
                     f.write('\necho working on %s >> %s\n' % (tag, fstatus))
-                    f.write('echo %s is done %s >> %s\n' % (tag.split('_')[1], fstatus))
+                    f.write('echo %s is done >> %s\n' % (tag.split('_')[1], fstatus))
                 elif status == 'CONTINUE':
                     f.write('\necho working on %s >> %s\n' % (tag, fstatus))
                     f.write('cp %s %s\n' % (os.path.join(calc_dir, 'CONTCAR'), os.path.join(calc_dir, 'POSCAR')))

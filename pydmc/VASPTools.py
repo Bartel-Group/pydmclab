@@ -183,6 +183,7 @@ class VASPSetUp(object):
             modify_incar['ENAUG'] = 800
             modify_incar['ISIF'] = 2
             modify_incar['EDIFF'] = 1e-5
+            modify_incar['NELM'] = 40
         
         if calc == 'static':
             modify_incar['LCHARG'] = True
