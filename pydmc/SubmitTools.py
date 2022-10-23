@@ -12,7 +12,7 @@ class SubmitTools(object):
     
     def __init__(self,
                  launch_dir,
-                 config_yaml=os.path.join(os.getcwd(), 'base_configs.yaml'),
+                 fyaml=os.path.join(os.getcwd(), 'base_configs.yaml'),
                  user_configs={},
                  magmom=None,
                  files_to_inherit=['WAVECAR', 'CONTCAR']):
@@ -48,13 +48,10 @@ class SubmitTools(object):
         
         self.launch_dir = launch_dir
         
-        fyaml = os.path.join(self.launch_dir, 'base_configs.yaml')
         if not os.path.exists(fyaml):
-            fyaml = os.path.join(HERE, 'base_configs.yaml')
+            pydmc_yaml = os.path.join(HERE, 'base_configs.yaml')
+            copyfile(pydmc_yaml, fyaml)
         
-        copyfile(fyaml, os.path.join(self.launch_dir, 'base_configs.yaml'))
-        
-        fyaml = os.path.join(self.launch_dir, 'base_configs.yaml')
         base_configs = read_yaml(fyaml)
         configs = {**base_configs, **user_configs}
         self.configs = dotdict(configs)
