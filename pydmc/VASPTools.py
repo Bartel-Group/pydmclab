@@ -131,7 +131,7 @@ class VASPSetUp(object):
             s = MagTools(s).get_nonmagnetic_structure
         elif mag == 'fm':
             s = MagTools(s).get_ferromagnetic_structure
-        elif mag == 'afm':
+        elif 'afm' in mag:
             magmom = self.magmom
             if not magmom:
                 raise ValueError('You must specify a magmom for an AFM calculation')
