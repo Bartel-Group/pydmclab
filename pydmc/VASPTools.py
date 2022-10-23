@@ -322,7 +322,10 @@ class VASPAnalysis(object):
         if not os.path.exists(fvasprun):
             return False
         
-        vr = Vasprun(os.path.join(self.calc_dir, 'vasprun.xml'))
+        try:
+            vr = Vasprun(os.path.join(self.calc_dir, 'vasprun.xml'))
+        except:
+            return False
         if calc == 'static':
             return vr.converged_electronic
         else:
