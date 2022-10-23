@@ -303,6 +303,7 @@ class SubmitTools(object):
                         f.write('if [ $isInFile -eq 0 ]; then\n')
                         f.write('   echo %s is not done yet; gotta exit >> %s\n' % (calc_prev, fstatus))
                         f.write('   scancel $SLURM_JOB_ID\n')
+                        f.write('fi\n')
                     else:
                         src_dir = None
                     if src_dir:
