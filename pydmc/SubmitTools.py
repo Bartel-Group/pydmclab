@@ -256,7 +256,7 @@ class SubmitTools(object):
         xcs, calcs = self.xcs, self.calcs
         files_to_inherit = self.files_to_inherit
         with open(fsub, 'w') as f:
-            f.write('#!/bin/bash')
+            f.write('#!/bin/bash\n')
             for key in options:
                 option = options[key]
                 if option:
