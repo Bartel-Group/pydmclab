@@ -268,13 +268,13 @@ class SubmitTools(object):
                 xc, calc = tag.split('_')[1].split('-')
                 calc_dir = os.path.join(self.launch_dir, '-'.join([xc, calc]))
                 if status == 'DONE':
-                    f.write('\nWorking on %s >> %s\n' % (tag, fstatus))
+                    f.write('\necho working on %s >> %s\n' % (tag, fstatus))
                     f.write('echo %s is done %s >> %s\n' % (tag.split('_')[1], fstatus))
                 elif status == 'CONTINUE':
-                    f.write('\nWorking on %s >> %s\n' % (tag, fstatus))
+                    f.write('\necho working on %s >> %s\n' % (tag, fstatus))
                     f.write('cp %s %s\n' % (os.path.join(calc_dir, 'CONTCAR'), os.path.join(calc_dir, 'POSCAR')))
                 elif status == 'NEWRUN':
-                    f.write('\nWorking on %s >> %s\n' % (tag, fstatus))
+                    f.write('\necho working on %s >> %s\n' % (tag, fstatus))
                     if xcs.index(xc) == 0:
                         xc_prev = None
                     else:
