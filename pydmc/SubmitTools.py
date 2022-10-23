@@ -1,8 +1,10 @@
+from pydmc.VASPTools import VASPSetUp, VASPAnalysis
+from pydmc.handy import read_yaml, write_yaml, dotdict
+from pymatgen.core.structure import Structure
+
 import os
 from shutil import copyfile
-from pydmc.VASPTools import VASPSetUp, VASPAnalysis
-from handy import read_yaml, write_yaml, dotdict
-from pymatgen.core.structure import Structure
+
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
