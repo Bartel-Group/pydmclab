@@ -92,8 +92,10 @@ class SubmitTools(object):
         Returns dictionary of slurm options
             - nodes, ntasks, walltime, etc
         """
-        return self.configs.SLURM
-        
+        options = self.configs.SLURM
+        options = {k : v for k, v in options.items() if v is not None}
+        return options
+    
     @property
     def vasp_command(self):
         """
