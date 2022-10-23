@@ -1,6 +1,5 @@
 # HPC-related
 machine: agate # agate, mesabi, mangi, msi so far
-partition: agsmall # lots of options
 vasp: vasp_std # use vasp_gam for "loose" calcs (NotImpelemented yet)
 vasp_dir: /home/cbartel/shared/bin/vasp/ # path to vasp executables
 mpi_command: srun # may be mpirun on some machines
@@ -18,6 +17,8 @@ SLURM:
   qos:  # may need this on some machines
   account: cbartel # may change on different machines
   job-name: my-job # **change** to a unique identifier so you can easily cancel a certain job
+  partition: agsmall # lots of options
+
 
 # VASPSetUp (general)
 # see VASPTools.VASPSetUp for what these mean
