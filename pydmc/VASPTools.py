@@ -26,7 +26,9 @@ class VASPSetUp(object):
     
     def __init__(self, 
                  calc_dir,
-                 magmom=None):
+                 magmom=None,
+                fvaspout='vasp.o',
+                fvasperrors='errors.o',):
         """
         Args:
             calc_dir (os.PathLike) - directory where I want to execute VASP
@@ -45,6 +47,9 @@ class VASPSetUp(object):
             self.structure = Structure.from_file(fpos)
             
         self.magmom = magmom
+        
+        self.fvaspout = fvaspout
+        self.fvasperrors = fvasperrors
 
         
     def get_vasp_input(self,
@@ -192,8 +197,13 @@ class VASPSetUp(object):
             modify_incar['LORBIT'] = 0
             modify_incar['LVHAR'] = True
             modify_incar['ICHARG'] = 0
-            
-        modify_incar['LWAVE'] = True
+        
+        if 'LWAVE' not in modify_incar:
+            modify_incar['LWAVE'] = True
+        
+        if ('NCORE' not in modify_incar) and ('NPAR' not in modify_incar):
+            modify_incar['NCORE'] = 4
+        
                 
         vasp_input = vaspset(s, 
                              user_incar_settings=modify_incar, 
@@ -254,7 +264,7 @@ class VASPSetUp(object):
     @property
     def error_log(self):
         error_msgs = self.error_msgs
-        out_file = os.path.join(self.calc_dir, self.configs.fvaspout)
+        out_file = os.path.join(self.calc_dir, self.fvaspout)
         errors = []
         with open(out_file) as f:
             contents = f.read()
@@ -268,12 +278,12 @@ class VASPSetUp(object):
     def is_clean(self):
         if VASPAnalysis(self.calc_dir).is_converged:
             return True
-        if not os.path.exists(os.path.join(self.calc_dir, self.configs.fvaspout)):
+        if not os.path.exists(os.path.join(self.calc_dir, self.fvaspout)):
             return True
         errors = self.error_log
         if len(errors) == 0:
             return True
-        with open(os.path.join(self.calc_dir, self.configs.fvasperrors), 'w') as f:
+        with open(os.path.join(self.calc_dir, self.fvasperrors), 'w') as f:
             for e in errors:
                 f.write(e+'\n')
         return False
