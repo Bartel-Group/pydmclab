@@ -24,7 +24,6 @@
 - for manipulating and analyzing crystal structures
 
 #### TO DO:
-- getting structures from MP
 - making supercells
 - making slabs
 - assigning oxidation states
@@ -48,8 +47,7 @@
 - for setting up DFT calculations
 
 #### TO DO:
-- clean up compmatscipy version
-- leverage pymatgen a bit more
+- experiment + add capabilities
 - unit tests
 
 ### VASPAnalysis
@@ -61,12 +59,12 @@
 - leverage pymatgen a bit more
 - unit tests
 
-## JobSubmission
+## SubmitTools
 #### Summary:
 - for figuring out which jobs to run and running them
 
 #### TO DO:
-- clean up compmatscipy version
+- experiment + add capabilities
 - leverage pymatgen a bit more
 
 ## ThermoTools
