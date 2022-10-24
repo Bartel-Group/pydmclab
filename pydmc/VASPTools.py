@@ -158,7 +158,7 @@ class VASPSetUp(object):
             modify_incar['ENAUG'] = 1040
             modify_incar['ISYM'] = 0
             modify_incar['SIGMA'] = 0.01
-            modify_incar['LWAVE'] = False
+
             if calc != 'loose':
                 modify_incar['KSPACING'] = 0.22
             if xc != 'ggau':
