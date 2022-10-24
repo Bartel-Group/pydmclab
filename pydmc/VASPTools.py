@@ -206,6 +206,9 @@ class VASPSetUp(object):
         
         if 'NSW' not in modify_incar:
             modify_incar['NSW'] = 199
+            
+        if mag == 'nm':
+            modify_incar['ISPIN'] = 1
                 
         vasp_input = vaspset(s, 
                              user_incar_settings=modify_incar, 
