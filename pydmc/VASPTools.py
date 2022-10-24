@@ -204,6 +204,8 @@ class VASPSetUp(object):
         if ('NCORE' not in modify_incar) and ('NPAR' not in modify_incar):
             modify_incar['NCORE'] = 4
         
+        if 'NSW' not in modify_incar:
+            modify_incar['NSW'] = 199
                 
         vasp_input = vaspset(s, 
                              user_incar_settings=modify_incar, 
