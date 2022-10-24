@@ -190,7 +190,9 @@ class SubmitTools(object):
         tags = []
         for xc in xcs:
             for calc in calcs:
-                
+                if (xc == 'metagga') and (calc == 'loose') and configs.xc_sequence:
+                    print('not running loose metagga')
+                    continue
                 # (1) create calc_dir
                 tag = '%s-%s' % (xc, calc)
                 calc_dir = os.path.join(self.launch_dir, tag)
