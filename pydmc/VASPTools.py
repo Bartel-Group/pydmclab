@@ -220,6 +220,7 @@ class VASPSetUp(object):
         vasp_input.write_input(self.calc_dir)
         return vasp_input
     
+    @property
     def error_msgs(self):
         return {
             "tet": ["Tetrahedron method fails for NKPT<4",
