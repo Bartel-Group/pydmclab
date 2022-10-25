@@ -15,7 +15,8 @@ class SubmitTools(object):
                  fyaml=os.path.join(os.getcwd(), 'base_configs.yaml'),
                  user_configs={},
                  magmom=None,
-                 files_to_inherit=['WAVECAR', 'CONTCAR']):
+                 files_to_inherit=['WAVECAR', 'CONTCAR'],
+                 fyaml_partitions=os.path.join(HERE, 'partitions.yaml')):
         
         """
         Args:
@@ -74,7 +75,10 @@ class SubmitTools(object):
             self.structure = Structure.from_file(fpos)
     
         self.files_to_inherit = files_to_inherit
-        self.magmom = magmom        
+        self.magmom = magmom
+        
+        self.partitions = dotdict(read_yaml(fyaml_partitions))
+           
 
     @property
     def slurm_manager(self):
@@ -82,16 +86,6 @@ class SubmitTools(object):
         Returns slurm manager (eg #SBATCH)
         """
         return self.configs.manager
-    
-    @property
-    def partitions(self):
-        """
-        Returns dictionary of partition info.
-            e.g., partitions['agate']['agsmall']['cores_per_node'] = 128
-        
-        """
-        
-        return read_yaml(os.path.join(HERE, 'partitions.yaml'))
         
     @property
     def slurm_options(self):
@@ -101,6 +95,9 @@ class SubmitTools(object):
         """
         options = self.configs.SLURM
         options = {k : v for k, v in options.items() if v is not None}
+        partitions = self.partitions
+        if options['partition']['proc'] == 'gpu':
+            options['gres'] = 'gpu:%s:1' % options['partition']
         return options
     
     @property
