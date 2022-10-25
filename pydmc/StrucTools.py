@@ -142,6 +142,17 @@ class StrucTools(object):
                                             el_to_replace,
                                             n_strucs=1,
                                             structure=None):
+        """
+        Args:
+            el_to_replace (str) - element to replace with vacancy
+            n_strucs (int) - number of ordered structures to return if disordered
+            structure (Structure) - structure to create vacancy in
+                - if None, use self.structure
+                
+        Returns:
+            dict of ordered structures {index : structure (Structure.as_dict())}
+                - each structure will be missing 1 el_to_replace
+        """
         if not structure:
             s = self.structure
         else:
