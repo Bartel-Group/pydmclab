@@ -203,7 +203,7 @@ class SubmitTools(object):
                     os.mkdir(calc_dir)
                 
                 # (2) check convergence
-                convergence = VASPAnalysis(calc_dir).is_converged(calc)
+                convergence = VASPAnalysis(calc_dir).is_converged
                 if convergence and not fresh_restart:
                     print('%s is already converged; skipping' % tag)
                     status = 'DONE'
