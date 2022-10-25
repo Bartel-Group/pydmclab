@@ -101,7 +101,7 @@ class SubmitTools(object):
             options['nodes'] = 1
             options['ntasks'] = 1
             options['gres'] = 'gpu:%s:%s' % (options['partition'].split('-')[0], str(options['nodes']))
-        if not partition_specs['node_sharing']:
+        if not partition_specs['sharing']:
             options['ntasks'] = partition_specs['cores_per_node']
         return options
     
