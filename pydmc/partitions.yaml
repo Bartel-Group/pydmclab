@@ -30,20 +30,27 @@ amdsmall:
   cores_per_node: 128
   sharing: True
   max_wall: 96:00:00
-  mem_per_core: 2GB
+  mem_per_core: 1GB
   max_nodes: 1
   proc: cpu
 amdlarge:
   cores_per_node: 128
   sharing: False
   max_wall: 96:00:00
-  mem_per_core: 2GB
+  mem_per_core: 1GB
   max_nodes: 32
   proc: cpu
 v100:
   cores_per_node: 24
   sharing: True
   max_wall: 96:00:00
-  mem_per_core: 2GB
-  max_nodes: 32
+  mem_per_core: 15GB
+  max_nodes: 1
+  proc: gpu
+k40:
+  cores_per_node: 24
+  sharing: True
+  max_wall: 96:00:00
+  mem_per_core: 5GB
+  max_nodes: 40
   proc: gpu
