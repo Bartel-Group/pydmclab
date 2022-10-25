@@ -40,6 +40,20 @@ amdlarge:
   mem_per_core: 1GB
   max_nodes: 32
   proc: cpu
+small:
+  cores_per_node: 24
+  sharing: True
+  max_wall: 96:00:00
+  mem_per_core: 2GB
+  max_nodes: 10
+  proc: cpu
+large:
+  cores_per_node: 24
+  sharing: False
+  max_wall: 24:00:00
+  mem_per_core: 2GB
+  max_nodes: 48
+  proc: cpu  
 v100:
   cores_per_node: 24
   sharing: True
