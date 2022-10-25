@@ -1,29 +1,49 @@
-agate:
-  agsmall:
-    cores_per_node: 128
-    sharing: True
-    max_wall: 96:00:00
-    mem_per_core: 4GB
-    max_nodes: 1
-    proc: cpu
-  agmlarge:
-    cores_per_node: 128
-    sharing: False
-    max_wall: 24:00:00
-    mem_per_core: 4GB
-    max_nodes: 32
-    proc: cpu
-  a100-4:
-    cores_per_node: 128
-    sharing: True
-    max_wall: 24:00:00
-    mem_per_core: 4GB
-    max_nodes: 4
-    proc: gpu   
-  a100-8:
-    cores_per_node: 128
-    sharing: True
-    max_wall: 24:00:00
-    mem_per_core: 7.5GB
-    max_nodes: 4
-    proc: gpu
+agsmall:
+  cores_per_node: 128
+  sharing: True
+  max_wall: 96:00:00
+  mem_per_core: 4GB
+  max_nodes: 1
+  proc: cpu
+aglarge:
+  cores_per_node: 128
+  sharing: False
+  max_wall: 24:00:00
+  mem_per_core: 4GB
+  max_nodes: 32
+  proc: cpu
+a100-4:
+  cores_per_node: 128
+  sharing: True
+  max_wall: 24:00:00
+  mem_per_core: 4GB
+  max_nodes: 4
+  proc: gpu   
+a100-8:
+  cores_per_node: 128
+  sharing: True
+  max_wall: 24:00:00
+  mem_per_core: 7.5GB
+  max_nodes: 4
+  proc: gpu
+amdsmall:
+  cores_per_node: 128
+  sharing: True
+  max_wall: 96:00:00
+  mem_per_core: 2GB
+  max_nodes: 1
+  proc: cpu
+amdlarge:
+  cores_per_node: 128
+  sharing: False
+  max_wall: 96:00:00
+  mem_per_core: 2GB
+  max_nodes: 32
+  proc: cpu
+v100:
+  cores_per_node: 24
+  sharing: True
+  max_wall: 96:00:00
+  mem_per_core: 2GB
+  max_nodes: 32
+  proc: gpu
