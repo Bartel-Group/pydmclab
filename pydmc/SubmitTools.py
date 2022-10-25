@@ -96,8 +96,8 @@ class SubmitTools(object):
         options = self.configs.SLURM
         options = {k : v for k, v in options.items() if v is not None}
         partitions = self.partitions
-        if options['partition']['proc'] == 'gpu':
-            options['gres'] = 'gpu:%s:1' % options['partition']
+        if partitions[options['partition']]['proc'] == 'gpu':
+            options['gres'] = 'gpu:%s:%s' % (options['partition'], str(options['nodes']))
         return options
     
     @property
