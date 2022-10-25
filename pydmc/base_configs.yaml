@@ -34,6 +34,7 @@ validate_magmom: False # probably don't change
 # INCARs should be {INCAR_FLAG : value}
 # KPOINTs should be Kpoints object
 # POTCARs should be {el (str) : potcar flag (str)}
+
 # loose calculations
 loose_INCAR: {}
 loose_KPOINTS: 

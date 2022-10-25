@@ -1,14 +1,14 @@
-from pydmc.CompTools import CompTools
 from pydmc.handy import read_json, write_json
 from pydmc.MagTools import MagTools
+from pydmc.StrucTools import StrucTools
 
 import os
 import warnings
 
-from pymatgen.io.vasp.sets import MPRelaxSet, MPStaticSet, MPScanRelaxSet, MPScanStaticSet, MPHSERelaxSet, MPHSEBSSet, MVLSlabSet, LobsterSet
+from pymatgen.io.vasp.sets import MPRelaxSet, MPScanRelaxSet
 from pymatgen.io.vasp.outputs import Vasprun
 from pymatgen.core.structure import Structure
-from pymatgen.io.vasp.inputs import Kpoints, Incar
+from pymatgen.io.vasp.inputs import Kpoints
 
 """
 Holey Moley, getting pymatgen to find your POTCARs is not trivial...
@@ -23,20 +23,35 @@ Here's the workflow I used:
 """
 
 class VASPSetUp(object):
+    """
+    Use to write VASP inputs for a single initial structure
+    
+    Also changes inputs based on erros that are encountered
+    """
     
     def __init__(self, 
                  calc_dir,
                  magmom=None,
-                fvaspout='vasp.o',
-                fvasperrors='errors.o',):
+                 fvaspout='vasp.o',
+                 fvasperrors='errors.o',):
         """
         Args:
             calc_dir (os.PathLike) - directory where I want to execute VASP
             magmom (dict) - {'magmom' : [list of magmoms (float)]}
                 - or None
                 - only needed for AFM calculations where orderings would have been determined using MagTools separately
+            fvaspout (str) - name of file to write VASP output to
+            fvasperrors (str) - name of file to write VASP errors to
+            
         Returns:
+            calc_dir (os.PathLike) - directory where I want to execute VASP
             structure (pymatgen.Structure) - structure to be used for VASP calculation
+                - note: raises error if no POSCAR in calc_dir
+            magmom (dict) - {'magmom' : [list of magmoms (float)]}
+                - or None
+                - only needed for AFM calculations where orderings would have been determined using MagTools separately        
+            fvaspout (str) - name of file to write VASP output to
+            fvasperrors (str) - name of file to write VASP errors to    
         """
         
         self.calc_dir = calc_dir
@@ -63,6 +78,7 @@ class VASPSetUp(object):
                       modify_potcar=None, 
                       potcar_functional='PBE_54',
                       validate_magmom=False,
+                      verbose=True,
                       **kwargs):
         """
         Args:
@@ -71,9 +87,11 @@ class VASPSetUp(object):
                     options:
                         - 'mp' - Materials Project 
                         - 'dmc' - DMC 
+                        - specify whatever you'd like ('high_cutoff', 'lobster', 'custom', 'strict_ediff')
+                            - if it's not in ['mp', 'dmc'], it won't do anything to calc, but might be useful flag                    
                     note: this could override other args to ensure consistency
                 - If None:
-                    - specify whatever you'd like
+                    - won't be used                    
                     
             xc (str) - rung of Jacob's ladder
                 - modifies the default in "fun"
@@ -82,7 +100,7 @@ class VASPSetUp(object):
                     - 'metagga' - default=r2SCAN
                 
             calc (str) - type of calculation
-                - 'loose' : loose geometry optimization
+                - 'loose' : loose geometry optimization (only 1 k point; easier convergence)
                 - 'relax' : geometry optimization
                 - 'static' : static calculation
                 - 'slab' : slab geometry optmization
@@ -97,10 +115,13 @@ class VASPSetUp(object):
                 - 'fm' : ferromagnetic (ISPIN = 2)
                 - 'afm' : antiferromagnetic (ISPIN = 2)
                     - note: structure passed to VASPSetUp must have magmoms defined for AFM calculation
-                        - e.g., if many AFM orderings were generated using MagTools, tell VASPSetUp which one
+                        - e.g., if many AFM orderings were generated using MagTools, tell VASPSetUp which one to use
+                            - a general approach might be to first create a dictionary of these magmoms = {IDX : [magmoms]},
+                                then iterate through that dictionary to generate various 'afm_IDX' directories
+                    - code will read anything containing "afm" as AFM (e.g., "afm_1")
                 
             modify_incar (dict) - user-defined incar settings
-                - e.g., {'NPAR' : 4}
+                - e.g., {'NCORE' : 4}
                 - notes: 
                     - {'MAGMOM' : [MAG_SITE1 MAG_SITE2 ...]}
                     - {LDAU' : [U_ION_1 U_ION_2 ...]}
@@ -109,6 +130,8 @@ class VASPSetUp(object):
                 - Kpoints() for gamma only
                 - {'reciprocal_density' : int} for automatic kpoint mesh
                 - Kpoints(kpts=[[2,2,2]]) for a 2x2x2 grid
+                - if not None:
+                    - this will override KSPACING in INCAR (in addition to default kpoints settings)
                 
             modify_potcar (dict) - user-defined potcar settings
                 - e.g., {'Gd' : 'Gd_3'}
@@ -118,22 +141,34 @@ class VASPSetUp(object):
                 - note: I'm not sure a good reason why we would need to change this
             
             validate_magmom (bool) - VASPSet thing
-                - note: setting to False because this was causing (as far as I could tell) non-useful errors    
+                - note: setting to False because this was causing (as far as I could tell) non-useful errors
+            
+            verbose (bool) - print stuff
+            
             **kwargs - additional arguments for VASPSet
         """
         
-        if standard and modify_incar:
-            warnings.warn('You are attempting to generate consistent data, but modifying things in the INCAR')
-            print('e.g., %s' % str(modify_incar))
-        if standard and modify_kpoints:
-            warnings.warn('You are attempting to generate consistent data, but modifying things in the KPOINTS')
-        if standard and modify_potcar:
-            warnings.warn('You are attempting to generate consistent data, but modifying things in the POTCAR')
-        
-        if MagTools(self.structure).could_be_magnetic and (mag == 'nm'):
-            warnings.warn('Structure could be magnetic, but you are performing a nonmagnetic calculation')
+        if verbose:
+            # tell user what they are modifying in case they are trying to match MP or other people's calculations
+            if standard and modify_incar:
+                warnings.warn('you are attempting to generate consistent data, but modifying things in the INCAR\n')
+                print('e.g., %s' % str(modify_incar))
+                
+            if standard and modify_kpoints:
+                warnings.warn('you are attempting to generate consistent data, but modifying things in the KPOINTS\n')
+                print('e.g., %s' % str(modify_kpoints))
+
+            if standard and modify_potcar:
+                warnings.warn('you are attempting to generate consistent data, but modifying things in the POTCAR\n')
+                print('e.g., %s' % str(modify_potcar))
+            
+            # tell user they are doing a nonmagnetic calculation for a compound w/ magnetic elements
+            if MagTools(self.structure).could_be_magnetic and (mag == 'nm'):
+                warnings.warn('structure could be magnetic, but you are performing a nonmagnetic calculation\n')
         
         s = self.structure
+        
+        # get MAGMOM
         if mag == 'nm':
             s = MagTools(s).get_nonmagnetic_structure
         elif mag == 'fm':
@@ -141,75 +176,89 @@ class VASPSetUp(object):
         elif 'afm' in mag:
             magmom = self.magmom
             if not magmom:
-                raise ValueError('You must specify a magmom for an AFM calculation')
+                raise ValueError('you must specify a magmom for an AFM calculation\n')
             if (min(magmom) >= 0) and (max(magmom) <= 0):
-                raise ValueError('Structure is not AFM, but you are trying to run AFM calculation')
+                raise ValueError('provided magmom that is not AFM, but you are trying to run an AFM calculation\n')
             s.add_site_property('magmom', magmom)
 
+        # don't mess with much if trying to match Materials Project
         if standard == 'mp':
             fun = 'default'
-            
+        
+        # setting DMC standards --> what to do on top of MPRelaxSet or MPScanRelaxSet
         if standard == 'dmc':
-            fun = 'default'
-            modify_incar['EDIFF'] = 1e-6
-            modify_incar['EDIFFG'] = -0.03
-            modify_incar['ISMEAR'] = 0
-            modify_incar['ENCUT'] = 520
-            modify_incar['ENAUG'] = 1040
-            modify_incar['ISYM'] = 0
-            modify_incar['SIGMA'] = 0.01
+            fun = 'default' # same functional
+            modify_incar['EDIFF'] = 1e-6 # tighter energy convergence
+            modify_incar['EDIFFG'] = -0.03 # use forces to converge geometries
+            modify_incar['ISMEAR'] = 0 # less errors than w/ ISMEA = -5
+            modify_incar['ENCUT'] = 520 # lower ENCUT for meta-GGA than MP
+            modify_incar['ENAUG'] = 1040 # lower ENAUG for meta-GGA than MP
+            modify_incar['ISYM'] = 0 # don't use symmetry
+            modify_incar['SIGMA'] = 0.01 # smaller SIGMA --> we usually work w/ semiconductors/insulators
 
+            # use KSPACING instead of KPOINTS if not doing a "loose" calculation
             if calc != 'loose':
                 modify_incar['KSPACING'] = 0.22
+                
+            # turn off +U unless we are specifying GGA+U    
             if xc != 'ggau':
                 modify_incar['LDAU'] = False
+                
+            # turn off ISPIN for nonmagnetic calculations
             modify_incar['ISPIN'] = 1 if mag == 'nm' else 2
-            if calc != 'loose':
-                modify_kpoints = {'reciprocal_density' : 500}
         
+        # start from MPRelaxSet for GGA or GGA+U
         if xc in ['gga', 'ggau']:
             vaspset = MPRelaxSet
             
+            # use custom functional (eg PBEsol) if you want
             if fun != 'default':
                 modify_incar['GGA'] = fun
-                
+        
+        # start from MPScanRelaxSet for meta-GGA
         elif xc == 'metagga':
             vaspset = MPScanRelaxSet
                 
+            # use custom functional (eg SCAN) if you want
             if fun != 'default':
                 modify_incar['METAGGA'] = fun
-                
-        if calc == 'slab':
-            vaspset = MVLSlabSet()
-            
+        
+        # default "loose" relax
         if calc == 'loose':
-            modify_kpoints = Kpoints()
-            modify_incar['ENCUT'] = 400
-            modify_incar['ENAUG'] = 800
-            modify_incar['ISIF'] = 2
-            modify_incar['EDIFF'] = 1e-5
-            modify_incar['NELM'] = 40
+            modify_kpoints = Kpoints() # only use 1 kpoint
+            modify_incar['ENCUT'] = 400 # lower ENCUT
+            modify_incar['ENAUG'] = 800 # lower ENAUG
+            modify_incar['ISIF'] = 2 # don't relax volume
+            modify_incar['EDIFF'] = 1e-5 # looser energy convergence
+            modify_incar['NELM'] = 40 # fewer electronic steps
         
+        # default "static" claculation
         if calc == 'static':
-            modify_incar['LCHARG'] = True
-            modify_incar['LREAL'] = False
-            modify_incar['NSW'] = 0
-            modify_incar['LORBIT'] = 0
-            modify_incar['LVHAR'] = True
-            modify_incar['ICHARG'] = 0
+            modify_incar['LCHARG'] = True # write CHGCAR
+            modify_incar['LREAL'] = False # project in reciprocal space
+            modify_incar['NSW'] = 0 # no geometry steps
+            modify_incar['LORBIT'] = 0 # write DOSCAR and PROCAR
+            modify_incar['LVHAR'] = True # write LOCPOT
+            modify_incar['ICHARG'] = 0 # use WAVECAR instead of CHGCAR to intialize
+            modify_incar['LAECHG'] = True # write AECCARs for Bader analysis
         
+        # make sure WAVECAR is written unless told not to
         if 'LWAVE' not in modify_incar:
             modify_incar['LWAVE'] = True
         
+        # use better parallelization
         if ('NCORE' not in modify_incar) and ('NPAR' not in modify_incar):
             modify_incar['NCORE'] = 4
         
+        # add more ionic steps
         if 'NSW' not in modify_incar:
             modify_incar['NSW'] = 199
-            
+        
+        # make sure spin is off for nm calculations
         if mag == 'nm':
             modify_incar['ISPIN'] = 1
-                
+            
+        # initialize new VASPSet
         vasp_input = vaspset(s, 
                              user_incar_settings=modify_incar, 
                              user_kpoints_settings=modify_kpoints, 
@@ -221,12 +270,18 @@ class VASPSetUp(object):
         return vasp_input
     
     def prepare_calc(self, **kwargs):
+        """
+        Write input files (INCAR, KPOINTS, POTCAR)
+        """
         vasp_input = self.get_vasp_input(**kwargs)
         vasp_input.write_input(self.calc_dir)
         return vasp_input
     
     @property
     def error_msgs(self):
+        """
+        Dict of {group of errors (str) : [list of error messages (str) in group]}
+        """
         return {
             "tet": ["Tetrahedron method fails for NKPT<4",
                     "Fatal error detecting k-mesh",
@@ -269,6 +324,11 @@ class VASPSetUp(object):
         
     @property
     def error_log(self):
+        """
+        Parse fvaspout for error messages
+        
+        Returns list of errors (str)        
+        """
         error_msgs = self.error_msgs
         out_file = os.path.join(self.calc_dir, self.fvaspout)
         errors = []
@@ -282,6 +342,9 @@ class VASPSetUp(object):
     
     @property
     def is_clean(self):
+        """
+        True if no errors found, else False
+        """
         if VASPAnalysis(self.calc_dir).is_converged:
             return True
         if not os.path.exists(os.path.join(self.calc_dir, self.fvaspout)):
@@ -296,6 +359,11 @@ class VASPSetUp(object):
     
     @property
     def incar_changes_from_errors(self):
+        """
+        Automatic INCAR changes based on errors
+            - NOTE: also may remove WAVECAR and/or CHGCAR as needed
+        Returns {INCAR key (str) : INCAR value (str)}
+        """
         errors = self.error_log
         chgcar = os.path.join(self.calc_dir, 'CHGCAR')
         wavecar = os.path.join(self.calc_dir, 'WAVECAR')
@@ -330,25 +398,110 @@ class VASPSetUp(object):
         return incar_changes
             
 class VASPAnalysis(object):
-    
-    def __init__(self, calc_dir):
+    """
+    Analyze the results of one VASP calculation
+    """
+    def __init__(self, calc_dir, calc='from_calc_dir'):
+        """
+        Args:
+            calc_dir (os.PathLike) - path to directory containing VASP calculation
+            calc (str) = what kind of calc was done in calc_dir
+                - 'from_calc_dir' (default) - determine from calc_dir
+                - could also be in ['loose', 'static', 'relax']
+                
+        Returns:
+            calc_dir, calc
+        
+        """
         
         self.calc_dir = calc_dir
+        if calc == 'from_calc_dir':
+            self.calc = os.path.split(calc_dir)[-1].split('-')[1]
+        else:
+            self.calc = calc
+            
+    @property
+    def poscar(self):
+        """
+        Returns Structure object from POSCAR in calc_dir
+        """
+        return Structure.from_file(os.path.join(self.calc_dir), 'POSCAR')
     
-    def is_converged(self, calc):
+    @property
+    def contcar(self):
+        """
+        Returns Structure object from CONTCAR in calc_dir
+        """
+        return Structure.from_file(os.path.join(self.calc_dir), 'CONTCAR')
+
+    @property
+    def nsites(self):
+        """
+        Returns number of sites in POSCAR
+        """
+        return len(self.poscar)
+          
+    @property
+    def vasprun(self):
+        """
+        Returns Vasprun object from vasprun.xml in calc_dir
+        """
         fvasprun = os.path.join(self.calc_dir, 'vasprun.xml')
         if not os.path.exists(fvasprun):
             return False
         
         try:
             vr = Vasprun(os.path.join(self.calc_dir, 'vasprun.xml'))
+            return vr
         except:
-            return False
-        if calc == 'static':
-            return vr.converged_electronic
+            return False        
+    
+    @property
+    def is_converged(self):
+        """
+        Returns True if VASP calculation is converged, else False
+        """
+        vr = self.vasprun
+        if vr:
+            if self.calc == 'static':
+                return vr.converged_electronic
+            else:
+                return vr.converged
         else:
-            return vr.converged
+            return False
+    
+    @property
+    def E_per_at(self):
+        """
+        Returns energy per atom (eV/atom) from vasprun.xml or None if calc not converged
+        """
+        if self.is_converged:
+            vr = self.vasprun
+            return vr.final_energy / self.nsites
+        else:
+            return None
         
+    @property
+    def formula(self):
+        """
+        Returns formula of structure from POSCAR (full)
+        """
+        return self.poscar.formula
+    
+    @property
+    def compact_formula(self):
+        """
+        Returns formula of structure from POSCAR (compact)
+            - use this w/ E_per_at
+        """
+        return StrucTools(self.poscar).compact_formula
+    
+    @property
+    def incar_parameters(self):
+        """
+        Returns dict of VASP input settings from vasprun.xml
+        """
+        return self.vasprun.parameters
         
 def main():
     from pydmc.MPQuery import MPQuery
