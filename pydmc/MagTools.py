@@ -180,6 +180,18 @@ class MagTools(object):
             fake_strucs.append(s_tmp)
         fake_strucs_dict = dict(zip(list(range(len(fake_strucs))), fake_strucs))
         
+        matcher = StructureMatcher()
+        groups = matcher.group_structures([fake_strucs_dict[i] for i in fake_strucs_dict])
+        unique_strucs = []
+        for g in groups:
+            s = g[0]
+            s.remove_oxidation_states()
+            unique_strucs.append(s)
+        return unique_strucs
+        
+        """
+        Alternative method to remove duplicates ("from scratch")
+        
         # get rid of symmetrically identical structures
         unique_fake_strucs_indices = [0]
         duplicates = []
@@ -199,7 +211,7 @@ class MagTools(object):
                 if i not in duplicates:
                     print('adding you %s' % i)
                     unique_fake_strucs_indices.append(i)
-        print(duplicates)  
+        print(duplicates) 
         
         # remove "fake" oxidation states and make a list of unique afm orderings
         out = []
@@ -207,6 +219,33 @@ class MagTools(object):
             struc = fake_strucs_dict[j]
             struc.remove_oxidation_states()
             out.append(struc)
-            
         print('made %i unique afm structures' % len(out))
         return out
+        """
+        
+    
+def main():
+    from pydmc.MPQuery import MPQuery
+    import os
+
+    
+    remake = True
+    mpid = 'mp-763910'
+    calc_dir = os.path.join(os.getcwd(), '..', 'dev', mpid)
+    if not os.path.exists(calc_dir):
+        os.mkdir(calc_dir)
+    fpos = os.path.join(calc_dir, 'POSCAR')
+    if not os.path.exists(fpos) or remake:
+        mpq = MPQuery('***REMOVED***')
+        s = mpq.get_structure_by_material_id(mpid)
+        s.to(filename=os.path.join(calc_dir, 'POSCAR'))
+        
+    f_magmoms = os.path.join(calc_dir, 'magmoms.json')
+    if not f_magmoms or remake:
+        s = Structure.from_file(fpos)
+        mt = MagTools(s)
+        out = mt.get_antiferromagnetic_structures
+    return out
+
+if __name__ == '__main__':
+    out = main()
