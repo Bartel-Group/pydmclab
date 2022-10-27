@@ -124,6 +124,9 @@ def prepare_calc_and_launch(mpid,
     
     """
     # if you want to start from pydmc yaml in SCRIPTS_DIR
+    # NOTE: user_configs will over-ride things in base_configs.yaml but never write to it
+    # this option just gives you a chance to start from a fresh base_configs.yaml
+        # in case you manually edited this file for some reason
     if refresh_configs_yaml:
         fyaml = os.path.join(os.getcwd(), 'base_configs.yaml')
         if os.path.exists(fyaml):

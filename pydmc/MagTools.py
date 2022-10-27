@@ -108,7 +108,7 @@ class MagTools(object):
             - for all sites containing ions in magnetic_ions
                 - generate all possible combinations of 0 (spin down) or 1 (spin up) for each site
                     - if I had four sites w/ mag ions this might be: [(0,0,0,1), (0,0,1,1), ...]
-                - retain only the combinations that sum to 0.5 (ie half spin down, half spin up) 
+                - retain only the combinations that have average = 0.5 (ie half spin down, half spin up) 
             - now apply all these combinations to the structure
                 - generate a new structure for each combination that puts max(spin) on sites with 1 and min(spin) on sites with 0
             - now figure out which newly generated structures are symmetrically distinct
