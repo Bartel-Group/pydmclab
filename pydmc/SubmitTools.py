@@ -8,6 +8,8 @@ from shutil import copyfile, rmtree
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
+print(HERE)
+
 class SubmitTools(object):
     
     def __init__(self,
@@ -327,6 +329,7 @@ class SubmitTools(object):
                     f.write('\necho launched %s-%s >> %s\n' % (xc, calc, fstatus))
                 
 def main():
+    return
     from MPQuery import MPQuery
     from MagTools import MagTools
     mpq = MPQuery('***REMOVED***')
