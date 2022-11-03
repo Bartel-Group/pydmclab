@@ -23,13 +23,22 @@ Using enumlib:
 
 class MagTools(object):
     
-    def __init__(self, structure):
+    def __init__(self, 
+                 structure,
+                 max_afm_combos=100,
+                 afm_spins=(-5,5),
+                 fm_spins=(0.6, 5),
+                 randomize_afm=True):
         """
         Args:
             structure (Structure): pymatgen Structure object
                 
         """        
         self.s = structure
+        self.max_afm_combos = max_afm_combos
+        self.fm_spins = fm_spins
+        self.afm_spins = afm_spins
+        self.randomize_afm = randomize_afm
         
     @property
     def magnetic_ions(self):
@@ -84,12 +93,12 @@ class MagTools(object):
             - nonmagnetic ions are given spin = spins[0] (default: 0.6)
             - magnetic ions are given spin = spins[1] (default: 5)
         """
-        spins = (0.6, 5)
+        spins = self.fm_spins
         magnetic_ions_in_struc = self.magnetic_ions_in_struc
         if len(magnetic_ions_in_struc) == 0:
             return None
         s = self.s
-        magnetic_sites = [i for i in range(len(s)) if s[i].species_string in magnetic_ions_in_struc]
+        #magnetic_sites = [i for i in range(len(s)) if s[i].species_string in magnetic_ions_in_struc]
         magmom = [spins[0] if s[i].species_string not in magnetic_ions_in_struc else spins[1] for i in range(len(s))]
         s_tmp = s.copy()
         s_tmp.add_site_property('magmom', magmom)
@@ -125,8 +134,8 @@ class MagTools(object):
         """
         
         # parameters that could be args...
-        spins = (-5,5) # magnitudes of high/low spin
-        max_combos = 100 # max number of combinations to try (for cases with very many possible combos)
+        spins = self.afm_spins # magnitudes of high/low spin
+        max_combos = self.max_afm_combos # max number of combinations to try (for cases with very many possible combos)
         
         # which ions in structure are magnetic:
         magnetic_ions_in_struc = self.magnetic_ions_in_struc
@@ -135,10 +144,11 @@ class MagTools(object):
         
         strucs_with_magmoms = []
         s = self.get_nonmagnetic_structure
-        
+            
         # get sites w/ magnetic ions
         magnetic_sites = [i for i in range(len(s)) if s[i].species_string in magnetic_ions_in_struc]
         
+        print('%i magnetic sites' % len(magnetic_sites))
         # enumerate all possible ways to yield afm ordering
         combos = itertools.product(range(len(spins)), repeat=len(magnetic_sites))
         combos = list(combos)
@@ -187,6 +197,9 @@ class MagTools(object):
             s = g[0]
             s.remove_oxidation_states()
             unique_strucs.append(s)
+            
+        if self.randomize_afm:
+            return random.shuffle(unique_strucs)
         return unique_strucs
         
         """
@@ -230,7 +243,7 @@ def main():
 
     
     remake = True
-    mpid = 'mp-763910'
+    mpid = 'mp-554638'
     calc_dir = os.path.join(os.getcwd(), '..', 'dev', mpid)
     if not os.path.exists(calc_dir):
         os.mkdir(calc_dir)
@@ -238,8 +251,9 @@ def main():
     if not os.path.exists(fpos) or remake:
         mpq = MPQuery('***REMOVED***')
         s = mpq.get_structure_by_material_id(mpid)
+        s.make_supercell([2,1,1])
         s.to(filename=os.path.join(calc_dir, 'POSCAR'))
-        
+       # return s
     f_magmoms = os.path.join(calc_dir, 'magmoms.json')
     if not f_magmoms or remake:
         s = Structure.from_file(fpos)
