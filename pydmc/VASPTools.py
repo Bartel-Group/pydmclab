@@ -261,7 +261,8 @@ class VASPSetUp(object):
         # make sure spin is off for nm calculations
         if mag == 'nm':
             modify_incar['ISPIN'] = 1
-            
+        
+        print(modify_incar)    
         # initialize new VASPSet
         vasp_input = vaspset(s, 
                              user_incar_settings=modify_incar, 
