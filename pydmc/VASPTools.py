@@ -213,7 +213,9 @@ class VASPSetUp(object):
             
             # use custom functional (eg PBEsol) if you want
             if fun != 'default':
-                modify_incar['GGA'] = fun
+                modify_incar['GGA'] = fun.upper()
+            else:
+                modify_incar['GGA'] = 'PBE'
         
         # start from MPScanRelaxSet for meta-GGA
         elif xc == 'metagga':
@@ -221,7 +223,9 @@ class VASPSetUp(object):
                 
             # use custom functional (eg SCAN) if you want
             if fun != 'default':
-                modify_incar['METAGGA'] = fun
+                modify_incar['METAGGA'] = fun.upper()
+            else:
+                modify_incar['METAGGA'] = 'R2SCAN'
         
         # default "loose" relax
         if calc == 'loose':
