@@ -66,3 +66,22 @@ def is_slurm_job_in_queue(job_name, user_name='cbartel', fqueue='q.o'):
         return False
     else:
         return True
+    
+def make_project_tree():
+    
+    project_dir = os.getcwd()
+    tree = {'dev' : ['scripts', 'data', 'figures'],
+            'results' : ['scripts', 'data', 'figures'],
+            'prep' : ['notes', 'background'],
+            'products' : ['drafts', 'slides', 'other']}
+    for first_layer in tree:
+        next_layers = tree[first_layer]
+        for n in next_layers:
+            that_layer = os.path.join(project_dir, first_layer, n)
+            if not os.path.exists(that_layer):
+                os.makedirs(that_layer)
+            freadme = os.path.join(that_layer, 'README.md')
+            if not os.path.exists(freadme):
+                with open(freadme) as f:
+                    f.write('This is a placeholder for the %s directory' % that_layer)
+                    
