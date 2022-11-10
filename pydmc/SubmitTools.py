@@ -309,7 +309,7 @@ class SubmitTools(object):
                             src_dir = os.path.join(self.launch_dir, '-'.join([xc, calc_prev]))
                         f.write('isInFile=$(cat %s | grep -c %s)\n' % (os.path.join(src_dir, 'OUTCAR'), 'Elaps'))
                         f.write('if [ $isInFile -eq 0 ]; then\n')
-                        f.write('   echo %s is not done yet; gotta exit >> %s\n' % (calc_prev, fstatus))
+                        f.write('   echo "%s is not done yet so this job is being killed" >> %s\n' % (calc_prev, fstatus))
                         f.write('   scancel $SLURM_JOB_ID\n')
                         f.write('fi\n')
                     else:
