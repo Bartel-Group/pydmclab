@@ -386,6 +386,7 @@ class VASPSetUp(object):
         if 'eddrmm' in errors:
             if os.path.exists(wavecar):
                 os.remove(wavecar)
+            incar_changes['ALGO'] = 'Normal'
         if 'subspacematrix' in errors:
             incar_changes['LREAL'] = 'FALSE'
             incar_changes['PREC'] = 'Accurate'
