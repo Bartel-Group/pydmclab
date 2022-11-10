@@ -215,7 +215,7 @@ class VASPSetUp(object):
             if fun != 'default':
                 modify_incar['GGA'] = fun.upper()
             else:
-                modify_incar['GGA'] = 'PBE'
+                modify_incar['GGA'] = 'PE'
         
         # start from MPScanRelaxSet for meta-GGA
         elif xc == 'metagga':
