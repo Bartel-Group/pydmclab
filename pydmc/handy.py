@@ -82,6 +82,6 @@ def make_project_tree():
                 os.makedirs(that_layer)
             freadme = os.path.join(that_layer, 'README.md')
             if not os.path.exists(freadme):
-                with open(freadme) as f:
+                with open(freadme, 'w') as f:
                     f.write('This is a placeholder for the %s directory' % that_layer)
                     
