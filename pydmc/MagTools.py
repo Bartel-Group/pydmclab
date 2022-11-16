@@ -34,6 +34,7 @@ class MagTools(object):
             structure (Structure): pymatgen Structure object
                 
         """        
+        structure.remove_oxidation_states()
         self.s = structure
         self.max_afm_combos = max_afm_combos
         self.fm_spins = fm_spins
@@ -257,6 +258,8 @@ def main():
     f_magmoms = os.path.join(calc_dir, 'magmoms.json')
     if not f_magmoms or remake:
         s = Structure.from_file(fpos)
+        s = StrucTools(s).decorate_with_ox_states
+        print(s)
         mt = MagTools(s)
         out = mt.get_antiferromagnetic_structures
     return out

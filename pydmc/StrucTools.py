@@ -175,12 +175,15 @@ def main():
     #mpid = 'mp-770495' # Li5Ti2Mn3Fe3O16
     mpid = 'mp-772660' # NbCrO4
     #mpid = 'mp-776873' # Cr2O3
+    
+    mpid = 'mp-825' # RuO2
     s = mpq.get_structure_by_material_id(mpid)
-    s.make_supercell([2,2,2])
+    s.make_supercell([2,1,1])
+    print(s)
     st = StrucTools(s)
     
-    out = st.replace_species({Element('Cr') : {Element('Ti') : 1/2,
-                                            Element('Fe') : 1/4}},
+    out = st.replace_species({Element('Ru') : {Element('Ir') : 1/2,
+                                            Element('Ru') : 1/2}},
                              n_strucs=100)
     
     return out
