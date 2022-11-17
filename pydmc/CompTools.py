@@ -62,7 +62,9 @@ class CompTools(object):
                 - note: starts with "clean" formula
             e.g., if CompTools(c).clean == 'Al2Mg1O4', then CompTools(c).stoich('O') = 4
         """ 
-        return int(self.mol_frac(el) * self.n_atoms)
+        stoich = self.mol_frac(el) * self.n_atoms
+        stoich = np.round(stoich, 0)
+        return int(stoich)
     
     @property
     def chemsys(self):

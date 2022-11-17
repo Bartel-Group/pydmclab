@@ -539,7 +539,7 @@ class AnalyzeHull(object):
         A = self.A_for_decomp_solver(compound, competing_compounds)
         b = self.b_for_decomp_solver(compound)
         Es = self.Es_for_decomp_solver(competing_compounds)
-        n0 = [0.01 for c in competing_compounds]
+        n0 = [0.1 for c in competing_compounds]
         max_bound = CompTools(compound).n_atoms
         bounds = [(0,max_bound) for c in competing_compounds]
         def competing_formation_energy(nj):
@@ -547,7 +547,7 @@ class AnalyzeHull(object):
             return np.dot(nj, Es)
         constraints = [{'type' : 'eq',
                         'fun' : lambda x: np.dot(A, x)-b}]
-        tol, maxiter, disp = 1e-4, 1000, False
+        maxiter, disp = 1000, False
         for tol in [1e-6, 1e-4, 1e-3, 1e-2]:
             solution =  minimize(competing_formation_energy,
                                  n0,
