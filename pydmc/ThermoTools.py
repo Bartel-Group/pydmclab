@@ -11,22 +11,36 @@ class ParallelHulls(object):
     
     def __init__(self,
                  compound_to_energy,
+                 formation_energy_key='Ef_mp',
                  n_procs=4,
-                 ):
-        self.compound_to_energy = compound_to_energy
-        self.n_procs = n_procs if n_procs != 'all' else multip.cpu_count()
+                 data_dir=False,
+                 fresh_restart=False):
+        self.n_procs = n_procs if n_procs != 'all' else multip.cpu_count()-1
+        if not data_dir:
+            self.data_dir = os.getcwd()
+        else:
+            self.data_dir = data_dir
+        self.fresh_restart = fresh_restart
         
+        self.compound_to_energy = {k : compound_to_energy[k][formation_energy_key] 
+                                    for k in compound_to_energy
+                                    if len(CompTools(k).els) > 1}
     
     @property
     def compounds(self):
-        return list(self.compound_to_energy.keys())
+        compounds = list(self.compound_to_energy.keys())
+        return sorted(list([c for c in compounds if CompTools(c).n_els > 1]))
     
     @property
     def hull_spaces(self):
         compounds = self.compounds
-        return '_'.join(sorted(list(set([CompTools(c).els for c in compounds]))))
+        hull_spaces = []
+        for c in compounds:
+            space = '_'.join(sorted(list(set(CompTools(c).els))))
+            hull_spaces.append(space)
+        return sorted(list(set(hull_spaces)))
     
-    def hullin_from_space(self, space, verbose=False):
+    def hullin_from_space(self, space, verbose=True):
         """
         Function to parallelize in generation of hull input file
         
@@ -39,20 +53,19 @@ class ParallelHulls(object):
             {compound (str) : {'E' : formation energy (float, eV/atom),
                         'amts' : {el (str) : fractional amount of el in formula (float)}}}
         """
-        compounds = self.compounds
         compound_to_energy = self.compound_to_energy
         if verbose:
             print(space)
         space = space.split('_')
         for el in space:
             compound_to_energy[el] = 0
-        relevant_compounds = [c for c in compounds if set(CompTools(c).els).issubset(set(space))] + list(space)
+        relevant_compounds = [c for c in compound_to_energy if set(CompTools(c).els).issubset(set(space))] + list(space)
         return {c : {'E' : compound_to_energy[c],
                     'amts' : {el : CompTools(c).mol_frac(el=el) for el in space}}
                                                 for c in relevant_compounds}
 
     def parallel_hullin(self, 
-                        fjson=False, remake=False, verbose=False):
+                        fjson=False, verbose=True):
         """
         Parallel generation of hull input data    
         Args:
@@ -68,22 +81,22 @@ class ParallelHulls(object):
                     {'E' : formation energy (float, eV/atom),
                     'amts' : {el (str) : fractional amount of el in formula (float)}}}}
         """
-        compound_to_energy = self.compound_to_energy
+        remake = self.fresh_restart
         hull_spaces = self.hull_spaces
         if not fjson:
-            fjson = 'hull_input_data.json'
+            fjson = os.path.join(self.data_dir, 'hull_input_data.json')
         if (remake == True) or not os.path.exists(fjson):
             hull_data = {}
-            compounds = self.compounds
             pool = multip.Pool(processes=self.n_procs)
-            results = [r for r in pool.starmap(self._hullin_from_space, [(compound_to_energy, compounds, space, verbose) for space in hull_spaces])]
-            keys = ['_'.join(list(space)) for space in hull_spaces]
-            hull_data = dict(zip(keys, results))
+            results = [r for r in pool.starmap(self.hullin_from_space, [(space, verbose) for space in hull_spaces])]
+            pool.close()
+            hull_data = dict(zip(hull_spaces, results))
             return write_json(hull_data, fjson)
         else:
             return read_json(fjson)
         
-    def smallest_space(self, formula, verbose=False):
+    def smallest_space(self, hullin, formula, 
+                       verbose=False):
         """
         Args:
             hullin (dict) - {space (str, '_'.join(elements)) : 
@@ -99,7 +112,6 @@ class ParallelHulls(object):
         Returns:
             chemical space (str, '_'.join(elements), convex hull) that is easiest to compute
         """
-        hullin = self.parallel_hullin(remake=False)
         if verbose:
             print(formula)
         spaces = sorted(list(hullin.keys()))
@@ -111,7 +123,8 @@ class ParallelHulls(object):
         return smallest[0]
     
     def smallest_spaces(self,
-                        fjson=False, remake=False, Nprocs=4,
+                        hullin,
+                        fjson=False,
                         verbose=False):
         """
         Args:
@@ -123,17 +136,23 @@ class ParallelHulls(object):
                 chemical space (str, '_'.join(elements), convex hull) 
                 that is easiest to compute}
         """
+        remake = self.fresh_restart
         compounds = self.compounds
         if not fjson:
-            fjson = 'smallest_spaces.json'
+            fjson = os.path.join(self.data_dir, 'smallest_spaces.json')
         if not remake and os.path.exists(fjson):
             return read_json(fjson)
-        pool = multip.Pool(processes=Nprocs)
-        smallest = [r for r in pool.starmap(self.smallest_space, [(compound, verbose) for compound in compounds])]
+        pool = multip.Pool(processes=self.n_procs)
+        smallest = [r for r in pool.starmap(self.smallest_space, [(hullin, compound, verbose) for compound in compounds])]
+        pool.close()
         data = dict(zip(compounds, smallest))
         return write_json(data, fjson)
     
-    def compound_stability(self, formula, verbose=False):
+    def compound_stability(self, 
+                        hullin,
+                           smallest_spaces,
+                           formula,
+                           verbose=False):
         """
         Args:
             smallest_spaces (dict) - {formula (str) : smallest chemical space having formula (str)}
@@ -146,14 +165,19 @@ class ParallelHulls(object):
             'rxn' : decomposition reaction (str),
             'stability' : bool (True if on hull)}
         """
-        smallest_spaces = self.smallest_space()
-        hullin = self.parallel_hullin()
         if verbose:
             print(formula)
+        if CompTools(formula).n_els == 1:
+            return {'Ef' : 0,
+                    'Ed' : 0,
+                    'stability' : True,
+                    'rxn' : '1_%s' % formula}
         space = smallest_spaces[formula]
         return AnalyzeHull(hullin, space).cmpd_hull_output_data(formula)
     
     def parallel_hullout(self,
+                         hullin,
+                         smallest_spaces,
                         compounds='all', 
                         fjson=False, remake=False,
                         verbose=False):
@@ -170,16 +194,15 @@ class ParallelHulls(object):
                 'stability' : bool (True if on hull)}
                 }
         """
-        smallest_spaces = self.smallest_spaces()
-        hullin = self.parallel_hullin()
         if not fjson:
-            fjson = 'hullout.json'
+            fjson = os.path.join(self.data_dir, 'hullout.json')
         if not remake and os.path.exists(fjson):
             return read_json(fjson)
         pool = multip.Pool(processes=self.n_procs)
         if compounds == 'all':
             compounds = sorted(list(smallest_spaces.keys()))
-        results = [r for r in pool.starmap(self.compound_stability, [(smallest_spaces, hullin, compound, verbose) for compound in compounds])]
+        results = [r for r in pool.starmap(self.compound_stability, [(hullin, smallest_spaces, compound, verbose) for compound in compounds])]
+        pool.close()
         data = dict(zip(compounds, results))
         return write_json(data, fjson)    
     

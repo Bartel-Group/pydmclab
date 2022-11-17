@@ -200,7 +200,7 @@ class MagTools(object):
             unique_strucs.append(s)
             
         if self.randomize_afm:
-            return random.shuffle(unique_strucs)
+            random.shuffle(unique_strucs)
         return unique_strucs
         
         """
