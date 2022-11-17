@@ -75,7 +75,7 @@ class StrucTools(object):
             print('     automatically\n')
             transformer = AutoOxiStateDecorationTransformation()
         else:
-            transformer = OxidationStateDecorationTransformation(ox_states=ox_states)
+            transformer = OxidationStateDecorationTransformation(oxidation_states=ox_states)
             print('     using %s' % str(ox_states))
         return transformer.apply_transformation(s)
     
