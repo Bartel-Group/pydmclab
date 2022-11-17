@@ -325,7 +325,7 @@ class VASPSetUp(object):
             "rhosyg": ["RHOSYG internal error"],
             "posmap": ["POSMAP internal error: symmetry equivalent atom not found"],
             "point_group": ["Error: point group operation missing"],
-            "ibzkpt" : ["Error: internal error in subroutine IBZKPT"]
+            "ibzkpt" : ["internal error in subroutine IBZKPT"]
         }
         
     @property
