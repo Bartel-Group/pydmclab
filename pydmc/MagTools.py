@@ -5,9 +5,6 @@ from pymatgen.core.structure import Structure
 from pymatgen.transformations.site_transformations import ReplaceSiteSpeciesTransformation
 from pymatgen.analysis.structure_matcher import StructureMatcher
 
-random.seed(9)
-
-
 """
 Using enumlib:
     - install enumlib from https://github.com/msg-byu/enumlib
@@ -159,7 +156,7 @@ class MagTools(object):
         
         # randomly reduce list if too big for practical usage
         if len(combos) > max_combos:
-            combos = random.sample(combos, max_combos)
+            combos = random.Random(0).sample(combos, max_combos)
             print('%i afm combos' % len(combos))
             
         # decorate structures w/ magmoms for all afm orderings
@@ -200,7 +197,7 @@ class MagTools(object):
             unique_strucs.append(s)
             
         if self.randomize_afm:
-            random.shuffle(unique_strucs)
+            random.Random(1).shuffle(unique_strucs)
         return unique_strucs
         
         """
