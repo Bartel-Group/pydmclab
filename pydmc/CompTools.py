@@ -24,7 +24,10 @@ class CompTools(object):
         formula = Composition(formula).alphabetical_formula
         if '.' in formula:
             formula = Composition(formula).get_integer_formula_and_factor()[0]
-        return Composition(formula).to_pretty_string()
+        clean = Composition(formula).to_pretty_string()
+        if (len(clean) <= 3) and (clean[-1] == '2'):
+            clean = clean.replace('2', '1')
+        return clean
     
     @property
     def pretty(self):
@@ -42,7 +45,7 @@ class CompTools(object):
             dictionary of elements (str) and their amounts (float)
                 - note: starts with "clean" formula
         """
-        return Composition(CompTools(self.formula).clean).to_reduced_dict
+        return Composition(self.clean).get_el_amt_dict()
     
     def mol_frac(self, el):
         """
@@ -50,7 +53,16 @@ class CompTools(object):
             the molar fraction of an element (float)
                 - note: starts with "clean" formula
         """
-        return Composition(CompTools(self.formula).clean).get_atomic_fraction(el)
+        return Composition(self.clean).get_atomic_fraction(el)
+    
+    def stoich(self, el):
+        """
+        Returns:
+            the stoichiometry of an element (int)
+                - note: starts with "clean" formula
+            e.g., if CompTools(c).clean == 'Al2Mg1O4', then CompTools(c).stoich('O') = 4
+        """ 
+        return int(self.mol_frac(el) * self.n_atoms)
     
     @property
     def chemsys(self):
@@ -60,7 +72,7 @@ class CompTools(object):
                 - sorted
                 - elements separated by "-"
         """
-        return Composition(self.formula).chemical_system
+        return Composition(self.clean).chemical_system
     
     @property
     def els(self):
@@ -69,7 +81,7 @@ class CompTools(object):
             list of elements (str) in the formula
                 - sorted
         """
-        return list(sorted(CompTools(self.formula).chemsys.split('-')))
+        return list(sorted(self.chemsys.split('-')))
     
     @property
     def n_els(self):
@@ -77,7 +89,7 @@ class CompTools(object):
         Returns:
             number of elements (int) in the formula
         """
-        return len(CompTools(self.formula).els)
+        return len(self.els)
     
     @property
     def n_atoms(self):
@@ -86,17 +98,17 @@ class CompTools(object):
             number of atoms (int) in the formula
                 - note: starts with "clean" formula
         """
-        return np.sum(list(CompTools(self.formula).amts.values()))
+        return np.sum(list(self.amts.values()))
     
     def label_for_plot(self, el_order=None, reduce=True):
         """
         Returns:
             label (str) for plotting (includes $ for subscripts)
         """
-        formula = CompTools(self.formula).clean if reduce else self.formula
+        #formula = self.clean if reduce else self.formula
         if not el_order:
-            el_order = CompTools(formula).els
-        amts = CompTools(formula).amts
+            el_order = self.els
+        amts = self.amts
         label = r'$'
         for el in el_order:
             if el in amts:

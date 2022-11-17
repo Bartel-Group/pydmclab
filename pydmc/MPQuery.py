@@ -81,8 +81,16 @@ class MPQuery(object):
                                 'volume',
                                 'spacegroup.number') 
         return typical_properties 
+    
+    @property
+    def long_to_short_keys(self):
+        return {'energy_per_atom' : 'E_mp',
+                'formation_energy_per_atom' : 'Ef_mp',
+                'e_above_hull' : 'Ehull_mp',
+                'spacegroup.number' : 'sg',
+                'material_id' : 'mpid'}
          
-    def get_data_for_comp(self, comp, properties=None, criteria=None):
+    def get_data_for_comp(self, comp, properties=None, criteria=None, only_gs=False, dict_key=False):
         """
         Args:
             comp (list or str)
@@ -101,10 +109,19 @@ class MPQuery(object):
             criteria (dict or None)
                 dictionary of criteria to query
                     - if None, then use {}
+            
+            only_gs (bool)
+                if True, remove non-ground state polymorphs for each unique composition
+                
+            dict_key (str)
+                if False, return list of dicts
+                if True, return dict oriented by dict_key
+                    e.g., if dict_key = 'cmpd', then returns {CMPD : {query_data_for_that_cmpd}}
+                        or dict_key = 'mpid' --> {MPID : {data_for_that_mpid}}
         Returns:
             list of dictionaries of properties for each material in the desired comp
         """
-        
+        key_map = self.long_to_short_keys
         if properties == 'all':
             properties = self.supported_properties
         if properties == None:
@@ -145,7 +162,34 @@ class MPQuery(object):
                 all_formulas = [CompTools(c).pretty for c in comp]
                 criteria['pretty_formula'] = {'$in' : all_formulas}
                 
-        return self.mpr.query(criteria, properties)
+        list_from_mp = self.mpr.query(criteria, properties)
+        extra_keys = [k for k in list_from_mp[0] if k not in key_map]
+        cleaned_list_from_mp = [{key_map[old_key] : entry[old_key] for old_key in key_map} for entry in list_from_mp]
+        query = []
+        for i in range(len(list_from_mp)):
+            query.append({**cleaned_list_from_mp[i], 
+                          **{k : list_from_mp[i][k] for k in extra_keys}, 
+                          **{'cmpd' : CompTools(list_from_mp[i]['pretty_formula']).clean}})
+        
+        if only_gs:
+            
+            gs = {}
+            for entry in query:
+                cmpd = CompTools(entry['pretty_formula']).clean
+                if cmpd not in gs:
+                    gs[cmpd] = entry
+                else:
+                    Ef_stored = gs[cmpd]['Ef_mp']
+                    Ef_check = entry['Ef_mp']
+                    if Ef_check < Ef_stored:
+                        gs[cmpd] = entry
+        query = [gs[k] for k in gs]
+        if dict_key:
+            if dict_key not in query[0]:
+                raise ValueError('%s not in query' % dict_key)
+            query = {entry[dict_key] : entry for entry in query}
+            
+        return query
     
     def get_entry_by_material_id(self, 
                                  material_id, 

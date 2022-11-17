@@ -324,7 +324,8 @@ class VASPSetUp(object):
             "elf_ncl": ["WARNING: ELF not implemented for non collinear case"],
             "rhosyg": ["RHOSYG internal error"],
             "posmap": ["POSMAP internal error: symmetry equivalent atom not found"],
-            "point_group": ["Error: point group operation missing"]
+            "point_group": ["Error: point group operation missing"],
+            "ibzkpt" : ["Error: internal error in subroutine IBZKPT"]
         }
         
     @property
@@ -400,6 +401,8 @@ class VASPSetUp(object):
             incar_changes['IBRION'] = 1
         if 'brmix' in errors:
             incar_changes['IMIX'] = 1
+        if 'ibzkpt' in errors:
+            incar_changes['SYMPREC'] = 1e-10
         
         return incar_changes
             
