@@ -37,7 +37,7 @@ def serial_get_hull_input_data(gs, remake=False):
         return read_json(fjson)
     
     ghid = GetHullInputData(gs, 'Ef_mp')
-    return ghid.hull_data(fjson=fjson, remake=remake)
+    return ghid.hullin_data(fjson=fjson, remake=remake)
 
 def serial_get_hull_output_data(hullin, remake=False):
     fjson = os.path.join(DATA_DIR, 'hullout_serial_'+CHEMSYS+'.json')
