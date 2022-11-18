@@ -243,8 +243,8 @@ class SubmitTools(object):
                 
                 # (6) check for errors in continuing jobs
                 if status in ['CONTINUE', 'NEWRUN']:
-                    has_errors = vsu.is_clean
-                    if has_errors:
+                    calc_is_clean = vsu.is_clean
+                    if not calc_is_clean:
                         incar_changes = vsu.incar_changes_from_errors
                         calc_configs['modify_incar'] = {**calc_configs['modify_incar'], **incar_changes}
                       
