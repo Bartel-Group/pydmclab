@@ -352,9 +352,14 @@ class VASPSetUp(object):
         True if no errors found, else False
         """
         if VASPAnalysis(self.calc_dir).is_converged:
-            return True
+            clean = True
         if not os.path.exists(os.path.join(self.calc_dir, self.fvaspout)):
-            return True
+            clean = True
+        if clean == True:
+            with open(os.path.join(self.calc_dir, self.fvasperrors), 'w') as f:
+                for e in errors:
+                    f.write(e+'\n')  
+            return clean       
         errors = self.error_log
         if len(errors) == 0:
             return True
