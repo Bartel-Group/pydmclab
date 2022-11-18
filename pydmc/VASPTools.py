@@ -357,8 +357,7 @@ class VASPSetUp(object):
             clean = True
         if clean == True:
             with open(os.path.join(self.calc_dir, self.fvasperrors), 'w') as f:
-                for e in errors:
-                    f.write(e+'\n')  
+                f.write('')
             return clean       
         errors = self.error_log
         if len(errors) == 0:
