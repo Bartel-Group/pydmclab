@@ -14,6 +14,8 @@ This file currently tests the following classes in ThermoTools
     - AnalyzeHull
     - ParallelHulls
 
+TO-DO:
+    - convert into formal "tests"
 """
 
 def main():

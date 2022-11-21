@@ -351,6 +351,7 @@ class VASPSetUp(object):
         """
         True if no errors found, else False
         """
+        clean = False
         if VASPAnalysis(self.calc_dir).is_converged:
             clean = True
         if not os.path.exists(os.path.join(self.calc_dir, self.fvaspout)):
@@ -365,7 +366,7 @@ class VASPSetUp(object):
         with open(os.path.join(self.calc_dir, self.fvasperrors), 'w') as f:
             for e in errors:
                 f.write(e+'\n')
-        return False
+        return clean
     
     @property
     def incar_changes_from_errors(self):

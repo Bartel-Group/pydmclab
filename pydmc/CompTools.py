@@ -24,10 +24,12 @@ class CompTools(object):
         formula = Composition(formula).alphabetical_formula
         if '.' in formula:
             formula = Composition(formula).get_integer_formula_and_factor()[0]
-        clean = Composition(formula).to_pretty_string()
-        if (len(clean) <= 3) and (clean[-1] == '2'):
-            clean = clean.replace('2', '1')
-        return clean
+        formula = Composition(formula).alphabetical_formula
+        formula = Composition(formula).to_pretty_string()
+
+        if (len(formula) <= 3) and (formula[-1] == '2'):
+            formula = formula.replace('2', '1')
+        return formula
     
     @property
     def pretty(self):
@@ -45,6 +47,7 @@ class CompTools(object):
             dictionary of elements (str) and their amounts (float)
                 - note: starts with "clean" formula
         """
+        
         return Composition(self.clean).get_el_amt_dict()
     
     def mol_frac(self, el):
