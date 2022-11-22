@@ -294,7 +294,7 @@ class SubmitTools(object):
                     f.write('\necho working on %s >> %s\n' % (tag, fstatus))
                     
                     if xcs.index(xc) != 0:
-                        if calcs.index(calcs) == 0:
+                        if calcs.index(calc) == 0:
                             xc_prev = xcs[xcs.index(xc)-1]
                             calc_prev = calcs[-1]
                             pass_info = True
