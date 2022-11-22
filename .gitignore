@@ -129,3 +129,10 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# VASP calcs
+pydmc/examples/calcs/*/WAVECAR
+pydmc/examples/calcs/*/CHG*
+
+# bash-run stuff
+pydmc/*.py~

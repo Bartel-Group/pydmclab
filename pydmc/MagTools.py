@@ -195,6 +195,8 @@ class MagTools(object):
             s = g[0]
             s.remove_oxidation_states()
             unique_strucs.append(s)
+
+#        print('%i unique afm structures' % len(unique_strucs))
             
         if self.randomize_afm:
             random.Random(1).shuffle(unique_strucs)
