@@ -1,12 +1,12 @@
 from pydmc.handy import read_json, write_json
 from pydmc.MagTools import MagTools
-from pydmc.StrucTools import StrucTools
+from pydmc.StrucTools import StrucTools, SiteTools
 
 import os
 import warnings
 
 from pymatgen.io.vasp.sets import MPRelaxSet, MPScanRelaxSet
-from pymatgen.io.vasp.outputs import Vasprun
+from pymatgen.io.vasp.outputs import Vasprun, Outcar
 from pymatgen.core.structure import Structure
 from pymatgen.io.vasp.inputs import Kpoints
 
@@ -468,7 +468,23 @@ class VASPAnalysis(object):
             vr = Vasprun(os.path.join(self.calc_dir, 'vasprun.xml'))
             return vr
         except:
-            return False        
+            return False      
+ 
+    @property
+    def outcar(self):
+        """
+        Returns Outcar object from OUTCAR in calc_dir
+        """
+        foutcar = os.path.join(self.calc_dir, 'OUTCAR')
+        if not os.path.exists(foutcar):
+            return False
+        
+        try:
+            oc = Outcar(os.path.join(self.calc_dir, 'OUTCAR'))
+            return oc
+        except:
+            return False           
+      
     
     @property
     def is_converged(self):
@@ -517,11 +533,35 @@ class VASPAnalysis(object):
         """
         return self.vasprun.parameters
     
+    @property
+    def sites_to_els(self):
+        """
+        Returns {site index (int) : element (str) for every site in structure}
+        """
+        contcar = self.contcar
+        return {idx : SiteTools(contcar[idx]).el for idx in range(len(contcar))}
+
+            
+    @property
+    def magnetization(self):
+        """
+        Returns {element (str) : 
+                    {site index (int) : 
+                        {'mag' : total magnetization on site}}}
+        """
+        oc = self.outcar
+        mag = list(oc.magnetization)
+        sites_to_els = self.sites_to_els
+        els = sorted(list(set(sites_to_els.values())))
+        return {el : 
+                {idx : 
+                    {'mag' : mag[idx]['tot']} 
+                        for idx in sorted([i for i in sites_to_els if sites_to_els[i] == el])} 
+                            for el in els}
+        
         
 def main():
-    from pydmc.MPQuery import MPQuery
-
-    
+    from pydmc.MPQuery import MPQuery    
     remake = False
     mpid = 'mp-770495'
     calc_dir = os.path.join(os.getcwd(), '..', 'dev', mpid)
