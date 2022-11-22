@@ -804,3 +804,36 @@
    </energy>
   </scstep>
   <scstep>
+   <time name="diag">    4.56    4.99</time>
+   <time name="diis">   10.88   14.36</time>
+   <time name="orth">    0.72    0.80</time>
+   <time name="total">   17.38   21.64</time>
+   <energy>
+    <i name="e_fr_energy">    -93.22874123 </i>
+    <i name="e_wo_entrp">    -93.22874123 </i>
+    <i name="e_0_energy">    -93.22874123 </i>
+   </energy>
+  </scstep>
+  <scstep>
+   <time name="diag">    4.19    4.93</time>
+   <time name="diis">   13.56   24.33</time>
+   <time name="orth">    0.45    0.90</time>
+   <time name="total">   19.20   32.01</time>
+   <energy>
+    <i name="e_fr_energy">    -93.21770203 </i>
+    <i name="e_wo_entrp">    -93.21770203 </i>
+    <i name="e_0_energy">    -93.21770203 </i>
+   </energy>
+  </scstep>
+  <scstep>
+   <time name="diag">    2.96    5.43</time>
+   <time name="diis">   13.06   20.21</time>
+   <time name="orth">    0.66    0.81</time>
+   <time name="total">   17.76   28.53</time>
+   <energy>
+    <i name="e_fr_energy">    -93.21777096 </i>
+    <i name="e_wo_entrp">    -93.21777096 </i>
+    <i name="e_0_energy">    -93.21777096 </i>
+   </energy>
+  </scstep>
+  <scstep>
