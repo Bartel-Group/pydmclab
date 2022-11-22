@@ -131,8 +131,8 @@ dmypy.json
 .pyre/
 
 # VASP calcs
-pydmc/examples/calcs/*/WAVECAR
-pydmc/examples/calcs/*/CHG*
+pydmc/examples/calcs/*/*/*/*/WAVECAR
+pydmc/examples/calcs/*/*/*/*/CHG*
 
 # bash-run stuff
 pydmc/*.py~

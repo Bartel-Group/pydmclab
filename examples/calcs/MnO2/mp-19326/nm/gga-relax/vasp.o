@@ -1,0 +1,30 @@
+ running on   16 total cores
+ distrk:  each k-point on   16 cores,    1 groups
+ distr:  one band on    4 cores,    4 groups
+ using from now: INCAR     
+ vasp.5.4.4.18Apr17-6-g9f103f2a35 (build Nov 08 2022 17:27:33) complex          
+  
+ POSCAR found type information on POSCAR  Mn O 
+ POSCAR found :  2 types and      12 ions
+ scaLAPACK will be used
+ LDA part: xc-table for Pade appr. of Perdew
+ POSCAR found type information on POSCAR  Mn O 
+ POSCAR found :  2 types and      12 ions
+ generate k-points for:   10    7    4
+ found WAVECAR, reading the header
+  number of k-points has changed, file:     1 present:   142
+  trying to continue reading WAVECAR, but it might fail
+ WAVECAR: different cutoff or change in lattice found
+ POSCAR, INCAR and KPOINTS ok, starting setup
+ FFT: planning ...
+ reading WAVECAR
+ the WAVECAR file was read successfully
+ initial charge from wavefunction
+ entering main loop
+       N       E                     dE             d eps       ncg     rms          rms(c)
+DAV:   1    -0.621952548768E+02   -0.62195E+02   -0.15090E+03 22548   0.389E+02    0.304E+01
+RMM:   2    -0.998624549275E+02   -0.37667E+02   -0.39067E+02 18807   0.943E+01    0.221E+01
+RMM:   3    -0.955799020854E+02    0.42826E+01   -0.33756E+01 20577   0.288E+01    0.354E+01
+RMM:   4    -0.908221972687E+02    0.47577E+01   -0.75176E+00 19564   0.126E+01    0.187E+01
+RMM:   5    -0.951597303321E+02   -0.43375E+01   -0.73542E+00 19368   0.108E+01    0.329E+01
+RMM:   6    -0.906795205133E+02    0.44802E+01   -0.45015E+00 19612   0.910E+00    0.109E+01
