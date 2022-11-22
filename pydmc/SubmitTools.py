@@ -301,10 +301,10 @@ class SubmitTools(object):
                     else:
                         calc_prev = calcs[calcs.index(calc) - 1]
                     if calc_prev:
-                        if xc_prev:
-                            src_dir = os.path.join(self.launch_dir, '-'.join([xc_prev, calc_prev]))
-                        else:
+                        if calc == 'static':
                             src_dir = os.path.join(self.launch_dir, '-'.join([xc, calc_prev]))
+                        elif xc_prev:
+                            src_dir = os.path.join(self.launch_dir, '-'.join([xc_prev, calc_prev]))
                         f.write('isInFile=$(cat %s | grep -c %s)\n' % (os.path.join(src_dir, 'OUTCAR'), 'Elaps'))
                         f.write('if [ $isInFile -eq 0 ]; then\n')
                         f.write('   echo "%s is not done yet so this job is being killed" >> %s\n' % (calc_prev, fstatus))

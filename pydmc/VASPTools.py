@@ -516,6 +516,7 @@ class VASPAnalysis(object):
         Returns dict of VASP input settings from vasprun.xml
         """
         return self.vasprun.parameters
+    
         
 def main():
     from pydmc.MPQuery import MPQuery
