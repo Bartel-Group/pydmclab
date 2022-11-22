@@ -298,14 +298,14 @@ class SubmitTools(object):
                             xc_prev = xcs[xcs.index(xc)-1]
                             calc_prev = calcs[-1]
                             pass_info = True
-                        elif calcs.index(calcs) != 0:
+                        elif calcs.index(calc) != 0:
                             xc_prev = xc
                             calc_prev = calcs[calcs.index(calc)-1]
                             pass_info = True
                     elif xcs.index(xc) == 0:
-                        if calcs.index(calcs) == 0:
+                        if calcs.index(calc) == 0:
                             pass_info = False
-                        elif calcs.index(calcs) != 0:
+                        elif calcs.index(calc) != 0:
                             xc_prev = xc
                             calc_prev = calcs[calcs.index(calc)-1]
                             pass_info = True
