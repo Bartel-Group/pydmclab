@@ -301,7 +301,7 @@ class SubmitTools(object):
                     else:
                         calc_prev = calcs[calcs.index(calc) - 1]
                     if calc_prev:
-                        if calc == 'static':
+                        if (calc == 'static') or not xc_prev:
                             src_dir = os.path.join(self.launch_dir, '-'.join([xc, calc_prev]))
                         elif xc_prev:
                             src_dir = os.path.join(self.launch_dir, '-'.join([xc_prev, calc_prev]))
