@@ -293,22 +293,37 @@ class SubmitTools(object):
                 elif status == 'NEWRUN':
                     f.write('\necho working on %s >> %s\n' % (tag, fstatus))
                     
-                    if xcs.index(xc) != 0:
-                        if calcs.index(calc) == 0:
-                            xc_prev = xcs[xcs.index(xc)-1]
-                            calc_prev = calcs[-1]
-                            pass_info = True
-                        elif calcs.index(calc) != 0:
-                            xc_prev = xc
-                            calc_prev = calcs[calcs.index(calc)-1]
-                            pass_info = True
-                    elif xcs.index(xc) == 0:
-                        if calcs.index(calc) == 0:
+                    if xc in ['gga', 'ggau']:
+                        if calc == 'loose':
                             pass_info = False
-                        elif calcs.index(calc) != 0:
-                            xc_prev = xc
-                            calc_prev = calcs[calcs.index(calc)-1]
-                            pass_info = True
+                        elif calc == 'relax':
+                            if 'loose' in calcs:
+                                pass_info = True
+                                calc_prev = 'loose'
+                            else:
+                                pass_info = False
+                        elif calc == 'static':
+                            if 'relax' in calcs:
+                                pass_info = True
+                                calc_prev = 'relax'
+                            else:
+                                pass_info = False
+                        xc_prev = xc
+                    elif xc in ['metagga']:
+                        if calc == 'relax':
+                            if 'gga' in xcs:
+                                xc_prev = 'gga'
+                                calc_prev = 'static'
+                                pass_info = True
+                            else:
+                                pass_info = False
+                        elif calc == 'static':
+                            if 'relax' in calcs:
+                                pass_info = True
+                                calc_prev = 'relax'
+                                xc_prev = xc
+                            else:
+                                pass_info = False
                     
                     if pass_info:
                         src_dir = os.path.join(self.launch_dir, '-'.join([xc_prev, calc_prev]))
