@@ -292,34 +292,38 @@ class SubmitTools(object):
                     f.write('cp %s %s\n' % (os.path.join(calc_dir, 'CONTCAR'), os.path.join(calc_dir, 'POSCAR')))
                 elif status == 'NEWRUN':
                     f.write('\necho working on %s >> %s\n' % (tag, fstatus))
-                    if xcs.index(xc) == 0:
-                        xc_prev = None
-                    else:
-                        xc_prev = xcs[xcs.index(xc) - 1]
-                    if calcs.index(calc) == 0:
-                        calc_prev = None if not xc_prev else calcs[-1]
-                    else:
-                        calc_prev = calcs[calcs.index(calc) - 1]
-                    if calc_prev:
-                        if (calc == 'static') or not xc_prev:
-                            src_dir = os.path.join(self.launch_dir, '-'.join([xc, calc_prev]))
-                        elif xc_prev:
-                            src_dir = os.path.join(self.launch_dir, '-'.join([xc_prev, calc_prev]))
+                    
+                    if xcs.index(xc) != 0:
+                        if calcs.index(calcs) == 0:
+                            xc_prev = xcs[xcs.index(xc)-1]
+                            calc_prev = calcs[-1]
+                            pass_info = True
+                        elif calcs.index(calcs) != 0:
+                            xc_prev = xc
+                            calc_prev = calcs[calcs.index(calc)-1]
+                            pass_info = True
+                    elif xcs.index(xc) == 0:
+                        if calcs.index(calcs) == 0:
+                            pass_info = False
+                        elif calcs.index(calcs) != 0:
+                            xc_prev = xc
+                            calc_prev = calcs[calcs.index(calc)-1]
+                            pass_info = True
+                    
+                    if pass_info:
+                        src_dir = os.path.join(self.launch_dir, '-'.join([xc_prev, calc_prev]))
                         f.write('isInFile=$(cat %s | grep -c %s)\n' % (os.path.join(src_dir, 'OUTCAR'), 'Elaps'))
                         f.write('if [ $isInFile -eq 0 ]; then\n')
                         f.write('   echo "%s is not done yet so this job is being killed" >> %s\n' % (calc_prev, fstatus))
                         f.write('   scancel $SLURM_JOB_ID\n')
                         f.write('fi\n')
-                    else:
-                        src_dir = None
-                    if src_dir:
+
                         for file_to_inherit in files_to_inherit:
                             fsrc = os.path.join(src_dir, file_to_inherit)
                             if file_to_inherit == 'CONTCAR':
                                 fdst = os.path.join(calc_dir, 'POSCAR')
                             else:
                                 fdst = os.path.join(calc_dir, file_to_inherit)
-                            
                             f.write('cp %s %s\n' % (fsrc, fdst))
                     
                     f.write('cd %s\n' % calc_dir)
