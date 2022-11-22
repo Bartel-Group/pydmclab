@@ -152,15 +152,15 @@ class VASPSetUp(object):
             # tell user what they are modifying in case they are trying to match MP or other people's calculations
             if standard and modify_incar:
                 warnings.warn('you are attempting to generate consistent data, but modifying things in the INCAR\n')
-                print('e.g., %s' % str(modify_incar))
+                #print('e.g., %s' % str(modify_incar))
                 
             if standard and modify_kpoints:
                 warnings.warn('you are attempting to generate consistent data, but modifying things in the KPOINTS\n')
-                print('e.g., %s' % str(modify_kpoints))
+                #print('e.g., %s' % str(modify_kpoints))
 
             if standard and modify_potcar:
                 warnings.warn('you are attempting to generate consistent data, but modifying things in the POTCAR\n')
-                print('e.g., %s' % str(modify_potcar))
+                #print('e.g., %s' % str(modify_potcar))
             
             # tell user they are doing a nonmagnetic calculation for a compound w/ magnetic elements
             if MagTools(self.structure).could_be_magnetic and (mag == 'nm'):

@@ -198,6 +198,8 @@ class MagTools(object):
             
         if self.randomize_afm:
             random.Random(1).shuffle(unique_strucs)
+            
+        print('%i unique afm structures' % len(unique_strucs))
         return unique_strucs
         
         """
