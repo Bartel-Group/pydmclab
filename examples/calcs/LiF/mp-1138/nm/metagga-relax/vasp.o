@@ -1,0 +1,156 @@
+ running on   16 total cores
+ distrk:  each k-point on   16 cores,    1 groups
+ distr:  one band on    4 cores,    4 groups
+ using from now: INCAR     
+ vasp.5.4.4.18Apr17-6-g9f103f2a35 (build Nov 08 2022 17:27:33) complex          
+  
+ POSCAR found type information on POSCAR  Li F 
+ POSCAR found :  2 types and       2 ions
+ scaLAPACK will be used
+
+ ----------------------------------------------------------------------------- 
+|                                                                             |
+|           W    W    AA    RRRRR   N    N  II  N    N   GGGG   !!!           |
+|           W    W   A  A   R    R  NN   N  II  NN   N  G    G  !!!           |
+|           W    W  A    A  R    R  N N  N  II  N N  N  G       !!!           |
+|           W WW W  AAAAAA  RRRRR   N  N N  II  N  N N  G  GGG   !            |
+|           WW  WW  A    A  R   R   N   NN  II  N   NN  G    G                |
+|           W    W  A    A  R    R  N    N  II  N    N   GGGG   !!!           |
+|                                                                             |
+|      For LVTOT=.TRUE. VASP.5.x writes the TOTAL local potential to          |
+|      the file LOCPOT. If you want the Hartree contributions only, use       |
+|      LVHAR=.TRUE. instead.                                                  |
+|                                                                             |
+ ----------------------------------------------------------------------------- 
+
+
+ ----------------------------------------------------------------------------- 
+|                                                                             |
+|  ADVICE TO THIS USER RUNNING 'VASP/VAMP'   (HEAR YOUR MASTER'S VOICE ...):  |
+|                                                                             |
+|      You have a (more or less) 'small supercell' and for smaller cells      |
+|      it is recommended  to use the reciprocal-space projection scheme!      |
+|      The real space optimization is not  efficient for small cells and it   |
+|      is also less accurate ...                                              |
+|      Therefore set LREAL=.FALSE. in the  INCAR file                         |
+|                                                                             |
+ ----------------------------------------------------------------------------- 
+
+ LDA part: xc-table for Pade appr. of Perdew
+ POSCAR found type information on POSCAR  Li F 
+ POSCAR found :  2 types and       2 ions
+ generate k-points for:   13   13   13
+ found WAVECAR, reading the header
+ POSCAR, INCAR and KPOINTS ok, starting setup
+ FFT: planning ...
+ reading WAVECAR
+ the WAVECAR file was read successfully
+ augmentation electrons   10.0130197937186     
+ soft         electrons  0.000000000000000E+000
+ augmentation electrons   10.0130197937186     
+ soft         electrons  0.000000000000000E+000
+ augmentation electrons   10.0130197937186     
+ soft         electrons  0.000000000000000E+000
+ augmentation electrons   10.0130197937186     
+ soft         electrons  0.000000000000000E+000
+ augmentation electrons   10.0130197937186     
+ soft         electrons  0.000000000000000E+000
+ augmentation electrons   10.0130197937186     
+ soft         electrons  0.000000000000000E+000
+ augmentation electrons   10.0130197937186     
+ soft         electrons  0.000000000000000E+000
+ augmentation electrons   10.0130197937186     
+ soft         electrons  0.000000000000000E+000
+ augmentation electrons   10.0130197937186     
+ soft         electrons  0.000000000000000E+000
+ augmentation electrons   10.0130197937186     
+ soft         electrons  0.000000000000000E+000
+ augmentation electrons   10.0130197937186     
+ soft         electrons  0.000000000000000E+000
+ augmentation electrons   10.0130197937186     
+ soft         electrons  0.000000000000000E+000
+ augmentation electrons   10.0130197937186     
+ soft         electrons  0.000000000000000E+000
+ augmentation electrons   10.0130197937186     
+ soft         electrons  0.000000000000000E+000
+ augmentation electrons   10.0130197937186     
+ soft         electrons  0.000000000000000E+000
+ augmentation electrons   10.0130197937186     
+ soft         electrons  0.000000000000000E+000
+ total        electrons   10.0130197937186     
+ total        electrons   10.0130197937186     
+ total        electrons   10.0130197937186     
+ total        electrons   10.0130197937186     
+ total        electrons   10.0130197937186     
+ total        electrons   10.0130197937186     
+ total        electrons   10.0130197937186     
+ total        electrons   10.0130197937186     
+ total        electrons   10.0130197937186     
+ total        electrons   10.0130197937186     
+ total        electrons   10.0130197937186     
+ total        electrons   10.0130197937186     
+ total        electrons   10.0130197937186     
+ total        electrons   10.0130197937186     
+ total        electrons   10.0130197937186     
+ total        electrons   10.0130197937186     
+ augmentation electrons   2.20198382535121     
+ soft         electrons  0.000000000000000E+000
+ augmentation electrons   2.20198382535121     
+ augmentation electrons   2.20198382535121     
+ soft         electrons  0.000000000000000E+000
+ augmentation electrons   2.20198382535121     
+ soft         electrons  0.000000000000000E+000
+ augmentation electrons   2.20198382535121     
+ soft         electrons  0.000000000000000E+000
+ augmentation electrons   2.20198382535121     
+ soft         electrons  0.000000000000000E+000
+ augmentation electrons   2.20198382535121     
+ soft         electrons  0.000000000000000E+000
+ augmentation electrons   2.20198382535121     
+ soft         electrons  0.000000000000000E+000
+ augmentation electrons   2.20198382535121     
+ soft         electrons  0.000000000000000E+000
+ augmentation electrons   2.20198382535121     
+ soft         electrons  0.000000000000000E+000
+ augmentation electrons   2.20198382535121     
+ soft         electrons  0.000000000000000E+000
+ augmentation electrons   2.20198382535121     
+ soft         electrons  0.000000000000000E+000
+ augmentation electrons   2.20198382535121     
+ soft         electrons  0.000000000000000E+000
+ augmentation electrons   2.20198382535121     
+ soft         electrons  0.000000000000000E+000
+ augmentation electrons   2.20198382535121     
+ soft         electrons  0.000000000000000E+000
+ augmentation electrons   2.20198382535121     
+ soft         electrons  0.000000000000000E+000
+ soft         electrons  0.000000000000000E+000
+ total        electrons   2.20198382535121     
+ total        electrons   2.20198382535121     
+ total        electrons   2.20198382535121     
+ total        electrons   2.20198382535121     
+ total        electrons   2.20198382535121     
+ total        electrons   2.20198382535121     
+ total        electrons   2.20198382535121     
+ total        electrons   2.20198382535121     
+ total        electrons   2.20198382535121     
+ total        electrons   2.20198382535121     
+ total        electrons   2.20198382535121     
+ total        electrons   2.20198382535121     
+ total        electrons   2.20198382535121     
+ total        electrons   2.20198382535121     
+ total        electrons   2.20198382535121     
+ total        electrons   2.20198382535121     
+ initial charge from wavefunction
+ entering main loop
+       N       E                     dE             d eps       ncg     rms          ort
+ gam= 0.000 g(H,U,f)=  0.732E-01 0.172E-01 0.226-249 ort(H,U,f) = 0.000E+00 0.000E+00 0.000E+00
+SDA:   1    -0.118389341189E+02   -0.11839E+02    0.00000E+00 13188   0.904E-01 0.000E+00
+ gam= 0.000 trial= 0.400  step= 1.233 mean= 0.400
+ gam= 0.223 g(H,U,f)=  0.175E-01 0.273E-02 0.571-109 ort(H,U,f) =-0.284E-01 0.592E-02 0.158-108
+CGA:   2    -0.118833275978E+02   -0.44393E-01   -0.55757E-01 13188   0.202E-01-0.225E-01
+ gam= 0.223 trial= 0.442  step= 0.943 mean= 0.442
+ gam= 0.195 g(H,U,f)=  0.354E-02 0.388E-03 0.543E-14 ort(H,U,f) = 0.702E-04 0.692E-03 0.142E-13
+CGA:   3    -0.118906902456E+02   -0.73626E-02   -0.71505E-02 13188   0.393E-02 0.762E-03
+ gam= 0.195 trial= 0.467  step= 0.707 mean= 0.467
+ gam= 0.088 g(H,U,f)=  0.203E-03 0.143E-03 0.304E-25 ort(H,U,f) =-0.419E-03 0.245E-03 0.427E-25
