@@ -8,8 +8,6 @@ from shutil import copyfile, rmtree
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
-print(HERE)
-
 class SubmitTools(object):
     
     def __init__(self,

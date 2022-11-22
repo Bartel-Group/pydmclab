@@ -3,7 +3,8 @@ from pydmc.CompTools import CompTools
 from pymatgen.core.structure import Structure
 from pymatgen.transformations.standard_transformations import OrderDisorderedStructureTransformation, AutoOxiStateDecorationTransformation, OxidationStateDecorationTransformation
 from pymatgen.analysis.structure_matcher import StructureMatcher
-from pymatgen.core.composition import Element
+from pymatgen.core.composition import Element, Composition
+from pymatgen.core.ion import Ion
 
 
 class StrucTools(object):
@@ -105,7 +106,7 @@ class StrucTools(object):
         out = transformer.apply_transformation(s,
                                                 return_ranked_list=return_ranked_list)
         out = [i['structure'] for i in out]
-        print(out[0])
+        #print(out[0])
         if isinstance(out, list):
             print('getting unique structures\n')
             matcher = StructureMatcher()
@@ -164,8 +165,80 @@ class StrucTools(object):
         else:
             return StrucTools(structure).replace_species(species_mapping, n_strucs=n_strucs)
         
-        
-        
+class SiteTools(object):
+    """
+    make it a little easier to get site info
+    
+    @Chris - TO DO
+    """
+    def __init__(self, structure, index):
+        self.site = structure[index]
+    
+    @property
+    def site_dict(self):
+        """
+        Returns:
+            dict of site info (from Pymatgen)
+        """
+        return self.site.as_dict()
+    
+    @property
+    def coords(self):
+        """
+        Returns:
+            array of fractional coordinates for site ([x, y, z])
+        """
+        return self.site.frac_coords
+    
+    @property
+    def magmom(self):
+        """
+        Returns:
+            magnetic moment for site (float) or None
+        """
+        props = self.site.properties
+        if props:
+            if 'magmom' in props:
+                return props['magmom']
+        return None
+    
+    @property
+    def is_fully_occ(self):
+        """
+        Returns:
+            True if site is fully occupied else False
+        """
+        return self.site.is_ordered
+    
+    @property
+    def ion(self):
+        """
+        Returns:
+            whatever is occupying site (str)
+                - could be multiple ions, multiple elements, one element, one ion, etc
+        """
+        return self.site.species_string
+    
+    @property
+    def el(self):
+        """
+        Returns:
+            just the element occupying the site (even if it has an oxidation state)
+        """
+        return Composition(self.ion).element_composition
+    
+    @property
+    def ox_state(self):
+        """
+        Returns:
+            oxidation state (float) of site
+        """
+        if self.is_fully_occ:
+            return self.site_dict['species'][0]['oxidation_state']
+        else:
+            print('cant determine ox state for partially occ site')
+            return None
+    
 def main():
     from pydmc.MPQuery import MPQuery
 

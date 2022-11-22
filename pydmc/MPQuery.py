@@ -5,8 +5,20 @@ from pymatgen.ext.matproj import MPRester
 import itertools
 
 class MPQuery(object):
+    """
+    class to assist with downloading data from Materials Project
+    
+    """
+    
     
     def __init__(self, api_key=None):
+        """
+        Args:
+            api_key (str) - Materials Project API key
+            
+        Returns:
+            self.mpr (MPRester) - Materials Project REST interface
+        """
         
         api_key = api_key if api_key else 'YOUR_API_KEY'
         
@@ -15,6 +27,9 @@ class MPQuery(object):
           
     @property
     def supported_properties(self):
+        """
+        Returns list of supported properties to query for MP entries in Materials Project
+        """
         supported_properties = (
             "energy",
             "energy_per_atom",
@@ -44,8 +59,12 @@ class MPQuery(object):
         )
         
         return supported_properties
+    
     @property
     def supported_task_properties(self):
+        """
+        returns list of supported properties that can be queried for any MP task
+        """
         
         supported_task_properties = (
             "energy",
@@ -72,6 +91,10 @@ class MPQuery(object):
     
     @property
     def typical_properties(self):
+        """
+        A list of propreties that we often query for
+        
+        """
         typical_properties = ('energy_per_atom', 
                                 'pretty_formula',
                                 'material_id',
@@ -84,13 +107,22 @@ class MPQuery(object):
     
     @property
     def long_to_short_keys(self):
+        """
+        A map to nickname query properties with shorter handles
+            (dict)
+        """
         return {'energy_per_atom' : 'E_mp',
                 'formation_energy_per_atom' : 'Ef_mp',
                 'e_above_hull' : 'Ehull_mp',
                 'spacegroup.number' : 'sg',
                 'material_id' : 'mpid'}
          
-    def get_data_for_comp(self, comp, properties=None, criteria=None, only_gs=False, dict_key=False):
+    def get_data_for_comp(self, 
+                          comp, 
+                          properties=None, 
+                          criteria=None, 
+                          only_gs=False, 
+                          dict_key=False):
         """
         Args:
             comp (list or str)
@@ -183,7 +215,7 @@ class MPQuery(object):
                     Ef_check = entry['Ef_mp']
                     if Ef_check < Ef_stored:
                         gs[cmpd] = entry
-        query = [gs[k] for k in gs]
+            query = [gs[k] for k in gs]
         if dict_key:
             if dict_key not in query[0]:
                 raise ValueError('%s not in query' % dict_key)
@@ -213,6 +245,7 @@ class MPQuery(object):
                                                  incl_structure,
                                                  properties,
                                                  conventional)
+        
     def get_structure_by_material_id(self, material_id):
         """
         Args:
