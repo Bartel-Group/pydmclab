@@ -11,6 +11,17 @@ from pymatgen.core.structure import Structure
 import os
 import subprocess
 
+"""
+This demo tests the following pydmc modules:
+    1) MPQuery to get structures from Materials Project
+    2) MagTools to get magnetic configurations for those structures
+    3) VASPSetUp to prepare VASP input files
+    4) SubmitTools to submit jobs to the queue
+    5) VASPAnalysis to analyze VASP output files
+        - also tests SiteTools to get magnetic info during analysis
+
+"""
+
 # where is demo_VASPTools.py
 SCRIPTS_DIR = os.getcwd()
 
@@ -40,7 +51,7 @@ XC = 'metagga'
 # what "standard" settings I want to use
 STANDARD = 'dmc'
 
-# which MP IDs I want to calculate
+# which MP IDs I want to calculate and what are their chemical formulas
 MPIDS = {'mp-19326' : 'MnO2',
          'mp-1138' : 'LiF'}
 
@@ -203,7 +214,15 @@ def launch_calcs(
                  ready_to_launch=False,
                  fresh_restart=False,
                  refresh_configs_yaml=False):
-
+    """
+    loop through calculation directories, prepare them, and launch them
+    
+    Args:
+        ready_to_launch (bool) - True if submit jobs now; False if you want to check directories first
+        fresh_restart (bool) - if True, delete progress and start over; if False, pick up where you left off
+        refresh_configs_yaml (bool) - if True, grab the base_configs.yaml from pydmc; if False, keep the one you've been editing in SCRIPTS_DIR   
+    
+    """
     for MPID in MPIDS:
         print('\nworking on %s (%s)' % (MPID, MPIDS[MPID]))
         for MAG in MAGS:
@@ -215,6 +234,13 @@ def launch_calcs(
                                     refresh_configs_yaml=refresh_configs_yaml)
 
 def get_calc_dirs_for_launch_dir(mpid, mag):
+    """
+    Args:
+        mpid (str) - Materials Project ID
+        mag (str) - 'nm' = nonmagnetic, 'fm' = ferromagnetic, 'afm_#' = antiferromagnetic with # idx ordering
+        
+    finds all the calculation directories for a given structure/magnetic configuration pair (e.g., LAUNCH_DIR/gga-loose might be one of them)
+    """
     formula = MPIDS[mpid]
     launch_dir = get_launch_dir(formula, mpid, mag)
     calcs = [c for c in os.listdir(launch_dir) if 'gga' in c]
@@ -251,6 +277,18 @@ def purge_large_files_for_completed_calcs(mpid, mag):
                     os.remove(file_to_purge)
 
 def analyze_calc(mpid, mag):
+    """
+    Args:
+        mpid (str) - Materials Project ID
+        mag (str) - 'nm' = nonmagnetic, 'fm' = ferromagnetic, 'afm_#' = antiferromagnetic with # idx ordering
+        
+    Returns:
+        dictionary for results of each calculation
+            {'convergence' : True if calculation is converged, otherwise False,
+            'E' : total energy (eV/at)
+            'mag' : {el : {site index : {'mag' : magnetization of that site}}}}
+    
+    """
     d = {}
     calc_dirs = get_calc_dirs_for_launch_dir(mpid, mag)
     for calc_dir in calc_dirs:
@@ -266,6 +304,13 @@ def analyze_calc(mpid, mag):
     return d
 
 def analyze_calcs(remake=False):
+    """
+    Loops through all structure/magnetic configuration pairs and analyzes calculation results
+    
+    Returns:
+        {formula : {ID : {CALCULATION RESULTS}}}
+    
+    """
     fjson = os.path.join(DATA_DIR, 'demo_VASPTools_results.json')
     if not remake and os.path.exists(fjson):
         return read_json
@@ -283,15 +328,18 @@ def analyze_calcs(remake=False):
     return write_json(d, fjson)
 
 def main():
+    running_on_msi = False # only launch calcs if you're on MSI
+    
     print('\n Querying MP (or reading existing json)')
     query = query_mp(remake=False)
     print('\n Making magmoms (or reading existing json)')
     magmoms = get_afm_magmoms(query, remake=False)
 
     print('\n Launching calcs (or not if they are finished)')
-#    launch_calcs(ready_to_launch=True, 
-#                 fresh_restart=False,
-#                 refresh_configs_yaml=False)
+    if running_on_msi:
+        launch_calcs(ready_to_launch=True, 
+                    fresh_restart=False,
+                    refresh_configs_yaml=False)
 
     print('\n Analyzing calcs (or reading from existing json)')
     results = analyze_calcs(remake=True)
