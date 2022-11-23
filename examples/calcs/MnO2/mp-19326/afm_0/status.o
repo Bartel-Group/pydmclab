@@ -1,3 +1,20 @@
 working on NEWRUN_gga-loose
 launched gga-loose
 working on NEWRUN_gga-relax
+launched gga-relax
+working on NEWRUN_gga-static
+launched gga-static
+working on NEWRUN_metagga-relax
+launched metagga-relax
+working on NEWRUN_metagga-static
+launched metagga-static
+working on DONE_gga-loose
+gga-loose is done
+working on DONE_gga-relax
+gga-relax is done
+working on DONE_gga-static
+gga-static is done
+working on DONE_metagga-relax
+metagga-relax is done
+working on DONE_metagga-static
+metagga-static is done

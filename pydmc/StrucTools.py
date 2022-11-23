@@ -225,7 +225,7 @@ class SiteTools(object):
         Returns:
             just the element occupying the site (even if it has an oxidation state)
         """
-        return Composition(self.ion).element_composition
+        return CompTools(Composition(self.ion).formula).els[0]
     
     @property
     def ox_state(self):

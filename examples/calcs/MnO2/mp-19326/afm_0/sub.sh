@@ -11,65 +11,17 @@
 
 ulimit -s unlimited
 
-echo working on NEWRUN_gga-loose >> /panfs/jay/groups/26/cbartel/cbartel/bin/pydmc/examples/calcs/MnO2/mp-19326/afm_0/status.o
-cd /panfs/jay/groups/26/cbartel/cbartel/bin/pydmc/examples/calcs/MnO2/mp-19326/afm_0/gga-loose
+echo working on DONE_gga-loose >> /panfs/jay/groups/26/cbartel/cbartel/bin/pydmc/examples/calcs/MnO2/mp-19326/afm_0/status.o
+echo gga-loose is done >> /panfs/jay/groups/26/cbartel/cbartel/bin/pydmc/examples/calcs/MnO2/mp-19326/afm_0/status.o
 
-srun --ntasks=16 --mpi=pmi2 /home/cbartel/shared/bin/vasp/vasp_std > vasp.o
+echo working on DONE_gga-relax >> /panfs/jay/groups/26/cbartel/cbartel/bin/pydmc/examples/calcs/MnO2/mp-19326/afm_0/status.o
+echo gga-relax is done >> /panfs/jay/groups/26/cbartel/cbartel/bin/pydmc/examples/calcs/MnO2/mp-19326/afm_0/status.o
 
-echo launched gga-loose >> /panfs/jay/groups/26/cbartel/cbartel/bin/pydmc/examples/calcs/MnO2/mp-19326/afm_0/status.o
+echo working on DONE_gga-static >> /panfs/jay/groups/26/cbartel/cbartel/bin/pydmc/examples/calcs/MnO2/mp-19326/afm_0/status.o
+echo gga-static is done >> /panfs/jay/groups/26/cbartel/cbartel/bin/pydmc/examples/calcs/MnO2/mp-19326/afm_0/status.o
 
-echo working on NEWRUN_gga-relax >> /panfs/jay/groups/26/cbartel/cbartel/bin/pydmc/examples/calcs/MnO2/mp-19326/afm_0/status.o
-isInFile=$(cat /panfs/jay/groups/26/cbartel/cbartel/bin/pydmc/examples/calcs/MnO2/mp-19326/afm_0/gga-loose/OUTCAR | grep -c Elaps)
-if [ $isInFile -eq 0 ]; then
-   echo "loose is not done yet so this job is being killed" >> /panfs/jay/groups/26/cbartel/cbartel/bin/pydmc/examples/calcs/MnO2/mp-19326/afm_0/status.o
-   scancel $SLURM_JOB_ID
-fi
-cp /panfs/jay/groups/26/cbartel/cbartel/bin/pydmc/examples/calcs/MnO2/mp-19326/afm_0/gga-loose/WAVECAR /panfs/jay/groups/26/cbartel/cbartel/bin/pydmc/examples/calcs/MnO2/mp-19326/afm_0/gga-relax/WAVECAR
-cp /panfs/jay/groups/26/cbartel/cbartel/bin/pydmc/examples/calcs/MnO2/mp-19326/afm_0/gga-loose/CONTCAR /panfs/jay/groups/26/cbartel/cbartel/bin/pydmc/examples/calcs/MnO2/mp-19326/afm_0/gga-relax/POSCAR
-cd /panfs/jay/groups/26/cbartel/cbartel/bin/pydmc/examples/calcs/MnO2/mp-19326/afm_0/gga-relax
+echo working on DONE_metagga-relax >> /panfs/jay/groups/26/cbartel/cbartel/bin/pydmc/examples/calcs/MnO2/mp-19326/afm_0/status.o
+echo metagga-relax is done >> /panfs/jay/groups/26/cbartel/cbartel/bin/pydmc/examples/calcs/MnO2/mp-19326/afm_0/status.o
 
-srun --ntasks=16 --mpi=pmi2 /home/cbartel/shared/bin/vasp/vasp_std > vasp.o
-
-echo launched gga-relax >> /panfs/jay/groups/26/cbartel/cbartel/bin/pydmc/examples/calcs/MnO2/mp-19326/afm_0/status.o
-
-echo working on NEWRUN_gga-static >> /panfs/jay/groups/26/cbartel/cbartel/bin/pydmc/examples/calcs/MnO2/mp-19326/afm_0/status.o
-isInFile=$(cat /panfs/jay/groups/26/cbartel/cbartel/bin/pydmc/examples/calcs/MnO2/mp-19326/afm_0/gga-relax/OUTCAR | grep -c Elaps)
-if [ $isInFile -eq 0 ]; then
-   echo "relax is not done yet so this job is being killed" >> /panfs/jay/groups/26/cbartel/cbartel/bin/pydmc/examples/calcs/MnO2/mp-19326/afm_0/status.o
-   scancel $SLURM_JOB_ID
-fi
-cp /panfs/jay/groups/26/cbartel/cbartel/bin/pydmc/examples/calcs/MnO2/mp-19326/afm_0/gga-relax/WAVECAR /panfs/jay/groups/26/cbartel/cbartel/bin/pydmc/examples/calcs/MnO2/mp-19326/afm_0/gga-static/WAVECAR
-cp /panfs/jay/groups/26/cbartel/cbartel/bin/pydmc/examples/calcs/MnO2/mp-19326/afm_0/gga-relax/CONTCAR /panfs/jay/groups/26/cbartel/cbartel/bin/pydmc/examples/calcs/MnO2/mp-19326/afm_0/gga-static/POSCAR
-cd /panfs/jay/groups/26/cbartel/cbartel/bin/pydmc/examples/calcs/MnO2/mp-19326/afm_0/gga-static
-
-srun --ntasks=16 --mpi=pmi2 /home/cbartel/shared/bin/vasp/vasp_std > vasp.o
-
-echo launched gga-static >> /panfs/jay/groups/26/cbartel/cbartel/bin/pydmc/examples/calcs/MnO2/mp-19326/afm_0/status.o
-
-echo working on NEWRUN_metagga-relax >> /panfs/jay/groups/26/cbartel/cbartel/bin/pydmc/examples/calcs/MnO2/mp-19326/afm_0/status.o
-isInFile=$(cat /panfs/jay/groups/26/cbartel/cbartel/bin/pydmc/examples/calcs/MnO2/mp-19326/afm_0/gga-static/OUTCAR | grep -c Elaps)
-if [ $isInFile -eq 0 ]; then
-   echo "static is not done yet so this job is being killed" >> /panfs/jay/groups/26/cbartel/cbartel/bin/pydmc/examples/calcs/MnO2/mp-19326/afm_0/status.o
-   scancel $SLURM_JOB_ID
-fi
-cp /panfs/jay/groups/26/cbartel/cbartel/bin/pydmc/examples/calcs/MnO2/mp-19326/afm_0/gga-static/WAVECAR /panfs/jay/groups/26/cbartel/cbartel/bin/pydmc/examples/calcs/MnO2/mp-19326/afm_0/metagga-relax/WAVECAR
-cp /panfs/jay/groups/26/cbartel/cbartel/bin/pydmc/examples/calcs/MnO2/mp-19326/afm_0/gga-static/CONTCAR /panfs/jay/groups/26/cbartel/cbartel/bin/pydmc/examples/calcs/MnO2/mp-19326/afm_0/metagga-relax/POSCAR
-cd /panfs/jay/groups/26/cbartel/cbartel/bin/pydmc/examples/calcs/MnO2/mp-19326/afm_0/metagga-relax
-
-srun --ntasks=16 --mpi=pmi2 /home/cbartel/shared/bin/vasp/vasp_std > vasp.o
-
-echo launched metagga-relax >> /panfs/jay/groups/26/cbartel/cbartel/bin/pydmc/examples/calcs/MnO2/mp-19326/afm_0/status.o
-
-echo working on NEWRUN_metagga-static >> /panfs/jay/groups/26/cbartel/cbartel/bin/pydmc/examples/calcs/MnO2/mp-19326/afm_0/status.o
-isInFile=$(cat /panfs/jay/groups/26/cbartel/cbartel/bin/pydmc/examples/calcs/MnO2/mp-19326/afm_0/metagga-relax/OUTCAR | grep -c Elaps)
-if [ $isInFile -eq 0 ]; then
-   echo "relax is not done yet so this job is being killed" >> /panfs/jay/groups/26/cbartel/cbartel/bin/pydmc/examples/calcs/MnO2/mp-19326/afm_0/status.o
-   scancel $SLURM_JOB_ID
-fi
-cp /panfs/jay/groups/26/cbartel/cbartel/bin/pydmc/examples/calcs/MnO2/mp-19326/afm_0/metagga-relax/WAVECAR /panfs/jay/groups/26/cbartel/cbartel/bin/pydmc/examples/calcs/MnO2/mp-19326/afm_0/metagga-static/WAVECAR
-cp /panfs/jay/groups/26/cbartel/cbartel/bin/pydmc/examples/calcs/MnO2/mp-19326/afm_0/metagga-relax/CONTCAR /panfs/jay/groups/26/cbartel/cbartel/bin/pydmc/examples/calcs/MnO2/mp-19326/afm_0/metagga-static/POSCAR
-cd /panfs/jay/groups/26/cbartel/cbartel/bin/pydmc/examples/calcs/MnO2/mp-19326/afm_0/metagga-static
-
-srun --ntasks=16 --mpi=pmi2 /home/cbartel/shared/bin/vasp/vasp_std > vasp.o
-
-echo launched metagga-static >> /panfs/jay/groups/26/cbartel/cbartel/bin/pydmc/examples/calcs/MnO2/mp-19326/afm_0/status.o
+echo working on DONE_metagga-static >> /panfs/jay/groups/26/cbartel/cbartel/bin/pydmc/examples/calcs/MnO2/mp-19326/afm_0/status.o
+echo metagga-static is done >> /panfs/jay/groups/26/cbartel/cbartel/bin/pydmc/examples/calcs/MnO2/mp-19326/afm_0/status.o

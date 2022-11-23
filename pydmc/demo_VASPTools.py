@@ -199,28 +199,11 @@ def prepare_calc_and_launch(mpid,
         subprocess.call(['sbatch', 'sub.sh'])
         os.chdir(SCRIPTS_DIR)
 
-def analyze_calc(mpid, mag):
-    formula = MPIDS[mpid]
-    launch_dir = get_launch_dir(formula, mpid, mag)
-    calcs = [c for c in os.listdir(launch_dir) if 'gga' in c]
-    
-    for c in calcs:
-        calc_dir = os.path.join(launch_dir, c)
-        va = VASPAnalysis(calc_dir)
-        
-    
+def launch_calcs(
+                 ready_to_launch=False,
+                 fresh_restart=False,
+                 refresh_configs_yaml=False):
 
-def main():
-    print('\n Querying MP (or reading existing json)')
-    query = query_mp(remake=False)
-    print('\n Making magmoms (or reading existing json)')
-    magmoms = get_afm_magmoms(query, remake=True)
-
-#    return query, magmoms
-    ready_to_launch = True
-    fresh_restart = False
-    refresh_configs_yaml = False
-    
     for MPID in MPIDS:
         print('\nworking on %s (%s)' % (MPID, MPIDS[MPID]))
         for MAG in MAGS:
@@ -231,7 +214,89 @@ def main():
                                     fresh_restart=fresh_restart,
                                     refresh_configs_yaml=refresh_configs_yaml)
 
-    return query, magmoms
+def get_calc_dirs_for_launch_dir(mpid, mag):
+    formula = MPIDS[mpid]
+    launch_dir = get_launch_dir(formula, mpid, mag)
+    calcs = [c for c in os.listdir(launch_dir) if 'gga' in c]
+    calc_dirs = [os.path.join(launch_dir, c) for c in calcs]
+    return calc_dirs
+
+def purge_large_files_for_completed_calcs(mpid, mag):
+    """
+    gets rid of some large files to make space.. doing this mostly for pushing this example to github
+
+    note: 
+    - if you are doing a bader analysis, you need AECCAR*
+    - if you are doing a LOBSTER analysis, you need WAVECAR
+    - if you want to plot the electron density, you need CHGCAR and ELFCAR
+    """
+    large_files = ['WAVECAR', 'CHGCAR', 'PROCAR', 
+                   'LOCPOT', 'ELFCAR', 'CHG', 
+                   'AECCAR0', 'AECCAR1', 'AECCAR2']
+
+    calc_dirs = get_calc_dirs_for_launch_dir(mpid, mag)
+    n_calcs = len(calc_dirs)
+    n_converged = 0
+    for calc_dir in calc_dirs:
+        va = VASPAnalysis(calc_dir)
+        if va.is_converged:
+            n_converged += 1
+    if n_converged == n_calcs:
+        print('purging large files')
+        for calc_dir in calc_dirs:
+            for f in large_files:
+                file_to_purge = os.path.join(calc_dir, f)
+                print('purging %s' % file_to_purge)
+                if os.path.exists(file_to_purge):
+                    os.remove(file_to_purge)
+
+def analyze_calc(mpid, mag):
+    d = {}
+    calc_dirs = get_calc_dirs_for_launch_dir(mpid, mag)
+    for calc_dir in calc_dirs:
+        va = VASPAnalysis(calc_dir)
+        convergence = va.is_converged
+        print('converged = %s' % convergence)
+        E_per_at = va.E_per_at
+        mag = va.magnetization
+        d[calc_dir.split('/')[-1]] = {'convergence' : convergence,
+                                      'E' : E_per_at,
+                                      'mag' : mag}
+        print(d)
+    return d
+
+def analyze_calcs(remake=False):
+    fjson = os.path.join(DATA_DIR, 'demo_VASPTools_results.json')
+    if not remake and os.path.exists(fjson):
+        return read_json
+    d = {}
+    for MPID in MPIDS:
+        formula = MPIDS[MPID]
+        print('\nanalyzing %s (%s)' % (MPID, formula))
+        if formula not in d:
+            d[formula] = {}
+        d[formula][MPID] = {}
+        for MAG in MAGS:
+            print('mag = %s' % MAG)
+            d[formula][MPID][MAG] = analyze_calc(MPID, MAG)
+            purge_large_files_for_completed_calcs(MPID, MAG)
+    return write_json(d, fjson)
+
+def main():
+    print('\n Querying MP (or reading existing json)')
+    query = query_mp(remake=False)
+    print('\n Making magmoms (or reading existing json)')
+    magmoms = get_afm_magmoms(query, remake=False)
+
+    print('\n Launching calcs (or not if they are finished)')
+#    launch_calcs(ready_to_launch=True, 
+#                 fresh_restart=False,
+#                 refresh_configs_yaml=False)
+
+    print('\n Analyzing calcs (or reading from existing json)')
+    results = analyze_calcs(remake=True)
+
+    return query, magmoms, results
 
 if __name__ == '__main__':
-    query, magmoms = main()
+    query, magmoms, results = main()

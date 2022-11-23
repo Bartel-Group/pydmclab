@@ -261,7 +261,8 @@ class VASPSetUp(object):
         # make sure spin is off for nm calculations
         if mag == 'nm':
             modify_incar['ISPIN'] = 1
-        
+        else:
+            modify_incar['LORBIT'] = 11
         #print(modify_incar)    
         # initialize new VASPSet
         vasp_input = vaspset(s, 
@@ -439,14 +440,14 @@ class VASPAnalysis(object):
         """
         Returns Structure object from POSCAR in calc_dir
         """
-        return Structure.from_file(os.path.join(self.calc_dir), 'POSCAR')
+        return Structure.from_file(os.path.join(self.calc_dir, 'POSCAR'))
     
     @property
     def contcar(self):
         """
         Returns Structure object from CONTCAR in calc_dir
         """
-        return Structure.from_file(os.path.join(self.calc_dir), 'CONTCAR')
+        return Structure.from_file(os.path.join(self.calc_dir, 'CONTCAR'))
 
     @property
     def nsites(self):
@@ -539,7 +540,7 @@ class VASPAnalysis(object):
         Returns {site index (int) : element (str) for every site in structure}
         """
         contcar = self.contcar
-        return {idx : SiteTools(contcar[idx]).el for idx in range(len(contcar))}
+        return {idx : SiteTools(contcar, idx).el for idx in range(len(contcar))}
 
             
     @property
@@ -551,6 +552,8 @@ class VASPAnalysis(object):
         """
         oc = self.outcar
         mag = list(oc.magnetization)
+        if not mag:
+            return {}
         sites_to_els = self.sites_to_els
         els = sorted(list(set(sites_to_els.values())))
         return {el : 

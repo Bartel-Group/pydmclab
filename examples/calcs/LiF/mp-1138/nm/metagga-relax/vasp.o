@@ -233,3 +233,60 @@ CGA:   6    -0.119064629292E+02   -0.16461E-04   -0.17221E-04 13188   0.829E-05-
 CGA:   7    -0.119064663717E+02   -0.34425E-05   -0.36055E-05 13188   0.138E-05-0.110E-05
  gam= 0.167 trial= 0.701  step= 0.602 mean= 0.701
  gam= 0.157 g(H,U,f)=  0.172E-06 0.452E-07 0.193E-97 ort(H,U,f) = 0.242E-06 0.636E-07 0.198E-96
+CGA:   8    -0.119064667177E+02   -0.34600E-06   -0.36114E-06 13188   0.217E-06 0.305E-06
+ gam= 0.157 trial= 0.696  step= 0.332 mean= 0.696
+ final diagonalization
+   3 F= -.11906467E+02 E0= -.11906467E+02  d E =-.141548E-01
+ curvature:  -0.92 expect dE=-0.118E-04 dE for cont linesearch -0.118E-04
+ trial: gam=-0.02865 g(F)=  0.352E-13 g(S)=  0.128E-04 ort = 0.432E-03 (trialstep = 0.114E+01)
+ search vector abs. value=  0.138E-07
+ reached required accuracy - stopping structural energy minimisation
+ writing wavefunctions
+ augmentation electrons   2.28150101563488     
+ soft         electrons   7.73026617142727     
+ augmentation electrons   2.28150101563488     
+ soft         electrons   7.73026617142727     
+ augmentation electrons   2.28150101563488     
+ soft         electrons   7.73026617142727     
+ augmentation electrons   2.28150101563488     
+ soft         electrons   7.73026617142727     
+ augmentation electrons   2.28150101563488     
+ soft         electrons   7.73026617142727     
+ augmentation electrons   2.28150101563488     
+ augmentation electrons   2.28150101563488     
+ soft         electrons   7.73026617142727     
+ augmentation electrons   2.28150101563488     
+ soft         electrons   7.73026617142727     
+ augmentation electrons   2.28150101563488     
+ soft         electrons   7.73026617142727     
+ augmentation electrons   2.28150101563488     
+ soft         electrons   7.73026617142727     
+ augmentation electrons   2.28150101563488     
+ soft         electrons   7.73026617142727     
+ augmentation electrons   2.28150101563488     
+ soft         electrons   7.73026617142727     
+ augmentation electrons   2.28150101563488     
+ soft         electrons   7.73026617142727     
+ augmentation electrons   2.28150101563488     
+ soft         electrons   7.73026617142727     
+ augmentation electrons   2.28150101563488     
+ soft         electrons   7.73026617142727     
+ augmentation electrons   2.28150101563488     
+ soft         electrons   7.73026617142727     
+ soft         electrons   7.73026617142727     
+ total        electrons   10.0117671870621     
+ total        electrons   10.0117671870621     
+ total        electrons   10.0117671870621     
+ total        electrons   10.0117671870621     
+ total        electrons   10.0117671870621     
+ total        electrons   10.0117671870621     
+ total        electrons   10.0117671870621     
+ total        electrons   10.0117671870621     
+ total        electrons   10.0117671870621     
+ total        electrons   10.0117671870621     
+ total        electrons   10.0117671870621     
+ total        electrons   10.0117671870621     
+ total        electrons   10.0117671870621     
+ total        electrons   10.0117671870621     
+ total        electrons   10.0117671870621     
+ total        electrons   10.0117671870621     
