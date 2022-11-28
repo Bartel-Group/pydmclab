@@ -190,7 +190,7 @@ class VASPSetUp(object):
             fun = 'default' # same functional
             modify_incar['EDIFF'] = 1e-6 # tighter energy convergence
             modify_incar['EDIFFG'] = -0.03 # use forces to converge geometries
-            modify_incar['ISMEAR'] = 0 # less errors than w/ ISMEA = -5
+            modify_incar['ISMEAR'] = 0 # less errors than w/ ISMEAR = -5
             modify_incar['ENCUT'] = 520 # lower ENCUT for meta-GGA than MP
             modify_incar['ENAUG'] = 1040 # lower ENAUG for meta-GGA than MP
             modify_incar['ISYM'] = 0 # don't use symmetry
@@ -409,6 +409,10 @@ class VASPSetUp(object):
             incar_changes['IMIX'] = 1
         if 'ibzkpt' in errors:
             incar_changes['SYMPREC'] = 1e-10
+            incar_changes['ISMEAR'] = 0
+        if 'posmap' in errors:
+            incar_changes['SYMPREC'] = 1e-5
+            incar_changes['ISMEAR'] = 0
         
         return incar_changes
             
