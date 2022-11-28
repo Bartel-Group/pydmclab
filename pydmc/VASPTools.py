@@ -410,6 +410,7 @@ class VASPSetUp(object):
         if 'ibzkpt' in errors:
             incar_changes['SYMPREC'] = 1e-10
             incar_changes['ISMEAR'] = 0
+            incar_changes['ISYM'] = -1
         if 'posmap' in errors:
             incar_changes['SYMPREC'] = 1e-5
             incar_changes['ISMEAR'] = 0
