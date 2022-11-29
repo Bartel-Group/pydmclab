@@ -1,11 +1,19 @@
-from MPQuery import MPQuery
-from StrucTools import StrucTools
+USE_INSTALLED_PYDMC = True
+
+if USE_INSTALLED_PYDMC:
+    from pydmc.MPQuery import MPQuery
+    from pydmc.StrucTools import StrucTools
+    from pydmc.handy import read_json, write_json    
+else:
+    from MPQuery import MPQuery
+    from StrucTools import StrucTools
+    from handy import read_json, write_json
+
 import os
-from handy import read_json, write_json
 
 API_KEY = '***REMOVED***'
 
-DATA_DIR = os.path.join('..', 'examples', 'data')
+DATA_DIR = os.path.join('..', 'examples', 'query_demo')
 
 CHEMSYS = 'O-Al-Mg'
 

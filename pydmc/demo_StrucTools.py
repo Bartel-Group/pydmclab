@@ -1,5 +1,10 @@
-from StrucTools import StrucTools, SiteTools
-from MPQuery import MPQuery
+USE_INSTALLED_PYDMC = True
+if USE_INSTALLED_PYDMC:
+    from pydmc.StrucTools import StrucTools, SiteTools
+    from pydmc.MPQuery import MPQuery    
+else:
+    from StrucTools import StrucTools, SiteTools
+    from MPQuery import MPQuery
 
 from pymatgen.core.structure import Structure
 
