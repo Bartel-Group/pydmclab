@@ -1,0 +1,1 @@
+slurmstepd: error: *** JOB 153110447 ON cn0002 CANCELLED AT 2022-11-29T12:42:59 ***

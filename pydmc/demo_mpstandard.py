@@ -36,7 +36,7 @@ This demo tests the following pydmc modules:
 SCRIPTS_DIR = os.getcwd()
 
 # where to put .json files
-DATA_DIR = os.path.join(SCRIPTS_DIR, 'examples', 'typical_vasp', 'data')
+DATA_DIR = os.path.join(SCRIPTS_DIR, 'examples', 'vasp_mp_standard', 'data')
 if not os.path.exists(DATA_DIR):
     os.mkdir(DATA_DIR)
 
@@ -61,11 +61,11 @@ CALC = 'relax'
 XC = 'metagga'
 
 # what "standard" settings I want to use
-STANDARD = 'dmc'
+STANDARD = 'mp'
 
 # which MP IDs I want to calculate and what are their chemical formulas
-MPIDS = {'mp-19326' : 'MnO2',
-         'mp-1138' : 'LiF'}
+MPIDS = {'mp-755657' : 'O3V1Ti1',
+         'mp-28226' : 'Cr2Mn1O4'}
 
 # MSI user name (replace w/ your user name)
 USERNAME = 'cbartel'
@@ -74,7 +74,7 @@ def query_mp(remake=False):
     """
     get starting structures from MP
     """
-    fjson = os.path.join(DATA_DIR, 'demo_VASPTools_query.json')
+    fjson = os.path.join(DATA_DIR, 'demo_mp-standard_query.json')
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
 
@@ -94,7 +94,7 @@ def get_afm_magmoms(query, remake=False):
     get MAGMOMs for AFM calculations
     """
 
-    fjson = os.path.join(DATA_DIR, 'demo_VASPTools_magmoms.json')
+    fjson = os.path.join(DATA_DIR, 'demo_mp-standard_magmoms.json')
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
         
@@ -323,7 +323,7 @@ def analyze_calcs(remake=False):
         {formula : {ID : {CALCULATION RESULTS}}}
     
     """
-    fjson = os.path.join(DATA_DIR, 'demo_VASPTools_results.json')
+    fjson = os.path.join(DATA_DIR, 'demo_mp-standard_results.json')
     if not remake and os.path.exists(fjson):
         return read_json
     d = {}

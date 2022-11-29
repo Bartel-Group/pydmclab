@@ -188,63 +188,76 @@ class VASPSetUp(object):
         # setting DMC standards --> what to do on top of MPRelaxSet or MPScanRelaxSet
         if standard == 'dmc':
             fun = 'default' # same functional
-            modify_incar['EDIFF'] = 1e-6 # tighter energy convergence
-            modify_incar['EDIFFG'] = -0.03 # use forces to converge geometries
-            modify_incar['ISMEAR'] = 0 # less errors than w/ ISMEAR = -5
-            modify_incar['ENCUT'] = 520 # lower ENCUT for meta-GGA than MP
-            modify_incar['ENAUG'] = 1040 # lower ENAUG for meta-GGA than MP
-            modify_incar['ISYM'] = 0 # don't use symmetry
-            modify_incar['SIGMA'] = 0.01 # smaller SIGMA --> we usually work w/ semiconductors/insulators
+            dmc_standard_configs = {'EDIFF' : 1e-6,
+                                    'EDIFFG' : -0.03,
+                                    'ISMEAR' : 0,
+                                    'ENCUT' : 520,
+                                    'ENAUG' : 1040,
+                                    'ISYM' : 0,
+                                    'SIGMA' : 0.01}
+            for key in dmc_standard_configs:
+                if key not in modify_incar:
+                    modify_incar[key] = dmc_standard_configs[key]
 
             # use KSPACING instead of KPOINTS if not doing a "loose" calculation
             if calc != 'loose':
-                modify_incar['KSPACING'] = 0.22
+                if 'KSPACING' not in modify_incar:
+                    modify_incar['KSPACING'] = 0.22
                 
             # turn off +U unless we are specifying GGA+U    
             if xc != 'ggau':
-                modify_incar['LDAU'] = False
+                if 'LDAU' not in modify_incar:
+                    modify_incar['LDAU'] = False
                 
             # turn off ISPIN for nonmagnetic calculations
-            modify_incar['ISPIN'] = 1 if mag == 'nm' else 2
+            if 'ISPIN' not in modify_incar:
+                modify_incar['ISPIN'] = 1 if mag == 'nm' else 2
         
         # start from MPRelaxSet for GGA or GGA+U
         if xc in ['gga', 'ggau']:
             vaspset = MPRelaxSet
             
             # use custom functional (eg PBEsol) if you want
-            if fun != 'default':
-                modify_incar['GGA'] = fun.upper()
-            else:
-                modify_incar['GGA'] = 'PE'
+            if 'GGA' not in modify_incar:
+                if fun != 'default':
+                    modify_incar['GGA'] = fun.upper()
+                else:
+                    modify_incar['GGA'] = 'PE'
         
         # start from MPScanRelaxSet for meta-GGA
         elif xc == 'metagga':
             vaspset = MPScanRelaxSet
                 
             # use custom functional (eg SCAN) if you want
-            if fun != 'default':
-                modify_incar['METAGGA'] = fun.upper()
-            else:
-                modify_incar['METAGGA'] = 'R2SCAN'
+            if 'METAGGA' not in modify_incar:
+                if fun != 'default':
+                    modify_incar['METAGGA'] = fun.upper()
+                else:
+                    modify_incar['METAGGA'] = 'R2SCAN'
         
         # default "loose" relax
         if calc == 'loose':
             modify_kpoints = Kpoints() # only use 1 kpoint
-            modify_incar['ENCUT'] = 400 # lower ENCUT
-            modify_incar['ENAUG'] = 800 # lower ENAUG
-            modify_incar['ISIF'] = 2 # don't relax volume
-            modify_incar['EDIFF'] = 1e-5 # looser energy convergence
-            modify_incar['NELM'] = 40 # fewer electronic steps
+            loose_configs = {'ENCUT' : 400,
+                             'ENAUG' : 800,
+                             'ISIF' : 2,
+                             'EDIFF' : 1e-5,
+                             'NELM' : 40}
+            for key in loose_configs:
+                modify_incar[key] = loose_configs[key]
+            # NOTE: this will override even user-specified settings in modify_incar
         
         # default "static" claculation
         if calc == 'static':
-            modify_incar['LCHARG'] = True # write CHGCAR
-            modify_incar['LREAL'] = False # project in reciprocal space
-            modify_incar['NSW'] = 0 # no geometry steps
-            modify_incar['LORBIT'] = 0 # write DOSCAR and PROCAR
-            modify_incar['LVHAR'] = True # write LOCPOT
-            modify_incar['ICHARG'] = 0 # use WAVECAR instead of CHGCAR to intialize
-            modify_incar['LAECHG'] = True # write AECCARs for Bader analysis
+            static_configs = {'LCHARG' : True,
+                              'LREAL' : False,
+                              'NSW' : 0,
+                              'LORBIT' : 0,
+                              'LVHAR' : True,
+                              'ICHARG' : 0,
+                              'LAECHG' : True}
+            for key in static_configs:
+                modify_incar[key] = static_configs[key]
         
         # make sure WAVECAR is written unless told not to
         if 'LWAVE' not in modify_incar:
@@ -280,6 +293,9 @@ class VASPSetUp(object):
         Write input files (INCAR, KPOINTS, POTCAR)
         """
         vasp_input = self.get_vasp_input(**kwargs)
+#        print('\n\n\n')
+#        print(vasp_input.incar)
+#        print('\n\n\n')
         vasp_input.write_input(self.calc_dir)
         return vasp_input
     
@@ -469,13 +485,13 @@ class VASPAnalysis(object):
         """
         fvasprun = os.path.join(self.calc_dir, 'vasprun.xml')
         if not os.path.exists(fvasprun):
-            return False
+            return None
         
         try:
             vr = Vasprun(os.path.join(self.calc_dir, 'vasprun.xml'))
             return vr
         except:
-            return False      
+            return None     
  
     @property
     def outcar(self):
@@ -484,13 +500,13 @@ class VASPAnalysis(object):
         """
         foutcar = os.path.join(self.calc_dir, 'OUTCAR')
         if not os.path.exists(foutcar):
-            return False
+            return None
         
         try:
             oc = Outcar(os.path.join(self.calc_dir, 'OUTCAR'))
             return oc
         except:
-            return False           
+            return None
       
     
     @property

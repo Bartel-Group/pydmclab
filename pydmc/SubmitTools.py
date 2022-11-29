@@ -242,10 +242,13 @@ class SubmitTools(object):
                 # (6) check for errors in continuing jobs
                 if status in ['CONTINUE', 'NEWRUN']:
                     calc_is_clean = vsu.is_clean
+#                    print('\n---------------- CALC IS CLEAN ---------\n')
                     if not calc_is_clean:
+#                        print('\n\n\n\nCHECKING CLEANLINESS\n\n\n\n')
                         incar_changes = vsu.incar_changes_from_errors
                         calc_configs['modify_incar'] = {**calc_configs['modify_incar'], **incar_changes}
-                      
+#                        print('new configs = %s' % calc_configs)
+#                        print('\n\n\n')
                 # (7) prepare calc_dir to launch  
                 vsu.prepare_calc(calc=calc,
                                 xc=xc,
