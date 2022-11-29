@@ -557,6 +557,8 @@ class VASPAnalysis(object):
                         {'mag' : total magnetization on site}}}
         """
         oc = self.outcar
+        if not oc:
+            return {}
         mag = list(oc.magnetization)
         if not mag:
             return {}
