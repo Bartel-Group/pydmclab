@@ -25,11 +25,23 @@ class MagTools(object):
                  max_afm_combos=100,
                  afm_spins=(-5,5),
                  fm_spins=(0.6, 5),
-                 randomize_afm=True):
+                 randomize_afm=True,
+                 treat_as_nm=[]):
         """
         Args:
             structure (Structure): pymatgen Structure object
-                
+            max_afm_combos (int): maximum number of AFM spin configurations to generate
+            afm_spins (tuple): low and high spin for AFM initialization
+            fm_spins (tuple): zero and non-zero spin for FM initialization
+            randomize_afm (bool): randomize AFM spin configurations
+                - randomization occurs in two different steps
+                    - when AFM combinations are enumerated,
+                        if the number of combinations is greater than max_afm_combos,
+                        then we randomly select max_afm_combos combinations
+                    - when the unique AFM structures are generated,
+                        we randomly order them to avoid having the same "kinds" of AFM orderings always appearing first
+            treat_as_nm (list): list of elements to treat as non-magnetic
+                - e.g., if you want to only explore various initial configurations for other element(s)
         """        
         structure.remove_oxidation_states()
         self.s = structure
@@ -37,6 +49,7 @@ class MagTools(object):
         self.fm_spins = fm_spins
         self.afm_spins = afm_spins
         self.randomize_afm = randomize_afm
+        self.treat_as_nm = treat_as_nm
         
     @property
     def magnetic_ions(self):
@@ -55,8 +68,10 @@ class MagTools(object):
                                 'Fe', 'Co', 'Ni', 'Cu', 'Pr', 'Nd', 'Pm', 
                                 'Sm', 'Gd', 'Tb', 'Dy', 'Ho', 'er', 'Tm', 
                                 'Yb', 'Np', 'Ru', 'Os', 'Ir', 'U']
-        return sorted(list(set(from_matminer + from_MP))
-                      )
+        magnetic = list(set(from_matminer + from_MP))
+        treat_as_nm = self.treat_as_nm
+        return sorted([el for el in magnetic if el not in treat_as_nm])
+        
     @property
     def magnetic_ions_in_struc(self):
         """

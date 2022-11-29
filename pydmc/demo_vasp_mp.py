@@ -36,7 +36,7 @@ This demo tests the following pydmc modules:
 SCRIPTS_DIR = os.getcwd()
 
 # where to put .json files
-DATA_DIR = os.path.join(SCRIPTS_DIR, 'examples', 'vasp_mp_standard', 'data')
+DATA_DIR = os.path.join(SCRIPTS_DIR, 'examples', 'vasp_mp', 'data')
 if not os.path.exists(DATA_DIR):
     os.mkdir(DATA_DIR)
 
@@ -74,7 +74,7 @@ def query_mp(remake=False):
     """
     get starting structures from MP
     """
-    fjson = os.path.join(DATA_DIR, 'demo_mp-standard_query.json')
+    fjson = os.path.join(DATA_DIR, 'query.json')
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
 
@@ -94,7 +94,7 @@ def get_afm_magmoms(query, remake=False):
     get MAGMOMs for AFM calculations
     """
 
-    fjson = os.path.join(DATA_DIR, 'demo_mp-standard_magmoms.json')
+    fjson = os.path.join(DATA_DIR, 'magmoms.json')
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
         
@@ -323,7 +323,7 @@ def analyze_calcs(remake=False):
         {formula : {ID : {CALCULATION RESULTS}}}
     
     """
-    fjson = os.path.join(DATA_DIR, 'demo_mp-standard_results.json')
+    fjson = os.path.join(DATA_DIR, 'results.json')
     if not remake and os.path.exists(fjson):
         return read_json
     d = {}

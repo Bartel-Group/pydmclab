@@ -1,5 +1,10 @@
-from CompTools import CompTools
+USE_INSTALLED_PYDMC = True
 
+if USE_INSTALLED_PYDMC:
+    from pydmc.CompTools import CompTools
+else:
+    from CompTools import CompTools
+    
 """
 This file currently tests the following classes in CompTools
     - CompTools

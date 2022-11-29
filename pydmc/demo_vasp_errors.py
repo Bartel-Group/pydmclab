@@ -16,6 +16,7 @@ else:
     from MagTools import MagTools
     from StrucTools import StrucTools
     from MPQuery import MPQuery
+
 from pymatgen.core.structure import Structure
 
 import os
@@ -32,13 +33,14 @@ This demo tests the following pydmc modules:
 
 """
 
-# where is demo_VASPTools.py
+# where is demo_errorhandler.py
 SCRIPTS_DIR = os.getcwd()
 
 # where to put .json files
-DATA_DIR = os.path.join(SCRIPTS_DIR, 'examples', 'typical_vasp', 'data')
+DATA_DIR = os.path.join(SCRIPTS_DIR, 'examples', 'vasp_errors', 'data')
+
 if not os.path.exists(DATA_DIR):
-    os.mkdir(DATA_DIR)
+    os.makedirs(DATA_DIR)
 
 # where to run calculations
 CALCS_DIR = DATA_DIR.replace('data', 'calcs')
@@ -48,24 +50,19 @@ if not os.path.exists(CALCS_DIR):
 # Chris' API key (replace with your own)
 API_KEY = '***REMOVED***'
 
-# how many AFM orderings I want to sample
-MAX_AFM_IDX = 2
-
-# which magnetic configurations I want to calculate (note: AFM "mag" will be "afm_0", "afm_1", ... "afm_N"
-MAGS = ['nm', 'fm'] + ['afm_%s' % str(int(v)) for v in range(MAX_AFM_IDX)] if MAX_AFM_IDX != 0 else []
+MAGS = ['nm', 'fm']
 
 # what kind of calculation I want to do
 CALC = 'relax'
 
 # what kind of DFT I want to do
-XC = 'metagga'
+XC = 'gga'
 
 # what "standard" settings I want to use
 STANDARD = 'dmc'
 
 # which MP IDs I want to calculate and what are their chemical formulas
-MPIDS = {'mp-19326' : 'MnO2',
-         'mp-1138' : 'LiF'}
+MPIDS = {'mp-554638' : 'Ca2O7Ru2'}
 
 # MSI user name (replace w/ your user name)
 USERNAME = 'cbartel'
@@ -74,7 +71,7 @@ def query_mp(remake=False):
     """
     get starting structures from MP
     """
-    fjson = os.path.join(DATA_DIR, 'demo_VASPTools_query.json')
+    fjson = os.path.join(DATA_DIR, 'query.json')
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
 
@@ -89,27 +86,6 @@ def query_mp(remake=False):
         
     return write_json(d, fjson)
 
-def get_afm_magmoms(query, remake=False):
-    """
-    get MAGMOMs for AFM calculations
-    """
-
-    fjson = os.path.join(DATA_DIR, 'demo_VASPTools_magmoms.json')
-    if os.path.exists(fjson) and not remake:
-        return read_json(fjson)
-        
-    magmoms = {}
-    for mpid in query:
-        magmoms[mpid] = {}
-        s = Structure.from_dict(query[mpid]['structure'])
-        magtools = MagTools(s)
-        afm_strucs = magtools.get_antiferromagnetic_structures
-        if afm_strucs:
-            for i in range(len(afm_strucs)):
-                magmoms[mpid][i] = afm_strucs[i].site_properties['magmom']
-    
-    return write_json(magmoms, fjson)
-
 def get_job_name(launch_dir):
     """
     descriptive job name (formula-mpid-mag)
@@ -120,13 +96,23 @@ def get_launch_dir(formula, mpid, mag):
     """
     where I want to "$ sbatch sub.sh" to launch all calcs in a tree
     
-    examples/calcs/formula/mpid/mag/
+    examples_errors/calcs/formula/mpid/mag/
     """
 
     launch_dir = os.path.join(CALCS_DIR, formula, mpid, mag)
     if not os.path.exists(launch_dir):
         os.makedirs(launch_dir)
     return launch_dir
+
+def fake_error(mpid, mag, calc, error):
+    launch_dir = get_launch_dir(MPIDS[mpid], mpid, mag)
+    calc_dir = os.path.join(launch_dir, calc)
+    if not os.path.exists(calc_dir):
+        os.makedirs(calc_dir)
+    fvaspout = os.path.join(calc_dir, 'vasp.o')
+    with open(fvaspout, 'w') as f:
+        f.write(error+'\n')
+    print('added error = %s to %s' % (error, calc_dir))
 
 def prepare_calc_and_launch(mpid, 
                             mag,
@@ -164,7 +150,6 @@ def prepare_calc_and_launch(mpid,
 
     # load dictionaries from DATA_DIR/*json
     query = query_mp()
-    magmoms = get_afm_magmoms(query)
 
     # determine launch directory
     formula = MPIDS[mpid]
@@ -177,18 +162,9 @@ def prepare_calc_and_launch(mpid,
 
     # make launch_dir (where all calculations will live for a given structure + magnetic configuration
     launch_dir = get_launch_dir(formula, mpid, mag)
-
-    # determine magmom if calc is afm
-    if 'afm' in mag:
-        afm_idx = mag.split('_')[1]
-        if str(afm_idx) in magmoms[mpid]:
-            magmom = magmoms[mpid][str(afm_idx)]
-        else:
-            # skip if afm_* not in magmoms (eg we didn't make that many magmoms)
-            return
-    else:
-        # set magmom to None if not AFM (handled elsewhere in VASPSetUp)
-        magmom = None 
+    
+    # not AFM --> set magmom = None
+    magmom = None 
 
     # put POSCAR in launch_dir if it's not there already
     launch_pos = os.path.join(launch_dir, 'POSCAR')
@@ -211,7 +187,7 @@ def prepare_calc_and_launch(mpid,
     user_configs['job-name'] = job_name # use a unique job name
     user_configs['partition'] = 'msismall' # choose a partition (change this if jobs aren't starting quickly)
     user_configs['nodes'] = 1 # choose # nodes (increase if jobs are taking too long)
-    user_configs['ntasks'] = 16 # choose # tasks (increase if jobs are taking too long; decrease if trouble getting jobs running in a "small" queue
+    user_configs['ntasks'] = 8 # choose # tasks (increase if jobs are taking too long; decrease if trouble getting jobs running in a "small" queue
 
     sub = SubmitTools(launch_dir=launch_dir,
                       magmom=magmom,
@@ -244,7 +220,8 @@ def launch_calcs(
                                     ready_to_launch=ready_to_launch,
                                     fresh_restart=fresh_restart,
                                     refresh_configs_yaml=refresh_configs_yaml)
-
+            if MAG == 'nm':
+                fake_error(MPID, MAG, 'gga-relax', 'internal error in subroutine IBZKPT')
 def get_calc_dirs_for_launch_dir(mpid, mag):
     """
     Args:
@@ -323,7 +300,7 @@ def analyze_calcs(remake=False):
         {formula : {ID : {CALCULATION RESULTS}}}
     
     """
-    fjson = os.path.join(DATA_DIR, 'demo_VASPTools_results.json')
+    fjson = os.path.join(DATA_DIR, 'results.json')
     if not remake and os.path.exists(fjson):
         return read_json
     d = {}
@@ -343,20 +320,21 @@ def main():
     running_on_msi = True # only launch calcs if you're on MSI
     
     print('\n Querying MP (or reading existing json)')
-    query = query_mp(remake=True)
-    print('\n Making magmoms (or reading existing json)')
-    magmoms = get_afm_magmoms(query, remake=True)
+    query = query_mp(remake=False)
 
     print('\n Launching calcs (or not if they are finished)')
     if running_on_msi:
-        launch_calcs(ready_to_launch=True, 
+        launch_calcs(ready_to_launch=False, 
                     fresh_restart=True,
                     refresh_configs_yaml=False)
 
+        launch_calcs(ready_to_launch=True,
+                     fresh_restart=False,
+                     refresh_configs_yaml=False)
     print('\n Analyzing calcs (or reading from existing json)')
     results = analyze_calcs(remake=True)
 
-    return query, magmoms, results
+    return query, results
 
 if __name__ == '__main__':
-    query, magmoms, results = main()
+    query, results = main()

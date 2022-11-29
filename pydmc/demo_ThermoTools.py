@@ -1,9 +1,20 @@
-from CompTools import CompTools
-from MPQuery import MPQuery
-from ThermoTools import GetHullInputData, AnalyzeHull, ParallelHulls
-from handy import read_json, write_json
+USE_INSTALLED_PYDMC = True
+
+if USE_INSTALLED_PYDMC:
+    from pydmc.CompTools import CompTools
+    from pydmc.MPQuery import MPQuery
+    from pydmc.ThermoTools import GetHullInputData, AnalyzeHull, ParallelHulls
+    from pydmc.handy import read_json, write_json
+    from pydmc.plotting import set_rc_params, tableau_colors    
+
+else:
+    from CompTools import CompTools
+    from MPQuery import MPQuery
+    from ThermoTools import GetHullInputData, AnalyzeHull, ParallelHulls
+    from handy import read_json, write_json
+    from plotting import set_rc_params, tableau_colors
+
 import matplotlib.pyplot as plt
-from plotting import set_rc_params, tableau_colors
 
 import os
 import numpy as np
@@ -58,12 +69,12 @@ if __name__ == '__main__':
     CHEMSYS = 'Ca-Al-Ti-O-F'
 
     # where to save data
-    DATA_DIR = os.path.join('..', 'examples', 'data')
+    DATA_DIR = os.path.join('..', 'thermo_demo', 'data')
     if not os.path.exists(DATA_DIR):
         os.mkdir(DATA_DIR)
     
     # where to save figures
-    FIG_DIR = os.path.join('..', 'examples', 'figures')
+    FIG_DIR = os.path.join('..', 'thermo_demo', 'figures')
     if not os.path.exists(FIG_DIR):
         os.mkdir(FIG_DIR)
     
