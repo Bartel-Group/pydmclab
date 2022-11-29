@@ -88,7 +88,7 @@ def main():
     demo_basic_structure_manipulations()
     demo_ox_state_decoration(mpid=MPID)
     demo_replace_species_and_order(mpid=MPID)
-    demo_dilute_vacancy(mpid=MPID)
+    #demo_dilute_vacancy(mpid=MPID)
     return
 
 if __name__ == '__main__':

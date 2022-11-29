@@ -28,59 +28,22 @@ This file currently tests the following classes in ThermoTools
 TO-DO:
     - convert into formal "tests"
 """
+# Chris B's API key for MP query
+API_KEY = '***REMOVED***'
 
-def main():
-    # if True, re-grab data from MP
-    remake_query = True
-    # if True, re-calculate hull input data
-    remake_serial_hullin = True
-    # if True, re-calculate hull output data
-    remake_serial_hullout = True
-    # if True, re-calculate hull output data in parallel
-    remake_parallel_hullout = True
-    # if True, generate figure to check results
-    remake_figure_check = True
-    
-    # MP query for CHEMSYS
-    gs = get_mp_data_for_chemsys(CHEMSYS, remake=remake_query)
-    
-    # hull input data for CHEMSYS
-    hullin = serial_get_hull_input_data(gs, remake=remake_serial_hullin)
-    
-    # hull output data for CHEMSYS
-    hullout = serial_get_hull_output_data(hullin, remake=remake_serial_hullout)
-    
-    # hull output data for CHEMSYS (generated using parallelization)
-    p_hullout = parallel_get_hull_input_and_output_data(gs, remake=remake_parallel_hullout)
-    
-    # generate a graph that compares serial vs parallel hull output and also compares ThermoTools hull output to MP hull data
-    if remake_figure_check:
-        # %%
-        plot_to_check_success(gs, hullout, p_hullout)
-        # %%
-    return gs, hullin, hullout, p_hullout
+# chemical system to test on
+CHEMSYS = 'Ca-Al-Ti-O-F'
 
-if __name__ == '__main__':
-    
-    # Chris B's API key for MP query
-    API_KEY = '***REMOVED***'
+# where to save data
+DATA_DIR = os.path.join('examples', 'thermo_demo', 'data')
+if not os.path.exists(DATA_DIR):
+    os.mkdir(DATA_DIR)
 
-    # chemical system to test on
-    CHEMSYS = 'Ca-Al-Ti-O-F'
-
-    # where to save data
-    DATA_DIR = os.path.join('..', 'thermo_demo', 'data')
-    if not os.path.exists(DATA_DIR):
-        os.mkdir(DATA_DIR)
+# where to save figures
+FIG_DIR = os.path.join('examples', 'thermo_demo', 'figures')
+if not os.path.exists(FIG_DIR):
+    os.mkdir(FIG_DIR)
     
-    # where to save figures
-    FIG_DIR = os.path.join('..', 'thermo_demo', 'figures')
-    if not os.path.exists(FIG_DIR):
-        os.mkdir(FIG_DIR)
-    
-    # MP Query --> hull input data (serial) --> hull output data (serial) --> hull output data (parallel)
-    gs, hullin, hullout, p_hullout = main()
-
 def get_mp_data_for_chemsys(chemsys=CHEMSYS,
                             only_gs=True,
                             dict_key='cmpd',
@@ -298,3 +261,40 @@ def plot_to_check_success(
     #plt.show()
     
     fig.savefig(os.path.join(FIG_DIR, 'pd_demo_check.png'))
+    
+def main():
+    # if True, re-grab data from MP
+    remake_query = True
+    # if True, re-calculate hull input data
+    remake_serial_hullin = True
+    # if True, re-calculate hull output data
+    remake_serial_hullout = True
+    # if True, re-calculate hull output data in parallel
+    remake_parallel_hullout = True
+    # if True, generate figure to check results
+    remake_figure_check = True
+    
+    # MP query for CHEMSYS
+    gs = get_mp_data_for_chemsys(CHEMSYS, remake=remake_query)
+    
+    # hull input data for CHEMSYS
+    hullin = serial_get_hull_input_data(gs, remake=remake_serial_hullin)
+    
+    # hull output data for CHEMSYS
+    hullout = serial_get_hull_output_data(hullin, remake=remake_serial_hullout)
+    
+    # hull output data for CHEMSYS (generated using parallelization)
+    p_hullout = parallel_get_hull_input_and_output_data(gs, remake=remake_parallel_hullout)
+    
+    # generate a graph that compares serial vs parallel hull output and also compares ThermoTools hull output to MP hull data
+    if remake_figure_check:
+        # %%
+        plot_to_check_success(gs, hullout, p_hullout)
+        # %%
+    return gs, hullin, hullout, p_hullout
+
+if __name__ == '__main__':
+    
+  
+    # MP Query --> hull input data (serial) --> hull output data (serial) --> hull output data (parallel)
+    gs, hullin, hullout, p_hullout = main()

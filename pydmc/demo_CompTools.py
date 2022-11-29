@@ -97,6 +97,7 @@ def demo_plot_labels():
                         'Si1.6C1.6',
                         'MgAlO3.5']
     
+    print('\n')
     el_order = ('Li', 'Si', 'Mg', 'Al', 'Cr', 'Mn', 'C', 'O')
     for initial in initial_formulas:
         ct = CompTools(initial)

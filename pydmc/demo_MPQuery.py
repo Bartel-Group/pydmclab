@@ -13,7 +13,7 @@ import os
 
 API_KEY = '***REMOVED***'
 
-DATA_DIR = os.path.join('..', 'examples', 'query_demo')
+DATA_DIR = os.path.join('examples', 'query_demo')
 
 CHEMSYS = 'O-Al-Mg'
 

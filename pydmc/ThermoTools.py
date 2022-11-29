@@ -644,7 +644,7 @@ class ParallelHulls(object):
         if (remake == True) or not os.path.exists(fjson):
             hullin_data = {}
             pool = multip.Pool(processes=self.n_procs)
-            results = [r for r in pool.starmap(self.hullin_from_space, [(space, verbose) for space in hull_spaces])]
+            results = [r for r in pool.starmap(self.hullin_from_space, [(space, verbose) for space in chemical_spaces])]
             pool.close()
             hullin_data = dict(zip(chemical_spaces, results))
             return write_json(hullin_data, fjson)
