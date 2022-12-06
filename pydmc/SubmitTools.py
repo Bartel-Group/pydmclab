@@ -290,11 +290,12 @@ class SubmitTools(object):
                 if status == 'DONE':
                     f.write('\necho working on %s >> %s\n' % (tag, fstatus))
                     f.write('echo %s is done >> %s\n' % (tag.split('_')[1], fstatus))
-                elif status == 'CONTINUE':
-                    f.write('\necho working on %s >> %s\n' % (tag, fstatus))
-                    f.write('cp %s %s\n' % (os.path.join(calc_dir, 'CONTCAR'), os.path.join(calc_dir, 'POSCAR')))
-                elif status == 'NEWRUN':
-                    f.write('\necho working on %s >> %s\n' % (tag, fstatus))
+                else:
+                    if status == 'CONTINUE':
+                        f.write('\necho working on %s >> %s\n' % (tag, fstatus))
+                        f.write('cp %s %s\n' % (os.path.join(calc_dir, 'CONTCAR'), os.path.join(calc_dir, 'POSCAR')))
+                    if status == 'NEWRUN':
+                        f.write('\necho working on %s >> %s\n' % (tag, fstatus))
                     
                     if xc in ['gga', 'ggau']:
                         if calc == 'loose':
