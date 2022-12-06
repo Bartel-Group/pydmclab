@@ -282,6 +282,7 @@ class SubmitTools(object):
                     f.write('%s --%s=%s\n' % (manager, key, str(option)))
             f.write('\n\n')
             f.write('ulimit -s unlimited\n')
+            f.write('\necho This JOBID = $SLURM_JOBID\n')
             tags = self.prepare_directories
             for tag in tags:
                 status = tag.split('_')[0]
