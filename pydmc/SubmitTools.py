@@ -33,7 +33,7 @@ class SubmitTools(object):
                     {'mag' : 'afm',
                     'standard' : 'mp',
                     'nodes' : 2,
-                    'walltime' : '96:00:00',
+                    'time' : '96:00:00',
                     'job-name' : SOMETHING_SPECIFIC}
                     
             magmom (list) - list of magnetic moments for each atom in structure
