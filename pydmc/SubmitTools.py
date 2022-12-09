@@ -113,7 +113,24 @@ class SubmitTools(object):
         """
         configs = self.configs
         vasp_exec = os.path.join(configs.vasp_dir, configs.vasp)
-        return '\n%s --ntasks=%s --mpi=pmi2 %s > %s' % (configs.mpi_command, str(self.slurm_options['ntasks']), vasp_exec, configs.fvaspout)
+        return '\n%s --ntasks=%s --mpi=pmi2 %s > %s\n' % (configs.mpi_command, str(self.slurm_options['ntasks']), vasp_exec, configs.fvaspout)
+    
+    @property
+    def lobster_command(self):
+        """
+        Returns command used to execute lobster
+        """
+        lobster = '/home/cbartel/shared/bin/lobster/lobster-4.1.0/lobster-4.1.0'
+        return '\n%s\n' % lobster
+    
+    @property
+    def bader_command(self):
+        """
+        Returns command used to execute bader
+        """
+        chgsum = '/home/cbartel/shared/bin/bader/chgsum.pl AECCAR0 AECCAR2'
+        bader = '/home/cbartel/shared/bin/bader/bader CHGCAR -ref CHGCAR_sum'
+        return '\n%s\n%s\n' % (chgsum, bader)
     
     @property
     def calcs(self):
@@ -347,6 +364,10 @@ class SubmitTools(object):
                     
                     f.write('cd %s\n' % calc_dir)
                     f.write('%s\n' % vasp_command)
+                    if calc == 'static':
+                        if self.configs['lobster_static']:
+                            f.write(self.lobster_command)
+                            f.write(self.vasp_command)
                     f.write('\necho launched %s-%s >> %s\n' % (xc, calc, fstatus))
                 
 def main():

@@ -4,11 +4,13 @@ from pydmc.StrucTools import StrucTools, SiteTools
 
 import os
 import warnings
+from shutil import copyfile
 
 from pymatgen.io.vasp.sets import MPRelaxSet, MPScanRelaxSet
-from pymatgen.io.vasp.outputs import Vasprun, Outcar
+from pymatgen.io.vasp.outputs import Vasprun, Outcar, Eigenval
 from pymatgen.core.structure import Structure
 from pymatgen.io.vasp.inputs import Kpoints
+from pymatgen.io.lobster import Lobsterin
 
 """
 Holey Moley, getting pymatgen to find your POTCARs is not trivial...
@@ -33,7 +35,8 @@ class VASPSetUp(object):
                  calc_dir,
                  magmom=None,
                  fvaspout='vasp.o',
-                 fvasperrors='errors.o',):
+                 fvasperrors='errors.o',
+                 lobster_static=True):
         """
         Args:
             calc_dir (os.PathLike) - directory where I want to execute VASP
@@ -42,6 +45,7 @@ class VASPSetUp(object):
                 - only needed for AFM calculations where orderings would have been determined using MagTools separately
             fvaspout (str) - name of file to write VASP output to
             fvasperrors (str) - name of file to write VASP errors to
+            lobster_static (bool) - if True, run LOBSTER on static calculations
             
         Returns:
             calc_dir (os.PathLike) - directory where I want to execute VASP
@@ -62,11 +66,10 @@ class VASPSetUp(object):
             self.structure = Structure.from_file(fpos)
             
         self.magmom = magmom
-        
         self.fvaspout = fvaspout
         self.fvasperrors = fvasperrors
+        self.lobster_static = lobster_static
 
-        
     def get_vasp_input(self,
                       standard='mp',
                       xc='gga',
@@ -147,7 +150,7 @@ class VASPSetUp(object):
             
             **kwargs - additional arguments for VASPSet
         """
-        
+              
         if verbose:
             # tell user what they are modifying in case they are trying to match MP or other people's calculations
             if standard and modify_incar:
@@ -278,6 +281,12 @@ class VASPSetUp(object):
             modify_incar['LORBIT'] = 11
         #print(modify_incar)    
         # initialize new VASPSet
+        
+        if self.lobster_static and (calc == 'static'):
+            modify_incar['NEDOS'] = 4000
+            modify_incar['ISTART'] = 0
+            modify_incar['LAECHG'] = True
+            
         vasp_input = vaspset(s, 
                              user_incar_settings=modify_incar, 
                              user_kpoints_settings=modify_kpoints, 
@@ -297,6 +306,22 @@ class VASPSetUp(object):
 #        print(vasp_input.incar)
 #        print('\n\n\n')
         vasp_input.write_input(self.calc_dir)
+        
+        if self.lobster_static:
+            va = VASPAnalysis(self.calc_dir)
+            if va.incar_parameters['NSW'] == 0:
+                INCAR_input = os.path.join(self.calc_dir, 'INCAR_input')
+                INCAR_output = os.path.join(self.calc_dir, 'INCAR')
+                copyfile(INCAR_output, INCAR_input)
+                lobsterin = Lobsterin.standard_calculations_from_vasp_files(POSCAR_input=os.path.join(self.calc_dir, 'POSCAR'),
+                                                                            INCAR_input=INCAR_input,
+                                                                            POTCAR_input=os.path.join(self.calc_dir, 'POTCAR'),
+                                                                            option='standard')
+                lobsterin.write_lobsterin(os.path.join(self.calc_dir, 'lobsterin'))
+                lobsterin.write_INCAR(INCAR_input=INCAR_input,
+                                      INCAR_output=INCAR_output)
+                
+            
         return vasp_input
     
     @property
@@ -507,7 +532,32 @@ class VASPAnalysis(object):
             return oc
         except:
             return None
+        
+    @property
+    def eigenval(self):
+        """
+        Returns Eigenval object from EIGENVAL in calc_dir
+        """
+        feigenval = os.path.join(self.calc_dir, 'EIGENVAL')
+        if not os.path.exists(feigenval):
+            return None
+        
+        try:
+            ev = Eigenval(os.path.join(self.calc_dir, 'EIGENVAL'))
+            return ev
+        except:
+            return None
       
+    @property
+    def nbands(self):
+        """
+        Returns number of bands from EIGENVAL
+        """
+        ev = self.eigenval
+        if ev:
+            return ev.nbands
+        else:
+            return None
     
     @property
     def is_converged(self):
