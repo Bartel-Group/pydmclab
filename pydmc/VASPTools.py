@@ -318,8 +318,8 @@ class VASPSetUp(object):
                                                                             POTCAR_input=os.path.join(self.calc_dir, 'POTCAR'),
                                                                             option='standard')
                 lobsterin.write_lobsterin(os.path.join(self.calc_dir, 'lobsterin'))
-                lobsterin.write_INCAR(INCAR_input=INCAR_input,
-                                      INCAR_output=INCAR_output)
+                lobsterin.write_INCAR(incar_input=INCAR_input,
+                                      incar_output=INCAR_output)
                 
             
         return vasp_input
