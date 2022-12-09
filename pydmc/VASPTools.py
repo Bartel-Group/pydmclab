@@ -9,7 +9,7 @@ from shutil import copyfile
 from pymatgen.io.vasp.sets import MPRelaxSet, MPScanRelaxSet
 from pymatgen.io.vasp.outputs import Vasprun, Outcar, Eigenval
 from pymatgen.core.structure import Structure
-from pymatgen.io.vasp.inputs import Kpoints
+from pymatgen.io.vasp.inputs import Kpoints, Incar
 from pymatgen.io.lobster import Lobsterin
 
 """
@@ -604,7 +604,11 @@ class VASPAnalysis(object):
         """
         Returns dict of VASP input settings from vasprun.xml
         """
-        return self.vasprun.parameters
+        vr = self.vasprun
+        if vr:
+            return vr.parameters
+        else:
+            return Incar(os.path.join(self.calc_dir, 'INCAR')).as_dict()
     
     @property
     def sites_to_els(self):
@@ -636,6 +640,15 @@ class VASPAnalysis(object):
                         for idx in sorted([i for i in sites_to_els if sites_to_els[i] == el])} 
                             for el in els}
         
+    @property
+    def clean_dos(self):
+        """
+        Returns dict of clean DOS from vasprun.xml
+        """
+        vr = self.vasprun
+        if not vr:
+            return {}
+        return vr.complete_dos.as_dict()
         
 def main():
     from pydmc.MPQuery import MPQuery    
