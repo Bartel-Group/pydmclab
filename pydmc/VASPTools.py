@@ -205,7 +205,7 @@ class VASPSetUp(object):
             # use 500 K-points per recip atom if not doing a "loose" calculation
             if calc != 'loose':
                 if not modify_kpoints:
-                    modify_kpoints = {'reciprocal_density' : 500}
+                    modify_kpoints = {'reciprocal_density' : 100}
                 
             # turn off +U unless we are specifying GGA+U    
             if xc != 'ggau':
