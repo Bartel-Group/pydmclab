@@ -187,6 +187,7 @@ class VASPSetUp(object):
         # don't mess with much if trying to match Materials Project
         if standard == 'mp':
             fun = 'default'
+            modify_kpoints = {'reciprocal_density' : 64}
         
         # setting DMC standards --> what to do on top of MPRelaxSet or MPScanRelaxSet
         if standard == 'dmc':
@@ -202,10 +203,10 @@ class VASPSetUp(object):
                 if key not in modify_incar:
                     modify_incar[key] = dmc_standard_configs[key]
 
-            # use reciprocal_density = 100 means 100*volume (A**3) = # kpoints (https://pymatgen.org/_modules/pymatgen/io/vasp/sets.html)
+            # use length = 25 means reciprocal space discretization of 25 K-points per Å−1
             if calc != 'loose':
                 if not modify_kpoints:
-                    modify_kpoints = {'reciprocal_density' : 100}
+                    modify_kpoints = {'length' : 25}
                 
             # turn off +U unless we are specifying GGA+U    
             if xc != 'ggau':
