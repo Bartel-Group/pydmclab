@@ -1,6 +1,7 @@
 from pydmc.handy import read_json, write_json
 from pydmc.MagTools import MagTools
 from pydmc.StrucTools import StrucTools, SiteTools
+from pydmc.CompTools import CompTools
 
 import os
 import warnings
@@ -10,7 +11,8 @@ from pymatgen.io.vasp.sets import MPRelaxSet, MPScanRelaxSet
 from pymatgen.io.vasp.outputs import Vasprun, Outcar, Eigenval
 from pymatgen.core.structure import Structure
 from pymatgen.io.vasp.inputs import Kpoints, Incar
-from pymatgen.io.lobster import Lobsterin
+from pymatgen.io.lobster.inputs import Lobsterin
+from pymatgen.io.lobster.outputs import Doscar
 
 """
 Holey Moley, getting pymatgen to find your POTCARs is not trivial...
@@ -648,14 +650,85 @@ class VASPAnalysis(object):
                             for el in els}
         
     @property
-    def clean_dos(self):
+    def fdoscar(self):
+        fdoscar = os.path.join(self.calc_dir, 'DOSCAR.lobster')
+        if not os.path.exists(fdoscar):
+            fdoscar = fdoscar.replace('.lobster', '')
+            if not os.path.exists(fdoscar):
+                return None
+    
+    @property
+    def els_to_orbs(self):
+        if not (self.fdoscar and 'lobster' in self.fdoscar):
+            return None
+        s_orbs = ['s']
+        p_orbs = ['p_x', 'p_y', 'p_z']
+        d_orbs = ['d_xy', 'd_yz', 'd_z^2', 'd_xz', 'd_(x^2-y^2)']
+        f_orbs = ['f_y(3x^2-y^2)', 'f_xyz', 'f_yz^2', 'f_z^3', 'f_xz^2', 'f_z(x^2-y^2)', 'f_x(x^2-3y^2)']
+        all_orbitals = {'s' : s_orbs,
+                        'p' : p_orbs,
+                        'd' : d_orbs,
+                        'f' : f_orbs}
+        
+        data = {}
+        with open(os.path.join(self.calc_dir, 'lobsterin')) as f:
+            for line in f:
+                if 'basisfunctions' in line:
+                    line = line[:-1].split(' ')
+                    el = line[1]
+                    basis = line[1:-1]
+                    data[el] = basis
+        orbs = {}
+        for el in data:
+            orbs[el] = {}
+            for basis in data[el]:
+                number = basis[0]
+                letter = basis[1]
+                orbitals = number+[v for v in all_orbitals[letter]]
+                orbs[el] = orbitals
+        return orbs
+    
+    @property
+    def sites_to_orbs(self):
+        sites_to_els = self.sites_to_els
+        els_to_orbs = self.els_to_orbs
+        out = {}
+        for site in sites_to_els:
+            el = sites_to_els[site]
+            orbs = els_to_orbs[el]
+            out[site] = orbs
+        return out
+
+    def dos(self, fjson=None, remake=False):
         """
         Returns dict of clean DOS from vasprun.xml
         """
-        vr = self.vasprun
-        if not vr:
-            return {}
-        return vr.complete_dos.as_dict()
+        if not (self.fdoscar and 'lobster' in self.fdoscar):
+            raise NotImplementedError('Need a DOSCAR.lobster file')
+        if not fjson:
+            fjson = os.path.join(self.calc_dir, 'dos.json')
+        if os.path.exists(fjson) and not remake:
+            return read_json(fjson)
+        
+        fdoscar = self.fdoscar
+        if not fdoscar:
+            return None
+        complete_dos = Doscar(doscar=fdoscar,
+                                structure_file=os.path.join(self.calc_dir, 'POSCAR')).completedos
+        
+        sites_to_orbs = self.sites_to_orbs
+        s = self.contcar
+        out = {}
+        for site_idx in sites_to_orbs:
+            site = s[site_idx]
+            orbitals = sites_to_orbs[site_idx]
+            for orbital in orbitals:
+                dos = complete_dos.get_site_orbital_dos(site, orbital).as_dict()
+                energies = dos['energies']
+                for spin in dos['densities']:
+                    out[spin] = dict(zip(energies, dos['densities'][spin]))
+        return write_json(out, fjson)
+                
         
 def main():
     from pydmc.MPQuery import MPQuery    
