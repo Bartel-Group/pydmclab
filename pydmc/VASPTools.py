@@ -202,7 +202,7 @@ class VASPSetUp(object):
                 if key not in modify_incar:
                     modify_incar[key] = dmc_standard_configs[key]
 
-            # use 500 K-points per recip atom if not doing a "loose" calculation
+            # use reciprocal_density = 100 means 100*volume (A**3) = # kpoints (https://pymatgen.org/_modules/pymatgen/io/vasp/sets.html)
             if calc != 'loose':
                 if not modify_kpoints:
                     modify_kpoints = {'reciprocal_density' : 100}
