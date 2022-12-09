@@ -656,6 +656,7 @@ class VASPAnalysis(object):
             fdoscar = fdoscar.replace('.lobster', '')
             if not os.path.exists(fdoscar):
                 return None
+        return fdoscar
     
     @property
     def els_to_orbs(self):
