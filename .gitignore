@@ -133,6 +133,5 @@ dmypy.json
 # VASP calcs
 pydmc/examples/*/calcs/*/*/*/*/*
 
-
 # bash-run stuff
 pydmc/*.py~
