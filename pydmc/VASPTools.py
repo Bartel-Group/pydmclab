@@ -313,13 +313,16 @@ class VASPSetUp(object):
                 INCAR_input = os.path.join(self.calc_dir, 'INCAR_input')
                 INCAR_output = os.path.join(self.calc_dir, 'INCAR')
                 copyfile(INCAR_output, INCAR_input)
-                lobsterin = Lobsterin.standard_calculations_from_vasp_files(POSCAR_input=os.path.join(self.calc_dir, 'POSCAR'),
+                POSCAR_input = os.path.join(self.calc_dir, 'POSCAR')
+                POTCAR_input = os.path.join(self.calc_dir, 'POTCAR')
+                lobsterin = Lobsterin.standard_calculations_from_vasp_files(POSCAR_input=POSCAR_input,
                                                                             INCAR_input=INCAR_input,
-                                                                            POTCAR_input=os.path.join(self.calc_dir, 'POTCAR'),
+                                                                            POTCAR_input=POTCAR_input,
                                                                             option='standard')
                 lobsterin.write_lobsterin(os.path.join(self.calc_dir, 'lobsterin'))
                 lobsterin.write_INCAR(incar_input=INCAR_input,
-                                      incar_output=INCAR_output)
+                                      incar_output=INCAR_output,
+                                      poscar_input=POSCAR_input)
                 
             
         return vasp_input
