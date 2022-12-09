@@ -202,10 +202,10 @@ class VASPSetUp(object):
                 if key not in modify_incar:
                     modify_incar[key] = dmc_standard_configs[key]
 
-            # use KSPACING instead of KPOINTS if not doing a "loose" calculation
+            # use 500 K-points per recip atom if not doing a "loose" calculation
             if calc != 'loose':
-                if 'KSPACING' not in modify_incar:
-                    modify_incar['KSPACING'] = 0.22
+                if not modify_kpoints:
+                    modify_kpoints = {'reciprocal_density' : 500}
                 
             # turn off +U unless we are specifying GGA+U    
             if xc != 'ggau':
@@ -286,6 +286,9 @@ class VASPSetUp(object):
             modify_incar['NEDOS'] = 4000
             modify_incar['ISTART'] = 0
             modify_incar['LAECHG'] = True
+            if not modify_kpoints:
+                # need KPOINTS file for LOBSTER
+                modify_kpoints = {'reciprocal_density' : 500}
             
         vasp_input = vaspset(s, 
                              user_incar_settings=modify_incar, 

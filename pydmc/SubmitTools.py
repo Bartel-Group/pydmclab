@@ -367,7 +367,7 @@ class SubmitTools(object):
                     if calc == 'static':
                         if self.configs['lobster_static']:
                             f.write(self.lobster_command)
-                            f.write(self.vasp_command)
+                            f.write(self.bader_command)
                     f.write('\necho launched %s-%s >> %s\n' % (xc, calc, fstatus))
                 
 def main():
