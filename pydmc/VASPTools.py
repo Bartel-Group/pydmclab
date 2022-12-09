@@ -608,7 +608,7 @@ class VASPAnalysis(object):
         if vr:
             return vr.parameters
         else:
-            return Incar(os.path.join(self.calc_dir, 'INCAR')).as_dict()
+            return Incar.from_file(os.path.join(self.calc_dir, 'INCAR')).as_dict()
     
     @property
     def sites_to_els(self):
