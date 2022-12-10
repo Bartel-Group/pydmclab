@@ -783,7 +783,11 @@ class VASPAnalysis(object):
             - also has a key "total" : 1d array of total DOS (summed over all orbitals over all e-)
             - also has a key "E" just like in pdos (1d array of energies aligning with each DOS)
 
-        @TODO: add demo/test, add to plotting
+        @TODO: add demo/test
+        @TODO: explore for magnetic materials
+        @TODO: add options for summing or not summing spins
+        @TODO: work on generic plotting
+        @TODO: work on COHPCAR/COOPCAR
         """
         if not (self.fdoscar and 'lobster' in self.fdoscar):
             raise NotImplementedError('Need a DOSCAR.lobster file')
