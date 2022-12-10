@@ -6,6 +6,7 @@ from pydmc.CompTools import CompTools
 import os
 import warnings
 from shutil import copyfile
+import numpy as np
 
 from pymatgen.io.vasp.sets import MPRelaxSet, MPScanRelaxSet
 from pymatgen.io.vasp.outputs import Vasprun, Outcar, Eigenval
@@ -651,6 +652,11 @@ class VASPAnalysis(object):
         
     @property
     def fdoscar(self):
+        """
+        Path to DOSCAR for DOS analysis
+            - for now, just DOSCAR.lobster is usable
+        
+        """
         fdoscar = os.path.join(self.calc_dir, 'DOSCAR.lobster')
         if not os.path.exists(fdoscar):
             fdoscar = fdoscar.replace('.lobster', '')
@@ -660,6 +666,11 @@ class VASPAnalysis(object):
     
     @property
     def els_to_orbs(self):
+        """
+        Returns:
+            {element (str) : [list of orbitals (str) considered in calculation]}
+        
+        """
         if not (self.fdoscar and 'lobster' in self.fdoscar):
             return None
         s_orbs = ['s']
@@ -677,20 +688,28 @@ class VASPAnalysis(object):
                 if 'basisfunctions' in line:
                     line = line[:-1].split(' ')
                     el = line[1]
-                    basis = line[1:-1]
+                    basis = line[2:-1]
                     data[el] = basis
+        #print(data)
         orbs = {}
         for el in data:
-            orbs[el] = {}
+            orbs[el] = []
             for basis in data[el]:
                 number = basis[0]
                 letter = basis[1]
-                orbitals = number+[v for v in all_orbitals[letter]]
-                orbs[el] = orbitals
+                #print(number)
+                #print(letter)
+                #print('\n')
+                orbitals = [number+v for v in all_orbitals[letter]]
+                orbs[el] += orbitals
         return orbs
     
     @property
     def sites_to_orbs(self):
+        """
+        Returns:
+            {site index (int) : [list of orbitals (str) considered in calculation]}
+        """
         sites_to_els = self.sites_to_els
         els_to_orbs = self.els_to_orbs
         out = {}
@@ -700,14 +719,29 @@ class VASPAnalysis(object):
             out[site] = orbs
         return out
 
-    def dos(self, fjson=None, remake=False):
+    def pdos(self, fjson=None, remake=False):
         """
-        Returns dict of clean DOS from vasprun.xml
+        Returns complex dict of projected DOS data
+            - uses DOSCAR.lobster as of now (must run LOBSTER first)
+        
+        Returns:
+            {element (str) :
+                {site index in CONTCAR (int) :
+                    {orbital (str) (e.g., '2p_x') :
+                        {spin (str) (e.g., '1' or ???) : 
+                            {DOS (float)}}}}}
+            NOTE: there is one more key in the first level
+                {'E' : 1d array of energies corresponding with DOS}
+                - so when looping through elements, you must
+                    for el in pdos:
+                        if el != 'E':
+                            ...
+            
         """
         if not (self.fdoscar and 'lobster' in self.fdoscar):
             raise NotImplementedError('Need a DOSCAR.lobster file')
         if not fjson:
-            fjson = os.path.join(self.calc_dir, 'dos.json')
+            fjson = os.path.join(self.calc_dir, 'pdos.json')
         if os.path.exists(fjson) and not remake:
             return read_json(fjson)
         
@@ -718,51 +752,80 @@ class VASPAnalysis(object):
                                 structure_file=os.path.join(self.calc_dir, 'POSCAR')).completedos
         
         sites_to_orbs = self.sites_to_orbs
+        sites_to_els = self.sites_to_els
         s = self.contcar
         out = {}
         for site_idx in sites_to_orbs:
             site = s[site_idx]
+            el = sites_to_els[site_idx]
             orbitals = sites_to_orbs[site_idx]
+            if el not in out:
+                out[el] = {site_idx : {}}
+            else:
+                out[el][site_idx] = {}
             for orbital in orbitals:
+                out[el][site_idx][orbital] = {}
                 dos = complete_dos.get_site_orbital_dos(site, orbital).as_dict()
                 energies = dos['energies']
                 for spin in dos['densities']:
-                    out[spin] = dict(zip(energies, dos['densities'][spin]))
+                    out[el][site_idx][orbital][spin] = dos['densities'][spin]
+        out['E'] = energies
         return write_json(out, fjson)
                 
+    def tdos(self, pdos=None, fjson=None, remake=False):
+        """
+        Returns more compact dict than pdos
+            - uses DOSCAR.lobster as of now (must run LOBSTER first)
+        
+        Returns:
+            {element (str) :
+                1d array of DOS (float) summed for all orbitals, spins, and sites having that element}
+            - also has a key "total" : 1d array of total DOS (summed over all orbitals over all e-)
+            - also has a key "E" just like in pdos (1d array of energies aligning with each DOS)
+
+        @TODO: add demo/test, add to plotting
+        """
+        if not (self.fdoscar and 'lobster' in self.fdoscar):
+            raise NotImplementedError('Need a DOSCAR.lobster file')
+        if not fjson:
+            fjson = os.path.join(self.calc_dir, 'tdos.json')
+        if os.path.exists(fjson) and not remake:
+            return read_json(fjson)       
+        if not pdos:
+            pdos = self.pdos
+        out = {}
+        energies = pdos['E']
+        for el in pdos:
+            if el == 'E':
+                continue
+            out[el] = np.zeros(len(energies))
+            for site in pdos[el]:
+                for orb in pdos[el][site]:
+                    for spin in pdos[el][site][orb]:
+                        out[el] += np.array(pdos[el][site][orb][spin])
+        out['total'] = np.zeros(len(energies))
+        print(out['total'][690])
+        for el in out:
+            if el == 'total':
+                continue
+            out['total'] += np.array(out[el])
+            print(el)
+            print(out[el][690])
+            print(out['total'][690])
+
+        out['E'] = energies
+        for k in out:
+            out[k] = list(out[k])
+        return write_json(out, fjson)
         
 def main():
-    from pydmc.MPQuery import MPQuery    
-    remake = False
-    mpid = 'mp-770495'
-    calc_dir = os.path.join(os.getcwd(), '..', 'dev', mpid)
-    if not os.path.exists(calc_dir):
-        os.mkdir(calc_dir)
-    fpos = os.path.join(calc_dir, 'POSCAR')
-    if not os.path.exists(fpos) or remake:
-        mpq = MPQuery('***REMOVED***')
-        s = mpq.get_structure_by_material_id(mpid)
-        s.to(filename=os.path.join(calc_dir, 'POSCAR'))
-        
-    f_magmoms = os.path.join(calc_dir, 'magmoms.json')
-    if not f_magmoms or remake:
-        s = Structure.from_file(fpos)
-        mt = MagTools(s)
-        out = mt.get_antiferromagnetic_structures
-        
-        magmoms = {str(i) : out[i].site_properties['magmom'] for i in range(len(out))}
-        
-        magmoms = write_json(magmoms, f_magmoms)
-    magmoms = read_json(f_magmoms)
-    vsu = VASPSetUp(calc_dir, magmom=magmoms['10'])
-    vsu = vsu.prepare_calc(standard='mp', 
-                           mag='afm', 
-                           xc='metagga', 
-                           calc='static')
+    calc_dir = 'examples/vasp_dmc/data/gga-static-LiF-lobster'
+    va = VASPAnalysis(calc_dir)
     
-    print(calc_dir)
-    
-    return vsu
+    pdos = va.pdos(remake=False)
+    tdos = va.tdos(remake=True, pdos=read_json(os.path.join(calc_dir, 'pdos.json')))
+    #tdos = None
+    return pdos, tdos
 
 if __name__ == '__main__':
-    vsu = main()
+    pdos, tdos = main()
