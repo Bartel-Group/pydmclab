@@ -249,7 +249,8 @@ class SubmitTools(object):
                 vsu = VASPSetUp(calc_dir=calc_dir, 
                                 magmom=self.magmom,
                                 fvaspout=self.configs.fvaspout,
-                                fvasperrors=self.configs.fvasperrors) 
+                                fvasperrors=self.configs.fvasperrors,
+                                lobster_static=self.configs.lobster_static) 
                 
                 calc_configs = {'modify_%s' % input_file.lower() : 
                     configs['%s_%s' % (calc, input_file)] for input_file in ['INCAR', 'KPOINTS', 'POTCAR']}
