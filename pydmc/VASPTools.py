@@ -187,6 +187,11 @@ class VASPSetUp(object):
                 raise ValueError('provided magmom that is not AFM, but you are trying to run an AFM calculation\n')
             s.add_site_property('magmom', magmom)
 
+        # MP wants to set W_pv but we don't have that one in PBE54 (no biggie)
+        if not modify_potcar:
+            modify_potcar = {'W' : 'W'}
+        elif isinstance(modify_potcar, dict):
+            modify_potcar['W'] = 'W'
         # don't mess with much if trying to match Materials Project
         if standard == 'mp':
             fun = 'default'
@@ -194,10 +199,6 @@ class VASPSetUp(object):
                 modify_kpoints = {'reciprocal_density' : 64}
             elif isinstance(modify_kpoints, dict):
                 modify_kpoints['reciprocal_density'] = 64
-            if not modify_potcar:
-                modify_potcar = {'W' : 'W'}
-            elif isinstance(modify_potcar, dict):
-                modify_potcar['W'] = 'W'
         # setting DMC standards --> what to do on top of MPRelaxSet or MPScanRelaxSet
         if standard == 'dmc':
             fun = 'default' # same functional
