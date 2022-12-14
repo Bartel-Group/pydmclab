@@ -307,6 +307,11 @@ class SubmitTools(object):
                 calc_dir = os.path.join(self.launch_dir, '-'.join([xc, calc]))
                 if status == 'DONE':
                     f.write('\necho working on %s >> %s\n' % (tag, fstatus))
+                    if self.configs['lobster_static']:
+                        if not os.path.exists(os.path.join(calc_dir, 'lobsterout')):
+                            f.write(self.lobster_command)
+                        if not os.path.exists(os.path.join(calc_dir, 'ACF.dat')):
+                            f.write(self.bader_command)
                     f.write('echo %s is done >> %s\n' % (tag.split('_')[1], fstatus))
                 else:
                     if status == 'CONTINUE':
