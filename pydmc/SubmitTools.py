@@ -214,12 +214,9 @@ class SubmitTools(object):
                     continue
                 parents = []
                 if calc == 'static':
-                    for possible_parent in ['loose', 'relax']:
+                    for possible_parent in ['relax']:
                         if possible_parent in calcs:
                             parents.append(possible_parent)
-                elif calc == 'relax':
-                    if 'loose' in calcs:
-                        parents.append('loose')
 
                 # (1) create calc_dir
                 tag = '%s-%s' % (xc, calc)
