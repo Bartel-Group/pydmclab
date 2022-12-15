@@ -212,6 +212,15 @@ class SubmitTools(object):
                 if (xc == 'metagga') and (calc == 'loose') and configs.xc_sequence:
                     print('not running loose metagga')
                     continue
+                parents = []
+                if calc == 'static':
+                    for possible_parent in ['loose', 'relax']:
+                        if possible_parent in calcs:
+                            parents.append(possible_parent)
+                elif calc == 'relax':
+                    if 'loose' in calcs:
+                        parents.append('loose')
+
                 # (1) create calc_dir
                 tag = '%s-%s' % (xc, calc)
                 calc_dir = os.path.join(self.launch_dir, tag)
@@ -223,7 +232,15 @@ class SubmitTools(object):
                 
                 # (2) check convergence
                 convergence = VASPAnalysis(calc_dir).is_converged
-                if convergence and not fresh_restart:
+                all_parents_converged = True
+                for parent in parents:
+                    parent_tag = '%s-%s' % (xc, parent)
+                    parent_calc_dir = os.path.join(self.launch_dir, parent_tag)
+                    parent_convergence = VASPAnalysis(parent_calc_dir).is_converged
+                    if not parent_convergence:
+                        all_parents_converged = False
+                        print('%s (parent) not converged, need to continue this calc' % parent_tag)
+                if convergence and all_parents_converged and not fresh_restart:
                     print('%s is already converged; skipping' % tag)
                     status = 'DONE'
                     tags.append('%s_%s' % (status, tag))
@@ -260,13 +277,10 @@ class SubmitTools(object):
                 # (6) check for errors in continuing jobs
                 if status in ['CONTINUE', 'NEWRUN']:
                     calc_is_clean = vsu.is_clean
-#                    print('\n---------------- CALC IS CLEAN ---------\n')
                     if not calc_is_clean:
-#                        print('\n\n\n\nCHECKING CLEANLINESS\n\n\n\n')
                         incar_changes = vsu.incar_changes_from_errors
                         calc_configs['modify_incar'] = {**calc_configs['modify_incar'], **incar_changes}
-#                        print('new configs = %s' % calc_configs)
-#                        print('\n\n\n')
+
                 # (7) prepare calc_dir to launch  
                 vsu.prepare_calc(calc=calc,
                                 xc=xc,
