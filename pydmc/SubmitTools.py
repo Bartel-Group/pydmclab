@@ -377,6 +377,10 @@ class SubmitTools(object):
                                 fdst = os.path.join(calc_dir, 'POSCAR')
                             else:
                                 fdst = os.path.join(calc_dir, file_to_inherit)
+                            if file_to_inherit == 'CONTCAR':
+                                contents = open(fsrc).readlines()
+                                if len(contents) < 0:
+                                    continue
                             f.write('cp %s %s\n' % (fsrc, fdst))
                     
                     f.write('cd %s\n' % calc_dir)
