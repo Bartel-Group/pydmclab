@@ -500,6 +500,7 @@ class VASPSetUp(object):
             incar_changes['ISYM'] = -1
         if 'nelm_too_low' in self.unconverged_log:
             incar_changes['NELM'] = 399
+            incar_changes['ALGO'] = 'All'
         if 'nsw_too_low' in self.unconverged_log:
             incar_changes['NSW'] = 399
         return incar_changes
