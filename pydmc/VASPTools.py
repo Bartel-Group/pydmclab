@@ -31,7 +31,7 @@ class VASPSetUp(object):
     """
     Use to write VASP inputs for a single initial structure
     
-    Also changes inputs based on erros that are encountered
+    Also changes inputs based on errors that are encountered
     """
     
     def __init__(self, 
@@ -389,6 +389,21 @@ class VASPSetUp(object):
         
     @property
     def unconverged_log(self):
+        """
+        checks to see if both ionic and electronic convergence have been reached
+            if calculation had NELM # electronic steps, electronic convergence may not be met
+            if calculation had NSW # ionic steps, ionic convergence may not be met
+        
+        returns a list, unconverged, that can have 0, 1, or 2 items
+            if unconverged = []:
+                the calculation either:
+                    1) didn't finish (vasprun.xml not found or incomplete)
+                    2) both ionic and electronic convergence were met
+            if 'nelm_too_low' in unconverged:
+                the calculation didn't reach electronic convergence
+            if 'nsw_too_low' in unconverged:
+                the calculation didn't reach ionic convergence
+        """
         va = VASPAnalysis(self.calc_dir)
         unconverged = []
         if va.is_converged:
@@ -478,7 +493,7 @@ class VASPSetUp(object):
                 os.remove(wavecar)
             incar_changes['ALGO'] = 'Normal'
         if 'subspacematrix' in errors:
-            incar_changes['LREAL'] = 'FALSE'
+            incar_changes['LREAL'] = False
             incar_changes['PREC'] = 'Accurate'
         if 'inv_rot_mat' in errors:
             incar_changes['SYMPREC'] = 1e-8
@@ -503,6 +518,8 @@ class VASPSetUp(object):
             incar_changes['ALGO'] = 'All'
         if 'nsw_too_low' in self.unconverged_log:
             incar_changes['NSW'] = 399
+        if 'real_optlay' in errors:
+            incar_changes['LREAL'] = False
         return incar_changes
             
 class VASPAnalysis(object):
