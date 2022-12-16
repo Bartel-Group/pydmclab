@@ -388,6 +388,31 @@ class VASPSetUp(object):
         }
         
     @property
+    def unconverged_log(self):
+        va = VASPAnalysis(self.calc_dir)
+        unconverged = []
+        if va.is_converged:
+            return unconverged
+        
+        vr = va.vasprun
+        if not vr:
+            return unconverged
+        
+        electronic_convergence = vr.converged_electronic
+        if 'relax' in self.calc_dir:
+            ionic_convergence = vr.converged_ionic
+        else:
+            ionic_convergence = True
+            
+        if not electronic_convergence:
+            unconverged.append('nelm_too_low')
+        if not ionic_convergence:
+            unconverged.append('nsw_too_low')
+            
+        return unconverged
+        
+        
+    @property
     def error_log(self):
         """
         Parse fvaspout for error messages
@@ -419,7 +444,7 @@ class VASPSetUp(object):
             with open(os.path.join(self.calc_dir, self.fvasperrors), 'w') as f:
                 f.write('')
             return clean       
-        errors = self.error_log
+        errors = self.error_log + self.unconverged_log
         if len(errors) == 0:
             return True
         with open(os.path.join(self.calc_dir, self.fvasperrors), 'w') as f:
@@ -473,7 +498,10 @@ class VASPSetUp(object):
             incar_changes['SYMPREC'] = 1e-5
             incar_changes['ISMEAR'] = 0
             incar_changes['ISYM'] = -1
-        
+        if 'nelm_too_low' in self.unconverged_log:
+            incar_changes['NELM'] = 399
+        if 'nsw_too_low' in self.unconverged_log:
+            incar_changes['NSW'] = 399
         return incar_changes
             
 class VASPAnalysis(object):
@@ -528,7 +556,6 @@ class VASPAnalysis(object):
         fvasprun = os.path.join(self.calc_dir, 'vasprun.xml')
         if not os.path.exists(fvasprun):
             return None
-        
         try:
             vr = Vasprun(os.path.join(self.calc_dir, 'vasprun.xml'))
             return vr
