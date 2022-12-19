@@ -300,6 +300,11 @@ class VASPSetUp(object):
             if not modify_kpoints:
                 # need KPOINTS file for LOBSTER
                 modify_kpoints = {'reciprocal_density' : 500}
+        
+        if self.lobster_static:
+            if xc == 'metagga':
+                # gga-static will get ISYM = -1, so need to pass that to metagga
+                modify_incar['ISYM'] = -1
             
         vasp_input = vaspset(s, 
                              user_incar_settings=modify_incar, 
@@ -384,7 +389,8 @@ class VASPSetUp(object):
             "rhosyg": ["RHOSYG internal error"],
             "posmap": ["POSMAP internal error: symmetry equivalent atom not found"],
             "point_group": ["Error: point group operation missing"],
-            "ibzkpt" : ["internal error in subroutine IBZKPT"]
+            "ibzkpt" : ["internal error in subroutine IBZKPT"],
+            "bad_sym" : ["ERROR: while reading WAVECAR, plane wave coefficients changed"]
         }
         
     @property
@@ -520,6 +526,8 @@ class VASPSetUp(object):
             incar_changes['NSW'] = 399
         if 'real_optlay' in errors:
             incar_changes['LREAL'] = False
+        if 'bad_sym' in errors:
+            incar_changes['ISYM'] = -1
         return incar_changes
             
 class VASPAnalysis(object):
