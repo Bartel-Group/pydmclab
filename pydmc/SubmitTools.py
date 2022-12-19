@@ -245,6 +245,10 @@ class SubmitTools(object):
                 
                 # (3) check for POSCAR       
                 fpos_dst = os.path.join(calc_dir, 'POSCAR')
+                if os.path.exists(fpos_dst):
+                    contents = open(fpos_dst, 'r').readlines()
+                    if len(contents) == 0:
+                        copyfile(fpos_src, fpos_dst)
                 if not os.path.exists(fpos_dst):
                     copyfile(fpos_src, fpos_dst)
                 
