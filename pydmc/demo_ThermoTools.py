@@ -1,4 +1,4 @@
-USE_INSTALLED_PYDMC = True
+USE_INSTALLED_PYDMC = False
 
 if USE_INSTALLED_PYDMC:
     from pydmc.CompTools import CompTools
@@ -6,13 +6,15 @@ if USE_INSTALLED_PYDMC:
     from pydmc.ThermoTools import GetHullInputData, AnalyzeHull, ParallelHulls
     from pydmc.handy import read_json, write_json
     from pydmc.plotting import set_rc_params, tableau_colors    
-
+    from pydmc.data.loaders.reference_energies import mus_at_0K, mus_at_T
 else:
     from CompTools import CompTools
     from MPQuery import MPQuery
-    from ThermoTools import GetHullInputData, AnalyzeHull, ParallelHulls
+    from ThermoTools import GetHullInputData, AnalyzeHull, ParallelHulls, ChemPots
     from handy import read_json, write_json
     from plotting import set_rc_params, tableau_colors
+    from data.loaders.reference_energies import mus_at_0K, mus_at_T
+
 
 import matplotlib.pyplot as plt
 
@@ -262,17 +264,27 @@ def plot_to_check_success(
     
     fig.savefig(os.path.join(FIG_DIR, 'pd_demo_check.png'))
     
+def play_with_mus():
+    """
+    TO DO:
+        - quick tests worked but should do something more significant
+    """
+    return
+
 def main():
     # if True, re-grab data from MP
-    remake_query = True
+    remake_query = False
     # if True, re-calculate hull input data
-    remake_serial_hullin = True
+    remake_serial_hullin = False
     # if True, re-calculate hull output data
-    remake_serial_hullout = True
+    remake_serial_hullout = False
     # if True, re-calculate hull output data in parallel
-    remake_parallel_hullout = True
+    remake_parallel_hullout = False
     # if True, generate figure to check results
-    remake_figure_check = True
+    remake_figure_check = False
+    
+    # if True, test chemical potential stuff
+    remake_chemical_potentials = True
     
     # MP query for CHEMSYS
     gs = get_mp_data_for_chemsys(CHEMSYS, remake=remake_query)
