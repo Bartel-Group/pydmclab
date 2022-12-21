@@ -27,6 +27,18 @@ class MPCompatibilityTools(object):
             raise ValueError('Calculation in %s is not converged' % calc_dir)
 
     @property
+    def run_type(self):
+        calc_dir = self.calc_dir
+        calc = os.path.split(calc_dir)[-1]
+        xc = calc.split('-')[0]
+        if xc == 'ggau':
+            return 'GGA+U'
+        elif xc == 'gga':
+            return 'GGA'
+        elif xc == 'metagga':
+            return 'METAGGA'
+
+    @property
     def initial_entry(self):
         calc_dir = self.calc_dir
         structure = Structure.from_file(os.path.join(calc_dir, 'CONTCAR'))
@@ -35,7 +47,8 @@ class MPCompatibilityTools(object):
         E_per_at = VASPAnalysis(calc_dir).E_per_at
         return ComputedStructureEntry(structure=structure,
                                         energy=E_per_at*n_atoms,
-                                        composition=formula)
+                                        composition=formula,
+                                        parameters={'run_type' : self.run_type})
     @property
     def compatibility(self):
         return MaterialsProject2020Compatibility(compat_type='Advanced',
@@ -52,6 +65,7 @@ class MPCompatibilityTools(object):
         initial_entry = self.initial_entry
         return ComputedEntry(composition=initial_entry.composition,
                              energy=initial_entry.energy,
+                             parameters=initial_entry.parameters,
                              energy_adjustments=self.adjustments)
     
     @property
@@ -62,7 +76,7 @@ class MPCompatibilityTools(object):
         return uncorrected_E_per_at + correction_per_at
     
 def main():
-    calc_dir = '~/projects/compare_to_mp/calcs/Fe1S2/mp-1522/mp/fm/ggau-static'
+    calc_dir = '/panfs/jay/groups/26/cbartel/cbartel//projects/compare_to_mp/calcs/Fe1S2/mp-1522/mp/fm/ggau-static'
     compat = MPCompatibilityTools(calc_dir=calc_dir)
     return compat
 

@@ -3,3 +3,8 @@ launched gga-loose
 working on NEWRUN_gga-relax
 launched gga-relax
 working on NEWRUN_gga-static
+launched gga-static
+working on NEWRUN_metagga-relax
+launched metagga-relax
+working on NEWRUN_metagga-static
+relax is not done yet so this job is being killed
