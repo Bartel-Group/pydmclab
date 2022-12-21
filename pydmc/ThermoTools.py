@@ -819,6 +819,7 @@ class ChemPots(object):
     def __init__(self, 
                  temperature=0, 
                  xc='gga',
+                 functional='pbe',
                  standard='dmc',
                  partial_pressures={}, # atm
                  diatomics=['H', 'N', 'O', 'F', 'Cl'],
@@ -829,6 +830,7 @@ class ChemPots(object):
         Args:
             temperature (int) - temperature in Kelvin
             xc (str) - xc for DFT calculations
+            functional (str) - explicit functional for DFT claculations (don't include +U in name)
             standard (str) - standard for DFT calculations
             partial_pressures (dict) - {el (str) : partial pressure (atm)}
                 - adjusts chemical potential of gaseous species based on RTln(p/p0)
@@ -843,6 +845,7 @@ class ChemPots(object):
         """
         self.temperature = temperature
         self.xc = xc
+        self.functional = functional
         self.standard = standard
         self.partial_pressures = partial_pressures
         self.diatomics = diatomics
