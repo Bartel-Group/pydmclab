@@ -1,6 +1,6 @@
 from pydmc.CompTools import CompTools
 from pydmc.handy import read_json, write_json
-from pydmc.data.reference_energies import mus_at_0K, mus_at_T, mp2020_compatibility_dmus
+from pydmc.data.reference_energies import mus_at_0K, mus_at_T, mp2020_compatibility_dmus, mus_from_mp_no_corrections
 from pydmc.data.features import atomic_masses
 from pydmc.StrucTools import StrucTools
 
@@ -869,9 +869,12 @@ class ChemPots(object):
         """
 
         if self.temperature == 0:
-            all_mus = mus_at_0K()
-            els = sorted(list(all_mus[self.standard][self.functional].keys()))
-            mus = {el : all_mus[self.standard][self.functional][el]['mu'] for el in els}
+            if (self.standard == 'dmc') or ('meta' in self.xc):
+                all_mus = mus_at_0K()
+                els = sorted(list(all_mus[self.standard][self.functional].keys()))
+                mus = {el : all_mus[self.standard][self.functional][el]['mu'] for el in els}
+            elif (self.standard == 'mp') and ('meta' not in self.xc):
+                mus = mus_from_mp_no_corrections()
         else:
             allowed_Ts = list(range(300, 2100, 100))
             if self.temperature not in allowed_Ts:

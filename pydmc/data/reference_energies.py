@@ -40,3 +40,7 @@ def mp2020_compatibility_dmus():
             'superoxide' : {'O' : -0.161}}
     
     return data
+
+def mus_from_mp_no_corrections():
+    with open(os.path.join(DATA_PATH, "mus_from_mp_no_corrections.json")) as f:
+        return json.load(f)  
