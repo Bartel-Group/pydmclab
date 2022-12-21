@@ -1,6 +1,6 @@
 from pydmc.VASPTools import VASPSetUp, VASPAnalysis
 from pydmc.MagTools import MagTools
-from pydmc.handy import read_yaml, dotdict
+from pydmc.handy import read_yaml, dotdict, write_json, read_json
 from pymatgen.core.structure import Structure
 
 import os
@@ -10,7 +10,42 @@ import warnings
 
 
 HERE = os.path.dirname(os.path.abspath(__file__))
- 
+
+def is_calc_valid(structure,
+                  standard,
+                  xc,
+                  calc,
+                  mag,
+                  magmom,
+                  mag_override):
+    """
+    Returns:
+        True if calculation should be launched; 
+        False if some logic is violated
+    """
+    
+    if standard == 'mp':
+        if xc != 'ggau':
+            return False
+        
+    if not mag_override:
+        if mag == 'nm':
+            if MagTools(structure).could_be_magnetic:
+                return False
+        else:
+            if not MagTools(structure).could_be_magnetic:
+                return False
+        
+    if mag == 'afm':
+        if not magmom:
+            return False
+        
+    if xc == 'metagga':
+        if calc == 'loose':
+            return False
+        
+    return True
+
 class SubmitTools(object):
     
     def __init__(self,
@@ -452,8 +487,141 @@ class SubmitTools(object):
                     f.write('\necho launched %s-%s >> %s\n' % (xc, calc, fstatus))
         return True
                 
+class LaunchTools(object):
+    
+    def __init__(self,
+                 calcs_dir,
+                 structure,
+                 top_level='formula',
+                 unique_ID='my-1234',
+                 standards=['dmc'],
+                 xcs=['metagga'],
+                 compare_to_mp=False,
+                 n_afm_configs=0,
+                 magmoms=None,
+                 override_mag=False,
+                 relax=True
+                 ):
+        """
+        Args:
+        
+            calcs_dir (os.path): directory where calculations will be launched
+                - top_level will go at calcs_dir/top_level
+                
+            structure (Structure): pymatgen structure object
+            
+            top_level (str): top level directory
+                - if 'formula', use compact formula of structure
+                - if not 'formula', use top_level
+                    - could be whatever you want
+                    - for instance, if I were looking at Li_{x}Co10O20 at varying x values between 0 and 10,
+                        I might make top_level = LiCoO2
+            
+            unique_ID (str): level below top_level
+                - could be a material ID in materials project
+                - could be x in the example I described previously
+                - up to you
+        
+            compare_to_mp (bool): whether calculations will be compared to mp
+                - this will add standard = 'mp' to standards if it's not there already
+                - this will add xc = 'ggau' to xcs if it's not there already
+                
+            n_afm_configs (int): number of AFM configurations to run
+                - 0 means don't run AFM
+                
+            magmoms (dict): {index of configuration (int) : magmom (list) generated using MagTools}
+                - if None and n_afm_configs > 0, will be generated here
+            
+            relax (bool): whether structures will be relaxed
+                - this should almost always be true
+                
+            override_mag (bool): whether to run nm for mag systems or fm for nm systems
+                - this should almost always be false
+        """
+        
+        if not os.path.exists(calcs_dir):
+            os.mkdir(calcs_dir)
+            
+        self.calcs_dir = calcs_dir
+        self.structure = structure
+        self.top_level = top_level
+        self.unique_ID = unique_ID
+        self.standards = standards
+        self.xcs = xcs
+        self.compare_to_mp = compare_to_mp
+        self.n_afm_configs = n_afm_configs
+        self.override_mag = override_mag
+        self.relax = relax
+        
+        data_dir = calcs_dir.replace('calcs', 'data')
+        
+        if not os.path.exists(data_dir):
+            os.mkdir(data_dir)
+
+        if n_afm_configs > 0:
+            if not magmoms:
+                magtools = MagTools(structure)
+                afm_strucs = magtools.get_antiferromagnetic_structures
+                if afm_strucs:
+                    magmoms = {i : afm_strucs[i].site_properties['magmom'] for i in range(len(afm_strucs))}
+                    magmoms = write_json(magmoms, os.path.join(data_dir, '_'.join(unique_ID, 'magmoms.json')))
+        
+        self.magmoms = magmoms
+    
+    @property
+    def valid_calcs(self):
+        possible_calcs = ['loose', 'static', 'relax']
+        possible_mags = ['nm', 'fm'] + ['afm_%s' % str(i) for i in range(self.n_afm_configs)]
+        xcs = self.xcs
+        if 'metagga' in xcs:
+            if 'gga' not in xcs:
+                xcs.append('gga')
+                
+        standards = self.standards
+        if self.compare_to_mp:
+            if 'mp' not in standards:
+                standards.append('mp')
+        
+        out = {}
+        for standard in standards:
+            for xc in xcs:
+                for mag in possible_mags:
+                    for calc in possible_calcs:
+                        tag = '-'.join([standard, xc, mag, calc])
+                        if 'afm' in mag:
+                            magmoms = self.magmom
+                            idx = mag.split('_')[-1]
+                            if (idx in magmoms):
+                                magmom = magmoms[idx]
+                            elif str(idx) in magmoms:
+                                magmom = magmoms[str(idx)]
+                            else:
+                                magmom = None
+                        else:
+                            magmom = None
+                        validity = is_calc_valid(self.structure,
+                                                    standard,
+                                                    xc,
+                                                    calc,
+                                                    mag,
+                                                    magmom,
+                                                    self.mag_override)
+                        out[tag] = validity
+        valid_calcs = [tag for tag in out if out[tag]]
+        out = {}
+        unique_standards = list(set([tag.split('-')[0] for tag in valid_calcs]))
+        for standard in unique_standards:
+            out[standard] = {}
+            unique_xcs = list(set([tag.split('-')[1] for tag in valid_calcs if tag.split('-')[0] == standard]))
+            for unique_xc in unique_xcs:
+                out[standard][unique_xc] = {}
+                unique_mags = list(set([tag.split('-')[2] for tag in valid_calcs if tag.split('-')[0] == standard and tag.split('-')[1] == unique_xc]))
+                for unique_mag in unique_mags:
+                    out[standard][unique_xc][unique_mag] = list(set([tag.split('-')[3] for tag in valid_calcs if tag.split('-')[0] == standard and tag.split('-')[1] == unique_xc and tag.split('-')[2] == unique_mag]))
+        return out
+        
 def main():
-    return
+    
     from MPQuery import MPQuery
     from MagTools import MagTools
     mpq = MPQuery('***REMOVED***')
@@ -464,38 +632,7 @@ def main():
     #mpid = 'mp-776873' # Cr2O3
     s = mpq.get_structure_by_material_id(mpid)
     #s.make_supercell([3,3,3])
-    magtools = MagTools(s)
     
-    #return st, st, st
-    
-    s_nm, s_fm = magtools.get_nonmagnetic_structure, magtools.get_ferromagnetic_structure
-    
-    afm_strucs = magtools.get_antiferromagnetic_structures
-    
-    s_afm = afm_strucs[0]
-    afm_magmom = s_afm.site_properties['magmom']
-
-    launch_dirs = [os.path.join('..', 'dev', cmpd, mpid, mag) for mag in ['nm', 'fm', 'afm']]
-    strucs = [s_nm, s_fm, s_afm]
-    strucs = dict(zip(launch_dirs, strucs))
-    
-    for mag in ['nm', 'fm', 'afm']:
-        l = os.path.join('..', 'dev', cmpd, mpid, mag)
-        for l in launch_dirs:
-            if not os.path.exists(l):
-                os.makedirs(l)
-            s = strucs[l]
-            s.to(fmt='poscar', filename=os.path.join(l, 'POSCAR'))
-            if mag == 'afm':
-                magmom = afm_magmom
-            else:
-                magmom = None
-            sub = SubmitTools(launch_dir=l,
-                            magmom=magmom,
-                            user_configs={'fresh_restart': True,
-                                          'mag' : mag})
-            sub.write_sub
-            print(sub.magmom)
     return sub
     
 if __name__ == '__main__':
