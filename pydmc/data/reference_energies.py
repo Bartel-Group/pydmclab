@@ -12,7 +12,7 @@ def mus_at_T():
     with open(os.path.join(DATA_PATH, "elemental_gibbs_energies_T.json")) as f:
         return json.load(f)   
 
-def mp_dmus():
+def mp2020_compatibility_dmus():
     """
     from MP2020Compatibility (https://github.com/materialsproject/pymatgen/blob/master/pymatgen/entries/MP2020Compatibility.yaml)
     """
