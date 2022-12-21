@@ -1,6 +1,6 @@
 from pydmc.CompTools import CompTools
 from pydmc.handy import read_json, write_json
-from pydmc.data.reference_energies import mus_at_0K, mus_at_T, mp_dmus
+from pydmc.data.reference_energies import mus_at_0K, mus_at_T, mp2020_compatibility_dmus
 from pydmc.data.features import atomic_masses
 from pydmc.StrucTools import StrucTools
 
@@ -848,7 +848,7 @@ class ChemPots(object):
         self.diatomics = diatomics
         self.R = R
         if standard == 'mp':
-            mp_dmus = mp_dmus()
+            mp_dmus = mp2020_compatibility_dmus()
             for el in mp_dmus['anions']:
                 user_dmus[el] = mp_dmus['anions'][el]
             if xc == 'ggau':
