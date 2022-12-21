@@ -29,6 +29,7 @@ calc: relax # usually this is what we want unless you want an independent "stati
 potcar_functional: PBE_54 # probably don't change
 validate_magmom: False # probably don't change
 lobster_static: True # can make False if you don't want to run LOBSTER
+mag_override: False # if True, allows user to run nm calcs for mag systems and vice versa
 
 # may be desirable to pass various configs for each type of calculation
 # INCARs should be {INCAR_FLAG : value}
