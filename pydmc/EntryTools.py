@@ -64,5 +64,8 @@ class MPCompatibilityTools(object):
 def main():
     calc_dir = '~/projects/compare_to_mp/calcs/Fe1S2/mp-1522/mp/fm/ggau-static'
     compat = MPCompatibilityTools(calc_dir=calc_dir)
-    
+    return compat
+
+if __name__ == '__main__':
+    compat = main()
     
