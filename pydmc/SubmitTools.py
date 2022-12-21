@@ -106,11 +106,11 @@ class SubmitTools(object):
             
         if not mag_override:
             if mag == 'nm':
-                if MagTools(structure).could_be_magnetic():
+                if MagTools(structure).could_be_magnetic:
                     warnings.warn('this calc could be magnetic so not running nm; not setting up')
                     return False
             else:
-                if not MagTools(structure).could_be_magnetic():
+                if not MagTools(structure).could_be_magnetic:
                     warnings.warn('this calc shouldnt be magnetic so not running %s; not setting up' % mag)
                     return False
             

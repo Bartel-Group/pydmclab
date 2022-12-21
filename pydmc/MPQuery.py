@@ -2,7 +2,7 @@ from pydmc.CompTools import CompTools
 
 from pymatgen.ext.matproj import MPRester
 
-from mp_api.client import MPRester
+from mp_api.client import MPRester as new_MPRester
 
 import itertools
 
