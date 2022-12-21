@@ -38,3 +38,5 @@ def mp2020_compatibility_dmus():
                         'H': -0.179},
             'peroxide' : {'O' : -0.465},
             'superoxide' : {'O' : -0.161}}
+    
+    return data
