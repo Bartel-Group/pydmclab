@@ -156,7 +156,7 @@ class SubmitTools(object):
         configs = self.configs
         xc = configs.xc
         xc_sequence = configs.xc_sequence
-        if xc_sequence and (xc != 'gga'):
+        if xc_sequence and (xc not in ['gga', 'ggau']):
             xcs = ['gga', xc]
         else:
             xcs = [xc]
