@@ -1,13 +1,16 @@
 from pydmc.VASPTools import VASPSetUp, VASPAnalysis
+from pydmc.MagTools import MagTools
 from pydmc.handy import read_yaml, dotdict
 from pymatgen.core.structure import Structure
 
 import os
 from shutil import copyfile, rmtree
 
+import warnings
+
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-
+ 
 class SubmitTools(object):
     
     def __init__(self,
@@ -79,6 +82,50 @@ class SubmitTools(object):
         
         self.partitions = dotdict(read_yaml(fyaml_partitions))
            
+
+    @property
+    def is_calc_valid(self):
+        """
+        Returns:
+            True if calculation should be launched; 
+            False if some logic is violated
+        """
+        configs = self.configs
+        mag = configs.mag
+        standard = configs.standard
+        calc = configs.calc
+        xc = configs.xc
+        mag_override = configs.mag_override
+        structure = self.structure
+        magmom = self.magmom
+        
+        if standard == 'mp':
+            if xc != 'ggau':
+                warnings.warn('MP standard only applies to xc = GGA+U; not setting up')
+                return False
+            
+        if not mag_override:
+            if mag == 'nm':
+                if MagTools(structure).could_be_magnetic():
+                    warnings.warn('this calc could be magnetic so not running nm; not setting up')
+                    return False
+            else:
+                if not MagTools(structure).could_be_magnetic():
+                    warnings.warn('this calc shouldnt be magnetic so not running %s; not setting up' % mag)
+                    return False
+            
+        if mag == 'afm':
+            if not magmom:
+                warnings.warn('this calc is afm but no magmom specified; not setting up')
+                return False
+            
+        if xc == 'metagga':
+            if calc == 'loose':
+                warnings.warn('METAGGA inherits a GGA calc, so dont want to run "loose"; not setting up')
+                return False
+            
+        return True
+
 
     @property
     def slurm_manager(self):
@@ -208,6 +255,9 @@ class SubmitTools(object):
         fpos_src = os.path.join(self.launch_dir, 'POSCAR')
         tags = []
         for xc in xcs:
+            if (xc != 'ggau') and (configs.standard == 'mp'):
+                print('not running mp standard for anything but gga+u')
+                continue
             for calc in calcs:
                 if (xc == 'metagga') and (calc == 'loose') and configs.xc_sequence:
                     print('not running loose metagga')
@@ -299,6 +349,11 @@ class SubmitTools(object):
             - each submission script will launch a chain of jobs
         
         """
+        
+        is_calc_valid = self.is_calc_valid
+        if not is_calc_valid:
+            return False
+        
         configs = self.configs
         fsub = os.path.join(self.launch_dir, configs.fsub)
         fstatus = os.path.join(self.launch_dir, configs.fstatus)
@@ -395,6 +450,7 @@ class SubmitTools(object):
                             f.write(self.lobster_command)
                             f.write(self.bader_command)
                     f.write('\necho launched %s-%s >> %s\n' % (xc, calc, fstatus))
+        return True
                 
 def main():
     return

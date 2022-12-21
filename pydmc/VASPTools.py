@@ -19,12 +19,12 @@ from pymatgen.io.lobster.outputs import Doscar
 Holey Moley, getting pymatgen to find your POTCARs is not trivial...
 Here's the workflow I used:
     1) Download potpaw_LDA_PBE_52_54_orig.tar.gz from VASP
-    2) Extract the tar into a directory, we'll call it ~/bin/pp
+    2) Extract the tar into a directory, we'll call it FULL_PATH/bin/pp
     3) Download potpaw_PBE.tgz from VASP
-    4) Extract the tar INSIDE a directory: ~/bin/pp/potpaw_PBE
-    3) $ cd ~/bin
-    4) $ pmg config -p ~/bin/pp pymatgen_pot
-    5) $ pmg config -add PMG_VASP_PSP_DIR ~/bin/pymatgen_pot
+    4) Extract the tar INSIDE a directory: FULL_PATH/bin/pp/potpaw_PBE
+    3) $ cd FULL_PATH/bin
+    4) $ pmg config -p FULL_PATH/bin/pp pymatgen_pot
+    5) $ pmg config -add PMG_VASP_PSP_DIR FULL_PATH/bin/pymatgen_pot
     6) $ pmg config --add PMG_DEFAULT_FUNCTIONAL PBE_54
 
 """
@@ -41,7 +41,8 @@ class VASPSetUp(object):
                  magmom=None,
                  fvaspout='vasp.o',
                  fvasperrors='errors.o',
-                 lobster_static=True):
+                 lobster_static=True,
+                 mag_override=False):
         """
         Args:
             calc_dir (os.PathLike) - directory where I want to execute VASP
@@ -51,6 +52,7 @@ class VASPSetUp(object):
             fvaspout (str) - name of file to write VASP output to
             fvasperrors (str) - name of file to write VASP errors to
             lobster_static (bool) - if True, run LOBSTER on static calculations
+            mag_override (bool) - allows user to run nonmagnetic calcs for magnetic systems and vice versa
             
         Returns:
             calc_dir (os.PathLike) - directory where I want to execute VASP
@@ -74,6 +76,7 @@ class VASPSetUp(object):
         self.fvaspout = fvaspout
         self.fvasperrors = fvasperrors
         self.lobster_static = lobster_static
+        self.mag_override = mag_override
 
     def get_vasp_input(self,
                       standard='dmc',
@@ -93,7 +96,9 @@ class VASPSetUp(object):
             standard (str) - for generating consistent data
                 if not None:
                     options:
-                        - 'mp' - Materials Project 
+                        - 'mp' - Materials Project
+                            - this implies we want to compare energies to Materials Project, therefore strict adherence is required
+                            - standard = 'mp' can only be combined w/ xc = 'ggau' as this is what's in MP (currently - 12/2022) 
                         - 'dmc' - DMC 
                         - specify whatever you'd like ('high_cutoff', 'lobster', 'custom', 'strict_ediff')
                             - if it's not in ['mp', 'dmc'], it won't do anything to calc, but might be useful flag                    
@@ -155,7 +160,25 @@ class VASPSetUp(object):
             
             **kwargs - additional arguments for VASPSet
         """
-              
+        
+        if (standard == 'mp') and (xc != 'ggau'):
+            warnings.warn('standard = mp, but xc != ggau; not setting up\n')
+            return None
+        
+        if (calc == 'loose') and (xc == 'metagga'):
+            warnings.warn('calc = loose; xc = metagga; not setting up\n')
+            return None
+        
+        if (mag == 'nm') and (MagTools(self.structure).could_be_magnetic):
+            if self.mag_override == False:
+                warnings.warn('mag = nm, but structure could be magnetic\n')
+                return None
+            
+        if (mag != 'nm') and (MagTools(self.structure).could_be_magnetic == False):
+            if self.mag_override == False:
+                warnings.warn('mag != nm, but structure could not be magnetic\n')
+                return None
+            
         if verbose:
             # tell user what they are modifying in case they are trying to match MP or other people's calculations
             if standard and modify_incar:
@@ -327,6 +350,8 @@ class VASPSetUp(object):
         Write input files (INCAR, KPOINTS, POTCAR)
         """
         vasp_input = self.get_vasp_input(**kwargs)
+        if not vasp_input:
+            return None
 #        print('\n\n\n')
 #        print(vasp_input.incar)
 #        print('\n\n\n')
