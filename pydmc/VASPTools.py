@@ -76,7 +76,7 @@ class VASPSetUp(object):
         self.lobster_static = lobster_static
 
     def get_vasp_input(self,
-                      standard='mp',
+                      standard='dmc',
                       xc='gga',
                       calc='relax',
                       fun='default',
@@ -201,6 +201,7 @@ class VASPSetUp(object):
                 modify_kpoints = {'reciprocal_density' : 64}
             elif isinstance(modify_kpoints, dict):
                 modify_kpoints['reciprocal_density'] = 64
+                
         # setting DMC standards --> what to do on top of MPRelaxSet or MPScanRelaxSet
         if standard == 'dmc':
             fun = 'default' # same functional
@@ -239,7 +240,10 @@ class VASPSetUp(object):
                     modify_incar['GGA'] = fun.upper()
                 else:
                     modify_incar['GGA'] = 'PE'
-        
+
+            # for strict comparison to Materials Project GGA calculations, we need to use the old POTCARs
+            if standard == 'mp':
+                potcar_functional = None
         # start from MPScanRelaxSet for meta-GGA
         elif xc == 'metagga':
             vaspset = MPScanRelaxSet
