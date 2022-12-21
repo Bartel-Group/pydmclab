@@ -824,7 +824,7 @@ class ChemPots(object):
                  diatomics=['H', 'N', 'O', 'F', 'Cl'],
                  R=8.6173303e-5, # eV/K
                  user_chempots={},
-                 user_dmus={}):        
+                 user_dmus={}):
         """
         Args:
             temperature (int) - temperature in Kelvin
