@@ -58,5 +58,10 @@ class EntryTools(object):
                 raise NotImplementedError('need formation energy at 0 K for finite T stuff in pmg, will work on later')
             
     @property
-    def Ef(self):
-        return
+    def mp_corrected_E_per_at(self):
+        entry = self.entry
+        correction_per_fu = entry.correction
+        original_E_per_fu = entry.energy
+        n_atoms = CompTools(entry.composition.pretty_formula).n_atoms
+        return (original_E_per_fu + correction_per_fu)/n_atoms
+        
