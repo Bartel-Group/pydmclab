@@ -1,25 +1,27 @@
-USE_INSTALLED_PYDMC = False
+USE_INSTALLED_PYDMC = True
 
 if USE_INSTALLED_PYDMC:
     from pydmc.CompTools import CompTools
     from pydmc.MPQuery import MPQuery
-    from pydmc.ThermoTools import GetHullInputData, AnalyzeHull, ParallelHulls
+    from pydmc.ThermoTools import GetHullInputData, AnalyzeHull, ParallelHulls, ChemPots, FormationEnergy
     from pydmc.handy import read_json, write_json
     from pydmc.plotting import set_rc_params, tableau_colors    
-    from pydmc.data.loaders.reference_energies import mus_at_0K, mus_at_T
+    from pydmc.data.reference_energies import mus_at_0K, mus_at_T
 else:
     from CompTools import CompTools
     from MPQuery import MPQuery
-    from ThermoTools import GetHullInputData, AnalyzeHull, ParallelHulls, ChemPots
+    from ThermoTools import GetHullInputData, AnalyzeHull, ParallelHulls, ChemPots, FormationEnergy
     from handy import read_json, write_json
     from plotting import set_rc_params, tableau_colors
-    from data.loaders.reference_energies import mus_at_0K, mus_at_T
+    from data.reference_energies import mus_at_0K, mus_at_T
 
 
 import matplotlib.pyplot as plt
 
 import os
 import numpy as np
+
+set_rc_params()
 
 """
 This file currently tests the following classes in ThermoTools
@@ -263,12 +265,84 @@ def plot_to_check_success(
     #plt.show()
     
     fig.savefig(os.path.join(FIG_DIR, 'pd_demo_check.png'))
+
+def get_gs_elemental_energies_from_mp(remake=False):
+    fjson = os.path.join(DATA_DIR, 'mus_from_mp_no_corrections.json')
+    if not remake and os.path.exists(fjson):
+        return read_json(fjson)
     
-def play_with_mus():
+    mus = mus_at_0K()
+    
+    mp_pbe_mus = mus['mp']['pbe']
+    
+    mpq = MPQuery(api_key=API_KEY)
+    
+    mp_mus = {}
+    for el in mp_pbe_mus:
+        print(el)
+        my_mu = mp_pbe_mus[el]
+        el += '1'
+        query = mpq.get_data_for_comp(el, 
+                                      only_gs=True,
+                                      dict_key='cmpd')
+        
+        mp_mu = query[el]['E_mp']
+        mp_mus[el[:-1]] = mp_mu
+
+    return write_json(mp_mus, fjson)
+    
+def compare_my_mus_to_mp_mus():
     """
     TO DO:
         - quick tests worked but should do something more significant
     """
+    
+    mus = mus_at_0K()
+    
+    my_mp_pbe_mus = mus['mp']['pbe']
+    my_mp_pbe_mus = {el : my_mp_pbe_mus[el]['mu'] for el in my_mp_pbe_mus}
+    
+    mp_gs_mus_no_corrections = get_gs_elemental_energies_from_mp(remake=False)
+        
+    my_mus = []
+    mp_mus = []
+    for el in my_mp_pbe_mus:
+        my_mu = my_mp_pbe_mus[el]
+        mp_mu = mp_gs_mus_no_corrections[el]
+        
+        my_mus.append(my_mu)
+        mp_mus.append(mp_mu)
+        
+        diff = abs(my_mu - mp_mu)
+        
+        if diff > 0.1:
+            print(el)
+            print('ME = %.2f' % my_mu)
+            print('MP = %.2f' % mp_mu)
+            print('\n')
+    
+    fig = plt.figure()
+    ax = plt.subplot(111)
+    
+    xlim = min(my_mus + mp_mus), max(my_mus + mp_mus)
+    ylim = xlim
+    
+    ax = plt.scatter(my_mus, mp_mus,
+                     color='white',
+                     edgecolor='blue')
+    
+    ax = plt.plot(xlim, xlim, color='black', lw=1, ls='--')
+    
+    ax = plt.xlim(xlim)
+    ax = plt.ylim(ylim)
+    
+    ax = plt.xlabel('my mus (eV/at)')
+    ax = plt.ylabel('MP gs energies (eV/at)')
+    
+    
+    fig.savefig(os.path.join(FIG_DIR, 'my_mus_vs_mp_mus.png'))
+
+    
     return
 
 def main():
@@ -281,10 +355,11 @@ def main():
     # if True, re-calculate hull output data in parallel
     remake_parallel_hullout = False
     # if True, generate figure to check results
-    remake_figure_check = False
+    remake_hull_figure_check = False
     
     # if True, test chemical potential stuff
-    remake_chemical_potentials = True
+    
+    remake_mus_figure_check = True
     
     # MP query for CHEMSYS
     gs = get_mp_data_for_chemsys(CHEMSYS, remake=remake_query)
@@ -299,10 +374,13 @@ def main():
     p_hullout = parallel_get_hull_input_and_output_data(gs, remake=remake_parallel_hullout)
     
     # generate a graph that compares serial vs parallel hull output and also compares ThermoTools hull output to MP hull data
-    if remake_figure_check:
+    if remake_hull_figure_check:
         # %%
         plot_to_check_success(gs, hullout, p_hullout)
         # %%
+        
+    if remake_mus_figure_check:
+        compare_my_mus_to_mp_mus()
     return gs, hullin, hullout, p_hullout
 
 if __name__ == '__main__':

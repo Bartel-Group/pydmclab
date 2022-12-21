@@ -1,7 +1,7 @@
 from pydmc.CompTools import CompTools
 from pydmc.handy import read_json, write_json
-from pydmc.data.loaders.reference_energies import mus_at_0K, mus_at_T
-from pydmc.data.loaders.features import atomic_masses
+from pydmc.data.reference_energies import mus_at_0K, mus_at_T
+from pydmc.data.features import atomic_masses
 from pydmc.StrucTools import StrucTools
 
 import os
@@ -887,8 +887,7 @@ class ChemPots(object):
 class FormationEnergy(object):
     """
     TO DO:
-    
-    compute formation energies and modify them based on chemical potentials
+        - write tests/demo
     """
     
     def __init__(self,

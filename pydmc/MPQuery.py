@@ -211,8 +211,8 @@ class MPQuery(object):
                 if cmpd not in gs:
                     gs[cmpd] = entry
                 else:
-                    Ef_stored = gs[cmpd]['Ef_mp']
-                    Ef_check = entry['Ef_mp']
+                    Ef_stored = gs[cmpd]['E_mp']
+                    Ef_check = entry['E_mp']
                     if Ef_check < Ef_stored:
                         gs[cmpd] = entry
             query = [gs[k] for k in gs]

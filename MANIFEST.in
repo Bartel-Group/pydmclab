@@ -2,6 +2,5 @@ recursive-include pydmc/ *.yaml
 include README.md
 include pydmc/pydmc/*.yaml
 include pydmc/*.yaml
-include pydmc/data/*.json
-include pydmc/data/data/*.json
-include pydmc/data/loaders/*.py
+include pydmc/data_loaders/*.py
+include pydmc/data_loaders/data/*.json
