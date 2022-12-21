@@ -853,10 +853,10 @@ class ChemPots(object):
         if standard == 'mp':
             mp_dmus = mp2020_compatibility_dmus()
             for el in mp_dmus['anions']:
-                user_dmus[el] = mp_dmus['anions'][el]
+                user_dmus[el] = -mp_dmus['anions'][el]
             if xc == 'ggau':
                 for el in mp_dmus['U']:
-                    user_dmus[el] = mp_dmus['U'][el]
+                    user_dmus[el] = -mp_dmus['U'][el]
             
         self.user_dmus = user_dmus
         self.user_chempots = user_chempots
