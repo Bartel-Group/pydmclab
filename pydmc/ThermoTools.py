@@ -1,6 +1,6 @@
 from pydmc.CompTools import CompTools
 from pydmc.handy import read_json, write_json
-from pydmc.data.reference_energies import mus_at_0K, mus_at_T
+from pydmc.data.reference_energies import mus_at_0K, mus_at_T, mp_dmus
 from pydmc.data.features import atomic_masses
 from pydmc.StrucTools import StrucTools
 
@@ -818,7 +818,7 @@ class ChemPots(object):
     
     def __init__(self, 
                  temperature=0, 
-                 functional='pbe',
+                 xc='gga',
                  standard='dmc',
                  partial_pressures={}, # atm
                  diatomics=['H', 'N', 'O', 'F', 'Cl'],
@@ -828,7 +828,7 @@ class ChemPots(object):
         """
         Args:
             temperature (int) - temperature in Kelvin
-            functional (str) - functional for DFT calculations
+            xc (str) - xc for DFT calculations
             standard (str) - standard for DFT calculations
             partial_pressures (dict) - {el (str) : partial pressure (atm)}
                 - adjusts chemical potential of gaseous species based on RTln(p/p0)
@@ -842,14 +842,22 @@ class ChemPots(object):
                 - will override everything except user_chempots
         """
         self.temperature = temperature
-        self.functional = functional
+        self.xc = xc
         self.standard = standard
         self.partial_pressures = partial_pressures
         self.diatomics = diatomics
         self.R = R
+        if standard == 'mp':
+            mp_dmus = mp_dmus()
+            for el in mp_dmus['anions']:
+                user_dmus[el] = mp_dmus['anions'][el]
+            if xc == 'ggau':
+                for el in mp_dmus['U']:
+                    user_dmus[el] = mp_dmus['U'][el]
+            
         self.user_dmus = user_dmus
         self.user_chempots = user_chempots
-        
+                
     @property
     def chempots(self):
         """
