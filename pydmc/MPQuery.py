@@ -81,6 +81,7 @@ class NewMPQuery(object):
         return from_mp
         
 class MPQuery(object):
+    # Chris B API KEY = 
     """
     class to assist with downloading data from Materials Project
     
