@@ -1,9 +1,10 @@
-from pydmc.StrucTools import StrucTools 
+from pydmc.StrucTools import StrucTools, SiteTools
 import itertools
 import random
 from pymatgen.core.structure import Structure
 from pymatgen.transformations.site_transformations import ReplaceSiteSpeciesTransformation
 from pymatgen.analysis.structure_matcher import StructureMatcher
+
 
 """
 Using enumlib:
@@ -43,8 +44,10 @@ class MagTools(object):
             treat_as_nm (list): list of elements to treat as non-magnetic
                 - e.g., if you want to only explore various initial configurations for other element(s)
         """        
+        if isinstance(structure, dict):
+            structure = Structure.from_dict(structure)
         structure.remove_oxidation_states()
-        self.s = structure
+        self.structure = structure
         self.max_afm_combos = max_afm_combos
         self.fm_spins = fm_spins
         self.afm_spins = afm_spins
@@ -77,7 +80,7 @@ class MagTools(object):
         """
         list of elements (str) in structure that are magnetic
         """
-        els = StrucTools(self.s).els
+        els = StrucTools(self.structure).els
         magnetic_ions = self.magnetic_ions
         return sorted(list(set([el for el in els if el in magnetic_ions])))
     
@@ -87,13 +90,31 @@ class MagTools(object):
         True if any magnetic ions are in structure else False
         """
         return True if len(self.magnetic_ions_in_struc) > 0 else False
+
+    @property
+    def could_be_afm(self):
+        """
+        True if at least two magnetic sites in structure
+        """
+        if not self.could_be_magnetic:
+            return False
+        
+        magnetic_ions = self.magnetic_ions_in_struc
+        magnetic_sites = 0
+        structure = self.structure
+        for idx in range(len(structure)):
+            el = SiteTools(structure, idx).el
+            if el in magnetic_ions:
+                magnetic_sites += 1
+            if magnetic_sites > 1:
+                return True
         
     @property
     def get_nonmagnetic_structure(self):
         """
         Returns nonmagnetic Structure with magmom of zeros
         """       
-        s = self.s
+        s = self.structure
         magmom = [0 for i in range(len(s))]
         s_tmp = s.copy()
         s_tmp.add_site_property('magmom', magmom)
@@ -110,7 +131,7 @@ class MagTools(object):
         magnetic_ions_in_struc = self.magnetic_ions_in_struc
         if len(magnetic_ions_in_struc) == 0:
             return None
-        s = self.s
+        s = self.structure
         #magnetic_sites = [i for i in range(len(s)) if s[i].species_string in magnetic_ions_in_struc]
         magmom = [spins[0] if s[i].species_string not in magnetic_ions_in_struc else spins[1] for i in range(len(s))]
         s_tmp = s.copy()
@@ -252,8 +273,17 @@ class MagTools(object):
         print('made %i unique afm structures' % len(out))
         return out
         """
+
+    @property
+    def get_afm_magmoms(self):
+        afm_strucs = self.get_antiferromagnetic_structures
+        magmoms = {}
+        if afm_strucs:
+            for i in range(len(afm_strucs)):
+                magmoms[i] = afm_strucs[i].site_properties['magmom']
         
-    
+        return magmoms
+
 def main():
     from pydmc.MPQuery import MPQuery
     import os

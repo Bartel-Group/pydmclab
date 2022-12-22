@@ -21,7 +21,8 @@ class StrucTools(object):
                 - or None
                 
         """
-        
+        if isinstance(structure, dict):
+            structure = Structure.from_dict(structure)
         self.structure = structure
         self.ox_states = ox_states
         
