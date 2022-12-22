@@ -15,7 +15,7 @@ SLURM:
   constraint:  # may need this on some machines
   qos:  # may need this on some machines
   account: cbartel # may change on different machines
-  job-name: my-job # **change** to a unique identifier so you can easily cancel a certain job
+  job-name: None # **change** to a unique identifier so you can easily cancel a certain job
   partition: agsmall # lots of options
 
 

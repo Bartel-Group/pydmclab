@@ -102,6 +102,9 @@ class SubmitTools(object):
             if slurm_option in user_configs:
                 base_configs['SLURM'][slurm_option] = user_configs[slurm_option]
                 del user_configs[slurm_option]
+                
+        if not base_configs['SLURM']['job-name']:
+            base_configs['SLURM']['job-name'] = '.'.join([launch_dir.split('/')[-5:]])
 
         configs = {**base_configs, **user_configs}
         self.configs = dotdict(configs)
@@ -116,51 +119,6 @@ class SubmitTools(object):
         self.magmom = magmom
         
         self.partitions = dotdict(read_yaml(fyaml_partitions))
-           
-
-    @property
-    def is_calc_valid(self):
-        """
-        Returns:
-            True if calculation should be launched; 
-            False if some logic is violated
-        """
-        configs = self.configs
-        mag = configs.mag
-        standard = configs.standard
-        calc = configs.calc
-        xc = configs.xc
-        mag_override = configs.mag_override
-        structure = self.structure
-        magmom = self.magmom
-        
-        if standard == 'mp':
-            if xc != 'ggau':
-                warnings.warn('MP standard only applies to xc = GGA+U; not setting up')
-                return False
-            
-        if not mag_override:
-            if mag == 'nm':
-                if MagTools(structure).could_be_magnetic:
-                    warnings.warn('this calc could be magnetic so not running nm; not setting up')
-                    return False
-            else:
-                if not MagTools(structure).could_be_magnetic:
-                    warnings.warn('this calc shouldnt be magnetic so not running %s; not setting up' % mag)
-                    return False
-            
-        if mag == 'afm':
-            if not magmom:
-                warnings.warn('this calc is afm but no magmom specified; not setting up')
-                return False
-            
-        if xc == 'metagga':
-            if calc == 'loose':
-                warnings.warn('METAGGA inherits a GGA calc, so dont want to run "loose"; not setting up')
-                return False
-            
-        return True
-
 
     @property
     def slurm_manager(self):
@@ -238,7 +196,7 @@ class SubmitTools(object):
         configs = self.configs
         xc = configs.xc
         xc_sequence = configs.xc_sequence
-        if xc_sequence and (xc not in ['gga', 'ggau']):
+        if xc_sequence and (xc == 'metagga'):
             xcs = ['gga', xc]
         else:
             xcs = [xc]
@@ -500,7 +458,7 @@ class LaunchTools(object):
                  n_afm_configs=0,
                  magmoms=None,
                  override_mag=False,
-                 relax=True
+                 relax_geometry=True
                  ):
         """
         Args:
@@ -529,9 +487,10 @@ class LaunchTools(object):
             n_afm_configs (int): number of AFM configurations to run
                 - 0 means don't run AFM
                 
-            magmoms (dict): {index of configuration (int) : magmom (list) generated using MagTools}
+            magmoms (dict): path to json that contains {index of configuration (int) : magmom (list) generated using MagTools}
                 - if None and n_afm_configs > 0, will be generated here
-            
+                    - this is not advisable --> better to generate all afm magmoms for all materials, save as json, then pass that dict here
+
             relax (bool): whether structures will be relaxed
                 - this should almost always be true
                 
@@ -551,7 +510,7 @@ class LaunchTools(object):
         self.compare_to_mp = compare_to_mp
         self.n_afm_configs = n_afm_configs
         self.override_mag = override_mag
-        self.relax = relax
+        self.relax_geometry = relax_geometry
         
         data_dir = calcs_dir.replace('calcs', 'data')
         
@@ -564,14 +523,20 @@ class LaunchTools(object):
                 afm_strucs = magtools.get_antiferromagnetic_structures
                 if afm_strucs:
                     magmoms = {i : afm_strucs[i].site_properties['magmom'] for i in range(len(afm_strucs))}
-                    magmoms = write_json(magmoms, os.path.join(data_dir, '_'.join(unique_ID, 'magmoms.json')))
+                    #magmoms = write_json(magmoms, os.path.join(data_dir, '_'.join(unique_ID, 'magmoms.json')))
         
         self.magmoms = magmoms
     
     @property
     def valid_calcs(self):
-        possible_calcs = ['loose', 'static', 'relax']
-        possible_mags = ['nm', 'fm'] + ['afm_%s' % str(i) for i in range(self.n_afm_configs)]
+        if self.relax_geometry:
+            possible_calcs = ['loose', 'relax', 'static']
+        else:
+            possible_calcs = ['static']
+        
+        possible_mags = ['nm', 'fm']
+        if self.n_afm_configs > 0:
+            possible_mags += ['afm_%s' % str(i) for i in range(self.n_afm_configs)]
         xcs = self.xcs
         if 'metagga' in xcs:
             if 'gga' not in xcs:
@@ -582,12 +547,11 @@ class LaunchTools(object):
             if 'mp' not in standards:
                 standards.append('mp')
         
-        out = {}
+        out = []
         for standard in standards:
             for xc in xcs:
                 for mag in possible_mags:
                     for calc in possible_calcs:
-                        tag = '-'.join([standard, xc, mag, calc])
                         if 'afm' in mag:
                             magmoms = self.magmom
                             idx = mag.split('_')[-1]
@@ -606,19 +570,69 @@ class LaunchTools(object):
                                                     mag,
                                                     magmom,
                                                     self.mag_override)
-                        out[tag] = validity
-        valid_calcs = [tag for tag in out if out[tag]]
-        out = {}
-        unique_standards = list(set([tag.split('-')[0] for tag in valid_calcs]))
-        for standard in unique_standards:
-            out[standard] = {}
-            unique_xcs = list(set([tag.split('-')[1] for tag in valid_calcs if tag.split('-')[0] == standard]))
-            for unique_xc in unique_xcs:
-                out[standard][unique_xc] = {}
-                unique_mags = list(set([tag.split('-')[2] for tag in valid_calcs if tag.split('-')[0] == standard and tag.split('-')[1] == unique_xc]))
-                for unique_mag in unique_mags:
-                    out[standard][unique_xc][unique_mag] = list(set([tag.split('-')[3] for tag in valid_calcs if tag.split('-')[0] == standard and tag.split('-')[1] == unique_xc and tag.split('-')[2] == unique_mag]))
+                        if validity:
+                            out.append({'standard' : standard,
+                                        'xc' : xc,
+                                        'mag' : mag,
+                                        'calc' : calc})
+                        
         return out
+
+    @property
+    def launch_dirs(self):
+            
+        valid_calcs = self.valid_calcs
+        
+        idxs = [i for i in range(len(valid_calcs))]
+        valid_calcs = dict(zip(idxs, valid_calcs))
+        
+        launch_dirs = []
+    
+        level0 = self.calcs_dir
+        level1 = self.top_level
+        level2 = self.unique_ID
+        
+        unique_standards = sorted(list(set([d['standard'] for d in valid_calcs])))
+        
+        for standard in unique_standards:
+            standard_dir = os.path.join(level0, level1, level2, standard)
+            unique_xcs = [d['xc'] for d in valid_calcs if d['standard'] == standard]
+            if ('metagga' in unique_xcs) and ('gga' in unique_xcs):
+                unique_xcs.remove('gga')
+            for xc in unique_xcs:
+                xc_dir = os.path.join(standard_dir, xc)
+                unique_mags = [d['mag'] for d in valid_calcs if d['standard'] == standard and d['xc'] == xc]
+                for mag in unique_mags:
+                    mag_dir = os.path.join(xc_dir, mag)
+                    launch_dirs.append(mag_dir)
+        
+        return launch_dirs
+    
+    @property
+    def launch_dirs_to_tags(self):
+        launch_dirs = self.launch_dirs
+        valid_calcs = self.valid_calcs
+        
+        d = {}
+        for launch_dir in launch_dirs:
+            d[launch_dir] = []
+            standard, xc, mag = launch_dir.split('/')[-3:]
+            for calc in valid_calcs:
+                tag = '-'.join([calc['xc'], calc['calc']])
+                calc_standard, calc_xc, calc_mag = calc['standard'], calc['xc'], calc['mag']
+                if calc_standard == standard:
+                    if calc_mag == mag:
+                        if (calc_xc == xc) or ((calc_xc == 'gga') and (xc == 'metagga')):
+                            d[launch_dir].append(tag)
+                            
+        return d
+                
+    @property
+    def launch(self):
+        
+        """
+        Now go through launch dirs and call SubmitTools!!!
+        """
         
 def main():
     
