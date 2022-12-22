@@ -5,6 +5,7 @@ from pymatgen.core.structure import Structure
 
 import os
 from shutil import copyfile, rmtree
+import subprocess
 
 import warnings
 
@@ -32,11 +33,14 @@ def is_calc_valid(structure,
         if mag == 'nm':
             if MagTools(structure).could_be_magnetic:
                 return False
-        else:
+        elif 'afm' in mag:
+            if not MagTools(structure).could_be_afm:
+                return False
+        elif mag == 'fm':
             if not MagTools(structure).could_be_magnetic:
                 return False
         
-    if mag == 'afm':
+    if 'afm' in mag:
         if not magmom:
             return False
         
@@ -50,11 +54,15 @@ class SubmitTools(object):
     
     def __init__(self,
                  launch_dir,
-                 fyaml=os.path.join(os.getcwd(), 'base_configs.yaml'),
+                 valid_calcs,
+                 vasp_configs_yaml=os.path.join(os.getcwd(), '_vasp_configs.yaml'),
+                 slurm_configs_yaml=os.path.join(os.getcwd(), '_slurm_configs.yaml'),
+                 sub_configs_yaml=os.path.join(os.getcwd(), '_sub_configs.yaml'),
                  user_configs={},
                  magmom=None,
                  files_to_inherit=['WAVECAR', 'CONTCAR'],
-                 fyaml_partitions=os.path.join(HERE, 'partitions.yaml')):
+                 partitions_yaml=os.path.join(HERE, '_partitions.yaml'),
+                 refresh_configs=[]):
         
         """
         Args:
@@ -86,28 +94,43 @@ class SubmitTools(object):
         """
         
         self.launch_dir = launch_dir
-        
-        if not os.path.exists(fyaml):
-            pydmc_yaml = os.path.join(HERE, 'base_configs.yaml')
-            copyfile(pydmc_yaml, fyaml)
-        
-        base_configs = read_yaml(fyaml)
-        base_configs['SLURM']['time'] = int(base_configs['SLURM']['time'] / 60)
-        
-        slurm_options = ['nodes', 'time', 'job-name', 'partition',
-                         'account', 'error', 'output', 'mem',
-                         'time', 'ntasks', 'qos', 'constraint']
-        
-        for slurm_option in slurm_options:
-            if slurm_option in user_configs:
-                base_configs['SLURM'][slurm_option] = user_configs[slurm_option]
-                del user_configs[slurm_option]
-                
-        if not base_configs['SLURM']['job-name']:
-            base_configs['SLURM']['job-name'] = '.'.join([launch_dir.split('/')[-5:]])
+        self.valid_calcs = valid_calcs
 
-        configs = {**base_configs, **user_configs}
-        self.configs = dotdict(configs)
+        if not os.path.exists(vasp_configs_yaml) or ('vasp' in refresh_configs):
+            pydmc_vasp_configs_yaml = os.path.join(HERE, '_vasp_configs.yaml')
+            copyfile(pydmc_vasp_configs_yaml, vasp_configs_yaml)
+
+        if not os.path.exists(slurm_configs_yaml) or ('slurm' in refresh_configs):
+            pydmc_slurm_configs_yaml = os.path.join(HERE, '_slurm_configs.yaml')
+            copyfile(pydmc_slurm_configs_yaml, slurm_configs_yaml)
+        
+        if not os.path.exists(sub_configs_yaml) or ('sub' in refresh_configs):
+            pydmc_sub_configs_yaml = os.path.join(HERE, '_sub_configs.yaml')
+            copyfile(pydmc_sub_configs_yaml, sub_configs_yaml)
+            
+        slurm_configs = read_yaml(slurm_configs_yaml)
+        for option in slurm_configs:
+            if option in user_configs:
+                slurm_configs[option] = user_configs[option]
+                del user_configs[option]
+        
+        if not slurm_configs['job-name']:
+            slurm_configs['job-name'] = '.'.join(launch_dir.split('/')[-5:])
+        
+        self.slurm_configs = dotdict(slurm_configs)
+        
+        sub_configs = read_yaml(sub_configs_yaml)
+        for option in sub_configs:
+            if option in user_configs:
+                sub_configs[option] = user_configs[option]
+                del user_configs[option]
+
+        self.sub_configs = dotdict(sub_configs)
+
+        vasp_configs = read_yaml(vasp_configs_yaml)
+
+        vasp_configs = {**vasp_configs, **user_configs}
+        self.vasp_configs = dotdict(vasp_configs)
         
         fpos = os.path.join(launch_dir, 'POSCAR')
         if not os.path.exists(fpos):
@@ -118,14 +141,14 @@ class SubmitTools(object):
         self.files_to_inherit = files_to_inherit
         self.magmom = magmom
         
-        self.partitions = dotdict(read_yaml(fyaml_partitions))
+        self.partitions = dotdict(read_yaml(partitions_yaml))
 
     @property
-    def slurm_manager(self):
+    def queue_manager(self):
         """
-        Returns slurm manager (eg #SBATCH)
+        Returns queue manager (eg #SBATCH)
         """
-        return self.configs.manager
+        return self.sub_configs.manager
         
     @property
     def slurm_options(self):
@@ -133,7 +156,7 @@ class SubmitTools(object):
         Returns dictionary of slurm options
             - nodes, ntasks, walltime, etc
         """
-        options = self.configs.SLURM
+        options = self.slurm_configs
         options = {k : v for k, v in options.items() if v is not None}
         partitions = self.partitions
         partition_specs = partitions[options['partition']]
@@ -151,7 +174,7 @@ class SubmitTools(object):
         Returns command used to execute vasp
             e.g., 'mpirun -n 24 PATH_TO_VASP/vasp_std > vasp.o'
         """
-        configs = self.configs
+        configs = self.sub_configs
         vasp_exec = os.path.join(configs.vasp_dir, configs.vasp)
         return '\n%s --ntasks=%s --mpi=pmi2 %s > %s\n' % (configs.mpi_command, str(self.slurm_options['ntasks']), vasp_exec, configs.fvaspout)
     
@@ -178,9 +201,10 @@ class SubmitTools(object):
         Returns list of calcs to run 
             - (eg ['loose', 'relax', 'static'])
         """
-        configs = self.configs
-        calc = configs.calc
-        calc_sequence = configs.calc_sequence
+        vasp_configs = self.vasp_configs
+        sub_configs = self.sub_configs
+        calc = vasp_configs.calc
+        calc_sequence = sub_configs.calc_sequence
         if calc_sequence and (calc == 'relax'):
             calcs = ['loose', 'relax', 'static']
         else:
@@ -193,9 +217,10 @@ class SubmitTools(object):
         Returns list of exchange-correlation approaches to run
             - eg ['gga', 'metagga']
         """
-        configs = self.configs
-        xc = configs.xc
-        xc_sequence = configs.xc_sequence
+        vasp_configs = self.vasp_configs
+        sub_configs = self.sub_configs
+        xc = vasp_configs.xc
+        xc_sequence = sub_configs.xc_sequence
         if xc_sequence and (xc == 'metagga'):
             xcs = ['gga', xc]
         else:
@@ -241,61 +266,75 @@ class SubmitTools(object):
                                 'mag',
                                 'standard',
                                 'fun']
-        configs = self.configs
-        fresh_restart = configs.fresh_restart
+        vasp_configs = self.vasp_configs
+        sub_configs = self.sub_configs
+        fresh_restart = sub_configs.fresh_restart
         calcs = self.calcs
         xcs = self.xcs
-        fpos_src = os.path.join(self.launch_dir, 'POSCAR')
+        valid_calcs = self.valid_calcs
+        launch_dir = self.launch_dir
+
+        print('\n\n~~~~~ starting to work on %s ~~~~~\n\n' % launch_dir)
+
+
+        fpos_src = os.path.join(launch_dir, 'POSCAR')
         tags = []
         for xc in xcs:
-            if (xc != 'ggau') and (configs.standard == 'mp'):
-                print('not running mp standard for anything but gga+u')
-                continue
             for calc in calcs:
-                if (xc == 'metagga') and (calc == 'loose') and configs.xc_sequence:
-                    print('not running loose metagga')
+                xc_calc = '%s-%s' % (xc, calc)
+
+                # (0) make sure (xc, calc) combination is "valid" (determined with LaunchTools)
+                if xc_calc not in valid_calcs:
+                    print('     skipping %s b/c we probably dont need it' % xc_calc)
                     continue
-                parents = []
-                if calc == 'static':
-                    for possible_parent in ['relax']:
-                        if possible_parent in calcs:
-                            parents.append(possible_parent)
 
-                # (1) create calc_dir
-                tag = '%s-%s' % (xc, calc)
-                calc_dir = os.path.join(self.launch_dir, tag)
-
+                # (1) make calc_dir (or remove and remake if fresh_restart)
+                calc_dir = os.path.join(launch_dir, xc_calc)
                 if os.path.exists(calc_dir) and fresh_restart:
                     rmtree(calc_dir)
                 if not os.path.exists(calc_dir):
                     os.mkdir(calc_dir)
-                
-                # (2) check convergence
+
+                # (2) identify if given (xc, calc) has parents that need to finish first
+                parents = []
+                if calc == 'static':
+                    for possible_parent_calc in ['relax']:
+                        parent_xc_calc = '%s-%s' % (xc, possible_parent_calc)
+                        if parent_xc_calc in valid_calcs:
+                            parents.append(parent_xc_calc)
+                            
+                # (3) check convergence of current calc and parents
                 convergence = VASPAnalysis(calc_dir).is_converged
                 all_parents_converged = True
-                for parent in parents:
-                    parent_tag = '%s-%s' % (xc, parent)
-                    parent_calc_dir = os.path.join(self.launch_dir, parent_tag)
+                for parent_xc_calc in parents:
+                    parent_calc_dir = os.path.join(launch_dir, parent_xc_calc)
                     parent_convergence = VASPAnalysis(parent_calc_dir).is_converged
                     if not parent_convergence:
                         all_parents_converged = False
-                        print('%s (parent) not converged, need to continue this calc' % parent_tag)
+                        print('     %s (parent) not converged, need to continue this calc' % parent_xc_calc)
+
+                # if parents + current calc are converged, give it status = DONE
                 if convergence and all_parents_converged and not fresh_restart:
-                    print('%s is already converged; skipping' % tag)
+                    print('     %s is already converged; skipping' % xc_calc)
                     status = 'DONE'
-                    tags.append('%s_%s' % (status, tag))
+                    tags.append('%s_%s' % (status, xc_calc))
                     continue
                 
-                # (3) check for POSCAR       
+                # for jobs that are not DONE:
+
+                # (4) check for POSCAR
                 fpos_dst = os.path.join(calc_dir, 'POSCAR')
                 if os.path.exists(fpos_dst):
+                    # if there is a POSCAR, make sure its not empty
                     contents = open(fpos_dst, 'r').readlines()
+                    # if its empty, copy the initial structure to calc_dir
                     if len(contents) == 0:
                         copyfile(fpos_src, fpos_dst)
+                # if theres no POSCAR, copy the initial structure to calc_dir
                 if not os.path.exists(fpos_dst):
                     copyfile(fpos_src, fpos_dst)
                 
-                # (4) check for CONTCAR
+                # (5) check for CONTCAR. if one exists, if its not empty, and if not fresh_restart, mark this job as one to "CONTINUE" (ie later, we'll copy CONTCAR to POSCAR); otherwise, mark as NEWRUN
                 fcont_dst = os.path.join(calc_dir, 'CONTCAR')
                 if os.path.exists(fcont_dst):
                     contents = open(fcont_dst, 'r').readlines()
@@ -306,32 +345,37 @@ class SubmitTools(object):
                 else:
                     status = 'NEWRUN'
 
-                # (5) initialize VASPSetUp with configs
+                # (6) initialize VASPSetUp with configs
                 vsu = VASPSetUp(calc_dir=calc_dir, 
                                 magmom=self.magmom,
-                                fvaspout=self.configs.fvaspout,
-                                fvasperrors=self.configs.fvasperrors,
-                                lobster_static=self.configs.lobster_static) 
+                                fvaspout=sub_configs.fvaspout,
+                                fvasperrors=sub_configs.fvasperrors,
+                                lobster_static=vasp_configs.lobster_static) 
                 
+                # pass loose/static/relax_INCAR/KPOINTS/POTCAR from vasp_configs to this calc
                 calc_configs = {'modify_%s' % input_file.lower() : 
-                    configs['%s_%s' % (calc, input_file)] for input_file in ['INCAR', 'KPOINTS', 'POTCAR']}
+                    vasp_configs['%s_%s' % (calc, input_file)] for input_file in ['INCAR', 'KPOINTS', 'POTCAR']}
+                # pass the other vasp_configs to this calc
                 for key in prepare_calc_options:
-                    calc_configs[key] = configs[key]
+                    calc_configs[key] = vasp_configs[key]
                 
                 # (6) check for errors in continuing jobs
                 if status in ['CONTINUE', 'NEWRUN']:
                     calc_is_clean = vsu.is_clean
                     if not calc_is_clean:
+                        # change INCAR based on errors and include in calc_configs
                         incar_changes = vsu.incar_changes_from_errors
                         calc_configs['modify_incar'] = {**calc_configs['modify_incar'], **incar_changes}
 
+                print('--------- may be some warnings (POTCAR ones OK) ----------')
                 # (7) prepare calc_dir to launch  
                 vsu.prepare_calc(calc=calc,
                                 xc=xc,
                                 **calc_configs)
                 
-                print('prepared %s' % calc_dir)
-                tags.append('%s_%s' % (status, tag))
+                print('-------------- warnings should be done ---------------')
+                print('\n~~~~~ prepared %s ~~~~~\n' % calc_dir)
+                tags.append('%s_%s' % (status, xc_calc))
         return tags
    
     @property
@@ -343,37 +387,48 @@ class SubmitTools(object):
         
         """
         
-        is_calc_valid = self.is_calc_valid
-        if not is_calc_valid:
-            return False
+        vasp_configs = self.vasp_configs
+        sub_configs = self.sub_configs
+        slurm_configs = self.slurm_configs
         
-        configs = self.configs
-        fsub = os.path.join(self.launch_dir, configs.fsub)
-        fstatus = os.path.join(self.launch_dir, configs.fstatus)
+        launch_dir = self.launch_dir
         vasp_command = self.vasp_command
-        options = self.slurm_options
-        manager = self.slurm_manager
+        slurm_options = self.slurm_options
+        queue_manager = self.queue_manager
+
         xcs, calcs = self.xcs, self.calcs
+
         files_to_inherit = self.files_to_inherit
+
+        fsub = os.path.join(launch_dir, sub_configs.fsub)
+        
+        fstatus = os.path.join(launch_dir, sub_configs.fstatus)
+
         with open(fsub, 'w') as f:
             f.write('#!/bin/bash -l\n')
-            for key in options:
-                option = options[key]
-                if option:
-                    f.write('%s --%s=%s\n' % (manager, key, str(option)))
+            for key in slurm_options:
+                slurm_option = slurm_options[key]
+                if slurm_option:
+                    f.write('%s --%s=%s\n' % (queue_manager, key, str(slurm_option)))
             f.write('\n\n')
             f.write('ulimit -s unlimited\n')
             tags = self.prepare_directories
+            xc_calcs = [t.split('_')[1] for t in tags]
+            curr_xcs = [xc_calc.split('-')[0] for xc_calc in xc_calcs]
+            print('\n:::: writing sub now - %s ::::' % fsub)
             for tag in tags:
                 status = tag.split('_')[0]
                 xc, calc = tag.split('_')[1].split('-')
-                calc_dir = os.path.join(self.launch_dir, '-'.join([xc, calc]))
+                curr_calcs = [xc_calc.split('-')[1] for xc_calc in xc_calcs if xc_calc.split('-')[0] == xc]
+                curr_calcs = sorted(list(set(curr_calcs)))
+                
+                calc_dir = os.path.join(launch_dir, '-'.join([xc, calc]))
                 if status == 'DONE':
                     f.write('\necho working on %s >> %s\n' % (tag, fstatus))
-                    if self.configs['lobster_static']:
-                        if not os.path.exists(os.path.join(calc_dir, 'lobsterout')):
+                    if vasp_configs['lobster_static']:
+                        if not os.path.exists(os.path.join(calc_dir, 'lobsterout')) or sub_configs.force_postprocess:
                             f.write(self.lobster_command)
-                        if not os.path.exists(os.path.join(calc_dir, 'ACF.dat')):
+                        if not os.path.exists(os.path.join(calc_dir, 'ACF.dat')) or sub_configs.force_postprocess:
                             f.write(self.bader_command)
                     f.write('echo %s is done >> %s\n' % (tag.split('_')[1], fstatus))
                 else:
@@ -387,13 +442,13 @@ class SubmitTools(object):
                         if calc == 'loose':
                             pass_info = False
                         elif calc == 'relax':
-                            if 'loose' in calcs:
+                            if 'loose' in curr_calcs:
                                 pass_info = True
                                 calc_prev = 'loose'
                             else:
                                 pass_info = False
                         elif calc == 'static':
-                            if 'relax' in calcs:
+                            if 'relax' in curr_calcs:
                                 pass_info = True
                                 calc_prev = 'relax'
                             else:
@@ -401,14 +456,21 @@ class SubmitTools(object):
                         xc_prev = xc
                     elif xc in ['metagga']:
                         if calc == 'relax':
-                            if 'gga' in xcs:
+                            if 'gga' in curr_xcs:
                                 xc_prev = 'gga'
-                                calc_prev = 'static'
-                                pass_info = True
+                                if 'gga-static' in xc_calcs:
+                                    calc_prev = 'static'
+                                    pass_info = True
+                                elif 'gga-relax' in xc_calcs:
+                                    calc_prev = 'relax'
+                                    pass_info = True
+                                else:
+                                    print('no gga calc to pass from for metagga...')
+                                    pass_info = False
                             else:
                                 pass_info = False
                         elif calc == 'static':
-                            if 'relax' in calcs:
+                            if 'relax' in curr_calcs:
                                 pass_info = True
                                 calc_prev = 'relax'
                                 xc_prev = xc
@@ -416,7 +478,7 @@ class SubmitTools(object):
                                 pass_info = False
                     
                     if pass_info:
-                        src_dir = os.path.join(self.launch_dir, '-'.join([xc_prev, calc_prev]))
+                        src_dir = os.path.join(launch_dir, '-'.join([xc_prev, calc_prev]))
                         f.write('isInFile=$(cat %s | grep -c %s)\n' % (os.path.join(src_dir, 'OUTCAR'), 'Elaps'))
                         f.write('if [ $isInFile -eq 0 ]; then\n')
                         f.write('   echo "%s is not done yet so this job is being killed" >> %s\n' % (calc_prev, fstatus))
@@ -439,27 +501,59 @@ class SubmitTools(object):
                     f.write('cd %s\n' % calc_dir)
                     f.write('%s\n' % vasp_command)
                     if calc == 'static':
-                        if self.configs['lobster_static']:
-                            f.write(self.lobster_command)
-                            f.write(self.bader_command)
+                        if vasp_configs['lobster_static']:
+                            if not os.path.exists(os.path.join(calc_dir, 'lobsterout')) or sub_configs.force_postprocess:
+                                f.write(self.lobster_command)
+                            if not os.path.exists(os.path.join(calc_dir, 'ACF.dat')) or sub_configs.force_postprocess:
+                                f.write(self.bader_command)
                     f.write('\necho launched %s-%s >> %s\n' % (xc, calc, fstatus))
         return True
+    
+    @property
+    def launch_sub(self):
+        print('     now launching sub')
+        scripts_dir = os.getcwd()
+        launch_dir = self.launch_dir
+        sub_configs = self.sub_configs
+        fqueue = os.path.join(scripts_dir, sub_configs.fqueue)
+        job_name = self.slurm_configs['job-name']
+        with open(fqueue, 'w') as f:
+            subprocess.call(['squeue', '-u', '%s' % os.getlogin(), '--name=%s' % job_name], stdout=f)
+        names_in_q = []
+        with open(fqueue) as f:
+            for line in f:
+                if 'PARTITION' not in line:
+                    names_in_q.append([v for v in line.split(' ') if len(v) > 0][2])
+        if len(names_in_q) > 0:
+            print(' !!! job already in queue, not launching')
+            return
+
+        fsub = os.path.join(launch_dir, sub_configs.fsub)
+        flags_that_need_to_be_executed = ['srun', 'python', 'lobster', 'bader']
+        needs_to_launch = False
+        with open(fsub) as f:
+            contents = f.read()
+            for flag in flags_that_need_to_be_executed:
+                if flag in contents:
+                    needs_to_launch = True
+        if not needs_to_launch:
+            print(' !!! nothing to launch here, not launching\n\n')
+            return
+
+        os.chdir(launch_dir)
+        subprocess.call(['sbatch', 'sub.sh'])
+        os.chdir(scripts_dir)
                 
 class LaunchTools(object):
     
     def __init__(self,
                  calcs_dir,
                  structure,
+                 magmoms=None,
                  top_level='formula',
                  unique_ID='my-1234',
-                 standards=['dmc'],
-                 xcs=['metagga'],
-                 compare_to_mp=False,
-                 n_afm_configs=0,
-                 magmoms=None,
-                 override_mag=False,
-                 relax_geometry=True
-                 ):
+                 fyaml=os.path.join(os.getcwd(), '_launch_configs.yaml'),
+                 user_configs={}):
         """
         Args:
         
@@ -469,11 +563,9 @@ class LaunchTools(object):
             structure (Structure): pymatgen structure object
             
             top_level (str): top level directory
-                - if 'formula', use compact formula of structure
-                - if not 'formula', use top_level
-                    - could be whatever you want
-                    - for instance, if I were looking at Li_{x}Co10O20 at varying x values between 0 and 10,
-                        I might make top_level = LiCoO2
+        - could be whatever you want
+        - for instance, if I were looking at Li_{x}Co10O20 at varying x values between 0 and 10, I might make top_level = LiCoO2
+        - if I was just running a geometry relaxation on a given chemical formula (let's say LiTiS2), I would call the top_level = LiTiS2 or even better, Li1S2Ti1 (the CompTools(formula).clean standard)
             
             unique_ID (str): level below top_level
                 - could be a material ID in materials project
@@ -501,59 +593,71 @@ class LaunchTools(object):
         if not os.path.exists(calcs_dir):
             os.mkdir(calcs_dir)
             
-        self.calcs_dir = calcs_dir
-        self.structure = structure
-        self.top_level = top_level
-        self.unique_ID = unique_ID
-        self.standards = standards
-        self.xcs = xcs
-        self.compare_to_mp = compare_to_mp
-        self.n_afm_configs = n_afm_configs
-        self.override_mag = override_mag
-        self.relax_geometry = relax_geometry
+        if not os.path.exists(fyaml):
+            pydmc_yaml = os.path.join(HERE, 'launch_configs.yaml')
+            copyfile(pydmc_yaml, fyaml)
         
-        data_dir = calcs_dir.replace('calcs', 'data')
+        launch_configs = read_yaml(fyaml)
         
-        if not os.path.exists(data_dir):
-            os.mkdir(data_dir)
+        configs = {**launch_configs, **user_configs}
 
-        if n_afm_configs > 0:
-            if not magmoms:
-                magtools = MagTools(structure)
-                afm_strucs = magtools.get_antiferromagnetic_structures
-                if afm_strucs:
-                    magmoms = {i : afm_strucs[i].site_properties['magmom'] for i in range(len(afm_strucs))}
-                    #magmoms = write_json(magmoms, os.path.join(data_dir, '_'.join(unique_ID, 'magmoms.json')))
+        configs['top_level'] = top_level
+        configs['unique_ID'] = unique_ID
+        configs['calcs_dir'] = calcs_dir
         
-        self.magmoms = magmoms
+        if not isinstance(structure, dict):
+            structure = structure.as_dict()
+
+        configs['structure'] = structure
+
+        if configs['n_afm_configs'] > 0:
+            if MagTools(structure).could_be_afm:
+                if not magmoms:
+                    raise ValueError('You are running afm calculations but provided no magmoms, generate these first, then pass to LaunchTools')
+        
+        configs['magmoms'] = magmoms
+
+        standards = configs['standards'].copy()
+        if configs['compare_to_mp']:
+            if 'mp' not in standards:
+                standards.append('mp')
+
+        configs['standards'] = standards
+
+        self.configs = dotdict(configs)
+
     
     @property
     def valid_calcs(self):
-        if self.relax_geometry:
+        configs = self.configs
+        if configs.relax_geometry:
             possible_calcs = ['loose', 'relax', 'static']
         else:
             possible_calcs = ['static']
         
         possible_mags = ['nm', 'fm']
-        if self.n_afm_configs > 0:
-            possible_mags += ['afm_%s' % str(i) for i in range(self.n_afm_configs)]
-        xcs = self.xcs
+        if configs.n_afm_configs > 0:
+            possible_mags += ['afm_%s' % str(i) for i in range(configs.n_afm_configs)]
+
+        xcs = configs.xcs.copy()
         if 'metagga' in xcs:
             if 'gga' not in xcs:
                 xcs.append('gga')
-                
-        standards = self.standards
-        if self.compare_to_mp:
-            if 'mp' not in standards:
-                standards.append('mp')
-        
+
+        if configs.compare_to_mp:
+            if 'ggau' not in xcs:
+                xcs.append('ggau')
+
+        standards = configs.standards                
         out = []
         for standard in standards:
             for xc in xcs:
+                if (standard != 'mp') and (xc == 'ggau') and ('ggau' not in configs.xcs):
+                    continue
                 for mag in possible_mags:
                     for calc in possible_calcs:
                         if 'afm' in mag:
-                            magmoms = self.magmom
+                            magmoms = configs.magmoms
                             idx = mag.split('_')[-1]
                             if (idx in magmoms):
                                 magmom = magmoms[idx]
@@ -563,13 +667,13 @@ class LaunchTools(object):
                                 magmom = None
                         else:
                             magmom = None
-                        validity = is_calc_valid(self.structure,
+                        validity = is_calc_valid(configs.structure,
                                                     standard,
                                                     xc,
                                                     calc,
                                                     mag,
                                                     magmom,
-                                                    self.mag_override)
+                                                    configs.mag_override)
                         if validity:
                             out.append({'standard' : standard,
                                         'xc' : xc,
@@ -580,26 +684,24 @@ class LaunchTools(object):
 
     @property
     def launch_dirs(self):
+        configs = self.configs
             
         valid_calcs = self.valid_calcs
         
-        idxs = [i for i in range(len(valid_calcs))]
-        valid_calcs = dict(zip(idxs, valid_calcs))
-        
         launch_dirs = []
     
-        level0 = self.calcs_dir
-        level1 = self.top_level
-        level2 = self.unique_ID
+        level0 = configs.calcs_dir
+        level1 = configs.top_level
+        level2 = configs.unique_ID
         
         unique_standards = sorted(list(set([d['standard'] for d in valid_calcs])))
         
         for standard in unique_standards:
             standard_dir = os.path.join(level0, level1, level2, standard)
             unique_xcs = [d['xc'] for d in valid_calcs if d['standard'] == standard]
-            if ('metagga' in unique_xcs) and ('gga' in unique_xcs):
-                unique_xcs.remove('gga')
             for xc in unique_xcs:
+                if (xc == 'gga') and ('metagga' in unique_xcs):
+                    continue
                 xc_dir = os.path.join(standard_dir, xc)
                 unique_mags = [d['mag'] for d in valid_calcs if d['standard'] == standard and d['xc'] == xc]
                 for mag in unique_mags:
@@ -628,12 +730,123 @@ class LaunchTools(object):
         return d
                 
     @property
-    def launch(self):
+    def create_launch_dirs_and_make_POSCARs(self):
         
-        """
-        Now go through launch dirs and call SubmitTools!!!
-        """
+        launch_dirs = self.launch_dirs_to_tags
+        for launch_dir in launch_dirs:
+            if not os.path.exists(launch_dir):
+                os.makedirs(launch_dir)
         
+            fposcar = os.path.join(launch_dir, 'POSCAR')
+            if not os.path.exists(fposcar):
+                structure = Structure.from_dict(self.configs.structure)
+                structure.to(fmt='poscar', filename=fposcar)
+
+
+def make_sub_for_launcher():
+    flauncher_sub = os.path.join(os.getcwd(), 'sub_launch.sh')
+    launch_job_name = '-'.join([os.getcwd().split('/')[-2], 'launcher'])
+    with open(flauncher_sub, 'w') as f:
+        f.write('#!/bin/bash -l\n')
+        f.write('#SBATCH --nodes=1\n')
+        f.write('#SBATCH --ntasks=1\n')
+        f.write('#SBATCH --time=4:00:00\n')
+        f.write('#SBATCH --error=log_launch.e\n')
+        f.write('#SBATCH --output=log_launch.o\n')
+        f.write('#SBATCH --account=cbartel\n')
+        f.write('#SBATCH --job-name=%s\n' % launch_job_name)
+        f.write('#SBATCH --partition=msismall\n')
+        f.write('\npython launch.py\n')
+
+class BatchAnalysis(object):
+
+    def __init__(self,
+                 launch_dirs_to_tags):
+
+        self.launch_dirs_to_tags = launch_dirs_to_tags
+
+    def get_results(self,
+                    top_level_key='formula',
+                    magnetization=False,
+                    relaxed_structure=False,
+                    dos=None,
+                    use_static=True,
+                    check_relax=0.1):
+        launch_dirs = self.launch_dirs_to_tags
+        data = []
+        for launch_dir in launch_dirs:
+            print('\n~~~ analyzing %s ~~~' % launch_dir)
+            top, ID, standard, xc, mag = launch_dir.split('/')[-5:]
+            xc_calcs = launch_dirs[launch_dir]
+            if use_static:
+                xc_calcs = [c for c in xc_calcs if c.split('-')[-1] == 'static']
+            for xc_calc in xc_calcs:
+                print('     working on %s' % xc_calc)
+                calc_data = {'info' : {},
+                             'summary' : {},
+                             'flags' : []}
+                if magnetization:
+                    calc_data['magnetization'] = {}
+                if relaxed_structure:
+                    calc_data['structure'] = {}
+                if dos:
+                    calc_data['dos'] = {}
+                calc_dir = os.path.join(launch_dir, xc_calc)
+                xc, calc = xc_calc.split('-')
+                
+                calc_data['info']['calc_dir'] = calc_dir
+                calc_data['info']['mag'] = mag
+                calc_data['info']['standard'] = standard
+                calc_data['info'][top_level_key] = top
+                calc_data['info']['ID'] = ID
+                calc_data['info']['xc'] = xc
+                calc_data['info']['calc'] = calc
+
+                va = VASPAnalysis(calc_dir)
+                convergence = va.is_converged
+                E_per_at = va.E_per_at
+                if convergence:
+                    if (calc == 'static') and check_relax:
+                        relax_calc_dir = calc_dir.replace('static', 'relax')
+                        va_relax = VASPAnalysis(calc_dir)
+                        convergence_relax = va_relax.is_converged
+                        if not convergence_relax:
+                            convergence = False
+                            E_per_at = None
+                        E_relax = va_relax.E_per_at
+                        if E_per_at and E_relax:
+                            E_diff = abs(E_per_at - E_relax)
+                            if E_diff > check_relax:
+                                data['flags'].append('large E diff b/t relax and static')
+                
+                calc_data['summary']['E'] = E_per_at
+                calc_data['summary']['convergence'] = convergence
+                if not convergence:
+                    calc_data['flags'].append('not converged')
+                    
+                if relaxed_structure:
+                    if convergence:
+                        structure = va.contcar.as_dict()
+                    else:
+                        structure = None
+                    calc_data['structure'] = structure
+                
+                if magnetization:
+                    if convergence:
+                        calc_data['magnetization'] = va.magnetization
+
+                if dos:
+                    if dos == 'tdos':
+                        calc_data['dos'] = va.tdos()
+                    elif dos == 'pdos':
+                        calc_data['dos'] = va.pdos()
+                    else:
+                        raise NotImplementedError('only tdos and pdos are accepted args for dos')
+                
+                data.append(calc_data)
+
+        return {'data' : data}
+
 def main():
     
     from MPQuery import MPQuery

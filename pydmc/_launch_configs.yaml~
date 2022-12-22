@@ -1,0 +1,7 @@
+top_level: formula
+standards: ['dmc']
+xcs: ['metagga']
+compare_to_mp: False
+n_afm_configs: 0
+override_mag: False
+relax_geometry: True
