@@ -899,7 +899,6 @@ class VASPAnalysis(object):
                     for spin in pdos[el][site][orb]:
                         out[el] += np.array(pdos[el][site][orb][spin])
         out['total'] = np.zeros(len(energies))
-        print(out['total'][690])
         for el in out:
             if el == 'total':
                 continue
