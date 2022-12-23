@@ -454,7 +454,7 @@ class AnalyzeVASP(object):
     @property
     def calc_setup(self):
         calc_dir = self.calc_dir
-        formula, ID, standard, xc, mag, xc_calc = calc_dir.split('/')[-6]
+        formula, ID, standard, xc, mag, xc_calc = calc_dir.split('/')[-6:]
         return {'formula' : formula,
                 'ID' : ID,
                 'standard' : standard,
