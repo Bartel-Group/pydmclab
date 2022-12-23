@@ -334,7 +334,7 @@ class SubmitTools(object):
             
             # if there are INCAR updates, add them to calc_configs
             if incar_changes:
-                incar_key = '%_incar' % curr_calc
+                incar_key = '%s_incar' % curr_calc
                 if incar_key not in calc_configs:
                     calc_configs[incar_key] = {}
                     for setting in incar_changes:
