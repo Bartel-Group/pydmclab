@@ -198,7 +198,8 @@ class MPQuery(object):
                           properties=None, 
                           criteria=None, 
                           only_gs=False, 
-                          dict_key=False):
+                          dict_key=False,
+                          include_structure=False):
         """
         Args:
             comp (list or str)
@@ -298,6 +299,11 @@ class MPQuery(object):
                 raise ValueError('%s not in query' % dict_key)
             query = {entry[dict_key] : entry for entry in query}
             
+        if include_structure:
+            for key in query:
+                mpid = query[key]['mpid']
+                structure = self.get_structure_by_material_id(mpid)
+                query[key]['structure'] = structure.as_dict()
         return query
     
     def get_entry_by_material_id(self, 
