@@ -105,7 +105,6 @@ class SubmitTools(object):
             self.structure = Structure.from_file(fpos)
     
         self.files_to_inherit = files_to_inherit
-        self.magmom = magmom
         partitions = partition_configs()
         self.partitions = dotdict(partitions)
 
@@ -270,11 +269,11 @@ class SubmitTools(object):
                             parents.append(parent_xc_calc)
                             
                 # (3) check convergence of current calc and parents
-                convergence = VASPAnalysis(calc_dir).is_converged
+                convergence = AnalyzeVASP(calc_dir).is_converged
                 all_parents_converged = True
                 for parent_xc_calc in parents:
                     parent_calc_dir = os.path.join(launch_dir, parent_xc_calc)
-                    parent_convergence = VASPAnalysis(parent_calc_dir).is_converged
+                    parent_convergence = AnalyzeVASP(parent_calc_dir).is_converged
                     if not parent_convergence:
                         all_parents_converged = False
                         print('     %s (parent) not converged, need to continue this calc' % parent_xc_calc)
