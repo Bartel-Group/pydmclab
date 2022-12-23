@@ -2,7 +2,7 @@ from pydmc.hpc.vasp import VASPSetUp
 from pydmc.hpc.analyze import AnalyzeVASP
 from pydmc.core.mag import MagTools
 from pydmc.utils.handy import read_yaml, write_yaml, dotdict, write_json, read_json
-from pydmc.data.configs import vasp_configs, launch_configs, slurm_configs, sub_configs, partition_configs
+from pydmc.data.configs import load_vasp_configs, load_launch_configs, load_slurm_configs, load_sub_configs, load_partition_configs
 
 from pymatgen.core.structure import Structure
 
@@ -63,15 +63,15 @@ class SubmitTools(object):
         self.valid_calcs = valid_calcs
 
         if not os.path.exists(vasp_configs_yaml) or ('vasp' in refresh_configs):
-            _vasp_configs = vasp_configs()
+            _vasp_configs = load_vasp_configs()
             write_yaml(_vasp_configs, vasp_configs_yaml)
 
         if not os.path.exists(slurm_configs_yaml) or ('slurm' in refresh_configs):
-            _slurm_configs = slurm_configs()
+            _slurm_configs = load_slurm_configs()
             write_yaml(_slurm_configs, slurm_configs_yaml)
         
         if not os.path.exists(sub_configs_yaml) or ('sub' in refresh_configs):
-            _sub_configs = sub_configs()
+            _sub_configs = load_sub_configs()
             write_yaml(_sub_configs, sub_configs_yaml)
             
         slurm_configs = read_yaml(slurm_configs_yaml)
@@ -105,7 +105,7 @@ class SubmitTools(object):
             self.structure = Structure.from_file(fpos)
     
         self.files_to_inherit = files_to_inherit
-        partitions = partition_configs()
+        partitions = load_partition_configs()
         self.partitions = dotdict(partitions)
         
         self.magmom = magmom
