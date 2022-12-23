@@ -62,10 +62,10 @@ class LaunchTools(object):
             os.mkdir(calcs_dir)
             
         if not os.path.exists(launch_configs_yaml):
-            launch_configs = launch_configs()
-            write_yaml(launch_configs, launch_configs_yaml)
+            _launch_configs = launch_configs()
+            write_yaml(_launch_configs, launch_configs_yaml)
         
-        launch_configs = read_yaml(launch_configs_yaml)
+        _launch_configs = read_yaml(launch_configs_yaml)
         
         configs = {**launch_configs, **user_configs}
 
