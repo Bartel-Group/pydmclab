@@ -107,6 +107,8 @@ class SubmitTools(object):
         self.files_to_inherit = files_to_inherit
         partitions = partition_configs()
         self.partitions = dotdict(partitions)
+        
+        self.magmom = magmom
 
     @property
     def queue_manager(self):
