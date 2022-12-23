@@ -519,7 +519,23 @@ class VASPSetUp(object):
             unconverged.append('nsw_too_low')
             
         return unconverged
-        
+    
+    @property
+    def relax_static_energy_difference_error(self):
+        """
+        Haven't implemented catch yet
+        """
+        error = False
+        if 'static' in self.calc_dir:
+            relax_dir = self.calc_dir.replace('static', 'relax')
+            if os.path.exists(relax_dir):
+                E_static = AnalyzeVASP(self.calc_dir).E_per_at
+                if E_static:
+                    E_relax = AnalyzeVASP(self.calc_dir).E_per_at
+                    if abs(E_relax - E_static) > 0.2:
+                        error = True
+                        
+        return error
         
     @property
     def error_log(self):

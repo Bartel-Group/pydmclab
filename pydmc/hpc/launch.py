@@ -113,7 +113,26 @@ class LaunchTools(object):
                 standards.append('mp')
 
         configs['standards'] = standards
-
+        
+        
+        xcs_to_get_energies_for = configs['final_xcs'].copy()
+        standard_to_xcs = {standard : 
+                            {final_xc : [final_xc] for final_xc in xcs_to_get_energies_for} 
+                                for standard in configs['standards']}
+        
+        if 'metagga' in xcs_to_get_energies_for:
+            for standard in standard_to_xcs:
+                standard_to_xcs[standard]['metagga'] = ['gga', 'metagga']
+        
+        if configs['compare_to_mp']:
+            if 'mp' not in standard_to_xcs:
+                standard_to_xcs['mp'] = {'ggau' : ['ggau']}
+            
+            else:
+                standard_to_xcs['mp']['ggau'] = ['ggau']
+                
+        configs['standard_to_xcs'] = standard_to_xcs
+        
         self.configs = dotdict(configs)
 
     
@@ -140,23 +159,12 @@ class LaunchTools(object):
         if configs.n_afm_configs > 0:
             possible_mags += ['afm_%s' % str(i) for i in range(configs.n_afm_configs)]
 
-        xcs = configs.xcs.copy()
-        if 'metagga' in xcs:
-            if 'gga' not in xcs:
-                xcs.append('gga')
-
-        if configs.compare_to_mp:
-            if 'ggau' not in xcs:
-                xcs.append('ggau')
-
-        standards = configs.standards                
+        standard_to_xcs = configs.standard_to_xcs
         out = []
-        for standard in standards:
-            for xc in xcs:
-                if (standard != 'mp') and (xc == 'ggau') and ('ggau' not in configs.xcs):
-                    continue
-                for mag in possible_mags:
-                    for calc in possible_calcs:
+        for standard in standard_to_xcs:
+            for final_xc in standard_to_xcs[standard]:
+                for xc_to_run in standard_to_xcs[standard][final_xc]:
+                    for mag in possible_mags:
                         if 'afm' in mag:
                             magmoms = configs.magmoms
                             idx = mag.split('_')[-1]
@@ -168,18 +176,20 @@ class LaunchTools(object):
                                 magmom = None
                         else:
                             magmom = None
-                        validity = is_calc_valid(configs.structure,
+                        for calc in possible_calcs:
+                            validity = is_calc_valid(configs.structure,
                                                     standard,
-                                                    xc,
+                                                    xc_to_run,
                                                     calc,
                                                     mag,
                                                     magmom,
                                                     configs.mag_override)
-                        if validity:
-                            out.append({'standard' : standard,
-                                        'xc' : xc,
-                                        'mag' : mag,
-                                        'calc' : calc})
+                            if validity:
+                                out.append({'standard' : standard,
+                                            'final_xc' : final_xc,
+                                            'xc_to_run' : xc_to_run,
+                                            'mag' : mag,
+                                            'calc' : calc})
                         
         return out
 
@@ -208,14 +218,12 @@ class LaunchTools(object):
         
         for standard in unique_standards:
             standard_dir = os.path.join(level0, level1, level2, standard)
-            unique_xcs = [d['xc'] for d in valid_calcs if d['standard'] == standard]
-            for xc in unique_xcs:
-                if (xc == 'gga') and ('metagga' in unique_xcs):
-                    continue
-                xc_dir = os.path.join(standard_dir, xc)
-                unique_mags = [d['mag'] for d in valid_calcs if d['standard'] == standard and d['xc'] == xc]
+            final_xcs = [d['final_xc'] for d in valid_calcs if d['standard'] == standard]
+            for final_xc in final_xcs:
+                final_xc_dir = os.path.join(standard_dir, final_xc)
+                unique_mags = [d['mag'] for d in valid_calcs if d['standard'] == standard and d['final_xc'] == final_xc]
                 for mag in unique_mags:
-                    mag_dir = os.path.join(xc_dir, mag)
+                    mag_dir = os.path.join(final_xc_dir, mag)
                     launch_dirs.append(mag_dir)
         
         return launch_dirs
@@ -229,7 +237,7 @@ class LaunchTools(object):
             for the minimal list of self.launch_dirs
             
             each "tag" corresponds with one instsance where vasp needs to be executed
-                - tags have the form xc-calc
+                - tags have the form xc_to_run-calc
                     - e.g., 'gga-relax'
         
         """
@@ -239,14 +247,12 @@ class LaunchTools(object):
         d = {}
         for launch_dir in launch_dirs:
             d[launch_dir] = []
-            standard, xc, mag = launch_dir.split('/')[-3:]
+            standard, final_xc, mag = launch_dir.split('/')[-3:]
             for calc in valid_calcs:
-                tag = '-'.join([calc['xc'], calc['calc']])
-                calc_standard, calc_xc, calc_mag = calc['standard'], calc['xc'], calc['mag']
-                if calc_standard == standard:
-                    if calc_mag == mag:
-                        if (calc_xc == xc) or ((calc_xc == 'gga') and (xc == 'metagga')):
-                            d[launch_dir].append(tag)
+                tag = '-'.join([calc['xc_to_run'], calc['calc']])
+                calc_standard, calc_final_xc, calc_mag = calc['standard'], calc['final_xc'], calc['mag']
+                if (calc_standard == standard) and (calc_final_xc == final_xc) and (calc_mag == mag):
+                    d[launch_dir].append(tag)
                             
         return d
                 

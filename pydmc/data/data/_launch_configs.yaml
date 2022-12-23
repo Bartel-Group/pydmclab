@@ -1,5 +1,5 @@
 standards: ['dmc'] # list of standards to run; if compare_to_mp = True, 'mp' will be added
-xcs: ['metagga'] # list of xcs to run; if 'metagga' in xcs, 'gga' will be added
+final_xcs: ['metagga'] # list of xcs we want energies for; if 'metagga' in xcs, 'gga' will be added
 compare_to_mp: False # if True, launch will get everything it needs to generate MP-consistent data
 n_afm_configs: 0 # how many AFM configurations to run
 override_mag: False # if True, won't check for whether structure is mag or not mag, it will just do as you say

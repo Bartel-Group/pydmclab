@@ -209,35 +209,35 @@ class SubmitTools(object):
         return '\n%s\n%s\n' % (chgsum, bader)
     
     @property
-    def calcs(self):
+    def possible_calcs_to_run(self):
         """
         Returns list of calcs to run 
             - (eg ['loose', 'relax', 'static'])
         """
         vasp_configs = self.vasp_configs
         sub_configs = self.sub_configs
-        calc = vasp_configs.calc
+        final_calc = vasp_configs.final_calc
         calc_sequence = sub_configs.calc_sequence
-        if calc_sequence and (calc == 'relax'):
+        if calc_sequence and (final_calc == 'relax'):
             calcs = ['loose', 'relax', 'static']
         else:
-            calcs = [calc]
+            calcs = [final_calc]
         return calcs
     
     @property
-    def xcs(self):
+    def possible_xcs_to_run(self):
         """
         Returns list of exchange-correlation approaches to run
             - eg ['gga', 'metagga']
         """
         vasp_configs = self.vasp_configs
         sub_configs = self.sub_configs
-        xc = vasp_configs.xc
+        final_xc = vasp_configs.final_xc
         xc_sequence = sub_configs.xc_sequence
-        if xc_sequence and (xc == 'metagga'):
-            xcs = ['gga', xc]
+        if xc_sequence and (final_xc == 'metagga'):
+            xcs = ['gga', final_xc]
         else:
-            xcs = [xc]
+            xcs = [final_xc]
         return xcs
           
     @property
@@ -280,8 +280,8 @@ class SubmitTools(object):
         vasp_configs = self.vasp_configs
         sub_configs = self.sub_configs
         fresh_restart = sub_configs.fresh_restart
-        calcs = self.calcs
-        xcs = self.xcs
+        possible_calcs_to_run = self.possible_calcs_to_run
+        possible_xcs_to_run = self.possible_xcs_to_run
         valid_calcs = self.valid_calcs
         launch_dir = self.launch_dir
 
@@ -290,9 +290,9 @@ class SubmitTools(object):
 
         fpos_src = os.path.join(launch_dir, 'POSCAR')
         tags = []
-        for xc in xcs:
-            for calc in calcs:
-                xc_calc = '%s-%s' % (xc, calc)
+        for xc_to_run in possible_xcs_to_run:
+            for calc_to_run in possible_calcs_to_run:
+                xc_calc = '%s-%s' % (xc_to_run, calc_to_run)
 
                 # (0) make sure (xc, calc) combination is "valid" (determined with LaunchTools)
                 if xc_calc not in valid_calcs:
@@ -306,26 +306,31 @@ class SubmitTools(object):
                 if not os.path.exists(calc_dir):
                     os.mkdir(calc_dir)
 
-                # (2) identify if given (xc, calc) has parents that need to finish first
-                parents = []
-                if calc == 'static':
-                    for possible_parent_calc in ['relax']:
-                        parent_xc_calc = '%s-%s' % (xc, possible_parent_calc)
-                        if parent_xc_calc in valid_calcs:
-                            parents.append(parent_xc_calc)
-                            
-                # (3) check convergence of current calc and parents
+                # (2) check convergence of current calc
                 convergence = AnalyzeVASP(calc_dir).is_converged
-                all_parents_converged = True
-                for parent_xc_calc in parents:
-                    parent_calc_dir = os.path.join(launch_dir, parent_xc_calc)
-                    parent_convergence = AnalyzeVASP(parent_calc_dir).is_converged
-                    if not parent_convergence:
-                        all_parents_converged = False
-                        print('     %s (parent) not converged, need to continue this calc' % parent_xc_calc)
 
+                # (3) if converged, make sure parents have converged
+                large_E_diff_between_relax_and_static = False
+                if convergence:                
+                    if calc_to_run == 'static':
+                        parent_calc = 'relax'
+                        parent_xc_calc = '%s-%s' % (xc_to_run, parent_calc)                            
+                        parent_calc_dir = os.path.join(launch_dir, parent_xc_calc)
+                        parent_convergence = AnalyzeVASP(parent_calc_dir).is_converged
+                        if not parent_convergence:
+                            print('     %s (parent) not converged, need to continue this calc' % parent_xc_calc)
+                        else:
+                            relax_energy = AnalyzeVASP(parent_calc_dir).E_per_at
+                            static_energy = AnalyzeVASP(calc_dir).E_per_at
+                            if abs(relax_energy - static_energy) > 0.2:
+                                print('     %s (parent) and %s (child) energies differ by more than 0.2 eV/atom' % (parent_xc_calc, xc_calc))
+                                large_E_diff_between_relax_and_static = True
+                                # if there is a large difference, something fishy happened, so let's start the static calc over
+                    else:
+                        parent_convergence = True
+                
                 # if parents + current calc are converged, give it status = DONE
-                if convergence and all_parents_converged and not fresh_restart:
+                if convergence and parent_convergence and not fresh_restart and not large_E_diff_between_relax_and_static:
                     print('     %s is already converged; skipping' % xc_calc)
                     status = 'DONE'
                     tags.append('%s_%s' % (status, xc_calc))
@@ -349,7 +354,7 @@ class SubmitTools(object):
                 fcont_dst = os.path.join(calc_dir, 'CONTCAR')
                 if os.path.exists(fcont_dst):
                     contents = open(fcont_dst, 'r').readlines()
-                    if (len(contents) > 0) and not fresh_restart:
+                    if (len(contents) > 0) and not fresh_restart and not large_E_diff_between_relax_and_static:
                         status = 'CONTINUE'
                     else:
                         status = 'NEWRUN'
@@ -365,7 +370,7 @@ class SubmitTools(object):
                 
                 # pass loose/static/relax_INCAR/KPOINTS/POTCAR from vasp_configs to this calc
                 calc_configs = {'modify_%s' % input_file.lower() : 
-                    vasp_configs['%s_%s' % (calc, input_file)] for input_file in ['INCAR', 'KPOINTS', 'POTCAR']}
+                    vasp_configs['%s_%s' % (calc_to_run, input_file)] for input_file in ['INCAR', 'KPOINTS', 'POTCAR']}
                 
                 # pass the other vasp_configs to this calc
                 for key in prepare_calc_options:
@@ -381,8 +386,8 @@ class SubmitTools(object):
 
                 print('--------- may be some warnings (POTCAR ones OK) ----------')
                 # (7) prepare calc_dir to launch  
-                vsu.prepare_calc(calc=calc,
-                                xc=xc,
+                vsu.prepare_calc(calc=calc_to_run,
+                                xc=xc_to_run,
                                 **calc_configs)
                 
                 print('-------------- warnings should be done ---------------')
@@ -480,11 +485,11 @@ class SubmitTools(object):
             print('\n:::: writing sub now - %s ::::' % fsub)
             for tag in tags:
                 status = tag.split('_')[0]
-                xc, calc = tag.split('_')[1].split('-')
-                curr_calcs = [xc_calc.split('-')[1] for xc_calc in xc_calcs if xc_calc.split('-')[0] == xc]
+                xc_to_run, calc_to_run = tag.split('_')[1].split('-')
+                curr_calcs = [xc_calc.split('-')[1] for xc_calc in xc_calcs if xc_calc.split('-')[0] == xc_to_run]
                 curr_calcs = sorted(list(set(curr_calcs)))
                 
-                calc_dir = os.path.join(launch_dir, '-'.join([xc, calc]))
+                calc_dir = os.path.join(launch_dir, '-'.join([xc_to_run, calc_to_run]))
                 if status == 'DONE':
                     f.write('\necho working on %s >> %s\n' % (tag, fstatus))
                     if vasp_configs['lobster_static']:
@@ -500,24 +505,24 @@ class SubmitTools(object):
                     if status == 'NEWRUN':
                         f.write('\necho working on %s >> %s\n' % (tag, fstatus))
                     
-                    if xc in ['gga', 'ggau']:
-                        if calc == 'loose':
+                    if xc_to_run in ['gga', 'ggau']:
+                        if calc_to_run == 'loose':
                             pass_info = False
-                        elif calc == 'relax':
+                        elif calc_to_run == 'relax':
                             if 'loose' in curr_calcs:
                                 pass_info = True
                                 calc_prev = 'loose'
                             else:
                                 pass_info = False
-                        elif calc == 'static':
+                        elif calc_to_run == 'static':
                             if 'relax' in curr_calcs:
                                 pass_info = True
                                 calc_prev = 'relax'
                             else:
                                 pass_info = False
-                        xc_prev = xc
-                    elif xc in ['metagga']:
-                        if calc == 'relax':
+                        xc_prev = xc_to_run
+                    elif xc_to_run in ['metagga']:
+                        if calc_to_run == 'relax':
                             if 'gga' in curr_xcs:
                                 xc_prev = 'gga'
                                 if 'gga-static' in xc_calcs:
@@ -531,11 +536,11 @@ class SubmitTools(object):
                                     pass_info = False
                             else:
                                 pass_info = False
-                        elif calc == 'static':
+                        elif calc_to_run == 'static':
                             if 'relax' in curr_calcs:
                                 pass_info = True
                                 calc_prev = 'relax'
-                                xc_prev = xc
+                                xc_prev = xc_to_run
                             else:
                                 pass_info = False
                     
@@ -562,13 +567,13 @@ class SubmitTools(object):
                     
                     f.write('cd %s\n' % calc_dir)
                     f.write('%s\n' % vasp_command)
-                    if calc == 'static':
+                    if calc_to_run == 'static':
                         if vasp_configs['lobster_static']:
                             if not os.path.exists(os.path.join(calc_dir, 'lobsterout')) or sub_configs.force_postprocess:
                                 f.write(self.lobster_command)
                             if not os.path.exists(os.path.join(calc_dir, 'ACF.dat')) or sub_configs.force_postprocess:
                                 f.write(self.bader_command)
-                    f.write('\necho launched %s-%s >> %s\n' % (xc, calc, fstatus))
+                    f.write('\necho launched %s-%s >> %s\n' % (xc_to_run, calc_to_run, fstatus))
         return True
     
     @property
