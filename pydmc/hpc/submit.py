@@ -345,6 +345,26 @@ class SubmitTools(object):
                 tags.append('%s_%s' % (status, xc_calc))
         return tags
    
+   
+    @property
+    def is_job_in_queue(self):
+        scripts_dir = os.getcwd()
+        sub_configs = self.sub_configs
+        fqueue = os.path.join(scripts_dir, sub_configs.fqueue)
+        job_name = self.slurm_configs['job-name']
+        with open(fqueue, 'w') as f:
+            subprocess.call(['squeue', '-u', '%s' % os.getlogin(), '--name=%s' % job_name], stdout=f)
+        names_in_q = []
+        with open(fqueue) as f:
+            for line in f:
+                if 'PARTITION' not in line:
+                    names_in_q.append([v for v in line.split(' ') if len(v) > 0][2])
+        if len(names_in_q) > 0:
+            print(' !!! job already in queue, not messing with it')
+            return True
+        
+        return False
+        
     @property
     def write_sub(self):
         """
@@ -353,17 +373,16 @@ class SubmitTools(object):
             - each submission script will launch a chain of jobs
         
         """
-        
+        if self.is_job_in_queue:
+            return
+                
         vasp_configs = self.vasp_configs
         sub_configs = self.sub_configs
-        slurm_configs = self.slurm_configs
         
         launch_dir = self.launch_dir
         vasp_command = self.vasp_command
         slurm_options = self.slurm_options
         queue_manager = self.queue_manager
-
-        xcs, calcs = self.xcs, self.calcs
 
         files_to_inherit = self.files_to_inherit
 
@@ -478,22 +497,13 @@ class SubmitTools(object):
     
     @property
     def launch_sub(self):
+        if self.is_job_in_queue:
+            return
+        
         print('     now launching sub')
         scripts_dir = os.getcwd()
         launch_dir = self.launch_dir
-        sub_configs = self.sub_configs
-        fqueue = os.path.join(scripts_dir, sub_configs.fqueue)
-        job_name = self.slurm_configs['job-name']
-        with open(fqueue, 'w') as f:
-            subprocess.call(['squeue', '-u', '%s' % os.getlogin(), '--name=%s' % job_name], stdout=f)
-        names_in_q = []
-        with open(fqueue) as f:
-            for line in f:
-                if 'PARTITION' not in line:
-                    names_in_q.append([v for v in line.split(' ') if len(v) > 0][2])
-        if len(names_in_q) > 0:
-            print(' !!! job already in queue, not launching')
-            return
+        sub_configs = self.sub_configs   
 
         fsub = os.path.join(launch_dir, sub_configs.fsub)
         flags_that_need_to_be_executed = ['srun', 'python', 'lobster', 'bader']
@@ -510,13 +520,6 @@ class SubmitTools(object):
         os.chdir(launch_dir)
         subprocess.call(['sbatch', 'sub.sh'])
         os.chdir(scripts_dir)
-                
-
-
-
-
-
-
 
 def main():
     
