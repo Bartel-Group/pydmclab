@@ -290,109 +290,102 @@ class SubmitTools(object):
 
         fpos_src = os.path.join(launch_dir, 'POSCAR')
         tags = []
-        for xc_to_run in possible_xcs_to_run:
-            for calc_to_run in possible_calcs_to_run:
-                xc_calc = '%s-%s' % (xc_to_run, calc_to_run)
+        for valid_xc_calc in valid_calcs:
+            curr_calc, curr_xc = valid_xc_calc.split('-')
+            # (1) make calc_dir (or remove and remake if fresh_restart)
+            calc_dir = os.path.join(launch_dir, valid_xc_calc)
+            if os.path.exists(calc_dir) and fresh_restart:
+                rmtree(calc_dir)
+            if not os.path.exists(calc_dir):
+                os.mkdir(calc_dir)
 
-                # (0) make sure (xc, calc) combination is "valid" (determined with LaunchTools)
-                if xc_calc not in valid_calcs:
-                    print('     skipping %s b/c we probably dont need it' % xc_calc)
-                    continue
+            # (2) check convergence of current calc
+            convergence = AnalyzeVASP(calc_dir).is_converged
 
-                # (1) make calc_dir (or remove and remake if fresh_restart)
-                calc_dir = os.path.join(launch_dir, xc_calc)
-                if os.path.exists(calc_dir) and fresh_restart:
-                    rmtree(calc_dir)
-                if not os.path.exists(calc_dir):
-                    os.mkdir(calc_dir)
-
-                # (2) check convergence of current calc
-                convergence = AnalyzeVASP(calc_dir).is_converged
-
-                # (3) if converged, make sure parents have converged
-                large_E_diff_between_relax_and_static = False
-                if convergence:                
-                    if calc_to_run == 'static':
-                        parent_calc = 'relax'
-                        parent_xc_calc = '%s-%s' % (xc_to_run, parent_calc)                            
-                        parent_calc_dir = os.path.join(launch_dir, parent_xc_calc)
-                        parent_convergence = AnalyzeVASP(parent_calc_dir).is_converged
-                        if not parent_convergence:
-                            print('     %s (parent) not converged, need to continue this calc' % parent_xc_calc)
-                        else:
-                            relax_energy = AnalyzeVASP(parent_calc_dir).E_per_at
-                            static_energy = AnalyzeVASP(calc_dir).E_per_at
-                            if abs(relax_energy - static_energy) > 0.2:
-                                print('     %s (parent) and %s (child) energies differ by more than 0.2 eV/atom' % (parent_xc_calc, xc_calc))
-                                large_E_diff_between_relax_and_static = True
-                                # if there is a large difference, something fishy happened, so let's start the static calc over
+            # (3) if converged, make sure parents have converged
+            large_E_diff_between_relax_and_static = False
+            if convergence:                
+                if curr_calc == 'static':
+                    parent_calc = 'relax'
+                    parent_xc_calc = '%s-%s' % (curr_xc, parent_calc)                            
+                    parent_calc_dir = os.path.join(launch_dir, parent_xc_calc)
+                    parent_convergence = AnalyzeVASP(parent_calc_dir).is_converged
+                    if not parent_convergence:
+                        print('     %s (parent) not converged, need to continue this calc' % parent_xc_calc)
                     else:
-                        parent_convergence = True
-                
-                # if parents + current calc are converged, give it status = DONE
-                if convergence and parent_convergence and not fresh_restart and not large_E_diff_between_relax_and_static:
-                    print('     %s is already converged; skipping' % xc_calc)
-                    status = 'DONE'
-                    tags.append('%s_%s' % (status, xc_calc))
-                    continue
-                
-                # for jobs that are not DONE:
+                        relax_energy = AnalyzeVASP(parent_calc_dir).E_per_at
+                        static_energy = AnalyzeVASP(calc_dir).E_per_at
+                        if abs(relax_energy - static_energy) > 0.2:
+                            print('     %s (parent) and %s (child) energies differ by more than 0.2 eV/atom' % (parent_xc_calc, valid_xc_calc))
+                            large_E_diff_between_relax_and_static = True
+                            # if there is a large difference, something fishy happened, so let's start the static calc over
+                else:
+                    parent_convergence = True
+            
+            # if parents + current calc are converged, give it status = DONE
+            if convergence and parent_convergence and not fresh_restart and not large_E_diff_between_relax_and_static:
+                print('     %s is already converged; skipping' % valid_xc_calc)
+                status = 'DONE'
+                tags.append('%s_%s' % (status, valid_xc_calc))
+                continue
+            
+            # for jobs that are not DONE:
 
-                # (4) check for POSCAR
-                fpos_dst = os.path.join(calc_dir, 'POSCAR')
-                if os.path.exists(fpos_dst):
-                    # if there is a POSCAR, make sure its not empty
-                    contents = open(fpos_dst, 'r').readlines()
-                    # if its empty, copy the initial structure to calc_dir
-                    if len(contents) == 0:
-                        copyfile(fpos_src, fpos_dst)
-                # if theres no POSCAR, copy the initial structure to calc_dir
-                if not os.path.exists(fpos_dst):
+            # (4) check for POSCAR
+            fpos_dst = os.path.join(calc_dir, 'POSCAR')
+            if os.path.exists(fpos_dst):
+                # if there is a POSCAR, make sure its not empty
+                contents = open(fpos_dst, 'r').readlines()
+                # if its empty, copy the initial structure to calc_dir
+                if len(contents) == 0:
                     copyfile(fpos_src, fpos_dst)
-                
-                # (5) check for CONTCAR. if one exists, if its not empty, and if not fresh_restart, mark this job as one to "CONTINUE" (ie later, we'll copy CONTCAR to POSCAR); otherwise, mark as NEWRUN
-                fcont_dst = os.path.join(calc_dir, 'CONTCAR')
-                if os.path.exists(fcont_dst):
-                    contents = open(fcont_dst, 'r').readlines()
-                    if (len(contents) > 0) and not fresh_restart and not large_E_diff_between_relax_and_static:
-                        status = 'CONTINUE'
-                    else:
-                        status = 'NEWRUN'
+            # if theres no POSCAR, copy the initial structure to calc_dir
+            if not os.path.exists(fpos_dst):
+                copyfile(fpos_src, fpos_dst)
+            
+            # (5) check for CONTCAR. if one exists, if its not empty, and if not fresh_restart, mark this job as one to "CONTINUE" (ie later, we'll copy CONTCAR to POSCAR); otherwise, mark as NEWRUN
+            fcont_dst = os.path.join(calc_dir, 'CONTCAR')
+            if os.path.exists(fcont_dst):
+                contents = open(fcont_dst, 'r').readlines()
+                if (len(contents) > 0) and not fresh_restart and not large_E_diff_between_relax_and_static:
+                    status = 'CONTINUE'
                 else:
                     status = 'NEWRUN'
+            else:
+                status = 'NEWRUN'
 
-                # (6) initialize VASPSetUp with configs
-                vsu = VASPSetUp(calc_dir=calc_dir, 
-                                magmom=self.magmom,
-                                fvaspout=sub_configs.fvaspout,
-                                fvasperrors=sub_configs.fvasperrors,
-                                lobster_static=vasp_configs.lobster_static) 
-                
-                # pass loose/static/relax_INCAR/KPOINTS/POTCAR from vasp_configs to this calc
-                calc_configs = {'modify_%s' % input_file.lower() : 
-                    vasp_configs['%s_%s' % (calc_to_run, input_file)] for input_file in ['INCAR', 'KPOINTS', 'POTCAR']}
-                
-                # pass the other vasp_configs to this calc
-                for key in prepare_calc_options:
-                    calc_configs[key] = vasp_configs[key]
-                
-                # (6) check for errors in continuing jobs
-                if status in ['CONTINUE', 'NEWRUN']:
-                    calc_is_clean = vsu.is_clean
-                    if not calc_is_clean:
-                        # change INCAR based on errors and include in calc_configs
-                        incar_changes = vsu.incar_changes_from_errors
-                        calc_configs['modify_incar'] = {**calc_configs['modify_incar'], **incar_changes}
+            # (6) initialize VASPSetUp with configs
+            vsu = VASPSetUp(calc_dir=calc_dir, 
+                            magmom=self.magmom,
+                            fvaspout=sub_configs.fvaspout,
+                            fvasperrors=sub_configs.fvasperrors,
+                            lobster_static=vasp_configs.lobster_static) 
+            
+            # pass loose/static/relax_INCAR/KPOINTS/POTCAR from vasp_configs to this calc
+            calc_configs = {'modify_%s' % input_file.lower() : 
+                vasp_configs['%s_%s' % (curr_calc, input_file)] for input_file in ['INCAR', 'KPOINTS', 'POTCAR']}
+            
+            # pass the other vasp_configs to this calc
+            for key in prepare_calc_options:
+                calc_configs[key] = vasp_configs[key]
+            
+            # (6) check for errors in continuing jobs
+            if status in ['CONTINUE', 'NEWRUN']:
+                calc_is_clean = vsu.is_clean
+                if not calc_is_clean:
+                    # change INCAR based on errors and include in calc_configs
+                    incar_changes = vsu.incar_changes_from_errors
+                    calc_configs['modify_incar'] = {**calc_configs['modify_incar'], **incar_changes}
 
-                print('--------- may be some warnings (POTCAR ones OK) ----------')
-                # (7) prepare calc_dir to launch  
-                vsu.prepare_calc(calc=calc_to_run,
-                                xc=xc_to_run,
-                                **calc_configs)
-                
-                print('-------------- warnings should be done ---------------')
-                print('\n~~~~~ prepared %s ~~~~~\n' % calc_dir)
-                tags.append('%s_%s' % (status, xc_calc))
+            print('--------- may be some warnings (POTCAR ones OK) ----------')
+            # (7) prepare calc_dir to launch  
+            vsu.prepare_calc(calc=curr_calc,
+                            xc=curr_xc,
+                            **calc_configs)
+            
+            print('-------------- warnings should be done ---------------')
+            print('\n~~~~~ prepared %s ~~~~~\n' % calc_dir)
+            tags.append('%s_%s' % (status, valid_xc_calc))
         return tags
    
    

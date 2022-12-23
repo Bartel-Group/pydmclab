@@ -114,7 +114,6 @@ class LaunchTools(object):
 
         configs['standards'] = standards
         
-        
         xcs_to_get_energies_for = configs['final_xcs'].copy()
         standard_to_xcs = {standard : 
                             {final_xc : [final_xc] for final_xc in xcs_to_get_energies_for} 
