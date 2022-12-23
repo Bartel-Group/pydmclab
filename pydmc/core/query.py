@@ -5,6 +5,7 @@ from pymatgen.ext.matproj import MPRester
 from mp_api.client import MPRester as new_MPRester
 
 import itertools
+import numpy as np
 
 class NewMPQuery(object):
     # Chris B key = ***REMOVED***
@@ -186,6 +187,8 @@ class MPQuery(object):
         """
         A map to nickname query properties with shorter handles
             (dict)
+            
+        So after querying 'energy_per_atom' will be a key, but this map will convert that to 'E_mp'
         """
         return {'energy_per_atom' : 'E_mp',
                 'formation_energy_per_atom' : 'Ef_mp',
@@ -198,7 +201,10 @@ class MPQuery(object):
                           properties=None, 
                           criteria=None, 
                           only_gs=False, 
-                          include_structure=False):
+                          include_structure=False,
+                          max_Ehull=None,
+                          max_strucs_per_cmpd=None,
+                          max_sites_per_structure=None):
         """
         Args:
             comp (list or str)
@@ -225,7 +231,7 @@ class MPQuery(object):
             if not only_gs:
                 {mpid : {DATA}}
             if only_gs:
-                {formula : DATA}
+                {formula : {DATA}}
         """
         key_map = self.long_to_short_keys
         if properties == 'all':
@@ -301,7 +307,35 @@ class MPQuery(object):
                 mpid = query[entry]['mpid']
                 structure = self.get_structure_by_material_id(mpid)
                 query[entry]['structure'] = structure.as_dict()
-        return query
+                
+        if max_sites_per_structure:
+            query = {e : query[e] for e in query if query[e]['nsites'] <= max_sites_per_structure}
+        
+        if max_Ehull:
+            if only_gs:
+                query = {e : query[e] for e in query if query[e]['Ehull_mp'] <= max_Ehull}
+            else:
+                cmpds = sorted(list(set([query[e]['cmpd'] for e in query])))
+                mpids = [e for e in query if query[e]['Ehull_mp'] <= max_Ehull if query[e]['cmpd'] in cmpds]
+                query = {e : query[e] for e in mpids}
+        
+        if max_strucs_per_cmpd:
+            if only_gs:
+                return query
+            if not only_gs:
+                trimmed_query = {}
+                cmpds = sorted(list(set([query[e]['cmpd'] for e in query])))
+                for cmpd in cmpds:
+                    mpids = [e for e in query if query[e]['cmpd'] == cmpd]
+                    Ehulls = [query[e]['Ehull_mp'] for e in mpids]
+                    sorted_indices = np.argsort(Ehulls)
+                    relevant_ids = [mpids[i] for i in sorted_indices]
+                    if len(relevant_ids) > max_strucs_per_cmpd:
+                        relevant_ids = relevant_ids[:max_strucs_per_cmpd]
+                    for mpid in relevant_ids:
+                        trimmed_query[mpid] = query[mpid]
+            
+                return trimmed_query
     
     def get_entry_by_material_id(self, 
                                  material_id, 

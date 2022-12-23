@@ -366,10 +366,28 @@ class AnalyzeVASP(object):
 class AnalyzeBatch(object):
 
     def __init__(self,
-                 launch_dirs_to_tags):
+                 launch_dirs_to_tags,
+                 get_mag=False,
+                 get_structures=False,
+                 get_dos=False,
+                 get_metadata=False):
 
         self.launch_dirs_to_tags = launch_dirs_to_tags
+    
+    @property
+    def calc_dirs(self):
+        launch_dirs = self.launch_dirs_to_tags
+        calc_dirs = []
+        for launch_dir in launch_dirs:
+            calc_dirs += [os.path.join(launch_dir, c) for c in launch_dirs[launch_dir]]
+        return calc_dirs
+    
+    def get_metadata(self):
+        calc_dirs = self.calc_dirs
+        for calc_dir in calc_dirs:
+            av = AnalyzeVASP(calc_dir)
 
+    
     def get_results(self,
                     top_level_key='formula',
                     magnetization=False,
@@ -407,18 +425,18 @@ class AnalyzeBatch(object):
                 calc_data['info']['xc'] = xc
                 calc_data['info']['calc'] = calc
 
-                va = AnalyzeVASP(calc_dir)
-                convergence = va.is_converged
-                E_per_at = va.E_per_at
+                analyzer = AnalyzeVASP(calc_dir)
+                convergence = analyzer.is_converged
+                E_per_at = analyzer.E_per_at
                 if convergence:
                     if (calc == 'static') and check_relax:
                         relax_calc_dir = calc_dir.replace('static', 'relax')
-                        va_relax = AnalyzeVASP(calc_dir)
-                        convergence_relax = va_relax.is_converged
+                        analyzer_relax = AnalyzeVASP(relax_calc_dir)
+                        convergence_relax = analyzer_relax.is_converged
                         if not convergence_relax:
                             convergence = False
                             E_per_at = None
-                        E_relax = va_relax.E_per_at
+                        E_relax = analyzer_relax.E_per_at
                         if E_per_at and E_relax:
                             E_diff = abs(E_per_at - E_relax)
                             if E_diff > check_relax:
@@ -431,20 +449,20 @@ class AnalyzeBatch(object):
                     
                 if relaxed_structure:
                     if convergence:
-                        structure = va.contcar.as_dict()
+                        structure = analyzer.contcar.as_dict()
                     else:
                         structure = None
                     calc_data['structure'] = structure
                 
                 if magnetization:
                     if convergence:
-                        calc_data['magnetization'] = va.magnetization
+                        calc_data['magnetization'] = analyzer.magnetization
 
                 if dos:
                     if dos == 'tdos':
-                        calc_data['dos'] = va.tdos()
+                        calc_data['dos'] = analyzer.tdos()
                     elif dos == 'pdos':
-                        calc_data['dos'] = va.pdos()
+                        calc_data['dos'] = analyzer.pdos()
                     else:
                         raise NotImplementedError('only tdos and pdos are accepted args for dos')
                 

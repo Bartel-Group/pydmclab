@@ -1,6 +1,6 @@
 nodes: 1 # how many nodes per launched sequence of calcs
 ntasks: 16 # how many total cores
-time: 24:00:00 # how long in HH:MM:SS before hitting walltime (can also use M)
+time: 1440 # how long in minutes before hitting walltime 
 error: log.e # where to write slurm errors to in launch_dir
 output: log.o # where to write slurm output to in launch_dir
 account: cbartel # account to charge
