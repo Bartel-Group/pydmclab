@@ -240,10 +240,7 @@ class MPQuery(object):
                 if not None, only retain the lowest energy structures for each composition until you reach max_strucs_per_cmpd
                 
         Returns:
-            if not only_gs:
-                {mpid : {DATA}}
-            if only_gs:
-                {formula : {DATA}}
+            {mpid : {DATA}}
         """
         key_map = self.long_to_short_keys
         if properties == 'all':
@@ -309,7 +306,7 @@ class MPQuery(object):
                     if Ef_check < Ef_stored:
                         gs[cmpd] = entry
             query = [gs[k] for k in gs]
-            query = {entry['cmpd'] : entry for entry in query}
+            query = {entry['mpid'] : entry for entry in query}
             
         else:
             query = {entry['mpid'] : entry for entry in query}
