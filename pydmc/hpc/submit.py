@@ -207,38 +207,6 @@ class SubmitTools(object):
         chgsum = '/home/cbartel/shared/bin/bader/chgsum.pl AECCAR0 AECCAR2'
         bader = '/home/cbartel/shared/bin/bader/bader CHGCAR -ref CHGCAR_sum'
         return '\n%s\n%s\n' % (chgsum, bader)
-    
-    @property
-    def possible_calcs_to_run(self):
-        """
-        Returns list of calcs to run 
-            - (eg ['loose', 'relax', 'static'])
-        """
-        vasp_configs = self.vasp_configs
-        sub_configs = self.sub_configs
-        final_calc = vasp_configs.final_calc
-        calc_sequence = sub_configs.calc_sequence
-        if calc_sequence and (final_calc == 'relax'):
-            calcs = ['loose', 'relax', 'static']
-        else:
-            calcs = [final_calc]
-        return calcs
-    
-    @property
-    def possible_xcs_to_run(self):
-        """
-        Returns list of exchange-correlation approaches to run
-            - eg ['gga', 'metagga']
-        """
-        vasp_configs = self.vasp_configs
-        sub_configs = self.sub_configs
-        final_xc = vasp_configs.final_xc
-        xc_sequence = sub_configs.xc_sequence
-        if xc_sequence and (final_xc == 'metagga'):
-            xcs = ['gga', final_xc]
-        else:
-            xcs = [final_xc]
-        return xcs
           
     @property
     def prepare_directories(self):
@@ -280,8 +248,6 @@ class SubmitTools(object):
         vasp_configs = self.vasp_configs
         sub_configs = self.sub_configs
         fresh_restart = sub_configs.fresh_restart
-        possible_calcs_to_run = self.possible_calcs_to_run
-        possible_xcs_to_run = self.possible_xcs_to_run
         valid_calcs = self.valid_calcs
         launch_dir = self.launch_dir
 
@@ -291,7 +257,7 @@ class SubmitTools(object):
         fpos_src = os.path.join(launch_dir, 'POSCAR')
         tags = []
         for valid_xc_calc in valid_calcs:
-            curr_calc, curr_xc = valid_xc_calc.split('-')
+            curr_xc, curr_calc = valid_xc_calc.split('-')
             # (1) make calc_dir (or remove and remake if fresh_restart)
             calc_dir = os.path.join(launch_dir, valid_xc_calc)
             if os.path.exists(calc_dir) and fresh_restart:
