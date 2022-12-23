@@ -481,7 +481,7 @@ class AnalyzeVASP(object):
         if include_structure:
             data['structure'] = self.relaxed_structure
         if include_mag:
-            data['mag'] = self.magnetization
+            data['magnetization'] = self.magnetization
         if include_dos:
             raise NotImplementedError('still working on DOS processing')
         return data   
