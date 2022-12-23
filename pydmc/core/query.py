@@ -203,8 +203,8 @@ class MPQuery(object):
                           only_gs=False, 
                           include_structure=False,
                           max_Ehull=None,
-                          max_strucs_per_cmpd=None,
-                          max_sites_per_structure=None):
+                          max_sites_per_structure=None,
+                          max_strucs_per_cmpd=None):
         """
         Args:
             comp (list or str)
@@ -226,6 +226,18 @@ class MPQuery(object):
             
             only_gs (bool)
                 if True, remove non-ground state polymorphs for each unique composition
+                
+            include_structure (bool)
+                if True, include the structure (as a dictionary) for each entry
+                
+            max_Ehull (float)
+                if not None, remove entries with Ehull_mp > max_Ehull
+                
+            max_sites_per_structure (int)
+                if not None, remove entries with more than max_sites_per_structure sites
+            
+            max_strucs_per_cmpd (int)
+                if not None, only retain the lowest energy structures for each composition until you reach max_strucs_per_cmpd
                 
         Returns:
             if not only_gs:
@@ -414,9 +426,8 @@ class MPQuery(object):
         return d
     
 def main():
-    api_key = '***REMOVED***'
-    mpq = NewMPQuery(api_key)
-    return mpq
+
+    return 
 
 if __name__ == '__main__':
     mpq = main()

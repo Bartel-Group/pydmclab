@@ -12,4 +12,4 @@ fqueue: q.o # this will be created in the folder where you execute python
 fresh_restart: False # True if you want to re-run all calculations; False if you want to pick up where you left off
 calc_sequence: True # True if you want to run calcs in a sequence (eg loose --> relax --> static)
 xc_sequence: True # True if you want to run functionals in a sequencec (eg gga --> metagga)
-force_postprocess: False # if True, run LOBSTER and Bader again if vasp_configs.lobster_static = True
+force_postprocess: False # if True, run LOBSTER and Bader again if vasp_configs.lobster_static = True even if output files exist

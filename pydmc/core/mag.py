@@ -41,6 +41,7 @@ class MagTools(object):
                         then we randomly select max_afm_combos combinations
                     - when the unique AFM structures are generated,
                         we randomly order them to avoid having the same "kinds" of AFM orderings always appearing first
+                    - random seeds are being used so both operations should be deterministic
             treat_as_nm (list): list of elements to treat as non-magnetic
                 - e.g., if you want to only explore various initial configurations for other element(s)
         """        
@@ -94,7 +95,7 @@ class MagTools(object):
     @property
     def could_be_afm(self):
         """
-        True if at least two magnetic sites in structure
+        True if there are at least two magnetic sites in structure
         """
         if not self.could_be_magnetic:
             return False
@@ -144,10 +145,11 @@ class MagTools(object):
         This is a chaotic way to get antiferromagnetic configurations 
             - but it doesn't require enumlib interaction with pymatgen
             - it seems reasonably efficient, might break down for large/complex structures
-            - note: it has no idea which configurations are "most likely" to be low energy
+            - note 1: it has no idea which configurations are "most likely" to be low energy
+            - note 2: it may require execution on MSI compute nodes
         
         Basic workflow:
-            - start from a the NM structure
+            - start from the NM structure
             - for all sites containing ions in magnetic_ions
                 - generate all possible combinations of 0 (spin down) or 1 (spin up) for each site
                     - if I had four sites w/ mag ions this might be: [(0,0,0,1), (0,0,1,1), ...]
@@ -162,9 +164,11 @@ class MagTools(object):
                  
         Returns:
             list of unique Structure objects with antiferromagnetic ordering
-                - exhaustive (if len(combos) < max_combos)
+                - exhaustive if len(combos) <= max_combos
                 - no idea which are most likely to be low energy
                 - reasonable to randomly sample if a very large list
+                
+            in general, probably unnecessary to calculate more than ~2-10 of these per structure
         """
         
         # parameters that could be args...
@@ -239,43 +243,14 @@ class MagTools(object):
             
         print('%i unique afm structures' % len(unique_strucs))
         return unique_strucs
-        
-        """
-        Alternative method to remove duplicates ("from scratch")
-        
-        # get rid of symmetrically identical structures
-        unique_fake_strucs_indices = [0]
-        duplicates = []
-        sm = StructureMatcher(attempt_supercell=True)
-        for i in fake_strucs_dict:
-            s1 = fake_strucs_dict[i]
-            while (i not in duplicates) and (i not in unique_fake_strucs_indices):
-                for j in unique_fake_strucs_indices:
-                    s2 = fake_strucs_dict[j]
-                    if s1.site_properties['magmom'] == s2.site_properties['magmom']:
-                        print('found a magmom match')
-                        duplicates.append(i)
-                    elif i not in duplicates:
-                        if sm.fit(s1, s2):
-                            print('found a symmetry match')
-                            duplicates.append(i)
-                if i not in duplicates:
-                    print('adding you %s' % i)
-                    unique_fake_strucs_indices.append(i)
-        print(duplicates) 
-        
-        # remove "fake" oxidation states and make a list of unique afm orderings
-        out = []
-        for j in unique_fake_strucs_indices:
-            struc = fake_strucs_dict[j]
-            struc.remove_oxidation_states()
-            out.append(struc)
-        print('made %i unique afm structures' % len(out))
-        return out
-        """
 
     @property
     def get_afm_magmoms(self):
+        """
+        Returns:
+            dict of magmoms for each AFM ordering for a given structure
+                {idx of configuration (int) : magmoms (list)}
+        """
         afm_strucs = self.get_antiferromagnetic_structures
         magmoms = {}
         if afm_strucs:
@@ -285,30 +260,8 @@ class MagTools(object):
         return magmoms
 
 def main():
-    from pydmc.MPQuery import MPQuery
-    import os
 
-    
-    remake = True
-    mpid = 'mp-554638'
-    calc_dir = os.path.join(os.getcwd(), '..', 'dev', mpid)
-    if not os.path.exists(calc_dir):
-        os.mkdir(calc_dir)
-    fpos = os.path.join(calc_dir, 'POSCAR')
-    if not os.path.exists(fpos) or remake:
-        mpq = MPQuery('***REMOVED***')
-        s = mpq.get_structure_by_material_id(mpid)
-        s.make_supercell([2,1,1])
-        s.to(filename=os.path.join(calc_dir, 'POSCAR'))
-       # return s
-    f_magmoms = os.path.join(calc_dir, 'magmoms.json')
-    if not f_magmoms or remake:
-        s = Structure.from_file(fpos)
-        s = StrucTools(s).decorate_with_ox_states
-        print(s)
-        mt = MagTools(s)
-        out = mt.get_antiferromagnetic_structures
-    return out
+    return 
 
 if __name__ == '__main__':
     out = main()

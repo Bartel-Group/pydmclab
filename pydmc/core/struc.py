@@ -12,7 +12,8 @@ class StrucTools(object):
     Purpose: to manipulate crystal structures for DFT calculations
     """
     
-    def __init__(self, structure,
+    def __init__(self, 
+                 structure,
                  ox_states=None):
         """
         Args:
@@ -29,7 +30,7 @@ class StrucTools(object):
     @property
     def compact_formula(self):
         """
-        "clean" (reduced, systematic) formula for structure
+        "clean" (reduced, systematic) formula (str) for structure
         """
         return CompTools(self.structure.formula).clean
     
@@ -37,7 +38,6 @@ class StrucTools(object):
     def formula(self):
         """
         pretty (unreduced formula) for structure
-        
         """
         return self.structure.formula
     
@@ -56,11 +56,14 @@ class StrucTools(object):
             
         Returns:
             Structure repeated nx, ny, nz
+            
+            so to make a 1x2x3 supercell of the initial structure, use:
+                supercell = StrucTools(structure).make_supercell([1, 2, 3])
         """
-        s = self.structure
+        structure = self.structure
         print('making supercell with grid %s\n' % str(grid))
-        s.make_supercell(grid)
-        return s
+        structure.make_supercell(grid)
+        return structure
         
     
     @property
@@ -71,7 +74,7 @@ class StrucTools(object):
             - otherwise, applies ox_states
         """
         print('decorating with oxidation states\n')
-        s = self.structure
+        structure = self.structure
         ox_states = self.ox_states
         if not ox_states:
             print('     automatically\n')
@@ -79,7 +82,7 @@ class StrucTools(object):
         else:
             transformer = OxidationStateDecorationTransformation(oxidation_states=ox_states)
             print('     using %s' % str(ox_states))
-        return transformer.apply_transformation(s)
+        return transformer.apply_transformation(structure)
     
     def get_ordered_structures(self,
                                algo=0,
@@ -88,6 +91,8 @@ class StrucTools(object):
         """
         Args:
             algo (int) - 0 = fast, 1 = complete, 2 = best first
+                - see pymatgen.transformations.standard_transformations.OrderDisorderedStructureTransformation
+                - 0 usually OK
             decorate (bool) - whether to decorate with oxidation states
                 - if False, self.structure must already have them
             n_strucs (int) - number of ordered structures to return
@@ -98,13 +103,13 @@ class StrucTools(object):
         """
         transformer = OrderDisorderedStructureTransformation(algo=algo)
         if decorate:
-            s = self.decorate_with_ox_states
+            structure = self.decorate_with_ox_states
         else:
-            s = self.structure
+            structure = self.structure
         return_ranked_list = n_strucs if n_strucs > 1 else False
         
         print('ordering disordered structures\n')
-        out = transformer.apply_transformation(s,
+        out = transformer.apply_transformation(structure,
                                                 return_ranked_list=return_ranked_list)
         out = [i['structure'] for i in out]
         #print(out[0])
@@ -131,20 +136,23 @@ class StrucTools(object):
             dict of ordered structures {index : structure (Structure.as_dict())}
                 - index = 0 has lowest Ewald energy
         """
-        s = self.structure
+        structure = self.structure
         print('replacing species with %s\n' % str(species_mapping))
-        s.replace_species(species_mapping)
-        if s.is_ordered:
-            return {0 : s.as_dict()}
+        structure.replace_species(species_mapping)
+        if structure.is_ordered:
+            return {0 : structure.as_dict()}
         else:
-            structools = StrucTools(s, self.ox_states)
+            structools = StrucTools(structure, self.ox_states)
             return structools.get_ordered_structures(n_strucs=n_strucs) 
                
-    def get_structures_with_dilute_vacancy(self,
+    def BROKEN_get_structures_with_dilute_vacancy(self,
                                             el_to_replace,
                                             n_strucs=1,
                                             structure=None):
         """
+        @TODO: revisit this
+        
+        
         Args:
             el_to_replace (str) - element to replace with vacancy
             n_strucs (int) - number of ordered structures to return if disordered
@@ -168,11 +176,20 @@ class StrucTools(object):
         
 class SiteTools(object):
     """
-    make it a little easier to get site info
+    make it a little easier to get site info from structures
     
-    @Chris - TO DO
     """
     def __init__(self, structure, index):
+        """
+        Args:
+            structure (Structure) - pymatgen structure
+            index (int) - index of site in structure
+            
+        Returns:
+            pymatgen Site object
+        """
+        if isinstance(structure, dict):
+            structure = Structure.from_dict(structure)
         self.site = structure[index]
     
     @property
@@ -241,26 +258,8 @@ class SiteTools(object):
             return None
     
 def main():
-    from pydmc.MPQuery import MPQuery
-
-    mpq = MPQuery('***REMOVED***')
-    mpid = 'mp-22584' # LiMn2O4
-    #mpid = 'mp-1301329' # LiMnTiO4
-    #mpid = 'mp-770495' # Li5Ti2Mn3Fe3O16
-    mpid = 'mp-772660' # NbCrO4
-    #mpid = 'mp-776873' # Cr2O3
-    
-    mpid = 'mp-825' # RuO2
-    s = mpq.get_structure_by_material_id(mpid)
-    s.make_supercell([2,1,1])
-    print(s)
-    st = StrucTools(s)
-    
-    out = st.replace_species({Element('Ru') : {Element('Ir') : 1/2,
-                                            Element('Ru') : 1/2}},
-                             n_strucs=100)
-    
-    return out
+   
+    return 
 
 if __name__ == '__main__':
     out = main()

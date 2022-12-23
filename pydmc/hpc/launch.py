@@ -1,5 +1,4 @@
 import os
-from shutil import copyfile
 
 from pymatgen.core.structure import Structure
 
@@ -7,12 +6,19 @@ from pydmc.utils.handy import read_yaml, write_yaml, dotdict, is_calc_valid
 from pydmc.core.mag import MagTools
 from pydmc.data.configs import load_launch_configs
 
-
-
-
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 class LaunchTools(object):
+    """
+    This is a class to figure out:
+        - what launch_dirs need to be created
+            - i.e., which directories will house submission scripts
+        - what calculations need to be run in each launch_dir
+        - the general flow will be:
+            - use LaunchTools to generate launch_dirs (and their corresponding "valid_calcs")
+            - use SubmitTools to generate submission scripts for each launch_dir
+                - note: SubmitTools is making heavy use of VASPSetUp to configure directories and set up each VASP calc
+    """
     
     def __init__(self,
                  calcs_dir,
@@ -20,42 +26,58 @@ class LaunchTools(object):
                  magmoms=None,
                  top_level='formula',
                  unique_ID='my-1234',
-                 launch_configs_yaml=os.path.join(os.getcwd(), '_launch_configs.yaml'),
-                 user_configs={}):
+                 user_configs={},
+                 launch_configs_yaml=os.path.join(os.getcwd(), '_launch_configs.yaml')):
         """
         Args:
         
-            calcs_dir (os.path): directory where calculations will be launched
-                - top_level will go at calcs_dir/top_level
-                
+            calcs_dir (os.path): directory where calculations will be stored
+                - usually if I'm writing a "launch" script to configure and run a bunch of calcs from  a directory: os.getcwd() = */scripts:
+                    - then calcs_dir will be os.getcwd().replace('scripts', 'calcs')
+                    - I should also probably have a directory to store data called calcs_dir.replace('calcs', 'data')
+                    - these are best practices but not strictly enforced in the code anywhere
+                                    
             structure (Structure): pymatgen structure object
-            
+                - usually I want to run a series of calculations for some input structure
+                    - this is the input structure
+                    
             top_level (str): top level directory
-        - could be whatever you want
-        - for instance, if I were looking at Li_{x}Co10O20 at varying x values between 0 and 10, I might make top_level = LiCoO2
-        - if I was just running a geometry relaxation on a given chemical formula (let's say LiTiS2), I would call the top_level = LiTiS2 or even better, Li1S2Ti1 (the CompTools(formula).clean standard)
-            
+                - could be whatever you want, but there are some guidelines
+                    - usually this will be a chemical formula
+                        - if I was just running a geometry relaxation on a given chemical formula 
+                            - let's say LiTiS2)
+                                - I would call the top_level = LiTiS2 or even better, Li1S2Ti1 (the CompTools(formula).clean standard)
+                - for more complicated calcs,
+                    - lets say I'm studying Li_{x}Co10O20 at varying x values between 0 and 10
+                        - I might make top_level = LiCoO2
+                
             unique_ID (str): level below top_level
-                - could be a material ID in materials project
-                - could be x in the example I described previously
-                - up to you
-        
-            compare_to_mp (bool): whether calculations will be compared to mp
-                - this will add standard = 'mp' to standards if it's not there already
-                - this will add xc = 'ggau' to xcs if it's not there already
+                - could be a material ID in materials project (for standard geometry relaxations, this makes sense)
+                - could be x in the LiCoO2 example I described previously
+                - it's really up to you, but it must be unique within the top_level directory
                 
-            n_afm_configs (int): number of AFM configurations to run
-                - 0 means don't run AFM
+            magmoms (dict): 
+                - if you are running AFM calculations
+                    - {index of configuration index (int) : magmom (list)} generated using MagTools
+                    - best practice is to save this as a json in data_dir so you only call MagTools once
+                - if you are not running AFM calculations
+                    - can be None or {} 
+                    
+            user_configs (dict):
+                - any setting you want to pass that's not default in pydmc/data/data/_launch_configs.yaml
+                - some common ones to change might be:
+                    {xcs : ['ggau'],
+                     compare_to_mp : True,
+                     n_afm_configs : 3,
+                     etc.}
+                     
+            launch_configs_yaml (os.pathLike) - path to yaml file containing launch configs
+                - there's usually no reason to change this
+                - this holds some default configs for LaunchTools
+                - can always be changed with user_configs  
                 
-            magmoms (dict): path to json that contains {index of configuration (int) : magmom (list) generated using MagTools}
-                - if None and n_afm_configs > 0, will be generated here
-                    - this is not advisable --> better to generate all afm magmoms for all materials, save as json, then pass that dict here
-
-            relax (bool): whether structures will be relaxed
-                - this should almost always be true
-                
-            override_mag (bool): whether to run nm for mag systems or fm for nm systems
-                - this should almost always be false
+        Returns:
+            configs (dotdict): dictionary of all configs and arguments to LaunchTools
         """
         
         if not os.path.exists(calcs_dir):
@@ -97,6 +119,17 @@ class LaunchTools(object):
     
     @property
     def valid_calcs(self):
+        """
+        Returns list of calculations that are "valid" given the configs
+            - note: makes use of pydmc.utils.handy.is_calc_valid to check a given calc
+        
+        Calcs might be "invalid" if:
+            - you are passing a structure from one functional to another, then there's no need to run a loose calc
+            - you have a nonmagnetic material, there's no need to run magnetic calcs
+            - you are using mp standards, there's no reason not to use MP functional (GGA+U)
+            - you are passing mag = afm_9, but there are only 5 AFM configs
+            - etc.
+        """
         configs = self.configs
         if configs.relax_geometry:
             possible_calcs = ['loose', 'relax', 'static']
@@ -152,6 +185,15 @@ class LaunchTools(object):
 
     @property
     def launch_dirs(self):
+        """
+        Returns the minimal list of directories that need a submission file to launch a chain of calcs
+        
+        These launch_dirs have a very prescribed structure:
+            calcs_dir / top_level / unique_ID / standard / xc / mag / calc
+            
+            e.g.,
+                this could be */calcs/Nd2O7Ru2/mp-19930/dmc/metagga/fm/relax
+        """
         configs = self.configs
             
         valid_calcs = self.valid_calcs
@@ -180,6 +222,17 @@ class LaunchTools(object):
     
     @property
     def launch_dirs_to_tags(self):
+        """
+        Returns:
+            dictionary of {launch_dir : [tags]}
+            
+            for the minimal list of self.launch_dirs
+            
+            each "tag" corresponds with one instsance where vasp needs to be executed
+                - tags have the form xc-calc
+                    - e.g., 'gga-relax'
+        
+        """
         launch_dirs = self.launch_dirs
         valid_calcs = self.valid_calcs
         
@@ -199,6 +252,14 @@ class LaunchTools(object):
                 
     @property
     def create_launch_dirs_and_make_POSCARs(self):
+        """
+        Loops through my launch_dirs and puts a POSCAR in each one
+        
+        SubmitTools will take it from there to
+            - create the other VASP inputs
+            - make and submit a submission file
+            - handle errors, etc
+        """
         
         launch_dirs = self.launch_dirs_to_tags
         for launch_dir in launch_dirs:

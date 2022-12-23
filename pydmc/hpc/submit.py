@@ -1,8 +1,7 @@
 from pydmc.hpc.vasp import VASPSetUp
 from pydmc.hpc.analyze import AnalyzeVASP
-from pydmc.core.mag import MagTools
-from pydmc.utils.handy import read_yaml, write_yaml, dotdict, write_json, read_json
-from pydmc.data.configs import load_vasp_configs, load_launch_configs, load_slurm_configs, load_sub_configs, load_partition_configs
+from pydmc.utils.handy import read_yaml, write_yaml, dotdict
+from pydmc.data.configs import load_vasp_configs, load_slurm_configs, load_sub_configs, load_partition_configs
 
 from pymatgen.core.structure import Structure
 
@@ -10,53 +9,93 @@ import os
 from shutil import copyfile, rmtree
 import subprocess
 
-import warnings
-
-
 HERE = os.path.dirname(os.path.abspath(__file__))
 
-
-
 class SubmitTools(object):
+    """
+    This class is focused on figuring out how to prepare chains of calculations
+        - the idea being that the output from this class is some file that you can
+            "submit" to a queueing system
+        - this class will automatically crawl through the VASP output files and figure out
+            how to edit that submission file to finish the desired calculations
     
+    """
     def __init__(self,
                  launch_dir,
                  valid_calcs,
+                 user_configs={},
+                 magmom=None,
                  vasp_configs_yaml=os.path.join(os.getcwd(), '_vasp_configs.yaml'),
                  slurm_configs_yaml=os.path.join(os.getcwd(), '_slurm_configs.yaml'),
                  sub_configs_yaml=os.path.join(os.getcwd(), '_sub_configs.yaml'),
-                 user_configs={},
-                 magmom=None,
                  files_to_inherit=['WAVECAR', 'CONTCAR'],
                  refresh_configs=[]):
         
         """
         Args:
-            launch_dir (str) - directory to launch calculations from
+            launch_dir (str) - directory to launch calculations from (to submit the submission file)
                 - assumes initial structure is POSCAR in launch_dir
-                - this might be LiMn2O4_mp-123456
-                    - then within this directory, you might generate a set of calc_dirs
+                - within this directory, various VASP calculation directories (calc_dirs) will be created
                         - gga-loose, gga-relax, gga-static, etc
-            config_yaml (str) - path to yaml file containing base configs
-                if None:
-                    - get them from pydmc
-            user_configs (dict) - dictionary of user configs to override base configs
-                common ones:
-                    {'mag' : 'afm',
-                    'standard' : 'mp',
+                            - VASP will be run in each of these, but we need to run these sequentially, so we pack them together in one submission script
+            
+            valid_calcs (list) - list of calculations to run
+                - this will get created automatically by LaunchTools
+                    - i.e. it will figure out what are the minimal number of necessary calculations to run for a given launch_dir
+                        (it will also figure out the minimal number of launch_dirs)
+                - each item in the list is formatted as xc-calc (e.g., gga-loose)
+                
+            user_configs (dict) - any non-default parameters you want to pass 
+                - these will override the defaults in the yaml files
+                - look at pydmc/data/data/*configs*.yaml for the defaults
+                    - note: _launch_configs.yaml will be modified using LaunchTools
+                - you should be passing stuff here!
+                - some common ones might be:
+                    {'mag' : 'afm_3',
+                    'standard' : 'dmc',
                     'nodes' : 2,
-                    'time' : '96:00:00',
-                    'job-name' : SOMETHING_SPECIFIC}
-                    
+                    'job-name' : SOMETHING_SPECIFIC,
+                    'lobster_static' : False,
+                    etc
+                    etc}
+                    - anything that's not in the default yaml files that you want to apply to calculations in this launch_dir
+
             magmom (list) - list of magnetic moments for each atom in structure
-                - only specify if mag='afm'
+                - only specify if 'afm' in mag, otherwise magmom=None is fine
+                - e.g., if afm_1, you might grab these from a magmoms dictionary you made with MagTools as:
+                    magmom = magmoms[mpid]['1']
+                
+            vasp_configs_yaml (os.pathLike) - path to yaml file containing vasp configs
+                - there's usually no reason to change this
+                - this holds some default configs for VASP
+                - can always be changed with user_configs
+ 
+             slurm_configs_yaml (os.pathLike) - path to yaml file containing slurm configs
+                - there's usually no reason to change this
+                - this holds some default configs for slurm
+                - can always be changed with user_configs  
+                
+            sub_configs_yaml (os.pathLike) - path to yaml file containing submission file configs
+                - there's usually no reason to change this
+                - this holds some default configs for submission files
+                - can always be changed with user_configs             
                 
             files_to_inherit (list) - list of files to copy from calc to calc
+                - this shouldn't have to be changed
+                
+            refresh_configs (bool) - if True, will refresh the yaml files with the pydmc defaults
+                - this is useful if you've made changes to the configs files in the directory you're working in and want to start over
         
         Returns:
             self.launch_dir (os.pathLike) - directory to launch calculations from
-            self.configs (dict) - dictionary of configs (in format similar to yaml)
+            self.valid_calcs (list) - list of calculations to run
+            self.slurm_configs (dotdict) - dictionary of slurm configs (in format similar to yaml)
+            self.vasp_configs (dotdict) - dictionary of vasp configs (in format similar to yaml)
+            self.sub_configs (dotdict) - dictionary of submission configs (in format similar to yaml)
             self.files_to_inherit (list) - list of files to copy from calc to calc
+            self.structure (Structure) - pymatgen structure object from launch_dir/POSCAR
+            self.magmom (list) - list of magnetic moments for each atom in structure
+            self.partitions (dotdict) - dictionary of info regarding partition configurations on MSI
         """
         
         self.launch_dir = launch_dir
@@ -139,7 +178,7 @@ class SubmitTools(object):
     def vasp_command(self):
         """
         Returns command used to execute vasp
-            e.g., 'mpirun -n 24 PATH_TO_VASP/vasp_std > vasp.o'
+            e.g., 'srun -n 24 PATH_TO_VASP/vasp_std > vasp.o'
         """
         configs = self.sub_configs
         vasp_exec = os.path.join(configs.vasp_dir, configs.vasp)
@@ -197,36 +236,34 @@ class SubmitTools(object):
     @property
     def prepare_directories(self):
         """
-        A lot going on here. The objective is to prepare a set of directories for all calculations 
-            - for a given initial crystal structure (material)
-                - */launch_dir/POSCAR 
-            - at a given magnetic ordering
-                - user_configs['mag'] = 'nm', 'fm', OR 'afm'
-                - if 'afm', must supply self.magmom
+        This gets called by SubmitTools.write_sub, so you should rarely call this on its own
         
-        When to call this:
-            - when you are setting up a set of calculations for the first time
-            - when you want to loop through a set of calculations that have partially finished
-                - to run the ones that haven't started/finished yet (fresh_restart=False)
-                - to re-run them all (fresh_restart=True)
-        
+        A lot going on here. The objective is to prepare a set of directories for all calculations of interest to a self.launch_dir (which holds a single submission script)
+              
         1) For each xc-calc pair, create a directory (calc_dir)
             - */launch_dir/xc-calc
+            
         2) Check if that calc_dir has a converged VASP job
-            - if it does
-                - if fresh_restart = False --> label calc_dir as status='DONE' and move on
-                - if fresh_restart = True --> remove prev calc in that dir
+            - note: also checks "parents" (ie a static is labeled unconverged if its relax is unconverged)
+            - if calc and parents are converged:
+                - checks sub_configs['fresh_restart']
+                    - if fresh_restart = False --> label calc_dir as status='DONE' and move on
+                    - if fresh_restart = True --> start this calc over
+                    
         3) Put */launch_dir/POSCAR into */launch_dir/xc-calc/POSCAR if there's not a POSCAR there already
+        
         4) Check if */calc_dir/CONTCAR exists and has data in it,
             - if it does, copy */calc_dir/CONTCAR to */calc_dir/POSCAR and label status='CONTINUE' (ie continuing job)
-            - if it doeqmsn't, label status='NEW' (ie new job)
+            - if it doesn't, label status='NEW' (ie new job)
+            
         5) Initialize VASPSetUp for calc_dir
-            - modifies vasp_input_set with self.configs as requested in **kwargs and configs.yaml
-        6) If status='CONTINUE',
-            - check for errors using vsu
+            - modifies vasp_input_set with self.configs as requested in configs dictionaries (mainly vasp_configs which receives user_configs as well)
+            
+        6) If status in ['CONTINUE', 'NEW'],
+            - check for errors using VASPSetUp
                 - may remove WAVECAR/CHGCAR
-                - may make edits to INCAR
-        7) prepare calc_dir to launch        
+                - will likely make edits to INCAR
+                      
         """
         prepare_calc_options = ['potcar_functional',
                                 'validate_magmom',
@@ -348,6 +385,12 @@ class SubmitTools(object):
    
     @property
     def is_job_in_queue(self):
+        """
+        Returns:
+            True if this job-name is already in the queue, else False
+            
+        Will prevent you from messing with directories that have running/pending jobs
+        """
         scripts_dir = os.getcwd()
         sub_configs = self.sub_configs
         fqueue = os.path.join(scripts_dir, sub_configs.fqueue)
@@ -369,17 +412,42 @@ class SubmitTools(object):
     def write_sub(self):
         """
         A lot going on here. The objective is to write a submission script for each calculation
-            - so that I can iterate through a for loop and launch all calcs
             - each submission script will launch a chain of jobs
+            - this gets a bit tricky because a submission script is executed in bash
+                - it's essentially like moving to a compute node and typing each line of the submission script into the compute node's command line
+                - this means we can't really use python while the submission script is being executed
         
+        1) check if job's in queue. if it is, just return
+        
+        2) write our slurm options at the top of sub file
+        
+        3) loop through all the calculations we want to do from this launch dir
+            - label them as "DONE", "CONTINUE", or "NEWRUN"
+            
+        4) for "CONTINUE"
+            - copy CONTCAR to POSCAR to save progress
+            
+        5) for "NEWRUN" and "CONTINUE"
+            - figure out what parent calculations to get data from
+                - e.g., gga-static for metagga-relax
+            - make sure that parent calculation finished without errors before passing data to next calc
+                - and before running next calc
+                - if a parent calc didnt finish, but we've moved onto the next job, kill the job, so we can (automatically) debug the parent calc
+
+        6) write VASP commands
+        
+        7) if lobster_static and calc is static, write LOBSTER and BADER commands
         """
-        if self.is_job_in_queue:
-            return
+
                 
         vasp_configs = self.vasp_configs
         sub_configs = self.sub_configs
         
         launch_dir = self.launch_dir
+        print('\nchecking if %s is in q' % launch_dir)
+        if self.is_job_in_queue:
+            return
+        
         vasp_command = self.vasp_command
         slurm_options = self.slurm_options
         queue_manager = self.queue_manager
@@ -412,9 +480,9 @@ class SubmitTools(object):
                 if status == 'DONE':
                     f.write('\necho working on %s >> %s\n' % (tag, fstatus))
                     if vasp_configs['lobster_static']:
-                        if not os.path.exists(os.path.join(calc_dir, 'lobsterout')) or sub_configs.force_postprocess:
+                        if sub_configs.force_postprocess or not os.path.exists(os.path.join(calc_dir, 'lobsterout')):
                             f.write(self.lobster_command)
-                        if not os.path.exists(os.path.join(calc_dir, 'ACF.dat')) or sub_configs.force_postprocess:
+                        if sub_configs.force_postprocess or not os.path.exists(os.path.join(calc_dir, 'ACF.dat')):
                             f.write(self.bader_command)
                     f.write('echo %s is done >> %s\n' % (tag.split('_')[1], fstatus))
                 else:
@@ -497,6 +565,12 @@ class SubmitTools(object):
     
     @property
     def launch_sub(self):
+        """
+        launch the submission script written in write_sub
+            - if job is not in queue already
+            - if there's something to launch
+                (ie if all calcs are done, dont launch)
+        """
         if self.is_job_in_queue:
             return
         

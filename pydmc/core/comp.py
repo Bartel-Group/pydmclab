@@ -19,6 +19,8 @@ class CompTools(object):
                 - sorted by elements
                 - parentheses removed
                 - fractions --> integers
+                
+        In general, we want to use this for maximum consistency
         """
         formula = Composition(self.formula).reduced_formula
         formula = Composition(formula).alphabetical_formula
@@ -53,7 +55,7 @@ class CompTools(object):
     def mol_frac(self, el):
         """
         Returns:
-            the molar fraction of an element (float)
+            the molar fraction (float) of an element (str)
                 - note: starts with "clean" formula
         """
         return Composition(self.clean).get_atomic_fraction(el)
@@ -75,7 +77,7 @@ class CompTools(object):
         Returns:
             chemical system (str) of the formula
                 - sorted
-                - elements separated by "-"
+                - elements (str) joined by "-"
         """
         return Composition(self.clean).chemical_system
     
@@ -132,8 +134,7 @@ class CompTools(object):
     
     
 def main():
-    formula = 'NaV2.5(PO4)3'
-    return CompTools(formula)
+    return 
     
 
 if __name__ == '__main__':
