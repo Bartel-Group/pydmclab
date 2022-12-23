@@ -1,17 +1,13 @@
-from pydmc.utils.handy import read_json, write_json
 from pydmc.core.mag import MagTools
-from pydmc.core.struc import StrucTools, SiteTools
-from pydmc.core.comp import CompTools
-from pydmc.hpc.analyze import AnalyzeVASP
+from pydmc.hpc.analyze import AnalyzeVASP, VASPOutputs
 
 import os
 import warnings
 from shutil import copyfile
-import numpy as np
 
 from pymatgen.io.vasp.sets import MPRelaxSet, MPScanRelaxSet
 from pymatgen.core.structure import Structure
-from pymatgen.io.vasp.inputs import Kpoints, Incar
+from pymatgen.io.vasp.inputs import Kpoints
 from pymatgen.io.lobster.inputs import Lobsterin
 
 """
@@ -408,8 +404,8 @@ class VASPSetUp(object):
         
         # for LOBSTER, use Janine George's Lobsterin approach (mainly to get NBANDS)
         if self.lobster_static:
-            analyzer = AnalyzeVASP(self.calc_dir)
-            if analyzer.incar_parameters['NSW'] == 0:
+            outputs = VASPOutputs(self.calc_dir)
+            if outputs.incar.as_dict()['NSW'] == 0:
                 INCAR_input = os.path.join(self.calc_dir, 'INCAR_input')
                 INCAR_output = os.path.join(self.calc_dir, 'INCAR')
                 copyfile(INCAR_output, INCAR_input)
@@ -496,6 +492,7 @@ class VASPSetUp(object):
                 the calculation didn't reach ionic convergence
         """
         analyzer = AnalyzeVASP(self.calc_dir)
+        outputs = VASPOutputs(self.calc_dir)
         unconverged = []
         
         # if calc is fully converged, return empty list (calc is done)
@@ -503,7 +500,7 @@ class VASPSetUp(object):
             return unconverged
         
         # if vasprun doesnt exist, return empty list (calc errored out or didnt start yet)
-        vr = analyzer.vasprun
+        vr = outputs.vasprun
         if not vr:
             return unconverged
         
