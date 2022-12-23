@@ -442,7 +442,11 @@ class AnalyzeVASP(object):
         
     @property
     def relaxed_structure(self):
-        return self.outputs.contcar.as_dict()
+        structure = self.outputs.contcar
+        if structure:
+            return structure.as_dict()
+        else:
+            return None
     
     @property
     def metadata(self):
