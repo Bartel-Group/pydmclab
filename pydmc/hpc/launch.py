@@ -67,7 +67,7 @@ class LaunchTools(object):
         
         _launch_configs = read_yaml(launch_configs_yaml)
         
-        configs = {**launch_configs, **user_configs}
+        configs = {**_launch_configs, **user_configs}
 
         configs['top_level'] = top_level
         configs['unique_ID'] = unique_ID
