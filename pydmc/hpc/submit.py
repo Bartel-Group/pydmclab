@@ -366,6 +366,7 @@ class SubmitTools(object):
                 # pass loose/static/relax_INCAR/KPOINTS/POTCAR from vasp_configs to this calc
                 calc_configs = {'modify_%s' % input_file.lower() : 
                     vasp_configs['%s_%s' % (calc, input_file)] for input_file in ['INCAR', 'KPOINTS', 'POTCAR']}
+                
                 # pass the other vasp_configs to this calc
                 for key in prepare_calc_options:
                     calc_configs[key] = vasp_configs[key]
