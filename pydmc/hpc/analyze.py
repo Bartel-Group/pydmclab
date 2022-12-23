@@ -505,13 +505,16 @@ class AnalyzeBatch(object):
                 include_calc_setup=False,
                 include_structure=False,
                 include_mag=False,
-                include_dos=False):
+                include_dos=False,
+                verbose=True):
         
         calc_dirs = self.calc_dirs
         if only_static:
             calc_dirs = [c for c in calc_dirs if 'static' in c]
         data = {}
         for calc_dir in calc_dirs:
+            if verbose:
+                print('analyzing %s' % calc_dir)
             if not key:
                 key = '.'.join(calc_dir.split('/')[-6:])
             else:
