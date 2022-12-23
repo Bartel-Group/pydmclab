@@ -198,7 +198,6 @@ class MPQuery(object):
                           properties=None, 
                           criteria=None, 
                           only_gs=False, 
-                          dict_key=False,
                           include_structure=False):
         """
         Args:
@@ -222,13 +221,11 @@ class MPQuery(object):
             only_gs (bool)
                 if True, remove non-ground state polymorphs for each unique composition
                 
-            dict_key (str)
-                if False, return list of dicts
-                if True, return dict oriented by dict_key
-                    e.g., if dict_key = 'cmpd', then returns {CMPD : {query_data_for_that_cmpd}}
-                        or dict_key = 'mpid' --> {MPID : {data_for_that_mpid}}
         Returns:
-            list of dictionaries of properties for each material in the desired comp
+            if not only_gs:
+                {mpid : {DATA}}
+            if only_gs:
+                {formula : DATA}
         """
         key_map = self.long_to_short_keys
         if properties == 'all':
@@ -294,16 +291,16 @@ class MPQuery(object):
                     if Ef_check < Ef_stored:
                         gs[cmpd] = entry
             query = [gs[k] for k in gs]
-        if dict_key:
-            if dict_key not in query[0]:
-                raise ValueError('%s not in query' % dict_key)
-            query = {entry[dict_key] : entry for entry in query}
+            query = {entry['cmpd'] : entry for entry in query}
+            
+        else:
+            query = {entry['mpid'] : entry for entry in query}
             
         if include_structure:
-            for key in query:
-                mpid = query[key]['mpid']
+            for entry in query:
+                mpid = query[entry]['mpid']
                 structure = self.get_structure_by_material_id(mpid)
-                query[key]['structure'] = structure.as_dict()
+                query[entry]['structure'] = structure.as_dict()
         return query
     
     def get_entry_by_material_id(self, 
