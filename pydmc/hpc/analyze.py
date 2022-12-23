@@ -11,50 +11,13 @@ from pydmc.core.struc import StrucTools, SiteTools
 from pydmc.core.comp import CompTools
 from pydmc.utils.handy import read_json, write_json
 
-class AnalyzeVASP(object):
-    """
-    Analyze the results of one VASP calculation
-    """
-    def __init__(self, calc_dir, calc='from_calc_dir'):
-        """
-        Args:
-            calc_dir (os.PathLike) - path to directory containing VASP calculation
-            calc (str) = what kind of calc was done in calc_dir
-                - 'from_calc_dir' (default) - determine from calc_dir
-                - could also be in ['loose', 'static', 'relax']
-                
-        Returns:
-            calc_dir, calc
-        
-        """
+class VASPOutputs(object):
+    
+    def __init__(self,
+                 calc_dir):
         
         self.calc_dir = calc_dir
-        if calc == 'from_calc_dir':
-            self.calc = os.path.split(calc_dir)[-1].split('-')[1]
-        else:
-            self.calc = calc
-            
-    @property
-    def poscar(self):
-        """
-        Returns Structure object from POSCAR in calc_dir
-        """
-        return Structure.from_file(os.path.join(self.calc_dir, 'POSCAR'))
-    
-    @property
-    def contcar(self):
-        """
-        Returns Structure object from CONTCAR in calc_dir
-        """
-        return Structure.from_file(os.path.join(self.calc_dir, 'CONTCAR'))
-
-    @property
-    def nsites(self):
-        """
-        Returns number of sites in POSCAR
-        """
-        return len(self.poscar)
-          
+        
     @property
     def vasprun(self):
         """
@@ -63,11 +26,85 @@ class AnalyzeVASP(object):
         fvasprun = os.path.join(self.calc_dir, 'vasprun.xml')
         if not os.path.exists(fvasprun):
             return None
+        
         try:
             vr = Vasprun(os.path.join(self.calc_dir, 'vasprun.xml'))
             return vr
         except:
-            return None     
+            return None    
+        
+    @property
+    def poscar(self):
+        """
+        Returns Structure object from POSCAR in calc_dir
+        """
+        fposcar = os.path.join(self.calc_dir, 'POSCAR')
+        if not os.path.exists(fposcar):
+            return None
+        
+        try:
+            return Structure.from_file(os.path.join(self.calc_dir, 'POSCAR'))
+        except:
+            return None
+        
+    @property
+    def incar(self):
+        """
+        Returns dict of VASP input settings from vasprun.xml
+        """
+        vr = self.vasprun
+        if vr:
+            return vr.parameters
+        else:
+            return Incar.from_file(os.path.join(self.calc_dir, 'INCAR'))
+        
+    @property
+    def kpoints(self):
+        """
+        Returns Kpoints object from KPOINTS in calc_dir
+        """
+        fkpoints = os.path.join(self.calc_dir, 'KPOINTS')
+        
+        if not os.path.exists(fkpoints):
+            return None
+        try:
+            return Kpoints.from_file(fkpoints)
+        except:
+            return None
+        
+    @property
+    def actual_kpoints(self):
+        """
+        Returns actual kpoints that were used (list of [a,b,c] for each kpoint)
+        """
+        vr = self.vasprun
+        if vr:
+            return vr.actual_kpoints
+        else:
+            return None
+        
+    @property
+    def potcar(self):
+        """
+        Returns list of POTCAR symbols from vasprun.xml
+        """
+        vr = self.vasprun
+        if vr:
+            return vr.potcar_symbols
+        else:
+            return None
+    @property
+    def contcar(self):
+        """
+        Returns Structure object from CONTCAR in calc_dir
+        """
+        fcontcar = os.path.join(self.calc_dir, 'CONTCAR')
+        if not os.path.exists(fcontcar):
+            return None
+        try:
+            return Structure.from_file(os.path.join(self.calc_dir, 'CONTCAR'))
+        except:
+            return None 
  
     @property
     def outcar(self):
@@ -97,25 +134,97 @@ class AnalyzeVASP(object):
             ev = Eigenval(os.path.join(self.calc_dir, 'EIGENVAL'))
             return ev
         except:
-            return None
-      
-    @property
-    def nbands(self):
+            return None        
+        
+    def doscar(self,
+               fdoscar='DOSCAR.lobster'):
         """
-        Returns number of bands from EIGENVAL
+        fdoscar (str) - 'DOSCAR' or 'DOSCAR.lobster'
         """
-        ev = self.eigenval
-        if ev:
-            return ev.nbands
-        else:
+        if not os.path.exists(fdoscar):
             return None
+        
+        try:
+            dos = Doscar(doscar=fdoscar,
+                structure_file=os.path.join(self.calc_dir, 'CONTCAR'))
+        except:
+            return None
+        
+        return dos
     
+    @property
+    def lobsterin(self):
+        s_orbs = ['s']
+        p_orbs = ['p_x', 'p_y', 'p_z']
+        d_orbs = ['d_xy', 'd_yz', 'd_z^2', 'd_xz', 'd_(x^2-y^2)']
+        f_orbs = ['f_y(3x^2-y^2)', 'f_xyz', 'f_yz^2', 'f_z^3', 'f_xz^2', 'f_z(x^2-y^2)', 'f_x(x^2-3y^2)']
+        all_orbitals = {'s' : s_orbs,
+                        'p' : p_orbs,
+                        'd' : d_orbs,
+                        'f' : f_orbs}
+        
+        basis_functions = {}
+        with open(os.path.join(self.calc_dir, 'lobsterin')) as f:
+            for line in f:
+                if 'basisfunctions' in line:
+                    line = line[:-1].split(' ')
+                    el = line[1]
+                    basis = line[2:-1]
+                    basis_functions[el] = basis
+                    
+
+        #print(data)
+        orbs = {}
+        for el in basis_functions:
+            orbs[el] = []
+            for basis in basis_functions[el]:
+                number = basis[0]
+                letter = basis[1]
+                #print(number)
+                #print(letter)
+                #print('\n')
+                orbitals = [number+v for v in all_orbitals[letter]]
+                orbs[el] += orbitals
+                
+        data = {el : {'orbs' : orbs[el],
+                      'basis' : basis_functions[el]} for el in orbs}
+        
+        return data        
+        
+class AnalyzeVASP(object):
+    """
+    Analyze the results of one VASP calculation
+    """
+    def __init__(self, 
+                 calc_dir, 
+                 calc=None):
+        """
+        Args:
+            calc_dir (os.PathLike) - path to directory containing VASP calculation
+            calc (str) = what kind of calc was done in calc_dir
+                - if None, infer from calc_dir
+                - could also be in ['loose', 'static', 'relax']
+                
+        Returns:
+            calc_dir, calc
+            outputs (VASPOutputs(calc_dir))
+        
+        """
+        
+        self.calc_dir = calc_dir
+        if calc == 'from_calc_dir':
+            self.calc = os.path.split(calc_dir)[-1].split('-')[1]
+        else:
+            self.calc = calc
+            
+        self.outputs = VASPOutputs(calc_dir)
+
     @property
     def is_converged(self):
         """
         Returns True if VASP calculation is converged, else False
         """
-        vr = self.vasprun
+        vr = self.outputs.vasprun
         if vr:
             if self.calc == 'static':
                 return vr.converged_electronic
@@ -123,15 +232,33 @@ class AnalyzeVASP(object):
                 return vr.converged
         else:
             return False
-    
+        
     @property
     def E_per_at(self):
         """
         Returns energy per atom (eV/atom) from vasprun.xml or None if calc not converged
         """
         if self.is_converged:
-            vr = self.vasprun
+            vr = self.outputs.vasprun
             return vr.final_energy / self.nsites
+        else:
+            return None
+
+    @property
+    def nsites(self):
+        """
+        Returns number of sites in POSCAR
+        """
+        return len(self.outputs.poscar)
+          
+    @property
+    def nbands(self):
+        """
+        Returns number of bands from EIGENVAL
+        """
+        ev = self.outputs.eigenval
+        if ev:
+            return ev.nbands
         else:
             return None
         
@@ -140,7 +267,7 @@ class AnalyzeVASP(object):
         """
         Returns formula of structure from POSCAR (full)
         """
-        return self.poscar.formula
+        return self.outputs.poscar.formula
     
     @property
     def compact_formula(self):
@@ -148,28 +275,16 @@ class AnalyzeVASP(object):
         Returns formula of structure from POSCAR (compact)
             - use this w/ E_per_at
         """
-        return StrucTools(self.poscar).compact_formula
-    
-    @property
-    def incar_parameters(self):
-        """
-        Returns dict of VASP input settings from vasprun.xml
-        """
-        vr = self.vasprun
-        if vr:
-            return vr.parameters
-        else:
-            return Incar.from_file(os.path.join(self.calc_dir, 'INCAR')).as_dict()
+        return StrucTools(self.outputs.poscar).compact_formula
     
     @property
     def sites_to_els(self):
         """
         Returns {site index (int) : element (str) for every site in structure}
         """
-        contcar = self.contcar
+        contcar = self.outputs.contcar
         return {idx : SiteTools(contcar, idx).el for idx in range(len(contcar))}
 
-            
     @property
     def magnetization(self):
         """
@@ -177,7 +292,7 @@ class AnalyzeVASP(object):
                     {site index (int) : 
                         {'mag' : total magnetization on site}}}
         """
-        oc = self.outcar
+        oc = self.outputs.outcar
         if not oc:
             return {}
         mag = list(oc.magnetization)
@@ -189,22 +304,7 @@ class AnalyzeVASP(object):
                 {idx : 
                     {'mag' : mag[idx]['tot']} 
                         for idx in sorted([i for i in sites_to_els if sites_to_els[i] == el])} 
-                            for el in els}
-        
-    @property
-    def fdoscar(self):
-        """
-        Path to DOSCAR for DOS analysis
-            - for now, just DOSCAR.lobster is usable
-        
-        """
-        fdoscar = os.path.join(self.calc_dir, 'DOSCAR.lobster')
-        if not os.path.exists(fdoscar):
-            fdoscar = fdoscar.replace('.lobster', '')
-            if not os.path.exists(fdoscar):
-                return None
-        return fdoscar
-    
+                            for el in els}    
     @property
     def els_to_orbs(self):
         """
@@ -212,38 +312,8 @@ class AnalyzeVASP(object):
             {element (str) : [list of orbitals (str) considered in calculation]}
         
         """
-        if not (self.fdoscar and 'lobster' in self.fdoscar):
-            return None
-        s_orbs = ['s']
-        p_orbs = ['p_x', 'p_y', 'p_z']
-        d_orbs = ['d_xy', 'd_yz', 'd_z^2', 'd_xz', 'd_(x^2-y^2)']
-        f_orbs = ['f_y(3x^2-y^2)', 'f_xyz', 'f_yz^2', 'f_z^3', 'f_xz^2', 'f_z(x^2-y^2)', 'f_x(x^2-3y^2)']
-        all_orbitals = {'s' : s_orbs,
-                        'p' : p_orbs,
-                        'd' : d_orbs,
-                        'f' : f_orbs}
-        
-        data = {}
-        with open(os.path.join(self.calc_dir, 'lobsterin')) as f:
-            for line in f:
-                if 'basisfunctions' in line:
-                    line = line[:-1].split(' ')
-                    el = line[1]
-                    basis = line[2:-1]
-                    data[el] = basis
-        #print(data)
-        orbs = {}
-        for el in data:
-            orbs[el] = []
-            for basis in data[el]:
-                number = basis[0]
-                letter = basis[1]
-                #print(number)
-                #print(letter)
-                #print('\n')
-                orbitals = [number+v for v in all_orbitals[letter]]
-                orbs[el] += orbitals
-        return orbs
+        lobsterin = self.outputs.lobsterin
+        return {el : lobsterin[el]['orbs'] for el in lobsterin}
     
     @property
     def sites_to_orbs(self):
@@ -262,6 +332,13 @@ class AnalyzeVASP(object):
 
     def pdos(self, fjson=None, remake=False):
         """
+        @TODO: add demo/test
+        @TODO: explore for magnetic materials
+        @TODO: add options for summing or not summing spins
+        @TODO: work on generic plotting
+        @TODO: work on COHPCAR/COOPCAR
+        
+        
         Returns complex dict of projected DOS data
             - uses DOSCAR.lobster as of now (must run LOBSTER first)
         
@@ -279,25 +356,24 @@ class AnalyzeVASP(object):
                             ...
             
         """
-        if not (self.fdoscar and 'lobster' in self.fdoscar):
-            raise NotImplementedError('Need a DOSCAR.lobster file')
+
         if not fjson:
             fjson = os.path.join(self.calc_dir, 'pdos.json')
         if os.path.exists(fjson) and not remake:
             return read_json(fjson)
         
-        fdoscar = self.fdoscar
-        if not fdoscar:
+        doscar = self.outputs.doscar()
+        if not doscar:
             return None
-        complete_dos = Doscar(doscar=fdoscar,
-                                structure_file=os.path.join(self.calc_dir, 'POSCAR')).completedos
+        
+        complete_dos = doscar.completedos
         
         sites_to_orbs = self.sites_to_orbs
         sites_to_els = self.sites_to_els
-        s = self.contcar
+        structure = self.outputs.contcar
         out = {}
         for site_idx in sites_to_orbs:
-            site = s[site_idx]
+            site = structure[site_idx]
             el = sites_to_els[site_idx]
             orbitals = sites_to_orbs[site_idx]
             if el not in out:
@@ -330,14 +406,14 @@ class AnalyzeVASP(object):
         @TODO: work on generic plotting
         @TODO: work on COHPCAR/COOPCAR
         """
-        if not (self.fdoscar and 'lobster' in self.fdoscar):
-            raise NotImplementedError('Need a DOSCAR.lobster file')
         if not fjson:
             fjson = os.path.join(self.calc_dir, 'tdos.json')
         if os.path.exists(fjson) and not remake:
             return read_json(fjson)       
         if not pdos:
             pdos = self.pdos
+        if not pdos:
+            return None
         out = {}
         energies = pdos['E']
         for el in pdos:
@@ -353,24 +429,63 @@ class AnalyzeVASP(object):
             if el == 'total':
                 continue
             out['total'] += np.array(out[el])
-            print(el)
-            print(out[el][690])
-            print(out['total'][690])
 
         out['E'] = energies
         for k in out:
             out[k] = list(out[k])
         return write_json(out, fjson)
-                              
+    
+    @property
+    def basic_info(self):
+        return {'convergence' : self.is_converged,
+                'E_per_at' : self.E_per_at}
+        
+    @property
+    def relaxed_structure(self):
+        return self.outputs.contcar.as_dict()
+    
+    @property
+    def metadata(self):
+        return {'calc_dir' : self.calc_dir,
+                'incar' : self.outputs.incar.as_dict(),
+                'kpoints' : self.outputs.kpoints.as_dict(),
+                'potcar' : self.outputs.potcar}
+        
+    @property
+    def calc_setup(self):
+        calc_dir = self.calc_dir
+        formula, ID, standard, xc, mag, xc_calc = calc_dir.split('/')[-6]
+        return {'formula' : formula,
+                'ID' : ID,
+                'standard' : standard,
+                'xc' : xc,
+                'mag' : mag,
+                'xc_calc' : xc_calc}
+        
+    def summary(self,
+                include_meta=False,
+                include_calc_setup=False,
+                include_structure=False,
+                include_mag=False,
+                include_dos=False):
+        data = {}
+        data['results'] = self.basic_info
+        if include_meta:
+            data['meta'] = self.metadata
+        if include_calc_setup:
+            data['meta']['setup'] = self.calc_setup
+        if include_structure:
+            data['structure'] = self.relaxed_structure
+        if include_mag:
+            data['mag'] = self.magnetization
+        if include_dos:
+            raise NotImplementedError('still working on DOS processing')
+        return data   
 
 class AnalyzeBatch(object):
 
     def __init__(self,
-                 launch_dirs_to_tags,
-                 get_mag=False,
-                 get_structures=False,
-                 get_dos=False,
-                 get_metadata=False):
+                 launch_dirs_to_tags):
 
         self.launch_dirs_to_tags = launch_dirs_to_tags
     
@@ -382,90 +497,34 @@ class AnalyzeBatch(object):
             calc_dirs += [os.path.join(launch_dir, c) for c in launch_dirs[launch_dir]]
         return calc_dirs
     
-    def get_metadata(self):
+    def results(self,
+                key=None,
+                only_static=True,
+                check_relax=True,
+                include_meta=False,
+                include_calc_setup=False,
+                include_structure=False,
+                include_mag=False,
+                include_dos=False):
+        
         calc_dirs = self.calc_dirs
+        if only_static:
+            calc_dirs = [c for c in calc_dirs if 'static' in c]
+        data = {}
         for calc_dir in calc_dirs:
-            av = AnalyzeVASP(calc_dir)
-
-    
-    def get_results(self,
-                    top_level_key='formula',
-                    magnetization=False,
-                    relaxed_structure=False,
-                    dos=None,
-                    use_static=True,
-                    check_relax=0.1):
-        launch_dirs = self.launch_dirs_to_tags
-        data = []
-        for launch_dir in launch_dirs:
-            print('\n~~~ analyzing %s ~~~' % launch_dir)
-            top, ID, standard, xc, mag = launch_dir.split('/')[-5:]
-            xc_calcs = launch_dirs[launch_dir]
-            if use_static:
-                xc_calcs = [c for c in xc_calcs if c.split('-')[-1] == 'static']
-            for xc_calc in xc_calcs:
-                print('     working on %s' % xc_calc)
-                calc_data = {'info' : {},
-                             'summary' : {},
-                             'flags' : []}
-                if magnetization:
-                    calc_data['magnetization'] = {}
-                if relaxed_structure:
-                    calc_data['structure'] = {}
-                if dos:
-                    calc_data['dos'] = {}
-                calc_dir = os.path.join(launch_dir, xc_calc)
-                xc, calc = xc_calc.split('-')
+            if not key:
+                key = '.'.join(calc_dir.split('/')[-6:])
+            else:
+                raise NotImplementedError('havent considered alternative keys yet')
+            analyzer = AnalyzeVASP(calc_dir)
+            summary = analyzer.summary(include_meta=include_meta,
+                                       include_calc_setup=include_calc_setup,
+                                       include_structure=include_structure,
+                                       include_mag=include_mag,
+                                       include_dos=include_dos)
+            if check_relax:
+                relax_energy = AnalyzeVASP(calc_dir.replace('static', 'relax')).E_per_at
+                summary['meta']['E_relax'] = relax_energy
                 
-                calc_data['info']['calc_dir'] = calc_dir
-                calc_data['info']['mag'] = mag
-                calc_data['info']['standard'] = standard
-                calc_data['info'][top_level_key] = top
-                calc_data['info']['ID'] = ID
-                calc_data['info']['xc'] = xc
-                calc_data['info']['calc'] = calc
-
-                analyzer = AnalyzeVASP(calc_dir)
-                convergence = analyzer.is_converged
-                E_per_at = analyzer.E_per_at
-                if convergence:
-                    if (calc == 'static') and check_relax:
-                        relax_calc_dir = calc_dir.replace('static', 'relax')
-                        analyzer_relax = AnalyzeVASP(relax_calc_dir)
-                        convergence_relax = analyzer_relax.is_converged
-                        if not convergence_relax:
-                            convergence = False
-                            E_per_at = None
-                        E_relax = analyzer_relax.E_per_at
-                        if E_per_at and E_relax:
-                            E_diff = abs(E_per_at - E_relax)
-                            if E_diff > check_relax:
-                                data['flags'].append('large E diff b/t relax and static')
-                
-                calc_data['summary']['E'] = E_per_at
-                calc_data['summary']['convergence'] = convergence
-                if not convergence:
-                    calc_data['flags'].append('not converged')
-                    
-                if relaxed_structure:
-                    if convergence:
-                        structure = analyzer.contcar.as_dict()
-                    else:
-                        structure = None
-                    calc_data['structure'] = structure
-                
-                if magnetization:
-                    if convergence:
-                        calc_data['magnetization'] = analyzer.magnetization
-
-                if dos:
-                    if dos == 'tdos':
-                        calc_data['dos'] = analyzer.tdos()
-                    elif dos == 'pdos':
-                        calc_data['dos'] = analyzer.pdos()
-                    else:
-                        raise NotImplementedError('only tdos and pdos are accepted args for dos')
-                
-                data.append(calc_data)
-
-        return {'data' : data}
+            data[key] = summary
+        return data
