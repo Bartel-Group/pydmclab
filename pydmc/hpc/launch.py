@@ -3,8 +3,9 @@ from shutil import copyfile
 
 from pymatgen.core.structure import Structure
 
-from pydmc.utils.handy import read_yaml, dotdict, is_calc_valid
+from pydmc.utils.handy import read_yaml, write_yaml, dotdict, is_calc_valid
 from pydmc.core.mag import MagTools
+from pydmc.data.configs import launch_configs
 
 
 
@@ -19,7 +20,7 @@ class LaunchTools(object):
                  magmoms=None,
                  top_level='formula',
                  unique_ID='my-1234',
-                 fyaml=os.path.join(os.getcwd(), '_launch_configs.yaml'),
+                 launch_configs_yaml=os.path.join(os.getcwd(), '_launch_configs.yaml'),
                  user_configs={}):
         """
         Args:
@@ -60,11 +61,11 @@ class LaunchTools(object):
         if not os.path.exists(calcs_dir):
             os.mkdir(calcs_dir)
             
-        if not os.path.exists(fyaml):
-            pydmc_yaml = os.path.join(HERE, 'launch_configs.yaml')
-            copyfile(pydmc_yaml, fyaml)
+        if not os.path.exists(launch_configs_yaml):
+            launch_configs = launch_configs()
+            write_yaml(launch_configs, launch_configs_yaml)
         
-        launch_configs = read_yaml(fyaml)
+        launch_configs = read_yaml(launch_configs_yaml)
         
         configs = {**launch_configs, **user_configs}
 
