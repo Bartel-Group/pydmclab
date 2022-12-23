@@ -521,8 +521,7 @@ class AnalyzeBatch(object):
         for calc_dir in calc_dirs:
             if verbose:
                 print('analyzing %s' % calc_dir)
-            if not key:
-                key = '.'.join(calc_dir.split('/')[-6:])
+            key = '.'.join(calc_dir.split('/')[-6:])
             analyzer = AnalyzeVASP(calc_dir)
             summary = analyzer.summary(include_meta=include_meta,
                                        include_calc_setup=include_calc_setup,
