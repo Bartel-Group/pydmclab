@@ -11,7 +11,7 @@ URL = 'https://github.umn.edu/bartel-group/pydmc'
 EMAIL = 'cbartel@umn.edu'
 AUTHOR = 'Chris Bartel'
 REQUIRES_PYTHON = '>=3.6.0'
-VERSION = '0.2.0'
+VERSION = '1.0.0'
 
 REQUIRED = ['numpy', 
             'pymatgen']
@@ -77,6 +77,7 @@ setup(
     python_requires=REQUIRES_PYTHON,
     url=URL,
     packages=find_packages(exclude=["tests", "*.tests", "*.tests.*", "tests.*"]),
+    package_data={'pydmc' : ['pydmc/data/data/*']},
     install_requires=REQUIRED,
     extras_require=EXTRAS,
     include_package_data=True,

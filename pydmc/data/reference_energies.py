@@ -1,14 +1,23 @@
 import numpy as np
 import os, json
 
+from pydmc.utils.handy import write_json, read_json
+from pydmc.core.query import MPQuery
+
 this_dir, this_filename = os.path.split(__file__)
 DATA_PATH = os.path.join(this_dir, "data")
 
 def mus_at_0K():
+    """
+    These were run by Bartel in December 2022
+    """
     with open(os.path.join(DATA_PATH, "elemental_reference_energies_0K.json")) as f:
         return json.load(f)
 
 def mus_at_T():
+    """
+    These come from Bartel 2018 Nat Comm
+    """
     with open(os.path.join(DATA_PATH, "elemental_gibbs_energies_T.json")) as f:
         return json.load(f)   
 
@@ -41,6 +50,32 @@ def mp2020_compatibility_dmus():
     
     return data
 
+def get_mus_from_mp_no_corrections():
+    fjson = os.path.join(DATA_PATH, 'mus_from_mp_no_corrections.json')
+  
+    mus = mus_at_0K()
+    
+    mp_pbe_mus = mus['mp']['pbe']
+    
+    mpq = MPQuery(api_key='***REMOVED***')
+    
+    mp_mus = {}
+    for el in mp_pbe_mus:
+        print(el)
+        my_mu = mp_pbe_mus[el]
+        el += '1'
+        query = mpq.get_data_for_comp(el, 
+                                      only_gs=True,
+                                      dict_key='cmpd')
+        
+        mp_mu = query[el]['E_mp']
+        mp_mus[el[:-1]] = mp_mu
+
+    return write_json(mp_mus, fjson)    
+    
 def mus_from_mp_no_corrections():
+    """
+    Last collected Dec 2022 (with legacy MP API)
+    """
     with open(os.path.join(DATA_PATH, "mus_from_mp_no_corrections.json")) as f:
         return json.load(f)  

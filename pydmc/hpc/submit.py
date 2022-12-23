@@ -1,0 +1,526 @@
+from pydmc.hpc.vasp import VASPSetUp
+from pydmc.hpc.analyze import AnalyzeVASP
+from pydmc.core.mag import MagTools
+from pydmc.utils.handy import read_yaml, write_yaml, dotdict, write_json, read_json
+from pydmc.data.configs import vasp_configs, launch_configs, slurm_configs, sub_configs, partition_configs
+
+from pymatgen.core.structure import Structure
+
+import os
+from shutil import copyfile, rmtree
+import subprocess
+
+import warnings
+
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+
+class SubmitTools(object):
+    
+    def __init__(self,
+                 launch_dir,
+                 valid_calcs,
+                 vasp_configs_yaml=os.path.join(os.getcwd(), '_vasp_configs.yaml'),
+                 slurm_configs_yaml=os.path.join(os.getcwd(), '_slurm_configs.yaml'),
+                 sub_configs_yaml=os.path.join(os.getcwd(), '_sub_configs.yaml'),
+                 user_configs={},
+                 magmom=None,
+                 files_to_inherit=['WAVECAR', 'CONTCAR'],
+                 refresh_configs=[]):
+        
+        """
+        Args:
+            launch_dir (str) - directory to launch calculations from
+                - assumes initial structure is POSCAR in launch_dir
+                - this might be LiMn2O4_mp-123456
+                    - then within this directory, you might generate a set of calc_dirs
+                        - gga-loose, gga-relax, gga-static, etc
+            config_yaml (str) - path to yaml file containing base configs
+                if None:
+                    - get them from pydmc
+            user_configs (dict) - dictionary of user configs to override base configs
+                common ones:
+                    {'mag' : 'afm',
+                    'standard' : 'mp',
+                    'nodes' : 2,
+                    'time' : '96:00:00',
+                    'job-name' : SOMETHING_SPECIFIC}
+                    
+            magmom (list) - list of magnetic moments for each atom in structure
+                - only specify if mag='afm'
+                
+            files_to_inherit (list) - list of files to copy from calc to calc
+        
+        Returns:
+            self.launch_dir (os.pathLike) - directory to launch calculations from
+            self.configs (dict) - dictionary of configs (in format similar to yaml)
+            self.files_to_inherit (list) - list of files to copy from calc to calc
+        """
+        
+        self.launch_dir = launch_dir
+        self.valid_calcs = valid_calcs
+
+        if not os.path.exists(vasp_configs_yaml) or ('vasp' in refresh_configs):
+            _vasp_configs = vasp_configs()
+            write_yaml(_vasp_configs, vasp_configs_yaml)
+
+        if not os.path.exists(slurm_configs_yaml) or ('slurm' in refresh_configs):
+            _slurm_configs = slurm_configs()
+            write_yaml(_slurm_configs, slurm_configs_yaml)
+        
+        if not os.path.exists(sub_configs_yaml) or ('sub' in refresh_configs):
+            _sub_configs = sub_configs()
+            write_yaml(_sub_configs, sub_configs_yaml)
+            
+        slurm_configs = read_yaml(slurm_configs_yaml)
+        for option in slurm_configs:
+            if option in user_configs:
+                slurm_configs[option] = user_configs[option]
+                del user_configs[option]
+        
+        if not slurm_configs['job-name']:
+            slurm_configs['job-name'] = '.'.join(launch_dir.split('/')[-5:])
+        
+        self.slurm_configs = dotdict(slurm_configs)
+        
+        sub_configs = read_yaml(sub_configs_yaml)
+        for option in sub_configs:
+            if option in user_configs:
+                sub_configs[option] = user_configs[option]
+                del user_configs[option]
+
+        self.sub_configs = dotdict(sub_configs)
+
+        vasp_configs = read_yaml(vasp_configs_yaml)
+
+        vasp_configs = {**vasp_configs, **user_configs}
+        self.vasp_configs = dotdict(vasp_configs)
+        
+        fpos = os.path.join(launch_dir, 'POSCAR')
+        if not os.path.exists(fpos):
+            raise FileNotFoundError('Need a POSCAR to initialize setup; POSCAR not found in {}'.format(self.launch_dir))
+        else:
+            self.structure = Structure.from_file(fpos)
+    
+        self.files_to_inherit = files_to_inherit
+        self.magmom = magmom
+        partitions = partition_configs()
+        self.partitions = dotdict(partitions)
+
+    @property
+    def queue_manager(self):
+        """
+        Returns queue manager (eg #SBATCH)
+        """
+        return self.sub_configs.manager
+        
+    @property
+    def slurm_options(self):
+        """
+        Returns dictionary of slurm options
+            - nodes, ntasks, walltime, etc
+        """
+        options = self.slurm_configs
+        options = {k : v for k, v in options.items() if v is not None}
+        partitions = self.partitions
+        partition_specs = partitions[options['partition']]
+        if partition_specs['proc'] == 'gpu':
+            options['nodes'] = 1
+            options['ntasks'] = 1
+            options['gres'] = 'gpu:%s:%s' % (options['partition'].split('-')[0], str(options['nodes']))
+        if not partition_specs['sharing']:
+            options['ntasks'] = partition_specs['cores_per_node']
+        return options
+    
+    @property
+    def vasp_command(self):
+        """
+        Returns command used to execute vasp
+            e.g., 'mpirun -n 24 PATH_TO_VASP/vasp_std > vasp.o'
+        """
+        configs = self.sub_configs
+        vasp_exec = os.path.join(configs.vasp_dir, configs.vasp)
+        return '\n%s --ntasks=%s --mpi=pmi2 %s > %s\n' % (configs.mpi_command, str(self.slurm_options['ntasks']), vasp_exec, configs.fvaspout)
+    
+    @property
+    def lobster_command(self):
+        """
+        Returns command used to execute lobster
+        """
+        lobster = '/home/cbartel/shared/bin/lobster/lobster-4.1.0/lobster-4.1.0'
+        return '\n%s\n' % lobster
+    
+    @property
+    def bader_command(self):
+        """
+        Returns command used to execute bader
+        """
+        chgsum = '/home/cbartel/shared/bin/bader/chgsum.pl AECCAR0 AECCAR2'
+        bader = '/home/cbartel/shared/bin/bader/bader CHGCAR -ref CHGCAR_sum'
+        return '\n%s\n%s\n' % (chgsum, bader)
+    
+    @property
+    def calcs(self):
+        """
+        Returns list of calcs to run 
+            - (eg ['loose', 'relax', 'static'])
+        """
+        vasp_configs = self.vasp_configs
+        sub_configs = self.sub_configs
+        calc = vasp_configs.calc
+        calc_sequence = sub_configs.calc_sequence
+        if calc_sequence and (calc == 'relax'):
+            calcs = ['loose', 'relax', 'static']
+        else:
+            calcs = [calc]
+        return calcs
+    
+    @property
+    def xcs(self):
+        """
+        Returns list of exchange-correlation approaches to run
+            - eg ['gga', 'metagga']
+        """
+        vasp_configs = self.vasp_configs
+        sub_configs = self.sub_configs
+        xc = vasp_configs.xc
+        xc_sequence = sub_configs.xc_sequence
+        if xc_sequence and (xc == 'metagga'):
+            xcs = ['gga', xc]
+        else:
+            xcs = [xc]
+        return xcs
+          
+    @property
+    def prepare_directories(self):
+        """
+        A lot going on here. The objective is to prepare a set of directories for all calculations 
+            - for a given initial crystal structure (material)
+                - */launch_dir/POSCAR 
+            - at a given magnetic ordering
+                - user_configs['mag'] = 'nm', 'fm', OR 'afm'
+                - if 'afm', must supply self.magmom
+        
+        When to call this:
+            - when you are setting up a set of calculations for the first time
+            - when you want to loop through a set of calculations that have partially finished
+                - to run the ones that haven't started/finished yet (fresh_restart=False)
+                - to re-run them all (fresh_restart=True)
+        
+        1) For each xc-calc pair, create a directory (calc_dir)
+            - */launch_dir/xc-calc
+        2) Check if that calc_dir has a converged VASP job
+            - if it does
+                - if fresh_restart = False --> label calc_dir as status='DONE' and move on
+                - if fresh_restart = True --> remove prev calc in that dir
+        3) Put */launch_dir/POSCAR into */launch_dir/xc-calc/POSCAR if there's not a POSCAR there already
+        4) Check if */calc_dir/CONTCAR exists and has data in it,
+            - if it does, copy */calc_dir/CONTCAR to */calc_dir/POSCAR and label status='CONTINUE' (ie continuing job)
+            - if it doeqmsn't, label status='NEW' (ie new job)
+        5) Initialize VASPSetUp for calc_dir
+            - modifies vasp_input_set with self.configs as requested in **kwargs and configs.yaml
+        6) If status='CONTINUE',
+            - check for errors using vsu
+                - may remove WAVECAR/CHGCAR
+                - may make edits to INCAR
+        7) prepare calc_dir to launch        
+        """
+        prepare_calc_options = ['potcar_functional',
+                                'validate_magmom',
+                                'mag',
+                                'standard',
+                                'fun']
+        vasp_configs = self.vasp_configs
+        sub_configs = self.sub_configs
+        fresh_restart = sub_configs.fresh_restart
+        calcs = self.calcs
+        xcs = self.xcs
+        valid_calcs = self.valid_calcs
+        launch_dir = self.launch_dir
+
+        print('\n\n~~~~~ starting to work on %s ~~~~~\n\n' % launch_dir)
+
+
+        fpos_src = os.path.join(launch_dir, 'POSCAR')
+        tags = []
+        for xc in xcs:
+            for calc in calcs:
+                xc_calc = '%s-%s' % (xc, calc)
+
+                # (0) make sure (xc, calc) combination is "valid" (determined with LaunchTools)
+                if xc_calc not in valid_calcs:
+                    print('     skipping %s b/c we probably dont need it' % xc_calc)
+                    continue
+
+                # (1) make calc_dir (or remove and remake if fresh_restart)
+                calc_dir = os.path.join(launch_dir, xc_calc)
+                if os.path.exists(calc_dir) and fresh_restart:
+                    rmtree(calc_dir)
+                if not os.path.exists(calc_dir):
+                    os.mkdir(calc_dir)
+
+                # (2) identify if given (xc, calc) has parents that need to finish first
+                parents = []
+                if calc == 'static':
+                    for possible_parent_calc in ['relax']:
+                        parent_xc_calc = '%s-%s' % (xc, possible_parent_calc)
+                        if parent_xc_calc in valid_calcs:
+                            parents.append(parent_xc_calc)
+                            
+                # (3) check convergence of current calc and parents
+                convergence = VASPAnalysis(calc_dir).is_converged
+                all_parents_converged = True
+                for parent_xc_calc in parents:
+                    parent_calc_dir = os.path.join(launch_dir, parent_xc_calc)
+                    parent_convergence = VASPAnalysis(parent_calc_dir).is_converged
+                    if not parent_convergence:
+                        all_parents_converged = False
+                        print('     %s (parent) not converged, need to continue this calc' % parent_xc_calc)
+
+                # if parents + current calc are converged, give it status = DONE
+                if convergence and all_parents_converged and not fresh_restart:
+                    print('     %s is already converged; skipping' % xc_calc)
+                    status = 'DONE'
+                    tags.append('%s_%s' % (status, xc_calc))
+                    continue
+                
+                # for jobs that are not DONE:
+
+                # (4) check for POSCAR
+                fpos_dst = os.path.join(calc_dir, 'POSCAR')
+                if os.path.exists(fpos_dst):
+                    # if there is a POSCAR, make sure its not empty
+                    contents = open(fpos_dst, 'r').readlines()
+                    # if its empty, copy the initial structure to calc_dir
+                    if len(contents) == 0:
+                        copyfile(fpos_src, fpos_dst)
+                # if theres no POSCAR, copy the initial structure to calc_dir
+                if not os.path.exists(fpos_dst):
+                    copyfile(fpos_src, fpos_dst)
+                
+                # (5) check for CONTCAR. if one exists, if its not empty, and if not fresh_restart, mark this job as one to "CONTINUE" (ie later, we'll copy CONTCAR to POSCAR); otherwise, mark as NEWRUN
+                fcont_dst = os.path.join(calc_dir, 'CONTCAR')
+                if os.path.exists(fcont_dst):
+                    contents = open(fcont_dst, 'r').readlines()
+                    if (len(contents) > 0) and not fresh_restart:
+                        status = 'CONTINUE'
+                    else:
+                        status = 'NEWRUN'
+                else:
+                    status = 'NEWRUN'
+
+                # (6) initialize VASPSetUp with configs
+                vsu = VASPSetUp(calc_dir=calc_dir, 
+                                magmom=self.magmom,
+                                fvaspout=sub_configs.fvaspout,
+                                fvasperrors=sub_configs.fvasperrors,
+                                lobster_static=vasp_configs.lobster_static) 
+                
+                # pass loose/static/relax_INCAR/KPOINTS/POTCAR from vasp_configs to this calc
+                calc_configs = {'modify_%s' % input_file.lower() : 
+                    vasp_configs['%s_%s' % (calc, input_file)] for input_file in ['INCAR', 'KPOINTS', 'POTCAR']}
+                # pass the other vasp_configs to this calc
+                for key in prepare_calc_options:
+                    calc_configs[key] = vasp_configs[key]
+                
+                # (6) check for errors in continuing jobs
+                if status in ['CONTINUE', 'NEWRUN']:
+                    calc_is_clean = vsu.is_clean
+                    if not calc_is_clean:
+                        # change INCAR based on errors and include in calc_configs
+                        incar_changes = vsu.incar_changes_from_errors
+                        calc_configs['modify_incar'] = {**calc_configs['modify_incar'], **incar_changes}
+
+                print('--------- may be some warnings (POTCAR ones OK) ----------')
+                # (7) prepare calc_dir to launch  
+                vsu.prepare_calc(calc=calc,
+                                xc=xc,
+                                **calc_configs)
+                
+                print('-------------- warnings should be done ---------------')
+                print('\n~~~~~ prepared %s ~~~~~\n' % calc_dir)
+                tags.append('%s_%s' % (status, xc_calc))
+        return tags
+   
+    @property
+    def write_sub(self):
+        """
+        A lot going on here. The objective is to write a submission script for each calculation
+            - so that I can iterate through a for loop and launch all calcs
+            - each submission script will launch a chain of jobs
+        
+        """
+        
+        vasp_configs = self.vasp_configs
+        sub_configs = self.sub_configs
+        slurm_configs = self.slurm_configs
+        
+        launch_dir = self.launch_dir
+        vasp_command = self.vasp_command
+        slurm_options = self.slurm_options
+        queue_manager = self.queue_manager
+
+        xcs, calcs = self.xcs, self.calcs
+
+        files_to_inherit = self.files_to_inherit
+
+        fsub = os.path.join(launch_dir, sub_configs.fsub)
+        
+        fstatus = os.path.join(launch_dir, sub_configs.fstatus)
+
+        with open(fsub, 'w') as f:
+            f.write('#!/bin/bash -l\n')
+            for key in slurm_options:
+                slurm_option = slurm_options[key]
+                if slurm_option:
+                    f.write('%s --%s=%s\n' % (queue_manager, key, str(slurm_option)))
+            f.write('\n\n')
+            f.write('ulimit -s unlimited\n')
+            tags = self.prepare_directories
+            xc_calcs = [t.split('_')[1] for t in tags]
+            curr_xcs = [xc_calc.split('-')[0] for xc_calc in xc_calcs]
+            print('\n:::: writing sub now - %s ::::' % fsub)
+            for tag in tags:
+                status = tag.split('_')[0]
+                xc, calc = tag.split('_')[1].split('-')
+                curr_calcs = [xc_calc.split('-')[1] for xc_calc in xc_calcs if xc_calc.split('-')[0] == xc]
+                curr_calcs = sorted(list(set(curr_calcs)))
+                
+                calc_dir = os.path.join(launch_dir, '-'.join([xc, calc]))
+                if status == 'DONE':
+                    f.write('\necho working on %s >> %s\n' % (tag, fstatus))
+                    if vasp_configs['lobster_static']:
+                        if not os.path.exists(os.path.join(calc_dir, 'lobsterout')) or sub_configs.force_postprocess:
+                            f.write(self.lobster_command)
+                        if not os.path.exists(os.path.join(calc_dir, 'ACF.dat')) or sub_configs.force_postprocess:
+                            f.write(self.bader_command)
+                    f.write('echo %s is done >> %s\n' % (tag.split('_')[1], fstatus))
+                else:
+                    if status == 'CONTINUE':
+                        f.write('\necho working on %s >> %s\n' % (tag, fstatus))
+                        f.write('cp %s %s\n' % (os.path.join(calc_dir, 'CONTCAR'), os.path.join(calc_dir, 'POSCAR')))
+                    if status == 'NEWRUN':
+                        f.write('\necho working on %s >> %s\n' % (tag, fstatus))
+                    
+                    if xc in ['gga', 'ggau']:
+                        if calc == 'loose':
+                            pass_info = False
+                        elif calc == 'relax':
+                            if 'loose' in curr_calcs:
+                                pass_info = True
+                                calc_prev = 'loose'
+                            else:
+                                pass_info = False
+                        elif calc == 'static':
+                            if 'relax' in curr_calcs:
+                                pass_info = True
+                                calc_prev = 'relax'
+                            else:
+                                pass_info = False
+                        xc_prev = xc
+                    elif xc in ['metagga']:
+                        if calc == 'relax':
+                            if 'gga' in curr_xcs:
+                                xc_prev = 'gga'
+                                if 'gga-static' in xc_calcs:
+                                    calc_prev = 'static'
+                                    pass_info = True
+                                elif 'gga-relax' in xc_calcs:
+                                    calc_prev = 'relax'
+                                    pass_info = True
+                                else:
+                                    print('no gga calc to pass from for metagga...')
+                                    pass_info = False
+                            else:
+                                pass_info = False
+                        elif calc == 'static':
+                            if 'relax' in curr_calcs:
+                                pass_info = True
+                                calc_prev = 'relax'
+                                xc_prev = xc
+                            else:
+                                pass_info = False
+                    
+                    if pass_info:
+                        src_dir = os.path.join(launch_dir, '-'.join([xc_prev, calc_prev]))
+                        f.write('isInFile=$(cat %s | grep -c %s)\n' % (os.path.join(src_dir, 'OUTCAR'), 'Elaps'))
+                        f.write('if [ $isInFile -eq 0 ]; then\n')
+                        f.write('   echo "%s is not done yet so this job is being killed" >> %s\n' % (calc_prev, fstatus))
+                        f.write('   scancel $SLURM_JOB_ID\n')
+                        f.write('fi\n')
+
+                        for file_to_inherit in files_to_inherit:
+                            fsrc = os.path.join(src_dir, file_to_inherit)
+                            if file_to_inherit == 'CONTCAR':
+                                fdst = os.path.join(calc_dir, 'POSCAR')
+                            else:
+                                fdst = os.path.join(calc_dir, file_to_inherit)
+                            if file_to_inherit == 'CONTCAR':
+                                if os.path.exists(fsrc):
+                                    contents = open(fsrc).readlines()
+                                    if len(contents) < 0:
+                                        continue
+                            f.write('cp %s %s\n' % (fsrc, fdst))
+                    
+                    f.write('cd %s\n' % calc_dir)
+                    f.write('%s\n' % vasp_command)
+                    if calc == 'static':
+                        if vasp_configs['lobster_static']:
+                            if not os.path.exists(os.path.join(calc_dir, 'lobsterout')) or sub_configs.force_postprocess:
+                                f.write(self.lobster_command)
+                            if not os.path.exists(os.path.join(calc_dir, 'ACF.dat')) or sub_configs.force_postprocess:
+                                f.write(self.bader_command)
+                    f.write('\necho launched %s-%s >> %s\n' % (xc, calc, fstatus))
+        return True
+    
+    @property
+    def launch_sub(self):
+        print('     now launching sub')
+        scripts_dir = os.getcwd()
+        launch_dir = self.launch_dir
+        sub_configs = self.sub_configs
+        fqueue = os.path.join(scripts_dir, sub_configs.fqueue)
+        job_name = self.slurm_configs['job-name']
+        with open(fqueue, 'w') as f:
+            subprocess.call(['squeue', '-u', '%s' % os.getlogin(), '--name=%s' % job_name], stdout=f)
+        names_in_q = []
+        with open(fqueue) as f:
+            for line in f:
+                if 'PARTITION' not in line:
+                    names_in_q.append([v for v in line.split(' ') if len(v) > 0][2])
+        if len(names_in_q) > 0:
+            print(' !!! job already in queue, not launching')
+            return
+
+        fsub = os.path.join(launch_dir, sub_configs.fsub)
+        flags_that_need_to_be_executed = ['srun', 'python', 'lobster', 'bader']
+        needs_to_launch = False
+        with open(fsub) as f:
+            contents = f.read()
+            for flag in flags_that_need_to_be_executed:
+                if flag in contents:
+                    needs_to_launch = True
+        if not needs_to_launch:
+            print(' !!! nothing to launch here, not launching\n\n')
+            return
+
+        os.chdir(launch_dir)
+        subprocess.call(['sbatch', 'sub.sh'])
+        os.chdir(scripts_dir)
+                
+
+
+
+
+
+
+
+def main():
+    
+    
+    return 
+    
+if __name__ == '__main__':
+    sub = main()

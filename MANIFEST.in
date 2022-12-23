@@ -1,6 +1,7 @@
-recursive-include pydmc/ *.yaml
-include README.md
-include pydmc/pydmc/*.yaml
-include pydmc/*.yaml
-include pydmc/data/*.py
-include pydmc/data/data/*.json
+include pydmc/core/*
+include pydmc/data/*
+include pydmc/data/data/*
+include pydmc/demos/*
+include pydmc/dev/*
+include pydmc/hpc/*
+include pydmc/utils/*
