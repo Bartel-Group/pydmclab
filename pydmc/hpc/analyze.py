@@ -508,6 +508,8 @@ class AnalyzeBatch(object):
                 include_dos=False,
                 verbose=True):
         
+        if key:
+            raise NotImplementedError('havent implemented non-default key yet')
         calc_dirs = self.calc_dirs
         if only_static:
             calc_dirs = [c for c in calc_dirs if 'static' in c]
@@ -517,8 +519,6 @@ class AnalyzeBatch(object):
                 print('analyzing %s' % calc_dir)
             if not key:
                 key = '.'.join(calc_dir.split('/')[-6:])
-            else:
-                raise NotImplementedError('havent considered alternative keys yet')
             analyzer = AnalyzeVASP(calc_dir)
             summary = analyzer.summary(include_meta=include_meta,
                                        include_calc_setup=include_calc_setup,
