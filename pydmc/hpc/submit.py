@@ -162,8 +162,8 @@ class SubmitTools(object):
         Returns dictionary of slurm options
             - nodes, ntasks, walltime, etc
         """
-        options = self.slurm_configs
-        options = {k : v for k, v in options.items() if v is not None}
+        slurm_configs = self.slurm_configs
+        options = {option : slurm_configs[option] for option in slurm_configs if slurm_configs[option]}
         partitions = self.partitions
         partition_specs = partitions[options['partition']]
         if partition_specs['proc'] == 'gpu':
