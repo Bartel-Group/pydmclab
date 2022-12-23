@@ -113,11 +113,15 @@ class SubmitTools(object):
             _sub_configs = load_sub_configs()
             write_yaml(_sub_configs, sub_configs_yaml)
             
+        user_configs_used = []
+            
         slurm_configs = read_yaml(slurm_configs_yaml)
         for option in slurm_configs:
             if option in user_configs:
-                slurm_configs[option] = user_configs[option]
-                del user_configs[option]
+                if option not in user_configs_used:
+                    new_value = user_configs[option]
+                    slurm_configs[option] = new_value
+                    user_configs_used.append(option)
         
         if not slurm_configs['job-name']:
             slurm_configs['job-name'] = '.'.join(launch_dir.split('/')[-5:])
@@ -127,13 +131,16 @@ class SubmitTools(object):
         sub_configs = read_yaml(sub_configs_yaml)
         for option in sub_configs:
             if option in user_configs:
-                sub_configs[option] = user_configs[option]
-                del user_configs[option]
+                if option not in user_configs_used:
+                    new_value = user_configs[option]
+                    sub_configs[option] = new_value
+                    user_configs_used.append(option)
 
         self.sub_configs = dotdict(sub_configs)
 
         vasp_configs = read_yaml(vasp_configs_yaml)
 
+        user_configs = {option : user_configs[option] for option in user_configs if option not in user_configs_used}
         vasp_configs = {**vasp_configs, **user_configs}
         self.vasp_configs = dotdict(vasp_configs)
         
