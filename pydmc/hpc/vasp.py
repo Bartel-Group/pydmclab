@@ -357,8 +357,8 @@ class VASPSetUp(object):
         vasp_input.write_input(self.calc_dir)
         
         if self.lobster_static:
-            va = AnalyzeVASP(self.calc_dir)
-            if va.incar_parameters['NSW'] == 0:
+            analyzer = AnalyzeVASP(self.calc_dir)
+            if analyzer.incar_parameters['NSW'] == 0:
                 INCAR_input = os.path.join(self.calc_dir, 'INCAR_input')
                 INCAR_output = os.path.join(self.calc_dir, 'INCAR')
                 copyfile(INCAR_output, INCAR_input)
@@ -440,12 +440,12 @@ class VASPSetUp(object):
             if 'nsw_too_low' in unconverged:
                 the calculation didn't reach ionic convergence
         """
-        va = AnalyzeVASP(self.calc_dir)
+        analyzer = AnalyzeVASP(self.calc_dir)
         unconverged = []
-        if va.is_converged:
+        if analyzer.is_converged:
             return unconverged
         
-        vr = va.vasprun
+        vr = analyzer.vasprun
         if not vr:
             return unconverged
         
