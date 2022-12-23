@@ -24,7 +24,6 @@ class SubmitTools(object):
                  launch_dir,
                  valid_calcs,
                  user_configs={},
-                 magmom=None,
                  vasp_configs_yaml=os.path.join(os.getcwd(), '_vasp_configs.yaml'),
                  slurm_configs_yaml=os.path.join(os.getcwd(), '_slurm_configs.yaml'),
                  sub_configs_yaml=os.path.join(os.getcwd(), '_sub_configs.yaml'),
@@ -142,6 +141,7 @@ class SubmitTools(object):
 
         user_configs = {option : user_configs[option] for option in user_configs if option not in user_configs_used}
         vasp_configs = {**vasp_configs, **user_configs}
+        
         self.vasp_configs = dotdict(vasp_configs)
         
         fpos = os.path.join(launch_dir, 'POSCAR')
@@ -153,9 +153,7 @@ class SubmitTools(object):
         self.files_to_inherit = files_to_inherit
         partitions = load_partition_configs()
         self.partitions = dotdict(partitions)
-        
-        self.magmom = magmom
-
+    
     @property
     def queue_manager(self):
         """
@@ -240,11 +238,7 @@ class SubmitTools(object):
                 - will likely make edits to INCAR
                       
         """
-        prepare_calc_options = ['potcar_functional',
-                                'validate_magmom',
-                                'mag',
-                                'standard',
-                                'fun']
+
         vasp_configs = self.vasp_configs
         sub_configs = self.sub_configs
         fresh_restart = sub_configs.fresh_restart
@@ -253,11 +247,17 @@ class SubmitTools(object):
 
         print('\n\n~~~~~ starting to work on %s ~~~~~\n\n' % launch_dir)
 
-
         fpos_src = os.path.join(launch_dir, 'POSCAR')
         tags = []
         for valid_xc_calc in valid_calcs:
+            # start making vasp_configs just for this particular calculation
+            calc_configs = vasp_configs.copy()
             curr_xc, curr_calc = valid_xc_calc.split('-')
+            
+            # update vasp configs with the current xc and calc
+            calc_configs['xc_to_run'] = curr_xc
+            calc_configs['calc_to_run'] = curr_calc
+            
             # (1) make calc_dir (or remove and remake if fresh_restart)
             calc_dir = os.path.join(launch_dir, valid_xc_calc)
             if os.path.exists(calc_dir) and fresh_restart:
@@ -320,34 +320,30 @@ class SubmitTools(object):
             else:
                 status = 'NEWRUN'
 
-            # (6) initialize VASPSetUp with configs
+            # (6) initialize VASPSetUp with current VASP configs for this calculation
             vsu = VASPSetUp(calc_dir=calc_dir, 
-                            magmom=self.magmom,
-                            fvaspout=sub_configs.fvaspout,
-                            fvasperrors=sub_configs.fvasperrors,
-                            lobster_static=vasp_configs.lobster_static) 
-            
-            # pass loose/static/relax_INCAR/KPOINTS/POTCAR from vasp_configs to this calc
-            calc_configs = {'modify_%s' % input_file.lower() : 
-                vasp_configs['%s_%s' % (curr_calc, input_file)] for input_file in ['INCAR', 'KPOINTS', 'POTCAR']}
-            
-            # pass the other vasp_configs to this calc
-            for key in prepare_calc_options:
-                calc_configs[key] = vasp_configs[key]
+                            user_configs=calc_configs)
             
             # (6) check for errors in continuing jobs
+            incar_changes = {}
             if status in ['CONTINUE', 'NEWRUN']:
                 calc_is_clean = vsu.is_clean
                 if not calc_is_clean:
                     # change INCAR based on errors and include in calc_configs
                     incar_changes = vsu.incar_changes_from_errors
-                    calc_configs['modify_incar'] = {**calc_configs['modify_incar'], **incar_changes}
+            
+            # if there are INCAR updates, add them to calc_configs
+            if incar_changes:
+                incar_key = '%_incar' % curr_calc
+                if incar_key not in calc_configs:
+                    calc_configs[incar_key] = {}
+                    for setting in incar_changes:
+                        calc_configs[incar_key][setting] = incar_changes[setting]
 
             print('--------- may be some warnings (POTCAR ones OK) ----------')
             # (7) prepare calc_dir to launch  
-            vsu.prepare_calc(calc=curr_calc,
-                            xc=curr_xc,
-                            **calc_configs)
+            VASPSetUp(calc_dir=calc_dir,
+                      user_configs=calc_configs).prepare_calc()
             
             print('-------------- warnings should be done ---------------')
             print('\n~~~~~ prepared %s ~~~~~\n' % calc_dir)
