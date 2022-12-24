@@ -264,22 +264,23 @@ class SubmitTools(object):
                 os.mkdir(calc_dir)
 
             # (2) check convergence of current calc
-            convergence = AnalyzeVASP(calc_dir).is_converged
+            E_per_at = AnalyzeVASP(calc_dir).E_per_at
+            convergence = True if E_per_at else False
 
             # (3) if converged, make sure parents have converged
             large_E_diff_between_relax_and_static = False
-            if convergence:                
+            if convergence:       
                 if curr_calc == 'static':
+                    static_energy = E_per_at
                     parent_calc = 'relax'
                     parent_xc_calc = '%s-%s' % (curr_xc, parent_calc)                            
                     parent_calc_dir = os.path.join(launch_dir, parent_xc_calc)
-                    parent_convergence = AnalyzeVASP(parent_calc_dir).is_converged
-                    if not parent_convergence:
+                    parent_energy = AnalyzeVASP(parent_calc_dir).E_per_at
+                    parent_convergence = True if parent_energy else False
+                    if not parent_energy:
                         print('     %s (parent) not converged, need to continue this calc' % parent_xc_calc)
                     else:
-                        relax_energy = AnalyzeVASP(parent_calc_dir).E_per_at
-                        static_energy = AnalyzeVASP(calc_dir).E_per_at
-                        if abs(relax_energy - static_energy) > 0.2:
+                        if abs(parent_energy - static_energy) > 0.2:
                             print('     %s (parent) and %s (child) energies differ by more than 0.2 eV/atom' % (parent_xc_calc, valid_xc_calc))
                             large_E_diff_between_relax_and_static = True
                             # if there is a large difference, something fishy happened, so let's start the static calc over
