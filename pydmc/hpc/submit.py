@@ -447,10 +447,11 @@ class SubmitTools(object):
                 if status == 'DONE':
                     f.write('\necho working on %s >> %s\n' % (tag, fstatus))
                     if vasp_configs['lobster_static']:
-                        if sub_configs.force_postprocess or not os.path.exists(os.path.join(calc_dir, 'lobsterout')):
-                            f.write(self.lobster_command)
-                        if sub_configs.force_postprocess or not os.path.exists(os.path.join(calc_dir, 'ACF.dat')):
-                            f.write(self.bader_command)
+                        if calc_to_run == 'static':
+                            if sub_configs.force_postprocess or not os.path.exists(os.path.join(calc_dir, 'lobsterout')):
+                                f.write(self.lobster_command)
+                            if sub_configs.force_postprocess or not os.path.exists(os.path.join(calc_dir, 'ACF.dat')):
+                                f.write(self.bader_command)
                     f.write('echo %s is done >> %s\n' % (tag.split('_')[1], fstatus))
                 else:
                     if status == 'CONTINUE':
@@ -521,8 +522,8 @@ class SubmitTools(object):
                     
                     f.write('cd %s\n' % calc_dir)
                     f.write('%s\n' % vasp_command)
-                    if calc_to_run == 'static':
-                        if vasp_configs['lobster_static']:
+                    if vasp_configs['lobster_static']:
+                        if calc_to_run == 'static':
                             if not os.path.exists(os.path.join(calc_dir, 'lobsterout')) or sub_configs.force_postprocess:
                                 f.write(self.lobster_command)
                             if not os.path.exists(os.path.join(calc_dir, 'ACF.dat')) or sub_configs.force_postprocess:
