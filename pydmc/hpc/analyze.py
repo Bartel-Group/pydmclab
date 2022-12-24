@@ -528,8 +528,7 @@ class AnalyzeBatch(object):
         return '.'.join(calc_dir.split('/')[-6:])
     
     def _results_for_calc_dir(self, 
-                              calc_dir,
-                              dummy=None):
+                              calc_dir):
         
         configs = self.configs
         verbose = configs.verbose
@@ -568,7 +567,7 @@ class AnalyzeBatch(object):
 
         if n_procs > 1:
             pool = multip.Pool(processes=n_procs)
-            data = [r for r in pool.starmap(self._results_for_calc_dir, [(calc_dir, None) for calc_dir in calc_dirs])]
+            data = pool.map(self._results_for_calc_dir, calc_dirs)
             pool.close()
 
         out = {list(d.keys())[0] : d[list(d.keys())[0]] for d in data}
