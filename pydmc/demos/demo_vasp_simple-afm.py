@@ -452,18 +452,5 @@ def main():
     if print_results_check:
         check_results(results)
 
-################### specify configurations ####################
-
-###### VASP configurations ######
-# see https://github.umn.edu/bartel-group/pydmc/blob/main/pydmc/data/data/_vasp_configs.yaml for default values
-
-vasp_configs = {}
-
-# if you want to change one of these to be non-default, you would do something like:
-### vasp_configs[SETTING] = VALUE
-### e.g., vasp_configs['relax_incar'] = {'ISYM' : -1} to change the ISYM flag in all "relax" calculations
-
-##### SUBMIT configurations #####
-# see https://github.umn.edu/bartel-group/pydmc/blob/main/pydmc/data/data/_sub_configs.yaml for default values
-
-
+if __name__ == '__main__':
+    main()

@@ -339,8 +339,6 @@ class MPQuery(object):
                 query = {e : query[e] for e in mpids}
         
         if max_strucs_per_cmpd:
-            if only_gs:
-                return query
             if not only_gs:
                 trimmed_query = {}
                 cmpds = sorted(list(set([query[e]['cmpd'] for e in query])))
@@ -355,6 +353,8 @@ class MPQuery(object):
                         trimmed_query[mpid] = query[mpid]
             
                 return trimmed_query
+        
+        return query
     
     def get_entry_by_material_id(self, 
                                  material_id, 
