@@ -366,7 +366,7 @@ class VASPSetUp(object):
             if configs.standard != 'mp':
                 lobster_incar_settings = {'NEDOS' : 4000,
                                           'ISTART' : 0,
-                                          'LAECHG' : 0}
+                                          'LAECHG' : True}
                 for key in lobster_incar_settings:
                     if key not in configs.lobster_incar:
                         modify_incar[key] = lobster_incar_settings[key]
