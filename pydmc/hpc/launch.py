@@ -161,19 +161,18 @@ class LaunchTools(object):
 
         standard_to_xcs = configs.standard_to_xcs
         out = []
+        magmoms = self.magmoms
         for standard in standard_to_xcs:
             for final_xc in standard_to_xcs[standard]:
                 for xc_to_run in standard_to_xcs[standard][final_xc]:
                     for mag in possible_mags:
                         if 'afm' in mag:
-                            magmoms = self.magmoms
                             idx = mag.split('_')[-1]
-                            if (idx in magmoms):
-                                magmom = magmoms[idx]
+                            magmom = None
+                            if int(idx) in magmoms:
+                                magmom = magmoms[int(idx)]
                             elif str(idx) in magmoms:
                                 magmom = magmoms[str(idx)]
-                            else:
-                                magmom = None
                         else:
                             magmom = None
                         for calc in possible_calcs:
