@@ -1,0 +1,9 @@
+only_static: True
+check_relax: True
+include_meta: False
+include_calc_setup: True
+include_structure: True
+include_mag: False
+include_dos: False
+verbose: True
+n_procs: all

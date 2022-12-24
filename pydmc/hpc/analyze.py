@@ -1,5 +1,6 @@
 import os
 import numpy as np
+import multiprocessing as multip
 
 from pymatgen.io.vasp.outputs import Vasprun, Outcar, Eigenval
 from pymatgen.core.structure import Structure
@@ -9,7 +10,8 @@ from pymatgen.io.lobster.outputs import Doscar
 
 from pydmc.core.struc import StrucTools, SiteTools
 from pydmc.core.comp import CompTools
-from pydmc.utils.handy import read_json, write_json
+from pydmc.utils.handy import read_json, write_json, read_yaml, write_yaml, dotdict
+from pydmc.data.configs import load_batch_VASP_analysis_configs
 
 class VASPOutputs(object):
     
@@ -492,9 +494,20 @@ class AnalyzeVASP(object):
 class AnalyzeBatch(object):
 
     def __init__(self,
-                 launch_dirs_to_tags):
+                 launch_dirs_to_tags,
+                 user_configs={},
+                 analysis_configs_yaml=os.path.join(os.getcwd(), '_batch_VASP_analysis_configs.yaml'),
+                 refresh_configs=False):
 
         self.launch_dirs_to_tags = launch_dirs_to_tags
+
+        if not os.path.exists(analysis_configs_yaml) or refresh_configs:
+            _analysis_configs = load_batch_VASP_analysis_configs()
+            write_yaml(_analysis_configs, analysis_configs_yaml)
+            
+        configs = {**_analysis_configs, **user_configs}
+        
+        self.configs = dotdict(configs)
     
     @property
     def calc_dirs(self):
@@ -502,38 +515,58 @@ class AnalyzeBatch(object):
         calc_dirs = []
         for launch_dir in launch_dirs:
             calc_dirs += [os.path.join(launch_dir, c) for c in launch_dirs[launch_dir]]
+        if self.configs.only_static:
+            calc_dirs = [c for c in calc_dirs if 'static' in c]
         return calc_dirs
     
-    def results(self,
-                key=None,
-                only_static=True,
-                check_relax=False,
-                include_meta=False,
-                include_calc_setup=False,
-                include_structure=False,
-                include_mag=False,
-                include_dos=False,
-                verbose=True):
+    def _key_for_calc_dir(self, calc_dir):
+        return '.'.join(calc_dir.split('/')[-6:])
+    
+    def _results_for_calc_dir(self, 
+                              calc_dir):
         
-        if key:
-            raise NotImplementedError('havent implemented non-default key yet')
-        calc_dirs = self.calc_dirs
-        if only_static:
-            calc_dirs = [c for c in calc_dirs if 'static' in c]
-        data = {}
-        for calc_dir in calc_dirs:
-            if verbose:
-                print('analyzing %s' % calc_dir)
-            key = '.'.join(calc_dir.split('/')[-6:])
-            analyzer = AnalyzeVASP(calc_dir)
-            summary = analyzer.summary(include_meta=include_meta,
-                                       include_calc_setup=include_calc_setup,
-                                       include_structure=include_structure,
-                                       include_mag=include_mag,
-                                       include_dos=include_dos)
-            if check_relax:
-                relax_energy = AnalyzeVASP(calc_dir.replace('static', 'relax')).E_per_at
-                summary['meta']['E_relax'] = relax_energy
+        configs = self.configs
+        verbose = configs.verbose
+        include_meta = configs.include_meta
+        include_calc_setup = configs.include_calc_setup
+        include_structure = configs.include_structure
+        include_mag = configs.include_mag
+        include_dos = configs.include_dos
+        check_relax = configs.check_relax
+        
+        if verbose:
+            print('analyzing %s' % calc_dir)
+        analyzer = AnalyzeVASP(calc_dir)
+        summary = analyzer.summary(include_meta=include_meta,
+                                    include_calc_setup=include_calc_setup,
+                                    include_structure=include_structure,
+                                    include_mag=include_mag,
+                                    include_dos=include_dos)
+        if check_relax:
+            relax_energy = AnalyzeVASP(calc_dir.replace('static', 'relax')).E_per_at
+            summary['meta']['E_relax'] = relax_energy
+            if not relax_energy:
+                summary['results']['convergence'] = False
+                summary['results']['E_per_at'] = None   
                 
-            data[key] = summary
-        return data
+        return {self._key_for_calc_dir(calc_dir) :  summary}
+    
+    @property
+    def results(self):
+        
+        n_procs = self.configs.n_procs
+    
+        calc_dirs = self.calc_dirs
+        if n_procs == 1:
+            data = [self._results_for_calc_dir(calc_dir) for calc_dir in calc_dirs]
+            
+        if n_procs == 'all':
+            n_procs = multip.cpu_count() - 1
+        if n_procs > 1:
+            pool = multip.Pool(processes=self.n_procs)
+            data = [r for r in pool.starmap(self._results_for_calc_dir, [(calc_dir) for calc_dir in calc_dirs])]
+            pool.close()
+
+        out = {list(d.keys())[0] : d[list(d.keys())[0]] for d in data}
+        
+        return out
