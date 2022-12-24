@@ -44,7 +44,7 @@ class VASPSetUp(object):
     def __init__(self, 
                  calc_dir,
                  user_configs={},
-                 vasp_configs_yaml=os.path.join(os.getcwd(), '_vasp_configs_yaml',),
+                 vasp_configs_yaml=os.path.join(os.getcwd(), '_vasp_configs.yaml',),
                  refresh_configs=False):
         """
         Args:
