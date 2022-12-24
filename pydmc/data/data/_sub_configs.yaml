@@ -11,3 +11,5 @@ fresh_restart: False # True if you want to re-run all calculations; False if you
 calc_sequence: True # True if you want to run calcs in a sequence (eg loose --> relax --> static)
 xc_sequence: True # True if you want to run functionals in a sequencec (eg gga --> metagga)
 force_postprocess: False # if True, run LOBSTER and Bader again if vasp_configs.lobster_static = True even if output files exist
+
+files_to_inherit: ['WAVECAR', 'CONTCAR'] # usually no need to change

@@ -24,11 +24,10 @@ class SubmitTools(object):
                  launch_dir,
                  valid_calcs,
                  user_configs={},
+                 refresh_configs=[],
                  vasp_configs_yaml=os.path.join(os.getcwd(), '_vasp_configs.yaml'),
                  slurm_configs_yaml=os.path.join(os.getcwd(), '_slurm_configs.yaml'),
-                 sub_configs_yaml=os.path.join(os.getcwd(), '_sub_configs.yaml'),
-                 files_to_inherit=['WAVECAR', 'CONTCAR'],
-                 refresh_configs=[]):
+                 sub_configs_yaml=os.path.join(os.getcwd(), '_sub_configs.yaml')):
         
         """
         Args:
@@ -150,7 +149,6 @@ class SubmitTools(object):
         else:
             self.structure = Structure.from_file(fpos)
     
-        self.files_to_inherit = files_to_inherit
         partitions = load_partition_configs()
         self.partitions = dotdict(partitions)
     
@@ -411,6 +409,8 @@ class SubmitTools(object):
         vasp_configs = self.vasp_configs
         sub_configs = self.sub_configs
         
+        files_to_inherit = sub_configs.files_to_inherit
+        
         launch_dir = self.launch_dir
         print('\nchecking if %s is in q' % launch_dir)
         if self.is_job_in_queue:
@@ -419,8 +419,6 @@ class SubmitTools(object):
         vasp_command = self.vasp_command
         slurm_options = self.slurm_options
         queue_manager = self.queue_manager
-
-        files_to_inherit = self.files_to_inherit
 
         fsub = os.path.join(launch_dir, sub_configs.fsub)
         

@@ -1,4 +1,5 @@
 from pydmc.core.comp import CompTools
+from pydmc.core.struc import StrucTools
 
 from pymatgen.ext.matproj import MPRester
 
@@ -202,6 +203,7 @@ class MPQuery(object):
                           criteria=None, 
                           only_gs=False, 
                           include_structure=False,
+                          supercell_structure=False,
                           max_Ehull=None,
                           max_sites_per_structure=None,
                           max_strucs_per_cmpd=None):
@@ -229,6 +231,11 @@ class MPQuery(object):
                 
             include_structure (bool)
                 if True, include the structure (as a dictionary) for each entry
+                
+            supercell_structure (bool)
+                only runs if include_structure = True
+                if False, just retrieve the MP structure
+                if not False, must be specified as [a,b,c] to make an a x b x c supercell of the MP structure
                 
             max_Ehull (float)
                 if not None, remove entries with Ehull_mp > max_Ehull
@@ -315,6 +322,9 @@ class MPQuery(object):
             for entry in query:
                 mpid = query[entry]['mpid']
                 structure = self.get_structure_by_material_id(mpid)
+                if supercell_structure:
+                    if len(supercell_structure) == 3:
+                        structure = StrucTools(structure).make_supercell(supercell_structure)
                 query[entry]['structure'] = structure.as_dict()
                 
         if max_sites_per_structure:
