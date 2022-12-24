@@ -504,7 +504,7 @@ class AnalyzeBatch(object):
     def results(self,
                 key=None,
                 only_static=True,
-                check_relax=True,
+                check_relax=False,
                 include_meta=False,
                 include_calc_setup=False,
                 include_structure=False,
