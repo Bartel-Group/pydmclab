@@ -505,6 +505,8 @@ class AnalyzeBatch(object):
             _analysis_configs = load_batch_vasp_analysis_configs()
             write_yaml(_analysis_configs, analysis_configs_yaml)
             
+        _analysis_configs = read_yaml(analysis_configs_yaml)
+            
         configs = {**_analysis_configs, **user_configs}
         
         if configs['n_procs'] == 'all':
