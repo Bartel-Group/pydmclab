@@ -37,7 +37,7 @@ DATA_DIR = SCRIPTS_DIR.replace('scripts', 'data')
 API_KEY = 'YOUR_KEY'
 
 # lets put a tag on all the files we save
-FILE_TAG = 'simple-afm'
+FILE_TAG = 'mp-hulls'
 
 ############### QUERYING MP ################
 
@@ -51,20 +51,31 @@ If we want MP data, we use pydmc.core.query.MPQuery
 """ 
 
 """
-Let's say we want a 2x2x2 supercell of the ground-state polymorphs of RuO2 and IrO2
+One of the main things you must provide for this workflow is a starting crystal structure
+    - oftentimes, we use Materials Project to grab initial structures
+    - we then either calculate them directly using different approaches
+    - or we manipulate them to make new structures
+    
+If we want MP data, we use pydmc.core.query.MPQuery
+""" 
 
-This function will return something that looks like this:
-    {mpid (str, mp-****) : 
-        {'cmpd' : chemical formula (str),
-        'structure : Structure.as_dict(),
-        'E_mp' : energy per atom from MP,
-        'Ef_mp' : formation energy per atom from MP,
-        etc}
 """
-def get_query(comp=['RuO2', 'IrO2'],
-              only_gs=True,
+Query example:
+    - we want all entries in the Li-Mn-Cl chemical space
+        - restricted to entries within 20 meV/atom of the convex hull
+        - restricted to <= 3 lowest energy polymorphs per composition
+        - restricted to structures with < 50 atoms in their unit cells
+        - excluding elemental phases (Li1, Mn1, O1)
+    - this might be a query if you were doing the convex hull analysis
+"""
+def get_query(comp='Li-Mn-Cl',
+              only_gs=False,
+              max_Ehull=0.02,
+              max_strucs_per_cmpd=3,
+              max_sites_per_cmpd=50,
+              criteria={'nelements' : {'$gte' : 2}},
               include_structure=True,
-              supercell_structure=[2,2,2],
+              supercell_structure=False,
               savename='query_%s.json' % FILE_TAG,
               remake=False):
     
@@ -76,78 +87,26 @@ def get_query(comp=['RuO2', 'IrO2'],
     
     data = mpq.get_data_for_comp(comp=comp,
                                  only_gs=only_gs,
+                                 max_Ehull=max_Ehull,
+                                 max_strucs_per_cmpd=max_strucs_per_cmpd,
+                                 max_sites_per_cmpd=max_sites_per_cmpd,
+                                 criteria=criteria,
                                  include_structure=include_structure,
                                  supercell_structure=supercell_structure)
     
     return write_json(data, fjson) 
 
-"""
-It's generally a good idea to write a quick "check" function to make sure each function does what you want
-"""
 def check_query(query):
     for mpid in query:
         print('\nmpid: %s' % mpid)
         print('\tcmpd: %s' % query[mpid]['cmpd'])
-        print('\tstructure has %i sites' % len(StrucTools(query[mpid]['structure']).structure))
-    
+        print('\tEhull: %.2f eV/atom' % query[mpid]['Ehull_mp'])
+        
 ############### MAGMOMS ################
 """
-Oftentimes we're interested in magnetic (spin-polarized) calculations
-
-In the pydmc language, we have three types of initial magnetic configurations:
-    - "nm" = nonmagnetic (not spin-polarized)
-    - "fm" = ferromagnetic (all spins aligned in the positive direction)
-    - "afm_*" = antiferromagnetic (half spins aligned in the positive direction, half in the negative direction)
-        - you can imagine that there are many unique ways to make an afm configuration
-        - the "*" is a placeholder for an integer (configuration 0, 1, 2, 3 = afm_0, afm_1, afm_2, afm_3)
-
-If we're only interested in nm or fm calculations, you don't have to do anything as pydmc takes care of it all
-
-If we want afm configurations, these are nontrivial to enumerate, so we want to enumerate them once and save to a file.
-
-We'll generate a "magmoms" dictionary for some afm configurations for the compounds in query_example_1
-
-Sometimes when we enumerate possible magnetic configurations, there are an absurdly large number
-    - usually it's ok if we just sample some representative set of ~1-10 configurations
+MP sometimes does AFM, but generally they use FM... we'll just use FM for this example
     
-If we want to run VASP on N configurations, it's probably a good idea to set 
-    - max_afm_combos = 3*N in case some we generate are symmetrically equivalent
-    - for this example, let's say our goal is 5 AFM configurations per structure
-    
-This function will return something that looks like:
-    magmoms = {mpid (str, mp-***) : 
-                {AFM configuration index (int) :
-                    [magmoms (list of floats, len = # of sites)]}} 
-    
-"""
-
-def get_magmoms(query,
-                max_afm_combos=15,
-                savename='magmoms_%s.json' % FILE_TAG,
-                remake=False):
-                          
-    fjson = os.path.join(DATA_DIR, savename)
-    if not remake and os.path.exists(fjson):
-        return read_json(fjson)
-    
-    magmoms = {}
-    for mpid in query:
-        magmoms[mpid] = {}
-        structure = query[mpid]['structure']
-        magtools = MagTools(structure=structure,
-                            max_afm_combos=max_afm_combos)
-        curr_magmoms = magtools.get_afm_magmoms
-        magmoms[mpid] = curr_magmoms
-
-    return write_json(magmoms, fjson)
-
-def check_magmoms(query,
-                  magmoms):
-    for mpid in magmoms:
-        cmpd = query[mpid]['cmpd']
-        curr_magmoms = magmoms[mpid]
-        print('\nanalyzing magmoms')
-        print('%s: %i AFM configs\n' % (cmpd, len(curr_magmoms)))            
+"""        
             
 ############### LAUNCHING ################
 """
@@ -187,7 +146,7 @@ Note on user_configs:
 
 def get_launch_dirs(query,
                     user_configs,
-                    magmoms,
+                    magmoms=None,
                     make_launch_dirs=True,
                     savename='launch_dirs_%s.json' % FILE_TAG,
                     remake=False):
@@ -200,13 +159,12 @@ def get_launch_dirs(query,
     for mpid in query:
 
         structure = query[mpid]['structure']
-        curr_magmoms = magmoms[mpid]
         top_level = query[mpid]['cmpd']
         ID = mpid
         
         launch = LaunchTools(calcs_dir=CALCS_DIR,
                              structure=structure,
-                             magmoms=curr_magmoms,
+                             magmoms=magmoms,
                              top_level=top_level,
                              unique_ID=ID,
                              user_configs=user_configs)
@@ -245,7 +203,7 @@ Note on user_configs:
 
 def submit_calcs(launch_dirs,
                  user_configs,
-                 magmoms,
+                 magmoms=None,
                  ready_to_launch=True):
     for launch_dir in launch_dirs:
 
@@ -331,7 +289,7 @@ def analyze_calcs(launch_dirs,
                             include_meta=True,
                             include_calc_setup=True,
                             include_structure=True,
-                            include_mag=True,
+                            include_mag=False,
                             include_dos=False,
                             verbose=True)
 
@@ -352,15 +310,7 @@ def check_results(results):
             converged += 1
             print('E (static) = %.2f' % data['results']['E_per_at'])
             print('E (relax) = %.2f' % data['meta']['E_relax'])
-            print('EDIFFG = %i' % data['meta']['incar']['EDIFFG'])
-            print('1st POTCAR = %s' % data['meta']['potcar'][0])
-            if mag != 'nm':
-                magnetization = data['magnetization']
-                an_el = list(magnetization.keys())[0]
-                an_idx = list(magnetization[an_el].keys())[0]
-                that_mag = magnetization[an_el][an_idx]['mag']
-                print('mag on %s (%i) = %.2f' % (an_el, an_idx, that_mag))
-            print(data['structure'])
+            #print(data['structure'])
     
     print('\n\n %i/%i converged' % (converged, len(keys_to_check)))       
             
@@ -373,9 +323,6 @@ def main():
     
     remake_query = True
     print_query_check = True 
-    
-    remake_magmoms = True
-    print_magmoms_check = True
     
     remake_launch_dirs = True
     print_launch_dirs_check = True
@@ -400,28 +347,23 @@ def main():
 
     if print_query_check:
         check_query(query=query)
-        
-    
-    magmoms = get_magmoms(query=query,
-                          remake=remake_magmoms)
-
-    if print_magmoms_check:
-        check_magmoms(query=query,
-                      magmoms=magmoms)
     
     """
     Here, I'll specify the user_configs pertaining to setting up the launch directories
-        - let's consider 5 AFM configurations
-        - let's use DMC standards
-        - and let's compare GGA+U to METAGGA
+        - no AFM
+
+        - setting standards=['dmc'] will also do DMC-standard calcs
+            - setting final_xcs=['metagga'] means we'll do meta-gga w/ our DMC standards
+        - and we want to compare_to_mp
+            - this means we will *additionally* do MP-consistent GGA+U         
     """
-    launch_configs = {'n_afm_configs' : 5,
+    launch_configs = {'n_afm_configs' : 0,
                       'standards' : ['dmc'],
-                      'final_xcs' : ['ggau', 'metagga']}
+                      'final_xcs' : ['metagga'],
+                      'compare_to_mp' : True}
     
     launch_dirs = get_launch_dirs(query=query,
                                   user_configs=launch_configs,
-                                  magmoms=magmoms,                                  
                                   remake=remake_launch_dirs)
     if print_launch_dirs_check:
         check_launch_dirs(launch_dirs=launch_dirs)
@@ -430,22 +372,18 @@ def main():
     Now, we need to specify any configurations relevant to VASP set up or our submission scripts
     For this example, we'll do the following (on top of the defaults):
         - run on only 8 cores
-        - run with a walltime of 12 hours
+        - run with a walltime of 48 hours
         - make sure we don't run LOBSTER
         - turn off symmetry in our loose, relax, and static calculations
         
     """
     user_configs = {'ntasks' : 8,
-                    'time' : int(12*60),
-                    'lobster_static' : False,
-                    'relax_incar' : {'ISYM' : -1},
-                    'static_incar' : {'ISYM' : -1},
-                    'loose_incar' : {'ISYM' : -1}}
+                    'time' : int(48*60),
+                    'lobster_static' : False}
     
     if remake_subs:
         submit_calcs(launch_dirs=launch_dirs,
                      user_configs=user_configs,
-                     magmoms=magmoms,                    
                      ready_to_launch=ready_to_launch)
  
     if print_subs_check:
