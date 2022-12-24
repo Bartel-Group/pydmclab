@@ -512,7 +512,7 @@ class AnalyzeBatch(object):
         if configs['n_procs'] == 'all':
             configs['n_procs'] = multip.cpu_count() - 1 
         
-        self.configs = dotdict(configs)
+        self.configs = configs
     
     @property
     def calc_dirs(self):
@@ -520,7 +520,7 @@ class AnalyzeBatch(object):
         calc_dirs = []
         for launch_dir in launch_dirs:
             calc_dirs += [os.path.join(launch_dir, c) for c in launch_dirs[launch_dir]]
-        if self.configs.only_static:
+        if self.configs['only_static']:
             calc_dirs = [c for c in calc_dirs if 'static' in c]
         return calc_dirs
     
@@ -531,13 +531,13 @@ class AnalyzeBatch(object):
                               calc_dir):
         
         configs = self.configs
-        verbose = configs.verbose
-        include_meta = configs.include_meta
-        include_calc_setup = configs.include_calc_setup
-        include_structure = configs.include_structure
-        include_mag = configs.include_mag
-        include_dos = configs.include_dos
-        check_relax = configs.check_relax
+        verbose = configs['verbose']
+        include_meta = configs['include_meta']
+        include_calc_setup = configs['include_calc_setup']
+        include_structure = configs['include_structure']
+        include_mag = configs['include_mag']
+        include_dos = configs['include_dos']
+        check_relax = configs['check_relax']
         
         if verbose:
             print('analyzing %s' % calc_dir)
@@ -554,12 +554,14 @@ class AnalyzeBatch(object):
                 summary['results']['convergence'] = False
                 summary['results']['E_per_at'] = None   
                 
-        return {self._key_for_calc_dir(calc_dir) :  summary}
+        key = self._key_for_calc_dir(calc_dir)
+                
+        return {key :  summary}
     
     @property
     def results(self):
         
-        n_procs = self.configs.n_procs
+        n_procs = self.configs['n_procs']
     
         calc_dirs = self.calc_dirs
         if n_procs == 1:
