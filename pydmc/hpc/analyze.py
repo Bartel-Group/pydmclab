@@ -437,8 +437,10 @@ class AnalyzeVASP(object):
     
     @property
     def basic_info(self):
-        return {'convergence' : self.is_converged,
-                'E_per_at' : self.E_per_at}
+        E_per_at = self.E_per_at
+        convergence = True if E_per_at else False
+        return {'convergence' : convergence,
+                'E_per_at' : E_per_at}
         
     @property
     def relaxed_structure(self):
@@ -450,10 +452,11 @@ class AnalyzeVASP(object):
     
     @property
     def metadata(self):
+        outputs = self.outputs
         return {'calc_dir' : self.calc_dir,
-                'incar' : self.outputs.incar.as_dict(),
-                'kpoints' : self.outputs.kpoints.as_dict(),
-                'potcar' : self.outputs.potcar}
+                'incar' : outputs.incar.as_dict(),
+                'kpoints' : outputs.kpoints.as_dict(),
+                'potcar' : outputs.potcar}
         
     @property
     def calc_setup(self):
