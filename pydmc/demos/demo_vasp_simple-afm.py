@@ -34,7 +34,7 @@ CALCS_DIR = SCRIPTS_DIR.replace('scripts', 'calcs')
 DATA_DIR = SCRIPTS_DIR.replace('scripts', 'data')
 
 # if you need data from MP as a starting point (often the case), you need your API key
-API_KEY = 'YOUR_API_KEY'
+API_KEY = 'YOUR_KEY'
 
 # lets put a tag on all the files we save
 FILE_TAG = 'simple-afm'
@@ -51,7 +51,7 @@ If we want MP data, we use pydmc.core.query.MPQuery
 """ 
 
 """
-Let's say we want a 2x2x2 supercell of the ground-state polymorphs of LiMn2O4 and LiCoO2
+Let's say we want a 2x2x2 supercell of the ground-state polymorphs of RuO2 and IrO2
 
 This function will return something that looks like this:
     {mpid (str, mp-****) : 
@@ -61,7 +61,7 @@ This function will return something that looks like this:
         'Ef_mp' : formation energy per atom from MP,
         etc}
 """
-def get_query(comp=['LiMn2O4', 'LiCoO2'],
+def get_query(comp=['RuO2', 'IrO2'],
               only_gs=True,
               include_structure=True,
               supercell_structure=[2,2,2],
@@ -200,13 +200,13 @@ def get_launch_dirs(query,
     for mpid in query:
 
         structure = query[mpid]['structure']
-        magmoms = magmoms[mpid]
+        curr_magmoms = magmoms[mpid]
         top_level = query[mpid]['cmpd']
         ID = mpid
         
         launch = LaunchTools(calcs_dir=CALCS_DIR,
                              structure=structure,
-                             magmoms=magmoms,
+                             magmoms=curr_magmoms,
                              top_level=top_level,
                              unique_ID=ID,
                              user_configs=user_configs)
@@ -397,10 +397,14 @@ def main():
         make_sub_for_launcher()
 
     query = get_query(remake=remake_query)
+
     if print_query_check:
         check_query(query=query)
         
-    magmoms = get_magmoms(remake=remake_magmoms)
+    
+    magmoms = get_magmoms(query=query,
+                          remake=remake_magmoms)
+
     if print_magmoms_check:
         check_magmoms(query=query,
                       magmoms=magmoms)
@@ -442,7 +446,7 @@ def main():
         submit_calcs(launch_dirs=launch_dirs,
                      magmoms=magmoms,
                      user_configs=user_configs,
-                     ready_to_lanch=ready_to_launch)
+                     ready_to_launch=ready_to_launch)
  
     if print_subs_check:
         check_subs(launch_dirs=launch_dirs)
@@ -454,3 +458,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
