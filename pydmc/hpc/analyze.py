@@ -507,6 +507,9 @@ class AnalyzeBatch(object):
             
         configs = {**_analysis_configs, **user_configs}
         
+        if configs['n_procs'] == 'all':
+            configs['n_procs'] = multip.cpu_count() - 1 
+        
         self.configs = dotdict(configs)
     
     @property
@@ -559,11 +562,9 @@ class AnalyzeBatch(object):
         calc_dirs = self.calc_dirs
         if n_procs == 1:
             data = [self._results_for_calc_dir(calc_dir) for calc_dir in calc_dirs]
-            
-        if n_procs == 'all':
-            n_procs = multip.cpu_count() - 1
+
         if n_procs > 1:
-            pool = multip.Pool(processes=self.n_procs)
+            pool = multip.Pool(processes=n_procs)
             data = [r for r in pool.starmap(self._results_for_calc_dir, [(calc_dir) for calc_dir in calc_dirs])]
             pool.close()
 

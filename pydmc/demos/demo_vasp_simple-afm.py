@@ -33,6 +33,10 @@ CALCS_DIR = SCRIPTS_DIR.replace('scripts', 'calcs')
 # where is my data going to live
 DATA_DIR = SCRIPTS_DIR.replace('scripts', 'data')
 
+for d in [CALCS_DIR, DATA_DIR]:
+    if not os.path.exists(d):
+        os.makedirs(d)
+
 # if you need data from MP as a starting point (often the case), you need your API key
 API_KEY = 'YOUR_KEY'
 
