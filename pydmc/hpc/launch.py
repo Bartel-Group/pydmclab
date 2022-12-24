@@ -23,9 +23,9 @@ class LaunchTools(object):
     def __init__(self,
                  calcs_dir,
                  structure,
+                 top_level,
+                 unique_ID,
                  magmoms=None,
-                 top_level='formula',
-                 unique_ID='my-1234',
                  user_configs={},
                  launch_configs_yaml=os.path.join(os.getcwd(), '_launch_configs.yaml')):
         """

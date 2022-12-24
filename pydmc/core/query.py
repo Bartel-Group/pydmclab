@@ -202,7 +202,7 @@ class MPQuery(object):
                           properties=None, 
                           criteria=None, 
                           only_gs=False, 
-                          include_structure=False,
+                          include_structure=True,
                           supercell_structure=False,
                           max_Ehull=None,
                           max_sites_per_structure=None,
