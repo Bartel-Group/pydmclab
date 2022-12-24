@@ -11,7 +11,7 @@ from pymatgen.io.lobster.outputs import Doscar
 from pydmc.core.struc import StrucTools, SiteTools
 from pydmc.core.comp import CompTools
 from pydmc.utils.handy import read_json, write_json, read_yaml, write_yaml, dotdict
-from pydmc.data.configs import load_batch_VASP_analysis_configs
+from pydmc.data.configs import load_batch_vasp_analysis_configs
 
 class VASPOutputs(object):
     
@@ -502,7 +502,7 @@ class AnalyzeBatch(object):
         self.launch_dirs_to_tags = launch_dirs_to_tags
 
         if not os.path.exists(analysis_configs_yaml) or refresh_configs:
-            _analysis_configs = load_batch_VASP_analysis_configs()
+            _analysis_configs = load_batch_vasp_analysis_configs()
             write_yaml(_analysis_configs, analysis_configs_yaml)
             
         configs = {**_analysis_configs, **user_configs}
