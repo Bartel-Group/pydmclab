@@ -33,8 +33,12 @@ CALCS_DIR = SCRIPTS_DIR.replace('scripts', 'calcs')
 # where is my data going to live
 DATA_DIR = SCRIPTS_DIR.replace('scripts', 'data')
 
+for d in [CALCS_DIR, DATA_DIR]:
+    if not os.path.exists(d):
+        os.makedirs(d)
+
 # if you need data from MP as a starting point (often the case), you need your API key
-API_KEY = 'YOUR_KEY'
+API_KEY = '***REMOVED***'
 
 # lets put a tag on all the files we save
 FILE_TAG = 'mp-hulls'
@@ -266,14 +270,19 @@ Depending on what you're goal is, there are a lot of additional analyses that mi
 The goal of VASPOutputs, AnalyzeVASP, and AnalyzeBatch are to save a lot of the HPC data into
     more tractable json's that can be moved locally for more analysis
     
-For this example, we'll grab the following information:
-    - metadata on the calculations (input files)
-    - basic info (did the calc finish, what's the energy)
-    - the relaxed crystal structure
-    - the magnetization info
+This function will return a dictionary that looks like:
+    {top_level.ID.standard.final_xc.mag.xc_calc: 
+        {OUTPUT DATA} for calculations in launch_dir}
+Note on user_configs:
+    - we'll need to specify these if we want anything beside the default configurations
+        - defaults for what to analyze can be found at pydmc/data/data/_batch_vasp_analysis_configs.yaml
+    - do we want magnetization, DOS, etc.
+    - do we only want static calculations, etc
+    - set these in main()
 """
 
 def analyze_calcs(launch_dirs,
+                  user_configs,
                   savename='results_%s' % FILE_TAG,
                   remake=False):
     
@@ -281,17 +290,10 @@ def analyze_calcs(launch_dirs,
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
     
-    analyzer = AnalyzeBatch(launch_dirs)
+    analyzer = AnalyzeBatch(launch_dirs,
+                            user_configs=user_configs)
 
-    data = analyzer.results(key=None,
-                            only_static=True,
-                            check_relax=True,
-                            include_meta=True,
-                            include_calc_setup=True,
-                            include_structure=True,
-                            include_mag=False,
-                            include_dos=False,
-                            verbose=True)
+    data = analyzer.results
 
     return write_json(data, fjson)    
 
@@ -321,10 +323,10 @@ def main():
     """    
     remake_sub_launch = False
     
-    remake_query = True
+    remake_query = False
     print_query_check = True 
     
-    remake_launch_dirs = True
+    remake_launch_dirs = False
     print_launch_dirs_check = True
     
     remake_subs = True
@@ -389,7 +391,9 @@ def main():
     if print_subs_check:
         check_subs(launch_dirs=launch_dirs)
     
+    analysis_configs = {'n_procs' : 4}
     results = analyze_calcs(launch_dirs=launch_dirs,
+                            user_configs=analysis_configs,
                             remake=remake_results)
     if print_results_check:
         check_results(results)
