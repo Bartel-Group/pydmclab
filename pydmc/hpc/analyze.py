@@ -482,6 +482,8 @@ class AnalyzeVASP(object):
         if include_meta:
             data['meta'] = self.metadata
         if include_calc_setup:
+            if 'meta' not in data:
+                data['meta'] = {}
             data['meta']['setup'] = self.calc_setup
         if include_structure:
             data['structure'] = self.relaxed_structure
