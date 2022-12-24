@@ -90,23 +90,15 @@ class LaunchTools(object):
         _launch_configs = read_yaml(launch_configs_yaml)
         
         configs = {**_launch_configs, **user_configs}
-
-        configs['top_level'] = top_level
-        configs['unique_ID'] = unique_ID
-        configs['calcs_dir'] = calcs_dir
-        
+            
         if not isinstance(structure, dict):
             structure = structure.as_dict()
-
-        configs['structure'] = structure
 
         if configs['n_afm_configs'] > 0:
             if MagTools(structure).could_be_afm:
                 if not magmoms:
                     raise ValueError('You are running afm calculations but provided no magmoms, generate these first, then pass to LaunchTools')
-        
-        configs['magmoms'] = magmoms
-
+    
         standards = configs['standards'].copy()
         if configs['compare_to_mp']:
             if 'mp' not in standards:
@@ -132,6 +124,15 @@ class LaunchTools(object):
                 
         configs['standard_to_xcs'] = standard_to_xcs
         
+        write_yaml(configs, launch_configs_yaml)
+
+        configs['top_level'] = top_level
+        configs['unique_ID'] = unique_ID
+        configs['calcs_dir'] = calcs_dir
+        
+        self.magmoms = magmoms
+        self.structure = structure
+
         self.configs = dotdict(configs)
 
     
@@ -165,7 +166,7 @@ class LaunchTools(object):
                 for xc_to_run in standard_to_xcs[standard][final_xc]:
                     for mag in possible_mags:
                         if 'afm' in mag:
-                            magmoms = configs.magmoms
+                            magmoms = self.magmoms
                             idx = mag.split('_')[-1]
                             if (idx in magmoms):
                                 magmom = magmoms[idx]
@@ -176,7 +177,7 @@ class LaunchTools(object):
                         else:
                             magmom = None
                         for calc in possible_calcs:
-                            validity = is_calc_valid(configs.structure,
+                            validity = is_calc_valid(self.structure,
                                                     standard,
                                                     xc_to_run,
                                                     calc,
@@ -273,5 +274,5 @@ class LaunchTools(object):
         
             fposcar = os.path.join(launch_dir, 'POSCAR')
             if not os.path.exists(fposcar):
-                structure = Structure.from_dict(self.configs.structure)
+                structure = Structure.from_dict(self.structure)
                 structure.to(fmt='poscar', filename=fposcar)

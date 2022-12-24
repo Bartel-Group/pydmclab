@@ -38,7 +38,7 @@ for d in [CALCS_DIR, DATA_DIR]:
         os.makedirs(d)
 
 # if you need data from MP as a starting point (often the case), you need your API key
-API_KEY = 'YOUR_KEY'
+API_KEY = '***REMOVED***'
 
 # lets put a tag on all the files we save
 FILE_TAG = 'simple-afm'
@@ -374,13 +374,13 @@ def main():
     """    
     remake_sub_launch = False
     
-    remake_query = True
+    remake_query = False
     print_query_check = True 
     
-    remake_magmoms = True
+    remake_magmoms = False
     print_magmoms_check = True
     
-    remake_launch_dirs = True
+    remake_launch_dirs = False
     print_launch_dirs_check = True
     
     remake_subs = True

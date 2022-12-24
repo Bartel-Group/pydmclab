@@ -567,7 +567,7 @@ class AnalyzeBatch(object):
 
         if n_procs > 1:
             pool = multip.Pool(processes=n_procs)
-            data = [r for r in pool.starmap(self._results_for_calc_dir, [(calc_dir) for calc_dir in calc_dirs])]
+            data = [r for r in pool.starmap(self._results_for_calc_dir, [(calc_dir,) for calc_dir in calc_dirs])]
             pool.close()
 
         out = {list(d.keys())[0] : d[list(d.keys())[0]] for d in data}
