@@ -455,17 +455,17 @@ def main():
     Now, we need to specify any configurations relevant to VASP set up or our submission scripts
     For this example, we'll do the following (on top of the defaults):
         - run on only 8 cores
-        - run with a walltime of 12 hours
-        - make sure we don't run LOBSTER
-        - use a slightly lower ENCUT in all our calculations
+        - run with a walltime of 80 hours
+        - make sure we run LOBSTER
+        - use a slightly higher ENCUT in all our calculations
         
     """
     user_configs = {'ntasks' : 8,
-                    'time' : int(12*60),
-                    'lobster_static' : False,
-                    'relax_incar' : {'ENCUT' : 500},
-                    'static_incar' : {'ENCUT' : 500},
-                    'loose_incar' : {'ENCUT' : 500}}
+                    'time' : int(80*60),
+                    'lobster_static' : True,
+                    'relax_incar' : {'ENCUT' : 555},
+                    'static_incar' : {'ENCUT' : 555},
+                    'loose_incar' : {'ENCUT' : 555}}
     
     if remake_subs:
         submit_calcs(launch_dirs=launch_dirs,

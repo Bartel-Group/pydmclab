@@ -75,7 +75,7 @@ This function will return something that looks like this:
 def get_query(comp='RuO2',
               only_gs=True,
               include_structure=True,
-              supercell_structure=[2,2,2],
+              supercell_structure=[1,2,3],
               savename='query_%s.json' % FILE_TAG,
               remake=False):
     
@@ -508,11 +508,11 @@ def main():
     Here, I'll specify the user_configs pertaining to setting up the launch directories
         - let's consider 4 AFM configurations
         - let's use DMC standards
-        - and let's use METAGGA
+        - and let's use GGA
     """
     launch_configs = {'n_afm_configs' : 2,
                       'standards' : ['dmc'],
-                      'final_xcs' : ['metagga']}
+                      'final_xcs' : ['gga']}
     
     launch_dirs = get_launch_dirs(strucs=strucs,
                                   user_configs=launch_configs,
