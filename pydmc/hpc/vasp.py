@@ -97,7 +97,7 @@ class VASPSetUp(object):
         
         configs = {**_vasp_configs, **user_configs}
         
-        write_yaml(configs, vasp_configs_yaml)
+        #write_yaml(configs, vasp_configs_yaml)
                 
         configs = dotdict(configs)
         

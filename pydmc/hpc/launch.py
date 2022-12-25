@@ -125,7 +125,7 @@ class LaunchTools(object):
                 
         configs['standard_to_xcs'] = standard_to_xcs
         
-        write_yaml(configs, launch_configs_yaml)
+        #write_yaml(configs, launch_configs_yaml)
 
         configs['top_level'] = top_level
         configs['unique_ID'] = unique_ID

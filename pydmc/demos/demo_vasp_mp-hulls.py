@@ -70,14 +70,14 @@ If we want MP data, we use pydmc.core.query.MPQuery
 
 """
 Query example:
-    - we want all entries in the Li-Mn-Cl chemical space
+    - we want all entries in the Li-Mn-Cl-F chemical space
         - restricted to entries within 20 meV/atom of the convex hull
         - restricted to <= 3 lowest energy polymorphs per composition
         - restricted to structures with < 50 atoms in their unit cells
         - excluding elemental phases (Li1, Mn1, O1)
     - this might be a query if you were doing the convex hull analysis
 """
-def get_query(comp='Li-Mn-Cl',
+def get_query(comp='Li-Mn-Cl-F',
               only_gs=False,
               max_Ehull=0.02,
               max_strucs_per_cmpd=3,
