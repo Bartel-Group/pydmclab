@@ -27,6 +27,7 @@ class LaunchTools(object):
                  unique_ID,
                  magmoms=None,
                  user_configs={},
+                 refresh_configs=True,
                  launch_configs_yaml=os.path.join(os.getcwd(), '_launch_configs.yaml')):
         """
         Args:
@@ -83,7 +84,7 @@ class LaunchTools(object):
         if not os.path.exists(calcs_dir):
             os.mkdir(calcs_dir)
             
-        if not os.path.exists(launch_configs_yaml):
+        if not os.path.exists(launch_configs_yaml) or refresh_configs:
             _launch_configs = load_launch_configs()
             write_yaml(_launch_configs, launch_configs_yaml)
         
