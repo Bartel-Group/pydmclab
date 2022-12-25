@@ -87,19 +87,19 @@ def make_project_tree():
                     f.write('This is a placeholder for the %s directory' % that_layer)
                     
 def make_sub_for_launcher():
-    flauncher_sub = os.path.join(os.getcwd(), 'sub_launch.sh')
+    flauncher_sub = os.path.join(os.getcwd(), 'sub_launcher.sh')
     launch_job_name = '-'.join([os.getcwd().split('/')[-2], 'launcher'])
     with open(flauncher_sub, 'w') as f:
         f.write('#!/bin/bash -l\n')
         f.write('#SBATCH --nodes=1\n')
         f.write('#SBATCH --ntasks=1\n')
         f.write('#SBATCH --time=4:00:00\n')
-        f.write('#SBATCH --error=log_launch.e\n')
-        f.write('#SBATCH --output=log_launch.o\n')
+        f.write('#SBATCH --error=_log_launcher.e\n')
+        f.write('#SBATCH --output=_log_launcher.o\n')
         f.write('#SBATCH --account=cbartel\n')
         f.write('#SBATCH --job-name=%s\n' % launch_job_name)
         f.write('#SBATCH --partition=msismall\n')
-        f.write('\npython launch.py\n')
+        f.write('\npython launcher.py\n')
         
 def is_calc_valid(structure,
                   standard,
