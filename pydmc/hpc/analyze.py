@@ -463,13 +463,13 @@ class AnalyzeVASP(object):
     @property
     def calc_setup(self):
         calc_dir = self.calc_dir
-        formula, ID, standard, xc, mag, xc_calc = calc_dir.split('/')[-6:]
+        formula, ID, standard, mag, xc_calc = calc_dir.split('/')[-5:]
         return {'formula' : formula,
                 'ID' : ID,
                 'standard' : standard,
-                'xc' : xc,
                 'mag' : mag,
-                'xc_calc' : xc_calc}
+                'xc' : xc_calc.split('-')[0],
+                'calc' : xc_calc.split('-')[1]}
         
     def summary(self,
                 include_meta=False,
@@ -496,12 +496,12 @@ class AnalyzeVASP(object):
 class AnalyzeBatch(object):
 
     def __init__(self,
-                 launch_dirs_to_tags,
+                 launch_dirs,
                  user_configs={},
                  analysis_configs_yaml=os.path.join(os.getcwd(), '_batch_VASP_analysis_configs.yaml'),
                  refresh_configs=True):
 
-        self.launch_dirs_to_tags = launch_dirs_to_tags
+        self.launch_dirs = launch_dirs
 
         if not os.path.exists(analysis_configs_yaml) or refresh_configs:
             _analysis_configs = load_batch_vasp_analysis_configs()
@@ -518,16 +518,17 @@ class AnalyzeBatch(object):
     
     @property
     def calc_dirs(self):
-        launch_dirs = self.launch_dirs_to_tags
+        launch_dirs = self.launch_dirs
         calc_dirs = []
+        calcs = ['loose', 'relax', 'static'] if not self.configs['only_static'] else ['static']
         for launch_dir in launch_dirs:
-            calc_dirs += [os.path.join(launch_dir, c) for c in launch_dirs[launch_dir]]
-        if self.configs['only_static']:
-            calc_dirs = [c for c in calc_dirs if 'static' in c]
+            files_in_launch_dir = os.listdir(launch_dir)
+            calc_dirs = [os.path.join(c, launch_dir) for c in files_in_launch_dir if c.split('-')[1] in ['loose', 'relax', 'static']]
+        
         return calc_dirs
     
     def _key_for_calc_dir(self, calc_dir):
-        return '.'.join(calc_dir.split('/')[-6:])
+        return '.'.join(calc_dir.split('/')[-5:])
     
     def _results_for_calc_dir(self, 
                               calc_dir):

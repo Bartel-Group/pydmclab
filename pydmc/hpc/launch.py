@@ -145,8 +145,8 @@ class LaunchTools(object):
         
         return ['fm'] + afm_indices
 
-    @property
-    def launch_dirs(self):
+    def launch_dirs(self,
+                    make_dirs=True):
         """
         Returns the minimal list of directories that need a submission file to launch a chain of calcs
         
@@ -156,6 +156,7 @@ class LaunchTools(object):
             e.g.,
                 this could be */calcs/Nd2O7Ru2/mp-19930/dmc/metagga/fm/relax
         """
+        structure = self.structure
         configs = self.configs
         
         mags = self.valid_mags
@@ -185,6 +186,13 @@ class LaunchTools(object):
                 launch_dir = os.path.join(level0, level1, level2, level3, level4)
                 launch_dirs[launch_dir] = {'xcs' : xcs,
                                            'magmom' : magmom}
+                if make_dirs:
+                    if not os.path.exists(launch_dir):
+                        os.makedirs(launch_dir)
+                    fposcar = os.path.join(launch_dir, 'POSCAR')
+                    if not os.path.exists(fposcar):
+                        structure = Structure.from_dict(structure)
+                        structure.to(fmt='poscar', filename=fposcar)                    
         
         return launch_dirs
                 

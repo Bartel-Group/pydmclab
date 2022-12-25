@@ -120,9 +120,6 @@ class SubmitTools(object):
                     slurm_configs[option] = new_value
                     user_configs_used.append(option)
         
-        if not slurm_configs['job-name']:
-            slurm_configs['job-name'] = '.'.join([top_level, unique_ID, standard, mag])
-        
         #write_yaml(slurm_configs, slurm_configs_yaml)
         self.slurm_configs = dotdict(slurm_configs)
         
@@ -364,8 +361,7 @@ class SubmitTools(object):
         return statuses
    
    
-    @property
-    def is_job_in_queue(self):
+    def is_job_in_queue(self, job_name):
         """
         Returns:
             True if this job-name is already in the queue, else False
@@ -375,7 +371,6 @@ class SubmitTools(object):
         scripts_dir = os.getcwd()
         sub_configs = self.sub_configs
         fqueue = os.path.join(scripts_dir, sub_configs.fqueue)
-        job_name = self.slurm_configs['job-name']
         with open(fqueue, 'w') as f:
             subprocess.call(['squeue', '-u', '%s' % os.getlogin(), '--name=%s' % job_name], stdout=f)
         names_in_q = []
@@ -427,9 +422,6 @@ class SubmitTools(object):
         files_to_inherit = sub_configs.files_to_inherit
         
         launch_dir = self.launch_dir
-        print('\nchecking if %s is in q' % launch_dir)
-        if self.is_job_in_queue:
-            return
         
         vasp_command = self.vasp_command
         slurm_options = self.slurm_options
@@ -442,6 +434,11 @@ class SubmitTools(object):
         for xc in packing:
             fsub = os.path.join(launch_dir, 'sub_%s.sh' % xc)
             fstatus = os.path.join(launch_dir, 'status_%s.o' % xc)
+            job_name = '.'.join(launch_dir.split('/')[-4:]+[xc])
+            print('\nchecking if %s is in q' % launch_dir)
+            if self.is_job_in_queue(job_name):
+                return
+            slurm_options['job-name'] = job_name
             with open(fsub, 'w') as f:
                 f.write('#!/bin/bash -l\n')
                 for key in slurm_options:
@@ -514,8 +511,7 @@ class SubmitTools(object):
             - if there's something to launch
                 (ie if all calcs are done, dont launch)
         """
-        if self.is_job_in_queue:
-            return
+
         
         print('     now launching sub')
         scripts_dir = os.getcwd()
@@ -525,7 +521,14 @@ class SubmitTools(object):
         flags_that_need_to_be_executed = ['srun', 'python', 'lobster', 'bader']
 
         for xc in packing:
+
             fsub = os.path.join(launch_dir, 'sub_%s.sh' % xc)
+            with open(fsub) as f:
+                for line in f:
+                    if 'job-name' in line:
+                        job_name = line[:-1].split('=')[-1]
+            if self.is_job_in_queue(job_name):
+                continue
             needs_to_launch = False
             with open(fsub) as f:
                 contents = f.read()
