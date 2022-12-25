@@ -191,8 +191,8 @@ class LaunchTools(object):
                         os.makedirs(launch_dir)
                     fposcar = os.path.join(launch_dir, 'POSCAR')
                     if not os.path.exists(fposcar):
-                        structure = Structure.from_dict(structure)
-                        structure.to(fmt='poscar', filename=fposcar)                    
+                        struc = Structure.from_dict(structure)
+                        struc.to(fmt='poscar', filename=fposcar)                    
         
         return launch_dirs
                 
