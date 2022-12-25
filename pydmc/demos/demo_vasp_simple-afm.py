@@ -74,7 +74,7 @@ This function will return something that looks like this:
         'Ef_mp' : formation energy per atom from MP,
         etc}
 """
-def get_query(comp=['RuO2', 'IrO2'],
+def get_query(comp=['MoO2', 'TiO2'],
               only_gs=True,
               include_structure=True,
               supercell_structure=[2,1,1],
@@ -277,7 +277,7 @@ def submit_calcs(launch_dirs,
         # these are some configurations we'll extract from the launch directory name
         top_level, ID, standard, final_xc, mag = launch_dir.split('/')[-5:]
         user_configs['standard'] = standard
-        user_configs['xc'] = final_xc
+        user_configs['xc_to_run'] = final_xc
         user_configs['mag'] = mag
         user_configs['job-name'] = '.'.join([top_level, ID, standard, final_xc, mag])
 
