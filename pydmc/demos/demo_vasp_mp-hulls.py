@@ -290,7 +290,7 @@ Note on user_configs:
 
 def analyze_calcs(launch_dirs,
                   user_configs,
-                  savename='results_%s' % FILE_TAG,
+                  savename='results_%s.json' % FILE_TAG,
                   remake=False):
     
     fjson = os.path.join(DATA_DIR, savename)

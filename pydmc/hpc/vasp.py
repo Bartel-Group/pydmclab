@@ -45,7 +45,7 @@ class VASPSetUp(object):
                  calc_dir,
                  user_configs={},
                  vasp_configs_yaml=os.path.join(os.getcwd(), '_vasp_configs.yaml',),
-                 refresh_configs=False):
+                 refresh_configs=True):
         """
         Args:
             calc_dir (os.PathLike) - directory where I want to execute VASP

@@ -278,7 +278,6 @@ def get_launch_dirs(strucs,
                     user_configs,
                     magmoms,
                     make_launch_dirs=True,
-                    refresh_configs=True,
                     savename='launch_dirs_%s.json' % FILE_TAG,
                     remake=False):
     
@@ -299,8 +298,7 @@ def get_launch_dirs(strucs,
                                 magmoms=curr_magmoms,
                                 top_level=top_level,
                                 unique_ID=ID,
-                                user_configs=user_configs,
-                                refresh_configs=refresh_configs)
+                                user_configs=user_configs)
             
             launch_dirs = launch.launch_dirs_to_tags
 
@@ -338,7 +336,6 @@ Note on user_configs:
 def submit_calcs(launch_dirs,
                  user_configs,
                  magmoms,
-                 refresh_configs=['sub', 'slurm', 'vasp'],
                  ready_to_launch=True):
     for launch_dir in launch_dirs:
 
@@ -364,7 +361,6 @@ def submit_calcs(launch_dirs,
         # now we'll prep the VASP directories and write the submission script
         sub = SubmitTools(launch_dir=launch_dir,
                           valid_calcs=valid_calcs,
-                          refresh_configs=refresh_configs,
                           user_configs=user_configs)
 
         sub.write_sub
@@ -413,8 +409,7 @@ Note on user_configs:
 
 def analyze_calcs(launch_dirs,
                   user_configs,
-                  refresh_configs=True,
-                  savename='results_%s' % FILE_TAG,
+                  savename='results_%s.json' % FILE_TAG,
                   remake=False):
     
     fjson = os.path.join(DATA_DIR, savename)
@@ -422,7 +417,6 @@ def analyze_calcs(launch_dirs,
         return read_json(fjson)
     
     analyzer = AnalyzeBatch(launch_dirs,
-                            refresh_configs=refresh_configs,
                             user_configs=user_configs)
 
     data = analyzer.results
@@ -452,7 +446,7 @@ def check_results(results):
                 an_el = list(magnetization.keys())[0]
                 an_idx = list(magnetization[an_el].keys())[0]
                 that_mag = magnetization[an_el][an_idx]['mag']
-                print('mag on %s (%i) = %.2f' % (an_el, an_idx, that_mag))
+                print('mag on %s (%s) = %.2f' % (an_el, str(an_idx), that_mag))
             print(data['structure'])
     
     print('\n\n %i/%i converged' % (converged, len(keys_to_check)))       
@@ -464,16 +458,16 @@ def main():
     """    
     remake_sub_launch = False
     
-    remake_query = True
+    remake_query = False
     print_query_check = True 
     
-    remake_strucs = True
+    remake_strucs = False
     print_strucs_check = True
 
-    remake_magmoms = True
+    remake_magmoms = False
     print_magmoms_check = True
     
-    remake_launch_dirs = True
+    remake_launch_dirs = False
     print_launch_dirs_check = True
     
     remake_subs = True

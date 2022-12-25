@@ -24,7 +24,7 @@ class SubmitTools(object):
                  launch_dir,
                  valid_calcs,
                  user_configs={},
-                 refresh_configs=[],
+                 refresh_configs=['vasp', 'sub', 'slurm'],
                  vasp_configs_yaml=os.path.join(os.getcwd(), '_vasp_configs.yaml'),
                  slurm_configs_yaml=os.path.join(os.getcwd(), '_slurm_configs.yaml'),
                  sub_configs_yaml=os.path.join(os.getcwd(), '_sub_configs.yaml')):

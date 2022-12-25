@@ -346,7 +346,7 @@ Note on user_configs:
 def analyze_calcs(launch_dirs,
                   user_configs,
                   refresh_configs=True,
-                  savename='results_%s' % FILE_TAG,
+                  savename='results_%s.json' % FILE_TAG,
                   remake=False):
     
     fjson = os.path.join(DATA_DIR, savename)
@@ -384,7 +384,7 @@ def check_results(results):
                 an_el = list(magnetization.keys())[0]
                 an_idx = list(magnetization[an_el].keys())[0]
                 that_mag = magnetization[an_el][an_idx]['mag']
-                print('mag on %s (%i) = %.2f' % (an_el, an_idx, that_mag))
+                print('mag on %s (%s) = %.2f' % (an_el, str(an_idx), that_mag))
             print(data['structure'])
     
     print('\n\n %i/%i converged' % (converged, len(keys_to_check)))       

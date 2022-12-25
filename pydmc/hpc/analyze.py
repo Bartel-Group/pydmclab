@@ -499,7 +499,7 @@ class AnalyzeBatch(object):
                  launch_dirs_to_tags,
                  user_configs={},
                  analysis_configs_yaml=os.path.join(os.getcwd(), '_batch_VASP_analysis_configs.yaml'),
-                 refresh_configs=False):
+                 refresh_configs=True):
 
         self.launch_dirs_to_tags = launch_dirs_to_tags
 
