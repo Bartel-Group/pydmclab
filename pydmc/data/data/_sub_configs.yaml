@@ -1,15 +1,34 @@
+# these configs are operating on a submission script
+# LaunhcTools should be passing the following
+## structure: pymatgen structure object
+## naming info: e.g., formula, mpid
+## magnetic type: nm, fm, afm_*
+## magmom: dictionary of magmoms
+
 vasp: vasp_std # use vasp_gam for "loose" calcs (havent implemented yet)
 vasp_dir: /home/cbartel/shared/bin/vasp/ # where vasp executable lives
 mpi_command: srun # how to launch on multicore/multinode (may be mpirun depending on compilation)
 manager: '#SBATCH' # how to manage interactions with the queue (some machines dont use slurm)
 
-fsub: sub.sh # what to call submission file in launch_dir with sbatch
-fstatus: status.o # where you get info on whats been launched
 fqueue: q.o # this will be created in the folder where you execute python
 
 fresh_restart: False # True if you want to re-run all calculations; False if you want to pick up where you left off
-calc_sequence: True # True if you want to run calcs in a sequence (eg loose --> relax --> static)
-xc_sequence: True # True if you want to run functionals in a sequencec (eg gga --> metagga)
 force_postprocess: False # if True, run LOBSTER and Bader again if vasp_configs.lobster_static = True even if output files exist
 
 files_to_inherit: ['WAVECAR', 'CONTCAR'] # usually no need to change
+
+packing: 
+ gga: 
+  - gga-loose
+  - gga-relax
+  - gga-static
+ ggau:
+  - ggau-loose
+  - ggau-relax
+  - ggau-static
+ metagga:
+  - gga-loose
+  - gga-relax
+  - gga-static
+  - metagga-relax
+  - metagga-static

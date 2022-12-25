@@ -25,6 +25,7 @@ class LaunchTools(object):
                  structure,
                  top_level,
                  unique_ID,
+                 to_launch,
                  magmoms=None,
                  user_configs={},
                  refresh_configs=True,
@@ -56,6 +57,9 @@ class LaunchTools(object):
                 - could be a material ID in materials project (for standard geometry relaxations, this makes sense)
                 - could be x in the LiCoO2 example I described previously
                 - it's really up to you, but it must be unique within the top_level directory
+                
+            to_launch (dict) : 
+                {standard (str) : [list of xcs (str)]}
                 
             magmoms (dict): 
                 - if you are running AFM calculations
@@ -100,98 +104,46 @@ class LaunchTools(object):
                 if not magmoms:
                     raise ValueError('You are running afm calculations but provided no magmoms, generate these first, then pass to LaunchTools')
     
-        standards = configs['standards'].copy()
         if configs['compare_to_mp']:
-            if 'mp' not in standards:
-                standards.append('mp')
-
-        configs['standards'] = standards
-        
-        xcs_to_get_energies_for = configs['final_xcs'].copy()
-        standard_to_xcs = {standard : 
-                            {final_xc : [final_xc] for final_xc in xcs_to_get_energies_for} 
-                                for standard in configs['standards']}
-        
-        if 'metagga' in xcs_to_get_energies_for:
-            for standard in standard_to_xcs:
-                standard_to_xcs[standard]['metagga'] = ['gga', 'metagga']
-        
-        if configs['compare_to_mp']:
-            if 'mp' not in standard_to_xcs:
-                standard_to_xcs['mp'] = {'ggau' : ['ggau']}
-            
-            else:
-                standard_to_xcs['mp']['ggau'] = ['ggau']
-                
-        configs['standard_to_xcs'] = standard_to_xcs
-        
-        #write_yaml(configs, launch_configs_yaml)
+            to_launch['mp'] = ['ggau']
 
         configs['top_level'] = top_level
         configs['unique_ID'] = unique_ID
         configs['calcs_dir'] = calcs_dir
+        configs['to_launch'] = to_launch
+
         
         self.magmoms = magmoms
         self.structure = structure
 
         self.configs = dotdict(configs)
 
-    
     @property
-    def valid_calcs(self):
-        """
-        Returns list of calculations that are "valid" given the configs
-            - note: makes use of pydmc.utils.handy.is_calc_valid to check a given calc
-        
-        Calcs might be "invalid" if:
-            - you are passing a structure from one functional to another, then there's no need to run a loose calc
-            - you have a nonmagnetic material, there's no need to run magnetic calcs
-            - you are using mp standards, there's no reason not to use MP functional (GGA+U)
-            - you are passing mag = afm_9, but there are only 5 AFM configs
-            - etc.
-        """
+    def valid_mags(self):
         configs = self.configs
-        if configs.relax_geometry:
-            possible_calcs = ['loose', 'relax', 'static']
-        else:
-            possible_calcs = ['static']
+        if configs.override_mag:
+            return configs.override_mag
         
-        possible_mags = ['nm', 'fm']
-        if configs.n_afm_configs > 0:
-            possible_mags += ['afm_%s' % str(i) for i in range(configs.n_afm_configs)]
-
-        standard_to_xcs = configs.standard_to_xcs
-        out = []
-        magmoms = self.magmoms
-        for standard in standard_to_xcs:
-            for final_xc in standard_to_xcs[standard]:
-                for xc_to_run in standard_to_xcs[standard][final_xc]:
-                    for mag in possible_mags:
-                        if 'afm' in mag:
-                            idx = mag.split('_')[-1]
-                            magmom = None
-                            if int(idx) in magmoms:
-                                magmom = magmoms[int(idx)]
-                            elif str(idx) in magmoms:
-                                magmom = magmoms[str(idx)]
-                        else:
-                            magmom = None
-                        for calc in possible_calcs:
-                            validity = is_calc_valid(self.structure,
-                                                    standard,
-                                                    xc_to_run,
-                                                    calc,
-                                                    mag,
-                                                    magmom,
-                                                    configs.mag_override)
-                            if validity:
-                                out.append({'standard' : standard,
-                                            'final_xc' : final_xc,
-                                            'xc_to_run' : xc_to_run,
-                                            'mag' : mag,
-                                            'calc' : calc})
-                        
-        return out
+        structure = self.structure
+        if not MagTools(structure).could_be_magnetic:
+            return ['nm']
+        
+        if not MagTools(structure).could_be_afm or not configs.n_afm_configs:
+            return ['fm']
+               
+        max_desired_afm_idx = configs.n_afm_configs-1
+        
+        magmoms = self.magmoms 
+               
+        configs_in_magmoms = list(magmoms.keys())
+        configs_in_magmoms = sorted([int(i) for i in configs_in_magmoms])
+        max_available_afm_idx = max(configs_in_magmoms)
+        
+        max_afm_idx = min(max_desired_afm_idx, max_available_afm_idx)
+        
+        afm_indices = ['afm_%s' % str(i) for i in range(max_afm_idx+1)]
+        
+        return ['fm'] + afm_indices
 
     @property
     def launch_dirs(self):
@@ -199,62 +151,42 @@ class LaunchTools(object):
         Returns the minimal list of directories that need a submission file to launch a chain of calcs
         
         These launch_dirs have a very prescribed structure:
-            calcs_dir / top_level / unique_ID / standard / xc / mag / calc
+            calcs_dir / top_level / unique_ID / standard / mag
             
             e.g.,
                 this could be */calcs/Nd2O7Ru2/mp-19930/dmc/metagga/fm/relax
         """
         configs = self.configs
-            
-        valid_calcs = self.valid_calcs
         
-        launch_dirs = []
+        mags = self.valid_mags
+        
+        magmoms = self.magmoms
+        
+        to_launch = configs.to_launch
     
         level0 = configs.calcs_dir
         level1 = configs.top_level
         level2 = configs.unique_ID
         
-        unique_standards = sorted(list(set([d['standard'] for d in valid_calcs])))
-        
-        for standard in unique_standards:
-            standard_dir = os.path.join(level0, level1, level2, standard)
-            final_xcs = [d['final_xc'] for d in valid_calcs if d['standard'] == standard]
-            for final_xc in final_xcs:
-                final_xc_dir = os.path.join(standard_dir, final_xc)
-                unique_mags = [d['mag'] for d in valid_calcs if d['standard'] == standard and d['final_xc'] == final_xc]
-                for mag in unique_mags:
-                    mag_dir = os.path.join(final_xc_dir, mag)
-                    launch_dirs.append(mag_dir)
+        launch_dirs = {}
+        for standard in to_launch:
+            level3 = standard
+            xcs = to_launch[standard]
+            for mag in mags:
+                magmom = None
+                if 'afm' in mag:
+                    idx = mag.split('_')[1]
+                    if str(idx) in magmoms:
+                        magmom = magmoms[str(idx)]
+                    elif int(idx) in magmoms:
+                        magmom = magmoms[int(idx)]
+                        
+                level4 = mag
+                launch_dir = os.path.join(level0, level1, level2, level3, level4)
+                launch_dirs[launch_dir] = {'xcs' : xcs,
+                                           'magmom' : magmom}
         
         return launch_dirs
-    
-    @property
-    def launch_dirs_to_tags(self):
-        """
-        Returns:
-            dictionary of {launch_dir : [tags]}
-            
-            for the minimal list of self.launch_dirs
-            
-            each "tag" corresponds with one instsance where vasp needs to be executed
-                - tags have the form xc_to_run-calc
-                    - e.g., 'gga-relax'
-        
-        """
-        launch_dirs = self.launch_dirs
-        valid_calcs = self.valid_calcs
-        
-        d = {}
-        for launch_dir in launch_dirs:
-            d[launch_dir] = []
-            standard, final_xc, mag = launch_dir.split('/')[-3:]
-            for calc in valid_calcs:
-                tag = '-'.join([calc['xc_to_run'], calc['calc']])
-                calc_standard, calc_final_xc, calc_mag = calc['standard'], calc['final_xc'], calc['mag']
-                if (calc_standard == standard) and (calc_final_xc == final_xc) and (calc_mag == mag):
-                    d[launch_dir].append(tag)
-                            
-        return d
                 
     @property
     def create_launch_dirs_and_make_POSCARs(self):
@@ -267,7 +199,7 @@ class LaunchTools(object):
             - handle errors, etc
         """
         
-        launch_dirs = self.launch_dirs_to_tags
+        launch_dirs = self.launch_dirs
         for launch_dir in launch_dirs:
             if not os.path.exists(launch_dir):
                 os.makedirs(launch_dir)

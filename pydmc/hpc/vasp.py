@@ -51,35 +51,57 @@ class VASPSetUp(object):
             calc_dir (os.PathLike) - directory where I want to execute VASP
                 - there must be a POSCAR in calc_dir
                 - the other input files will be added automatically within this code
-            magmom (dict) - {'magmom' : [list of magmoms (float)]}
-                - or None
-                - only needed for AFM calculations where orderings would have been determined separately using MagTools
+            user_configs (dict) - user-defined configs
+                - see below for more details
                 
-            The following will usually get overwritten by SubmitTools or LaunchTools using "config" files or user-defined configs:
-                fvaspout (str) - name of file to write VASP output to
-                    - generally no need to change
-                    - in pydmc/data/data/_sub_configs.yaml
-                fvasperrors (str) - name of file to write VASP errors to
-                    - generally no need to change
-                    - in pydmc/data/data/_sub_configs.yaml
-                lobster_static (bool) - if True, run LOBSTER on static calculations
-                    - note 1: this changes the way the static calculation is performed as LOBSTER needs certain settings
-                    - note 2: this als runs Bader charge analysis
-                    - in pydmc/data/data/_vasp_configs.yaml
-                mag_override (bool) - allows user to run nonmagnetic calcs for magnetic systems and vice versa
-                    - generally unadvisable to change
-                    - in pydmc/data/data/_launch_configs.yaml
         Returns:
             calc_dir (os.PathLike) - directory where I want to execute VASP
             structure (pymatgen.Structure) - structure to be used for VASP calculation
-                - note: raises error if no POSCAR in calc_dir
-            magmom (dict) - {'magmom' : [list of magmoms (float)]}
-                - or None
-                - only needed for AFM calculations where orderings would have been determined using MagTools separately        
-            fvaspout (str) - name of file to write VASP output to
-            fvasperrors (str) - name of file to write VASP errors to
-            lobster_static (bool) - if True, run LOBSTER on static calculations    
-            mag_override (bool) - allows user to run nonmagnetic calcs for magnetic systems and vice versa
+                - note: raises error if no POSCAR in calc_dir     
+            configs (dict)
+            
+                standard: dmc # make mp if comparing to MP data
+                xc: gga # gga, ggau, or metagga
+                fun: # usually this is fine
+                mag: fm # **change** as desired
+                magmom: # you will need to pass this for AFM calcs
+                calc: relax # usually this is what we want unless you want an independent "static" or "loose" calc
+                lobster_static: True # can make False if you don't want to run LOBSTER
+
+                # some output files
+                fvaspout: vasp.o # where vasp output goes in calc_dir for each vasp run
+                fvasperrors: errors.o # where vasp errors go in calc_dir for each vasp run
+
+                # may be desirable to pass various configs for each type of calculation
+                # INCARs should be {INCAR_FLAG : value}
+                # KPOINTs should be Kpoints object
+                # POTCARs should be {el (str) : potcar flag (str)}
+
+                # loose calculations
+                loose_incar: {}
+                loose_kpoints: 
+                loose_potcar:
+
+                # relax calculations
+                relax_incar: {}
+                relax_kpoints: 
+                relax_potcar:
+
+                # static calculations
+                static_incar: {}
+                static_kpoints:
+                static_potcar:
+
+                # lobster calculations
+                lobster_incar: {}
+                lobster_kpoints: 
+                lobster_potcar: 
+
+
+                # rarely need to change these:
+                mag_override: False # if True, allows user to run nm calcs for mag systems and vice versa
+                potcar_functional: PBE_54 # probably don't change
+                validate_magmom: False # probably don't change
         """
         
         self.calc_dir = calc_dir
@@ -96,9 +118,7 @@ class VASPSetUp(object):
         _vasp_configs = read_yaml(vasp_configs_yaml)
         
         configs = {**_vasp_configs, **user_configs}
-        
-        #write_yaml(configs, vasp_configs_yaml)
-                
+                        
         configs = dotdict(configs)
         
         self.configs = configs
@@ -107,94 +127,8 @@ class VASPSetUp(object):
                       verbose=False,
                       **kwargs):
         """
-        Args:
-            standard (str) - defines the group of input settings (INCAR, KPOINTS, POTCAR) we'll use
-                - unless comparing to Materials Project, 'dmc' will be our typical group standard
-                - if comparing to Materials Project, 'mp' will be needed
-                    - note: this takes care of itself in LaunchTools using the config "compare_to_mp" (in pydmc/data/_launch_configs)
-                - when experimenting with other settings, specify whatever you'd like ('high_cutoff', 'slab', 'custom', 'strict_ediff')
-                    - if it's not in ['mp', 'dmc'], it won't do anything to calc, but might be useful flag                    
-                        - SubmitTools and LaunchTools will make note of standard and use that to define calculation (and calculation directory trees)                  
-                    
-            xc (str) - rung of Jacob's ladder
-                - modifies the default in "fun"
-                    - 'gga' (default) - default=Perdew-Burke-Ernzerhof (PBE)
-                    - 'ggau' - default=PBE+U with MP U values
-                    - 'metagga' - default=r2SCAN
-                
-                - note: if you set xc='metagga', SubmitTools will also run xc='gga'
-                    - metagga's converge more quickly when preconditioned with gga, so you get the gga results for free
-                
-            calc (str) - type of calculation
-                - currently implemented:
-                    - 'loose' : loose geometry optimization (only 1 k point; easier convergence)
-                    - 'relax' : geometry optimization (to find the low-energy crystal structure near the inputted structure)
-                    - 'static' : static calculation (to get a more accurate energy/electronic structure at the equilibrium geometry)
-                        - this is needed because the k-point grid is made based on the input structure, but 'relax' may change the structure
-                            - performing a static calculation at the relaxed structure produces more sensible k-point grid
-
-                - not implemented yet, but should be in the near term
-                    - 'slab' : slab geometry optimization (ie for surfaces)
-                    - 'neb' : NEB calculation (to find the minimum energy path (activation energy) between two structures)
-
-                - not implemented yet, but would be nice to have eventually
-                    - 'phonon' : phonon calculation (to get phonon dispersion curves)
-                    - 'twod' : for 2D materials (this might fall under the umbrella of slab)
-                    - 'interface' : for interfaces (this might be too complex to fall under slab umbrella)
-                    - 'cluster' : for clusters (like nanoparticles)
-                
-            fun (str) - specify functional of interest
-                - 'default'
-                    - PBE if xc == 'gga' or 'ggau'
-                    - r2SCAN if xc == 'metagga'
-                    
-            mag (str) - magnetic ordering type
-                - 'nm' : nonmagnetic (ISPIN = 1)
-                - 'fm' : ferromagnetic (ISPIN = 2)
-                - 'afm_*' : antiferromagnetic (ISPIN = 2)
-                    - note: magmom must be passed to VASPSetUp only for AFM calculations
-                        - e.g., if many AFM orderings were generated using MagTools, tell VASPSetUp which one to use
-                            - a general approach might be to first create a dictionary of these using MagTools.get_afm_magmoms (magmoms = {IDX : [magmoms]})
-                    - code will read anything containing "afm" as AFM (e.g., "afm_1")
-                        - most natural to use afm_0, afm_1, ... to specify different AFM orderings
-                        
-            modify_incar (dict) - user-defined incar settings
-                - e.g., {'NCORE' : 4}
-                - most settings should be specified as int, str, bool, or float, except (at least):
-                    - {'MAGMOM' : [MAG_SITE1 MAG_SITE2 ...]}
-                    - {LDAU' : [U_ION_1 U_ION_2 ...]}
-                - see https://www.vasp.at/wiki/index.php/Category:INCAR_tag for all settings
-                
-            modify_kpoints (dict) - user-defined kpoint settings
-                - a lot of (slightly confusing) options here
-                    - Kpoints() means only use a single Kpoint
-                    - {'length' : 25} is a pretty sensible default (currently for dmc)
-                        - this is what VASP people tend to use, it seems
-                    - Kpoints(kpts=[[a,b,c]]) for a axbxc grid
-                    - {'reciprocal_density' : int} for automatic kpoint mesh
-                        - note: this is not the clearest approach
-                    - read more at https://www.vasp.at/wiki/index.php/KPOINTS
-
-                - if not None:
-                    - this will override KSPACING in INCAR (in addition to default kpoints settings)
-                        - KSPACING is a new thing in VASP where you can set the KPOINTS in the INCAR instead
-                            - I'm not too familiar/comfortable with this yet
-                
-            modify_potcar (dict) - user-defined potcar settings
-                - e.g., {'Gd' : 'Gd_3'}
-                    - different "flags" mean different e- treated as valence
-                
-            potcar_functional (str) - functional for POTCAR
-                - note 1: not sure if changing this will break code (POTCARs in pmg are a mess)
-                - note 2: I'm not sure a good reason why we would need to change this
-                - note 3: I think I'm changing this now when standard = 'mp' to use VERY old POTCARs
-                
-            validate_magmom (bool) - VASPSet thing
-                - note: setting to False because this was causing (as far as I could tell) non-useful errors
-                - don't believe this is necessary for us
-            
+        Args:            
             verbose (bool) - print stuff
-            
             **kwargs - additional arguments for VASPSet (see https://pymatgen.org/pymatgen.io.vasp.sets.html)
         """
         
@@ -234,19 +168,10 @@ class VASPSetUp(object):
             structure.add_site_property('magmom', magmom)
 
         # these are things that get updated based on other configs
-        if configs.calc_to_run == 'loose':
-            modify_incar = configs.loose_incar
-            modify_kpoints = configs.loose_kpoints
-            modify_potcar = configs.loose_potcar
-        elif configs.calc_to_run == 'relax':
-            modify_incar = configs.relax_incar
-            modify_kpoints = configs.relax_kpoints
-            modify_potcar = configs.relax_potcar
-        elif configs.calc_to_run == 'static':
-            modify_incar = configs.static_incar
-            modify_kpoints = configs.static_kpoints
-            modify_potcar = configs.static_potcar
-
+        
+        modify_incar = configs['%s_incar' % configs.calc]
+        modify_kpoints = configs['%s_kpoints' % configs.calc]
+        modify_potcar = configs['%s_potcar' % configs.calc]
         potcar_functional = configs.potcar_functional
         
         # MP wants to set W_pv but we don't have that one in PBE54 (no biggie)
@@ -258,7 +183,7 @@ class VASPSetUp(object):
             
         # don't mess with much if trying to match Materials Project
         if configs.standard == 'mp':
-            fun = 'default'
+            fun = None
             if not modify_kpoints:
                 modify_kpoints = {'reciprocal_density' : 64}
             elif isinstance(modify_kpoints, dict):
@@ -266,7 +191,7 @@ class VASPSetUp(object):
                 
         # setting DMC standards --> what to do on top of MPRelaxSet or MPScanRelaxSet (pymatgen defaults)
         if configs.standard == 'dmc':
-            fun = 'default' # same functional
+            fun = None
             dmc_standard_settings = {'EDIFF' : 1e-6,
                                     'EDIFFG' : -0.03,
                                     'ISMEAR' : 0,
@@ -279,12 +204,12 @@ class VASPSetUp(object):
                     modify_incar[key] = dmc_standard_settings[key]
 
             # use length = 25 means reciprocal space discretization of 25 K-points per Å−1
-            if configs.calc_to_run != 'loose':
+            if configs.calc != 'loose':
                 if not modify_kpoints:
                     modify_kpoints = {'length' : 25}
                 
             # turn off +U unless we are specifying GGA+U    
-            if configs.xc_to_run != 'ggau':
+            if configs.xc != 'ggau':
                 if 'LDAU' not in modify_incar:
                     modify_incar['LDAU'] = False
                 
@@ -293,12 +218,12 @@ class VASPSetUp(object):
                 modify_incar['ISPIN'] = 1 if configs.mag == 'nm' else 2
         
         # start from MPRelaxSet for GGA or GGA+U
-        if configs.xc_to_run in ['gga', 'ggau']:
+        if configs.xc in ['gga', 'ggau']:
             vaspset = MPRelaxSet
             
             # use custom functional (eg PBEsol) if you want
             if 'GGA' not in modify_incar:
-                if fun != 'default':
+                if fun:
                     modify_incar['GGA'] = fun.upper()
                 else:
                     modify_incar['GGA'] = 'PE'
@@ -308,18 +233,18 @@ class VASPSetUp(object):
                 potcar_functional = None
                 
         # start from MPScanRelaxSet for meta-GGA
-        elif configs.xc_to_run == 'metagga':
+        elif configs.xc == 'metagga':
             vaspset = MPScanRelaxSet
                 
             # use custom functional (eg SCAN) if you want
             if 'METAGGA' not in modify_incar:
-                if fun != 'default':
+                if fun:
                     modify_incar['METAGGA'] = fun.upper()
                 else:
                     modify_incar['METAGGA'] = 'R2SCAN'
         
         # default "loose" relax
-        if configs.calc_to_run == 'loose':
+        if configs.calc == 'loose':
             modify_kpoints = Kpoints() # only use 1 kpoint
             loose_settings = {'ENCUT' : 400,
                              'ENAUG' : 800,
@@ -331,7 +256,7 @@ class VASPSetUp(object):
                     modify_incar[key] = loose_settings[key]
         
         # default "static" claculation
-        if configs.calc_to_run == 'static':
+        if configs.calc == 'static':
             static_settings= {'LCHARG' : True,
                               'LREAL' : False,
                               'NSW' : 0,
@@ -364,7 +289,7 @@ class VASPSetUp(object):
         
         # if we are doing LOBSTER, need special parameters
         # note: some of this gets handled later for us
-        if configs.lobster_static and (configs.calc_to_run == 'static'):
+        if configs.lobster_static and (configs.calc == 'static'):
             if configs.standard != 'mp':
                 lobster_incar_settings = {'NEDOS' : 4000,
                                           'ISTART' : 0,
@@ -383,7 +308,7 @@ class VASPSetUp(object):
                     modify_kpoints = configs.lobster_kpoints
         
         if configs.lobster_static:
-            if configs.xc_to_run == 'metagga':
+            if configs.xc == 'metagga':
                 # gga-static will get ISYM = -1, so need to pass that to metagga relax otherwise WAVECAR from GGA doesnt help metagga
                 modify_incar['ISYM'] = -1
 
@@ -413,7 +338,7 @@ class VASPSetUp(object):
         vasp_input.write_input(self.calc_dir)
         
         # for LOBSTER, use Janine George's Lobsterin approach (mainly to get NBANDS)
-        if (configs.lobster_static) and (configs.calc_to_run == 'static'):
+        if (configs.lobster_static) and (configs.calc == 'static'):
             outputs = VASPOutputs(self.calc_dir)
             if outputs.incar.as_dict()['NSW'] == 0:
                 INCAR_input = os.path.join(self.calc_dir, 'INCAR_input')
@@ -520,7 +445,7 @@ class VASPSetUp(object):
         electronic_convergence = vr.converged_electronic
         
         # if we're relaxing the geometry, make sure last ionic loop converged
-        if configs.calc_to_run == 'relax':
+        if configs.calc == 'relax':
             ionic_convergence = vr.converged_ionic
         else:
             ionic_convergence = True

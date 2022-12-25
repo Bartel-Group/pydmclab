@@ -1,6 +1,3 @@
-standards: ['dmc'] # list of standards to run; if compare_to_mp = True, 'mp' will be added
-final_xcs: ['metagga'] # list of xcs we want energies for; if 'metagga' in xcs, 'gga' will be added
 compare_to_mp: False # if True, launch will get everything it needs to generate MP-consistent data
 n_afm_configs: 0 # how many AFM configurations to run
-override_mag: False # if True, won't check for whether structure is mag or not mag, it will just do as you say
-relax_geometry: True # if False, will only run static calculations (I think -- haven't checked my implementation of this)
+override_mag: False # could be ['nm'] if you only want to run nonmagnetic, won't check for whether structure is mag or not mag, it will just do as you say
