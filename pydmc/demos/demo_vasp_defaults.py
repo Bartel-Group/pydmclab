@@ -10,6 +10,11 @@ from pydmc.hpc.submit import SubmitTools
 from pydmc.hpc.analyze import AnalyzeBatch
 
 """
+This demo is really just to make sure that everything works using default arguments ...
+We'll calculate a couple NiO structures to see
+
+"""
+"""
 Overall note:
     - some of the configurations I'm choosing are purely to illustrate how to change things
         - not necessarily the best choices for a given calculation
@@ -78,7 +83,8 @@ def get_query(comp='NiO',
     data = mpq.get_data_for_comp(comp=comp,
                                  include_structure=True)
     
-    return write_json(data, fjson) 
+    write_json(data, fjson) 
+    return read_json(fjson)   
 
 """
 It's generally a good idea to write a quick "check" function to make sure each function does what you want
@@ -160,7 +166,8 @@ def get_launch_dirs(query,
 
         all_launch_dirs = {**all_launch_dirs, **launch_dirs}
 
-    return write_json(all_launch_dirs, fjson)   
+    write_json(all_launch_dirs, fjson) 
+    return read_json(fjson)  
 
 def check_launch_dirs(launch_dirs):
     print('\nanalyzing launch directories')
@@ -272,7 +279,8 @@ def analyze_calcs(launch_dirs,
 
     data = analyzer.results
 
-    return write_json(data, fjson)       
+    write_json(data, fjson)   
+    return read_json(fjson)      
 
 def check_results(results):
 

@@ -10,6 +10,11 @@ from pydmc.hpc.submit import SubmitTools
 from pydmc.hpc.analyze import AnalyzeBatch
 
 """
+This demo:
+    1) Let's get all the compounds in the Li-Mn-Cl space meeting some criteria 
+    2) Then calculate them with metagga and MP standards
+"""
+"""
 Overall note:
     - some of the configurations I'm choosing are purely to illustrate how to change things
         - not necessarily the best choices for a given calculation
@@ -98,7 +103,8 @@ def get_query(comp='Li-Mn-Cl',
                                  include_structure=include_structure,
                                  supercell_structure=supercell_structure)
     
-    return write_json(data, fjson) 
+    write_json(data, fjson)   
+    return read_json(fjson)
 
 def check_query(query):
     for mpid in query:
@@ -180,7 +186,8 @@ def get_launch_dirs(query,
 
         all_launch_dirs = {**all_launch_dirs, **launch_dirs}
 
-    return write_json(all_launch_dirs, fjson)   
+    write_json(all_launch_dirs, fjson)   
+    return read_json(fjson)   
 
 def check_launch_dirs(launch_dirs):
     print('\nanalyzing launch directories')
@@ -295,7 +302,8 @@ def analyze_calcs(launch_dirs,
 
     data = analyzer.results
 
-    return write_json(data, fjson)    
+    write_json(data, fjson)   
+    return read_json(fjson)    
 
 def check_results(results):
 
