@@ -1,5 +1,3 @@
-
-
 import os
 import numpy as np
 
@@ -11,6 +9,131 @@ from pydmc.hpc.launch import LaunchTools
 from pydmc.hpc.submit import SubmitTools
 from pydmc.hpc.analyze import AnalyzeBatch
 
+"""
+Basic framework
+
+Anytime we run VASP, we are usually interested in a set of calculations that share some feature(s):
+
+1) Initial crystal structures
+    a) Sometimes these are entries in Materials Project meeting some criteria:
+        - e.g., certain chemical space, chemical formula, E above hull, etc
+    b) Other times, we might start with an MP structure then perform some transformations to generate new structures
+        - e.g., replace x % of Ru with Ir in Ru_{1-x}Ir_{x}O_2 or extract x Li from Li_{1-x}CoO_2
+            - note: now we are disordering structures, so each chemical formula will have >= 1 enumerated structure
+                - i.e., Ru_0.5Ir_0.5O_2 has > 1 ordering of Ru/Ir on the cation sublattice
+    
+    The first two levels of our caculation directories will correspond to information relating to the crystal structure:
+        - top_level: the chemical formula (or some surrogate for the chemical formula)
+            - e.g., this could be RuO2 in 1(a) or it could be x in 1(b)
+        - unique_ID: some unique identifier for that "top_level"
+            - e.g., the Materials Project ID for the 1(a) case; or the index of 
+        
+    Each unique initial crytsal structure will be used for all directories below top_level/unique_ID
+    
+    Example tree #1:
+    calculating RuO2 and IrO2 ground-state polymorphs
+    -calcs
+     -RuO2
+      -mp-1234
+     -IrO2
+      -mp-5678
+      
+    Example tree #2:
+    calculating Ru_{2-x}Ir_{x}O4 for x = 0, 1, 2 for 2 ordered structures at each x
+    -calcs
+     -0
+      -0
+      -1
+     -1
+      -0
+      -1
+     -2
+      -0
+      -1
+         
+2) VASP input settings (standard)
+
+    Usually we want to compute a group of structures with similar settings so that we can safely compare the resulting energies
+    
+    - right now, we have two standards:
+        - dmc: our group standard (to be evolved collectively)
+            - these are best practice settings for our group
+        - mp: settings to use for strict comparison to Materials Project data
+    - these standards define the non-structure VASP input files (INCAR, KPOINTS, POTCAR)
+    
+    This will be the third level of our calculation directory: top_level/unique_ID/standard
+    
+    If we were calculating with dmc and mp standards, the tree might look like:
+    
+    -calcs
+     -RuO2
+      -mp-1234
+       -dmc
+       -mp
+
+    
+3) Magnetic configuration (mag)
+
+    We need to define what initial magnetic configuration we want to calculate for each initial structure
+    - nm: non-magnetic (no spins)
+    - fm: ferromagnetic (all spins > 0)
+    - afm_*: antiferromagnetic (spins up and down with sum(spins) = 0)
+        - * is a unique identifier for the ordering of spins
+        - if we want to do AFM calculations, we should first generate a "MAGMOM" (AFM ordering) file for each unique structure and save that data
+        - note: if we are computing AFM, we will also compute FM
+        
+    This will be the fourth level of our calculation directory: top_level/unique_ID/standard/mag
+    
+    -calcs
+     -RuO2
+      -mp-1234
+       -dmc
+        -afm_0
+
+        
+4) Exchange-correlation functional (xc)
+
+Now, we need to decide what flavor of DFT we want to use. Materials Project uses GGA+U. We will often use METAGGA.
+
+For each xc that we use, it's generally a good idea to run calculations in a sequence:
+    - a "loose" calculation that has fast-converging standards but not super accurate
+    - a "relax" calculation that will optimize the crystal structure with stricter standards
+    - a "static" calculation that will give us a better energy/electronic structure at that optimized geometry
+    - for METAGGA calculations, we need to first converge a GGA calculation before we start metagga-relax
+    
+We don't want to have to submit each of these individually to the queue, so we will "pack" them together:
+
+So, if we're running gga, that means three calculations will get packed together: gga-loose --> gga-relax --> gga-static
+    - if we're running metagga, we'll have 5 calcs: gga-loose --> gga-relax --> gga-static --> metagga-relax --> metagga-static
+
+each one of these "calcs" will require a VASP execution, meaning it needs VASP inputs and will generate VASP outputs,
+    so each xc-calc gets its own directory, becoming the 5th level of our calculation directory:
+    
+    top_level/unique_ID/standard/mag/xc-calc
+    
+    -calcs
+     -RuO2
+      -mp-1234
+       -dmc
+        -afm_0
+         -gga-loose
+         -gga-relax
+         -gga-static
+
+"""
+
+"""
+Most of this is taken care of automatically in pydmc
+
+1) Use MPQuery to get crystal structures from Materials Project
+2) [OPTIONAL] Transform those structures to generate new structures using StrucTools
+3) [OPTIONAL] Create AFM orderings ("magmoms") for each structure using MagTools(structure).get_afm_magmoms
+4) Create a dictionary of "launch directories" using LaunchTools
+    - this will look like: {top_level/unique_ID/standard : 
+                                {'xcs' : [XCs to use for that standard],
+                                'magmom' : [magmoms to use for that structure]}
+    - you 
+"""
 # where is this file
 SCRIPTS_DIR = os.getcwd()
 
