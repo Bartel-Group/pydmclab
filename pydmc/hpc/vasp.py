@@ -167,9 +167,9 @@ class VASPSetUp(object):
 
         # these are things that get updated based on other configs
         
-        modify_incar = configs['%s_incar' % configs.calc]
-        modify_kpoints = configs['%s_kpoints' % configs.calc]
-        modify_potcar = configs['%s_potcar' % configs.calc]
+        modify_incar = configs['%s_incar' % configs.calc_to_run]
+        modify_kpoints = configs['%s_kpoints' % configs.calc_to_run]
+        modify_potcar = configs['%s_potcar' % configs.calc_to_run]
         potcar_functional = configs.potcar_functional
         
         # MP wants to set W_pv but we don't have that one in PBE54 (no biggie)
@@ -202,12 +202,12 @@ class VASPSetUp(object):
                     modify_incar[key] = dmc_standard_settings[key]
 
             # use length = 25 means reciprocal space discretization of 25 K-points per Å−1
-            if configs.calc != 'loose':
+            if configs.calc_to_run != 'loose':
                 if not modify_kpoints:
                     modify_kpoints = {'length' : 25}
                 
             # turn off +U unless we are specifying GGA+U    
-            if configs.xc != 'ggau':
+            if configs.xc_to_run != 'ggau':
                 if 'LDAU' not in modify_incar:
                     modify_incar['LDAU'] = False
                 
@@ -216,7 +216,7 @@ class VASPSetUp(object):
                 modify_incar['ISPIN'] = 1 if configs.mag == 'nm' else 2
         
         # start from MPRelaxSet for GGA or GGA+U
-        if configs.xc in ['gga', 'ggau']:
+        if configs.xc_to_run in ['gga', 'ggau']:
             vaspset = MPRelaxSet
             
             # use custom functional (eg PBEsol) if you want
@@ -231,7 +231,7 @@ class VASPSetUp(object):
                 potcar_functional = None
                 
         # start from MPScanRelaxSet for meta-GGA
-        elif configs.xc == 'metagga':
+        elif configs.xc_to_run == 'metagga':
             vaspset = MPScanRelaxSet
                 
             # use custom functional (eg SCAN) if you want
@@ -242,7 +242,7 @@ class VASPSetUp(object):
                     modify_incar['METAGGA'] = 'R2SCAN'
         
         # default "loose" relax
-        if configs.calc == 'loose':
+        if configs.calc_to_run == 'loose':
             modify_kpoints = Kpoints() # only use 1 kpoint
             loose_settings = {'ENCUT' : 400,
                              'ENAUG' : 800,
@@ -254,7 +254,7 @@ class VASPSetUp(object):
                     modify_incar[key] = loose_settings[key]
         
         # default "static" claculation
-        if configs.calc == 'static':
+        if configs.calc_to_run == 'static':
             static_settings= {'LCHARG' : True,
                               'LREAL' : False,
                               'NSW' : 0,
@@ -287,7 +287,7 @@ class VASPSetUp(object):
         
         # if we are doing LOBSTER, need special parameters
         # note: some of this gets handled later for us
-        if configs.lobster_static and (configs.calc == 'static'):
+        if configs.lobster_static and (configs.calc_to_run == 'static'):
             if configs.standard != 'mp':
                 lobster_incar_settings = {'NEDOS' : 4000,
                                           'ISTART' : 0,
@@ -306,7 +306,7 @@ class VASPSetUp(object):
                     modify_kpoints = configs.lobster_kpoints
         
         if configs.lobster_static:
-            if configs.xc == 'metagga':
+            if configs.xc_to_run == 'metagga':
                 # gga-static will get ISYM = -1, so need to pass that to metagga relax otherwise WAVECAR from GGA doesnt help metagga
                 modify_incar['ISYM'] = -1
 
@@ -337,7 +337,7 @@ class VASPSetUp(object):
         vasp_input.write_input(calc_dir)
         
         # for LOBSTER, use Janine George's Lobsterin approach (mainly to get NBANDS)
-        if (configs.lobster_static) and (configs.calc == 'static'):
+        if (configs.lobster_static) and (configs.calc_to_run == 'static'):
             INCAR_input = os.path.join(calc_dir, 'INCAR_input')
             INCAR_output = os.path.join(calc_dir, 'INCAR')
             copyfile(INCAR_output, INCAR_input)
@@ -442,7 +442,7 @@ class VASPSetUp(object):
         electronic_convergence = vr.converged_electronic
         
         # if we're relaxing the geometry, make sure last ionic loop converged
-        if configs.calc == 'relax':
+        if configs.calc_to_run == 'relax':
             ionic_convergence = vr.converged_ionic
         else:
             ionic_convergence = True

@@ -22,7 +22,7 @@ class SubmitTools(object):
     """
     def __init__(self,
                  launch_dir,
-                 xcs,
+                 final_xcs,
                  magmom,
                  user_configs={},
                  refresh_configs=['vasp', 'sub', 'slurm'],
@@ -155,7 +155,7 @@ class SubmitTools(object):
         partitions = load_partition_configs()
         self.partitions = dotdict(partitions)
         
-        self.xcs = xcs
+        self.final_xcs = final_xcs
     
     @property
     def queue_manager(self):
@@ -247,7 +247,7 @@ class SubmitTools(object):
         sub_configs = self.sub_configs
         fresh_restart = sub_configs.fresh_restart
         launch_dir = self.launch_dir
-        xcs = self.xcs
+        final_xcs = self.final_xcs
         
         packing = sub_configs.packing
 
@@ -255,16 +255,16 @@ class SubmitTools(object):
 
         fpos_src = os.path.join(launch_dir, 'POSCAR')
         statuses = {}
-        for xc in xcs:
-            statuses[xc] = {}
-            for xc_calc in packing[xc]:
+        for final_xc in final_xcs:
+            statuses[final_xc] = {}
+            for xc_calc in packing[final_xc]:
                 # start making vasp_configs just for this particular calculation
                 calc_configs = {}
-                curr_xc, curr_calc = xc_calc.split('-')
+                xc_to_run, calc_to_run = xc_calc.split('-')
                 
                 # update vasp configs with the current xc and calc
-                calc_configs['xc'] = curr_xc
-                calc_configs['calc'] = curr_calc
+                calc_configs['xc_to_run'] = xc_to_run
+                calc_configs['calc_to_run'] = calc_to_run
                 
                 # (1) make calc_dir (or remove and remake if fresh_restart)
                 calc_dir = os.path.join(launch_dir, xc_calc)
@@ -280,10 +280,10 @@ class SubmitTools(object):
                 # (3) if converged, make sure parents have converged
                 large_E_diff_between_relax_and_static = False
                 if convergence:       
-                    if curr_calc == 'static':
+                    if calc_to_run == 'static':
                         static_energy = E_per_at
                         parent_calc = 'relax'
-                        parent_xc_calc = '%s-%s' % (curr_xc, parent_calc)                            
+                        parent_xc_calc = '%s-%s' % (xc_to_run, parent_calc)                            
                         parent_calc_dir = os.path.join(launch_dir, parent_xc_calc)
                         parent_energy = AnalyzeVASP(parent_calc_dir).E_per_at
                         parent_convergence = True if parent_energy else False
@@ -301,7 +301,7 @@ class SubmitTools(object):
                 if convergence and parent_convergence and not fresh_restart and not large_E_diff_between_relax_and_static:
                     print('     %s is already converged; skipping' % xc_calc)
                     status = 'done'
-                    statuses[xc][xc_calc] = status
+                    statuses[final_xc][xc_calc] = status
                     continue
                 
                 # for jobs that are not DONE:
@@ -329,11 +329,11 @@ class SubmitTools(object):
                 else:
                     status = 'new'
                 
-                statuses[xc][xc_calc] = status
+                statuses[final_xc][xc_calc] = status
 
                 vsu_configs_before_error_catch = {**vasp_configs, **calc_configs}
                 
-                print('\n\n\n~~~~XC ENTERING FIRST vsu = %s~~~~\n\n\n' % vsu_configs_before_error_catch['xc'])
+                print('\n\n\n~~~~XC ENTERING FIRST vsu = %s~~~~\n\n\n' % vsu_configs_before_error_catch['xc_to_run'])
 
                 # (6) initialize VASPSetUp with current VASP configs for this calculation
                 vsu = VASPSetUp(calc_dir=calc_dir, 
@@ -349,7 +349,7 @@ class SubmitTools(object):
                 
                 # if there are INCAR updates, add them to calc_configs
                 if incar_changes:
-                    incar_key = '%s_incar' % curr_calc
+                    incar_key = '%s_incar' % calc_to_run
                     if incar_key not in calc_configs:
                         calc_configs[incar_key] = {}
                     for setting in incar_changes:
@@ -361,11 +361,11 @@ class SubmitTools(object):
                 
                 vsu_configs = {**vasp_configs, **calc_configs}
                 
-                print('\n\n\n~~~~XC ENTERING SECOND vsu = %s~~~~\n\n\n' % vsu_configs['xc'])
+                print('\n\n\n~~~~XC ENTERING SECOND vsu = %s~~~~\n\n\n' % vsu_configs['xc_to_run'])
                 vsu = VASPSetUp(calc_dir=calc_dir,
                                 user_configs=vsu_configs)
                 
-                print('what got passed to vsu ----> %s <------' % vsu.configs['xc'])
+                print('what got passed to vsu ----> %s <------' % vsu.configs['xc_to_run'])
                 
                 vsu.prepare_calc
                 

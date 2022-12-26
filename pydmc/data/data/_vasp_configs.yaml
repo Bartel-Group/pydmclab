@@ -5,8 +5,8 @@ mag:  # **change** as desired
 magmom: # you will need to pass this for AFM calcs {'magmom' : [list of magmoms (float)]}
 
 # these should get passed through SubmitTools
-xc:  # gga, ggau, or metagga
-calc: # usually this is what we want unless you want an independent "static" or "loose" calc
+xc_to_run:  # gga, ggau, or metagga
+calc_to_run: # usually this is what we want unless you want an independent "static" or "loose" calc
 
 fun: # usually this is fine
 lobster_static: True # can make False if you don't want to run LOBSTER
