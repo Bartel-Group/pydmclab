@@ -121,7 +121,7 @@ class SubmitTools(object):
                     user_configs_used.append(option)
         
         #write_yaml(slurm_configs, slurm_configs_yaml)
-        self.slurm_configs = dotdict(slurm_configs)
+        self.slurm_configs = slurm_configs
         
         sub_configs = read_yaml(sub_configs_yaml)
         for option in sub_configs:
@@ -132,7 +132,7 @@ class SubmitTools(object):
                     user_configs_used.append(option)
 
         #write_yaml(sub_configs, sub_configs_yaml)
-        self.sub_configs = dotdict(sub_configs)
+        self.sub_configs = sub_configs
 
         vasp_configs = read_yaml(vasp_configs_yaml)
         for option in vasp_configs:
@@ -147,7 +147,7 @@ class SubmitTools(object):
         vasp_configs['magmom'] = magmom
         
         #write_yaml(vasp_configs, vasp_configs_yaml)
-        self.vasp_configs = dotdict(vasp_configs)
+        self.vasp_configs = vasp_configs
         
         fpos = os.path.join(launch_dir, 'POSCAR')
         if not os.path.exists(fpos):
@@ -156,7 +156,7 @@ class SubmitTools(object):
             self.structure = Structure.from_file(fpos)
     
         partitions = load_partition_configs()
-        self.partitions = dotdict(partitions)
+        self.partitions = partitions
         
         self.final_xcs = final_xcs
     
@@ -165,7 +165,7 @@ class SubmitTools(object):
         """
         Returns queue manager (eg #SBATCH)
         """
-        return self.sub_configs.manager
+        return self.sub_configs['manager']
         
     @property
     def slurm_options(self):
@@ -193,8 +193,8 @@ class SubmitTools(object):
         """
         sub_configs = self.sub_configs.copy()
         vasp_configs = self.vasp_configs.copy()
-        vasp_exec = os.path.join(sub_configs.vasp_dir, sub_configs.vasp)
-        return '\n%s --ntasks=%s --mpi=pmi2 %s > %s\n' % (sub_configs.mpi_command, str(self.slurm_options['ntasks']), vasp_exec, vasp_configs.fvaspout)
+        vasp_exec = os.path.join(sub_configs['vasp_dir'], sub_configs['vasp'])
+        return '\n%s --ntasks=%s --mpi=pmi2 %s > %s\n' % (sub_configs['mpi_command'], str(self.slurm_options['ntasks']), vasp_exec, vasp_configs['fvaspout'])
     
     @property
     def lobster_command(self):
@@ -247,11 +247,11 @@ class SubmitTools(object):
         """
 
         sub_configs = self.sub_configs.copy()
-        fresh_restart = sub_configs.fresh_restart
+        fresh_restart = sub_configs['fresh_restart']
         launch_dir = self.launch_dir
         final_xcs = self.final_xcs
         
-        packing = sub_configs.packing
+        packing = sub_configs['packing']
 
         print('\n\n~~~~~ starting to work on %s ~~~~~\n\n' % launch_dir)
 
@@ -381,7 +381,7 @@ class SubmitTools(object):
         """
         scripts_dir = os.getcwd()
         sub_configs = self.sub_configs.copy()
-        fqueue = os.path.join(scripts_dir, sub_configs.fqueue)
+        fqueue = os.path.join(scripts_dir, sub_configs['fqueue'])
         with open(fqueue, 'w') as f:
             subprocess.call(['squeue', '-u', '%s' % os.getlogin(), '--name=%s' % job_name], stdout=f)
         names_in_q = []
@@ -431,7 +431,7 @@ class SubmitTools(object):
         vasp_configs = self.vasp_configs.copy()
         sub_configs = self.sub_configs.copy()
         
-        files_to_inherit = sub_configs.files_to_inherit
+        files_to_inherit = sub_configs['files_to_inherit']
         
         launch_dir = self.launch_dir
         
@@ -440,7 +440,7 @@ class SubmitTools(object):
         queue_manager = self.queue_manager
 
 
-        packing = sub_configs.packing
+        packing = sub_configs['packing']
 
         statuses = self.prepare_directories
         for final_xc in final_xcs:
@@ -470,9 +470,9 @@ class SubmitTools(object):
                     if status == 'done':
                         if vasp_configs['lobster_static']:
                             if calc_to_run == 'static':
-                                if sub_configs.force_postprocess or not os.path.exists(os.path.join(calc_dir, 'lobsterout')):
+                                if sub_configs['force_postprocess'] or not os.path.exists(os.path.join(calc_dir, 'lobsterout')):
                                     f.write(self.lobster_command)
-                                if sub_configs.force_postprocess or not os.path.exists(os.path.join(calc_dir, 'ACF.dat')):
+                                if sub_configs['force_postprocess'] or not os.path.exists(os.path.join(calc_dir, 'ACF.dat')):
                                     f.write(self.bader_command)
                         f.write('echo %s is done >> %s\n' % (xc_calc, fstatus))
                     else:
@@ -508,9 +508,9 @@ class SubmitTools(object):
                         f.write('%s\n' % vasp_command)
                         if vasp_configs['lobster_static']:
                             if calc_to_run == 'static':
-                                if not os.path.exists(os.path.join(calc_dir, 'lobsterout')) or sub_configs.force_postprocess:
+                                if not os.path.exists(os.path.join(calc_dir, 'lobsterout')) or sub_configs['force_postprocess']:
                                     f.write(self.lobster_command)
-                                if not os.path.exists(os.path.join(calc_dir, 'ACF.dat')) or sub_configs.force_postprocess:
+                                if not os.path.exists(os.path.join(calc_dir, 'ACF.dat')) or sub_configs['force_postprocess']:
                                     f.write(self.bader_command)
                         f.write('\necho launched %s-%s >> %s\n' % (xc_to_run, calc_to_run, fstatus))
         return True
@@ -528,7 +528,7 @@ class SubmitTools(object):
         print('     now launching sub')
         scripts_dir = os.getcwd()
         launch_dir = self.launch_dir
-        flags_that_need_to_be_executed = self.sub_configs.execute_flags
+        flags_that_need_to_be_executed = self.sub_configs['execute_flags']
 
         for final_xc in final_xcs:
 

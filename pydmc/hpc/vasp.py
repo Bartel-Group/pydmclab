@@ -118,9 +118,7 @@ class VASPSetUp(object):
         _vasp_configs = read_yaml(vasp_configs_yaml)
         
         configs = {**_vasp_configs, **user_configs}
-                        
-        configs = dotdict(configs)
-        
+                                
         self.configs = configs
 
     @property
@@ -134,31 +132,31 @@ class VASPSetUp(object):
         configs = self.configs.copy()
         
         # tell user what they are modifying in case they are trying to match MP or other people's calculations
-        if configs.standard and configs.modify_incar:
+        if configs['standard'] and configs['modify_incar']:
             warnings.warn('you are attempting to generate consistent data, but modifying things in the INCAR\n')
             #print('e.g., %s' % str(modify_incar))
             
-        if configs.standard and configs.modify_kpoints:
+        if configs['standard'] and configs['modify_kpoints']:
             warnings.warn('you are attempting to generate consistent data, but modifying things in the KPOINTS\n')
             #print('e.g., %s' % str(modify_kpoints))
 
-        if configs.standard and configs.modify_potcar:
+        if configs['standard'] and configs['modify_potcar']:
             warnings.warn('you are attempting to generate consistent data, but modifying things in the POTCAR\n')
             #print('e.g., %s' % str(modify_potcar))
         
         # tell user they are doing a nonmagnetic calculation for a compound w/ magnetic elements
-        if MagTools(self.structure).could_be_magnetic and (configs.mag == 'nm'):
+        if MagTools(self.structure).could_be_magnetic and (configs['mag'] == 'nm'):
             warnings.warn('structure could be magnetic, but you are performing a nonmagnetic calculation\n')
         
         structure = self.structure
         
         # get MAGMOM
-        if configs.mag == 'nm':
+        if configs['mag'] == 'nm':
             structure = MagTools(structure).get_nonmagnetic_structure
-        elif configs.mag == 'fm':
+        elif configs['mag'] == 'fm':
             structure = MagTools(structure).get_ferromagnetic_structure
-        elif 'afm' in configs.mag:
-            magmom = configs.magmom
+        elif 'afm' in configs['mag']:
+            magmom = configs['magmom']
             if not magmom:
                 raise ValueError('you must specify a magmom for an AFM calculation\n')
             if (min(magmom) >= 0) and (max(magmom) <= 0):
@@ -167,20 +165,20 @@ class VASPSetUp(object):
 
         # these are things that get updated based on other configs
         
-        modify_incar = configs['%s_incar' % configs.calc_to_run]
-        modify_kpoints = configs['%s_kpoints' % configs.calc_to_run]
-        modify_potcar = configs['%s_potcar' % configs.calc_to_run]
-        potcar_functional = configs.potcar_functional
+        modify_incar = configs['%s_incar' % configs['calc_to_run']]
+        modify_kpoints = configs['%s_kpoints' % configs['calc_to_run']]
+        modify_potcar = configs['%s_potcar' % configs['calc_to_run']]
+        potcar_functional = configs['potcar_functional']
         
         # MP wants to set W_pv but we don't have that one in PBE54 (no biggie)
-        if configs.standard != 'mp':
+        if configs['standard'] != 'mp':
             if not modify_potcar:
                 modify_potcar = {'W' : 'W'}
             elif isinstance(modify_potcar, dict):
                 modify_potcar['W'] = 'W'
             
         # don't mess with much if trying to match Materials Project
-        if configs.standard == 'mp':
+        if configs['standard'] == 'mp':
             fun = None
             if not modify_kpoints:
                 modify_kpoints = {'reciprocal_density' : 64}
@@ -188,7 +186,7 @@ class VASPSetUp(object):
                 modify_kpoints['reciprocal_density'] = 64
                 
         # setting DMC standards --> what to do on top of MPRelaxSet or MPScanRelaxSet (pymatgen defaults)
-        if configs.standard == 'dmc':
+        if configs['standard'] == 'dmc':
             fun = None
             dmc_standard_settings = {'EDIFF' : 1e-6,
                                     'EDIFFG' : -0.03,
@@ -202,21 +200,21 @@ class VASPSetUp(object):
                     modify_incar[key] = dmc_standard_settings[key]
 
             # use length = 25 means reciprocal space discretization of 25 K-points per Å−1
-            if configs.calc_to_run != 'loose':
+            if configs['calc_to_run'] != 'loose':
                 if not modify_kpoints:
                     modify_kpoints = {'length' : 25}
                 
             # turn off +U unless we are specifying GGA+U    
-            if configs.xc_to_run != 'ggau':
+            if configs['xc_to_run'] != 'ggau':
                 if 'LDAU' not in modify_incar:
                     modify_incar['LDAU'] = False
                 
             # turn off ISPIN for nonmagnetic calculations
             if 'ISPIN' not in modify_incar:
-                modify_incar['ISPIN'] = 1 if configs.mag == 'nm' else 2
+                modify_incar['ISPIN'] = 1 if configs['mag'] == 'nm' else 2
         
         # start from MPRelaxSet for GGA or GGA+U
-        if configs.xc_to_run in ['gga', 'ggau']:
+        if configs['xc_to_run'] in ['gga', 'ggau']:
             vaspset = MPRelaxSet
             
             # use custom functional (eg PBEsol) if you want
@@ -227,14 +225,11 @@ class VASPSetUp(object):
                     modify_incar['GGA'] = 'PE'
 
             # for strict comparison to Materials Project GGA(+U) calculations, we need to use the old POTCARs
-            if configs.standard == 'mp':
+            if configs['standard'] == 'mp':
                 potcar_functional = None
                 
         # start from MPScanRelaxSet for meta-GGA
-        elif configs.xc_to_run == 'metagga':
-            
-            print('\n\nWOWOWOW Im in the metagga calculation????\n\n')
-            
+        elif configs['xc_to_run'] == 'metagga':         
             
             vaspset = MPScanRelaxSet
                 
@@ -246,7 +241,7 @@ class VASPSetUp(object):
                     modify_incar['METAGGA'] = 'R2SCAN'
         
         # default "loose" relax
-        if configs.calc_to_run == 'loose':
+        if configs['calc_to_run'] == 'loose':
             modify_kpoints = Kpoints() # only use 1 kpoint
             loose_settings = {'ENCUT' : 400,
                              'ENAUG' : 800,
@@ -258,7 +253,7 @@ class VASPSetUp(object):
                     modify_incar[key] = loose_settings[key]
         
         # default "static" claculation
-        if configs.calc_to_run == 'static':
+        if configs['calc_to_run'] == 'static':
             static_settings= {'LCHARG' : True,
                               'LREAL' : False,
                               'NSW' : 0,
@@ -283,7 +278,7 @@ class VASPSetUp(object):
             modify_incar['NSW'] = 199
         
         # make sure spin is off for nm calculations
-        if configs.mag == 'nm':
+        if configs['mag'] == 'nm':
             modify_incar['ISPIN'] = 1
         else:
             # make sure magnetization is written to OUTCAR for magnetic calcs
@@ -291,26 +286,26 @@ class VASPSetUp(object):
         
         # if we are doing LOBSTER, need special parameters
         # note: some of this gets handled later for us
-        if configs.lobster_static and (configs.calc_to_run == 'static'):
-            if configs.standard != 'mp':
+        if configs['lobster_static'] and (configs['calc_to_run'] == 'static'):
+            if configs['standard'] != 'mp':
                 lobster_incar_settings = {'NEDOS' : 4000,
                                           'ISTART' : 0,
                                           'LAECHG' : True}
                 for key in lobster_incar_settings:
-                    if key not in configs.lobster_incar:
+                    if key not in configs['lobster_incar']:
                         modify_incar[key] = lobster_incar_settings[key]
                 
-                for key in configs.lobster_incar:
-                    modify_incar[key] = configs.lobster_incar[key]
+                for key in configs['lobster_incar']:
+                    modify_incar[key] = configs['lobster_incar'][key]
 
-                if not configs.lobster_kpoints:
+                if not configs['lobster_kpoints']:
                     # need KPOINTS file for LOBSTER
                     modify_kpoints = {'length' : 25}
                 else:
-                    modify_kpoints = configs.lobster_kpoints
+                    modify_kpoints = configs['lobster_kpoints']
         
-        if configs.lobster_static:
-            if configs.xc_to_run == 'metagga':
+        if configs['lobster_static']:
+            if configs['xc_to_run'] == 'metagga':
                 # gga-static will get ISYM = -1, so need to pass that to metagga relax otherwise WAVECAR from GGA doesnt help metagga
                 modify_incar['ISYM'] = -1
 
@@ -322,7 +317,7 @@ class VASPSetUp(object):
                              user_kpoints_settings=modify_kpoints, 
                              user_potcar_settings=modify_potcar, 
                              user_potcar_functional=potcar_functional,
-                             validate_magmom=configs.validate_magmom)
+                             validate_magmom=configs['validate_magmom'])
         
         return vasp_input
     
@@ -343,7 +338,7 @@ class VASPSetUp(object):
         vasp_input.write_input(calc_dir)
         
         # for LOBSTER, use Janine George's Lobsterin approach (mainly to get NBANDS)
-        if (configs.lobster_static) and (configs.calc_to_run == 'static'):
+        if (configs['lobster_static']) and (configs['calc_to_run'] == 'static'):
             INCAR_input = os.path.join(calc_dir, 'INCAR_input')
             INCAR_output = os.path.join(calc_dir, 'INCAR')
             copyfile(INCAR_output, INCAR_input)
@@ -448,7 +443,7 @@ class VASPSetUp(object):
         electronic_convergence = vr.converged_electronic
         
         # if we're relaxing the geometry, make sure last ionic loop converged
-        if configs.calc_to_run == 'relax':
+        if configs['calc_to_run'] == 'relax':
             ionic_convergence = vr.converged_ionic
         else:
             ionic_convergence = True
@@ -468,7 +463,7 @@ class VASPSetUp(object):
         Returns list of errors (str)        
         """
         error_msgs = self.error_msgs
-        out_file = os.path.join(self.calc_dir, self.configs.fvaspout)
+        out_file = os.path.join(self.calc_dir, self.configs['fvaspout'])
         errors = []
         with open(out_file) as f:
             contents = f.read()
@@ -488,16 +483,16 @@ class VASPSetUp(object):
         clean = False
         if AnalyzeVASP(calc_dir).is_converged:
             clean = True
-        if not os.path.exists(os.path.join(calc_dir, configs.fvaspout)):
+        if not os.path.exists(os.path.join(calc_dir, configs['fvaspout'])):
             clean = True
         if clean == True:
-            with open(os.path.join(calc_dir, configs.fvasperrors), 'w') as f:
+            with open(os.path.join(calc_dir, configs['fvasperrors']), 'w') as f:
                 f.write('')
             return clean       
         errors = self.error_log + self.unconverged_log
         if len(errors) == 0:
             return True
-        with open(os.path.join(calc_dir, configs.fvasperrors), 'w') as f:
+        with open(os.path.join(calc_dir, configs['fvasperrors']), 'w') as f:
             for e in errors:
                 f.write(e+'\n')
         return clean

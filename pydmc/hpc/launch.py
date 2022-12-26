@@ -116,22 +116,22 @@ class LaunchTools(object):
         self.magmoms = magmoms
         self.structure = structure
 
-        self.configs = dotdict(configs)
+        self.configs = configs
 
     @property
     def valid_mags(self):
         configs = self.configs.copy()
-        if configs.override_mag:
-            return configs.override_mag
+        if configs['override_mag']:
+            return configs['override_mag']
         
         structure = self.structure
         if not MagTools(structure).could_be_magnetic:
             return ['nm']
         
-        if not MagTools(structure).could_be_afm or not configs.n_afm_configs:
+        if not MagTools(structure).could_be_afm or not configs['n_afm_configs']:
             return ['fm']
                
-        max_desired_afm_idx = configs.n_afm_configs-1
+        max_desired_afm_idx = configs['n_afm_configs']-1
         
         magmoms = self.magmoms 
                
@@ -163,11 +163,11 @@ class LaunchTools(object):
         
         magmoms = self.magmoms
         
-        to_launch = configs.to_launch
+        to_launch = configs['to_launch']
     
-        level0 = configs.calcs_dir
-        level1 = configs.top_level
-        level2 = configs.unique_ID
+        level0 = configs['calcs_dir']
+        level1 = configs['top_level']
+        level2 = configs['unique_ID']
         
         launch_dirs = {}
         for standard in to_launch:
