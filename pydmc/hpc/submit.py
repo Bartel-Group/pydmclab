@@ -259,7 +259,7 @@ class SubmitTools(object):
             statuses[xc] = {}
             for xc_calc in packing[xc]:
                 # start making vasp_configs just for this particular calculation
-                calc_configs = vasp_configs.copy()
+                calc_configs = {}
                 curr_xc, curr_calc = xc_calc.split('-')
                 
                 # update vasp configs with the current xc and calc
@@ -333,11 +333,11 @@ class SubmitTools(object):
 
                 # (6) initialize VASPSetUp with current VASP configs for this calculation
                 vsu = VASPSetUp(calc_dir=calc_dir, 
-                                user_configs=calc_configs)
+                                user_configs={**vasp_configs, **calc_configs})
                 
                 # (6) check for errors in continuing jobs
                 incar_changes = {}
-                if status in ['CONTINUE', 'NEWRUN']:
+                if status in ['continue', 'new']:
                     calc_is_clean = vsu.is_clean
                     if not calc_is_clean:
                         # change INCAR based on errors and include in calc_configs
@@ -355,7 +355,7 @@ class SubmitTools(object):
                 print('--------- may be some warnings (POTCAR ones OK) ----------')
                 # (7) prepare calc_dir to launch  
                 VASPSetUp(calc_dir=calc_dir,
-                        user_configs=calc_configs).prepare_calc()
+                        user_configs={**vasp_configs, **calc_configs}).prepare_calc()
                 
                 print('-------------- warnings should be done ---------------')
                 print('\n~~~~~ prepared %s ~~~~~\n' % calc_dir)

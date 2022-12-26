@@ -519,7 +519,7 @@ class AnalyzeBatch(object):
     @property
     def calc_dirs(self):
         launch_dirs = self.launch_dirs
-        calc_dirs = []
+        all_calc_dirs = []
         calcs = ['loose', 'relax', 'static'] if not self.configs['only_static'] else ['static']
         for launch_dir in launch_dirs:
             files_in_launch_dir = os.listdir(launch_dir)
@@ -528,8 +528,8 @@ class AnalyzeBatch(object):
                                 if '-' in c 
                                 if c.split('-')[1] in calcs]
             calc_dirs = [c for c in calc_dirs if os.path.exists(os.path.join(c, 'POSCAR'))]
-        
-        return calc_dirs
+            all_calc_dirs += calc_dirs
+        return sorted(list(set(all_calc_dirs)))
     
     def _key_for_calc_dir(self, calc_dir):
         return '.'.join(calc_dir.split('/')[-5:])
