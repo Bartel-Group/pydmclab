@@ -12,20 +12,18 @@ from pydmc.hpc.analyze import AnalyzeBatch
 """
 Basic framework
 
-Anytime we run VASP, we are usually interested in a set of calculations that share some feature(s):
-
-1) Initial crystal structures
+Initial crystal structures
     a) Sometimes these are entries in Materials Project meeting some criteria:
         - e.g., certain chemical space, chemical formula, E above hull, etc
     b) Other times, we might start with an MP structure then perform some transformations to generate new structures
         - e.g., replace x % of Ru with Ir in Ru_{1-x}Ir_{x}O_2 or extract x Li from Li_{1-x}CoO_2
             - note: now we are disordering structures, so each chemical formula will have >= 1 enumerated structure
-                - i.e., Ru_0.5Ir_0.5O_2 has > 1 ordering of Ru/Ir on the cation sublattice
+                - i.e., Ru_0.5Ir_0.5O_2 has > 1 way to configure Ru/Ir on the cation sublattice
     
     The first two levels of our caculation directories will correspond to information relating to the crystal structure:
         - top_level: the chemical formula (or some surrogate for the chemical formula)
             - e.g., this could be RuO2 in 1(a) or it could be x in 1(b)
-        - unique_ID: some unique identifier for that "top_level"
+        - unique_ID: some unique identifier for a crystal structure belonging to that "top_level"
             - e.g., the Materials Project ID for the 1(a) case; or the index of 
         
     Each unique initial crytsal structure will be used for all directories below top_level/unique_ID
@@ -51,7 +49,7 @@ Anytime we run VASP, we are usually interested in a set of calculations that sha
       -0
       -1
          
-2) VASP input settings (standard)
+VASP input settings ("standard")
 
     Usually we want to compute a group of structures with similar settings so that we can safely compare the resulting energies
     
@@ -59,26 +57,27 @@ Anytime we run VASP, we are usually interested in a set of calculations that sha
         - dmc: our group standard (to be evolved collectively)
             - these are best practice settings for our group
         - mp: settings to use for strict comparison to Materials Project data
-    - these standards define the non-structure VASP input files (INCAR, KPOINTS, POTCAR)
+    - standards define the non-structure VASP input files (INCAR, KPOINTS, POTCAR)
     
     This will be the third level of our calculation directory: top_level/unique_ID/standard
     
-    If we were calculating with dmc and mp standards, the tree might look like:
+    If we were calculating with dmc and mp standards, a part of the tree might look like:
     
     -calcs
      -RuO2
       -mp-1234
        -dmc
        -mp
-
     
-3) Magnetic configuration (mag)
+Magnetic configuration (mag)
 
     We need to define what initial magnetic configuration we want to calculate for each initial structure
     - nm: non-magnetic (no spins)
     - fm: ferromagnetic (all spins > 0)
     - afm_*: antiferromagnetic (spins up and down with sum(spins) = 0)
         - * is a unique identifier for the ordering of spins
+            - much like partially occupied / disordered structures have multiple ways to configure ions on the lattice,
+                - there are often many ways to configure spins on the lattice while still being AFM (sum(spins) = 0)
         - if we want to do AFM calculations, we should first generate a "MAGMOM" (AFM ordering) file for each unique structure and save that data
         - note: if we are computing AFM, we will also compute FM
         
@@ -91,7 +90,7 @@ Anytime we run VASP, we are usually interested in a set of calculations that sha
         -afm_0
 
         
-4) Exchange-correlation functional (xc)
+Exchange-correlation functional (xc)
 
 Now, we need to decide what flavor of DFT we want to use. Materials Project uses GGA+U. We will often use METAGGA.
 
@@ -99,14 +98,15 @@ For each xc that we use, it's generally a good idea to run calculations in a seq
     - a "loose" calculation that has fast-converging standards but not super accurate
     - a "relax" calculation that will optimize the crystal structure with stricter standards
     - a "static" calculation that will give us a better energy/electronic structure at that optimized geometry
-    - for METAGGA calculations, we need to first converge a GGA calculation before we start metagga-relax
+    - for METAGGA calculations, we need to first converge a GGA calculation before we start to optimize the geometry with metagga
     
 We don't want to have to submit each of these individually to the queue, so we will "pack" them together:
 
-So, if we're running gga, that means three calculations will get packed together: gga-loose --> gga-relax --> gga-static
-    - if we're running metagga, we'll have 5 calcs: gga-loose --> gga-relax --> gga-static --> metagga-relax --> metagga-static
-
-each one of these "calcs" will require a VASP execution, meaning it needs VASP inputs and will generate VASP outputs,
+    So, if we're running gga, that means three calculations will get packed together: gga-loose --> gga-relax --> gga-static
+        - if we're running metagga, we'll have 5 calcs: gga-loose --> gga-relax --> gga-static --> metagga-relax --> metagga-static
+        - each packing or chain of jobs will need a submission script (i.e., something that gets submitted to the queue)
+        
+Each one of these "xc-calcs" (e.g., gga-relax) will require a VASP execution, meaning it needs VASP inputs and will generate VASP outputs,
     so each xc-calc gets its own directory, becoming the 5th level of our calculation directory:
     
     top_level/unique_ID/standard/mag/xc-calc
@@ -132,22 +132,22 @@ Most of this is taken care of automatically in pydmc
 3) [OPTIONAL] Create AFM orderings ("magmoms") for each structure using MagTools(structure).get_afm_magmoms
     - write to a dictionary: magmoms.json
 4) Create a dictionary of "launch directories" using LaunchTools
-    - this will look like: {top_level/unique_ID/standard : 
+    - customizable with various _launch_configs
+    - launch directories are the directories that hold submission scripts
+        - these launch directories are defined by the top_level, unique_ID, standard, and mag
+    - this will look like: {top_level/unique_ID/standard/mag : 
                                 {'xcs' : [XCs to use for that standard],
                                 'magmom' : [magmoms to use for that structure]}
-    - you should pass what XCs you want to run for each standard to LaunchTools as to_launch = {standard : [xcs to run]}
-    - you should pass magmoms to LaunchTools if you're running AFM
-    - you can also pass any argument in pydmc/data/_launch_configs.yaml in "user_configs" to LaunchTools
     - write to a dictionary: launch_dirs.json
 5) Loop through the launch directories and prepare VASP inputs + submission files and launch each chain of VASP jobs using SubmitTools
+    - customizable with _sub_configs, _vasp_configs, and _slurm_configs
     - SubmitTools will figure out which jobs can be submitted together and how to order them for submission
     - It will also prepare each VASP job accordingly
-    - You just need to pass it the launch_dir, which "xcs to run", and the "magmom" to use
-    - You can also pass any setting relevant to job packing (_sub_configs.yaml), VASP inputs (_vasp_configs.yaml), and slurm (_slurm_configs.yaml) using "user_configs"
 6) Crawl through the launch directories, and analyze every VASP calculation using AnalyzeBatch
-    - you can pass any setting relevant to analysis (_batch_vasp_analysis_configs.yaml) using "user_configs"
+    - customizable with _analysis_configs
     - write to a dictionary: results.json
 """
+
 # where is this file
 SCRIPTS_DIR = os.getcwd()
 
@@ -166,6 +166,9 @@ API_KEY = '***REMOVED***'
 
 # lets put a tag on all the files we save
 FILE_TAG = 'clean-workflow'
+
+def main():
+    
 
 def get_query(comp=['MoO2', 'TiO2'],
               only_gs=True,
