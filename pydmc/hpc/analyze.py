@@ -500,24 +500,49 @@ class AnalyzeBatch(object):
                  user_configs={},
                  analysis_configs_yaml=os.path.join(os.getcwd(), '_batch_VASP_analysis_configs.yaml'),
                  refresh_configs=True):
+        """
+        Args:
+            launch_dirs (dict) : {launch directory : {'xcs' : [final_xcs for each chain of jobs], 'magmom' : [list of magmoms for that launch directory]}}
+            user_configs (dict) : any configs relevant to analysis
+                only_static: True # only retrieve data from the static calculations
+                check_relax: True # make sure the relax calculation and the static have similar energies
+                include_meta: False # include metadata like INCAR, KPOINTS, POTCAR settings
+                include_calc_setup: True # include things related to the calculation setup -- standard, mag, final_xc, etc
+                include_structure: True # include the relaxed crystal structure as a dict
+                include_mag: False # include the relaxed magnetization info as as dict
+                include_dos: False # include the density of states
+                verbose: True # print stuff as things get analyzed
+                n_procs: all # how many cores to parallelize the analysis over  
+            analysis_configs_yaml (str) : path to yaml file with baseline analysis configs    
+            refresh_configs (bool): if True, will refresh the local baseline analysis configs with the pydmc version      
+        """
 
+        # should get these from LaunchTools
         self.launch_dirs = launch_dirs
 
+        # write baseline analysis configs locally if not there or want to be refreshed
         if not os.path.exists(analysis_configs_yaml) or refresh_configs:
             _analysis_configs = load_batch_vasp_analysis_configs()
             write_yaml(_analysis_configs, analysis_configs_yaml)
             
         _analysis_configs = read_yaml(analysis_configs_yaml)
-            
+        
+        # update configs with any user_configs
         configs = {**_analysis_configs, **user_configs}
         
+        # figure out how many processors to use
         if configs['n_procs'] == 'all':
             configs['n_procs'] = multip.cpu_count() - 1 
         
+        # copy configs to prevent unwanted changes
         self.configs = configs.copy()
     
     @property
     def calc_dirs(self):
+        """
+        Returns:
+            a list of all calculation directories to crawl through and collect VASP output info
+        """
         launch_dirs = self.launch_dirs
         all_calc_dirs = []
         calcs = ['loose', 'relax', 'static'] if not self.configs['only_static'] else ['static']
@@ -532,10 +557,27 @@ class AnalyzeBatch(object):
         return sorted(list(set(all_calc_dirs)))
     
     def _key_for_calc_dir(self, calc_dir):
+        """
+        Args:
+            calc_dir (str) : path to a calculation directory where VASP was executed
+            
+        Returns:
+            a string that can be used as a key for a dictionary
+                top_level.unique_ID.standard.mag.xc_calc
+        """
         return '.'.join(calc_dir.split('/')[-5:])
     
     def _results_for_calc_dir(self, 
                               calc_dir):
+        """
+        Args:
+            calc_dir (str) : path to a calculation directory where VASP was executed
+            
+        Returns:
+            a dictionary of results for that calculation directory
+                - format varies based on self.configs
+                - see AnalyzeVASP.summary() for more info
+        """
         
         configs = self.configs.copy()
         verbose = configs['verbose']
@@ -549,36 +591,54 @@ class AnalyzeBatch(object):
         if verbose:
             print('analyzing %s' % calc_dir)
         analyzer = AnalyzeVASP(calc_dir)
+        
+        # collect the data we asked for
         summary = analyzer.summary(include_meta=include_meta,
                                     include_calc_setup=include_calc_setup,
                                     include_structure=include_structure,
                                     include_mag=include_mag,
                                     include_dos=include_dos)
+        
+        # store the relax energy if we asked to 
         if check_relax:
             relax_energy = AnalyzeVASP(calc_dir.replace('static', 'relax')).E_per_at
             summary['meta']['E_relax'] = relax_energy
             if not relax_energy:
                 summary['results']['convergence'] = False
                 summary['results']['E_per_at'] = None   
-                
+        
+        # save the data in a dictionary with a key for that calc_dir
         key = self._key_for_calc_dir(calc_dir)
                 
         return {key :  summary}
     
     @property
     def results(self):
+        """
+        
+        Returns:
+            {calc_dir key : results for that calc_dir}
+        """
         
         n_procs = self.configs['n_procs']
     
         calc_dirs = self.calc_dirs
+        
+        # run serial if only one processor
         if n_procs == 1:
             data = [self._results_for_calc_dir(calc_dir) for calc_dir in calc_dirs]
 
+        # otherwise, run parallel
         if n_procs > 1:
             pool = multip.Pool(processes=n_procs)
             data = pool.map(self._results_for_calc_dir, calc_dirs)
             pool.close()
 
-        out = {list(d.keys())[0] : d[list(d.keys())[0]] for d in data}
+        # each item in data is a dictionary that looks like {key : data for that key}
+            # we'll map to a dictionary of {key : data for that key} for all keys
+        out = {}
+        for d in data:
+            for key in d:
+                out[key] = d[key]
         
         return out

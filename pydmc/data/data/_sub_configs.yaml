@@ -1,10 +1,3 @@
-# these configs are operating on a submission script
-# LaunhcTools should be passing the following
-## structure: pymatgen structure object
-## naming info: e.g., formula, mpid
-## magnetic type: nm, fm, afm_*
-## magmom: dictionary of magmoms
-
 vasp: vasp_std # use vasp_gam for "loose" calcs (havent implemented yet)
 vasp_dir: /home/cbartel/shared/bin/vasp/ # where vasp executable lives
 mpi_command: srun # how to launch on multicore/multinode (may be mpirun depending on compilation)
@@ -17,8 +10,10 @@ force_postprocess: False # if True, run LOBSTER and Bader again if vasp_configs.
 
 files_to_inherit: ['WAVECAR', 'CONTCAR'] # usually no need to change
 
-execute_flags: ['srun', 'python', 'lobster', 'bader']
+execute_flags: ['srun', 'python', 'lobster', 'bader'] # what to look for in a submission script to see if it should be launched
 
+# this defines what jobs should be chained together and in what order they should be executed
+# if you only wanted to run a static calculation for metagga, you might pass packing['metagga'] = ['metagga-static']
 packing: 
  gga: 
   - gga-loose

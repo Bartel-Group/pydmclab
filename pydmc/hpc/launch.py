@@ -13,11 +13,10 @@ class LaunchTools(object):
     This is a class to figure out:
         - what launch_dirs need to be created
             - i.e., which directories will house submission scripts
-        - what calculations need to be run in each launch_dir
-        - the general flow will be:
-            - use LaunchTools to generate launch_dirs (and their corresponding "valid_calcs")
-            - use SubmitTools to generate submission scripts for each launch_dir
-                - note: SubmitTools is making heavy use of VASPSetUp to configure directories and set up each VASP calc
+        - what calculation chains need to be run in each launch_dir
+    The output is going to be:
+        {launch_dir (str) : {'xcs' : [list of final xcs for each chain (str)],
+                             'magmom' : [list of magmoms for the structure in that launch_dir (list)],}}
     """
     
     def __init__(self,
@@ -60,6 +59,7 @@ class LaunchTools(object):
                 
             to_launch (dict) : 
                 {standard (str) : [list of xcs (str)]}
+                - e.g., if I want to run gga+u and metagga with dmc standards, to_launch = {'dmc' : ['metagga', 'ggau']}
                 
             magmoms (dict): 
                 - if you are running AFM calculations
@@ -70,12 +70,15 @@ class LaunchTools(object):
                     
             user_configs (dict):
                 - any setting you want to pass that's not default in pydmc/data/data/_launch_configs.yaml
-                - some common ones to change might be:
-                    {xcs : ['ggau'],
-                     compare_to_mp : True,
-                     n_afm_configs : 3,
-                     etc.}
-                     
+                - launch_configs:
+                    compare_to_mp: False # if True, launch will get everything it needs to generate MP-consistent data
+                    n_afm_configs: 0 # how many AFM configurations to run
+                    override_mag: False # could be ['nm'] if you only want to run nonmagnetic, won't check for whether structure is mag or not mag, it will just do as you say
+
+
+            refresh_configs (bool) - if True, will copy pydmc baseline configs to your local directory
+                - this is useful if you've made changes to the configs files in the directory you're working in and want to start over
+                                     
             launch_configs_yaml (os.pathLike) - path to yaml file containing launch configs
                 - there's usually no reason to change this
                 - this holds some default configs for LaunchTools
@@ -85,52 +88,83 @@ class LaunchTools(object):
             configs (dotdict): dictionary of all configs and arguments to LaunchTools
         """
         
+        # make our calcs_dir if it doesn't exist (this will hold all the launch_dirs)
         if not os.path.exists(calcs_dir):
             os.mkdir(calcs_dir)
-            
+        
+        # make our local launch_configs file if it doesn't exist    
         if not os.path.exists(launch_configs_yaml) or refresh_configs:
             _launch_configs = load_launch_configs()
             write_yaml(_launch_configs, launch_configs_yaml)
         
+        # initialize our baseline launch_configs
         _launch_configs = read_yaml(launch_configs_yaml)
         
+        # update our baseline launch_configs with user_configs
         configs = {**_launch_configs, **user_configs}
-            
+        
+        # make structure a dict() for easier handling
         if not isinstance(structure, dict):
             structure = structure.as_dict()
 
+        # check to make sure we have magmoms if we're running AFM calcs
         if configs['n_afm_configs'] > 0:
             if MagTools(structure).could_be_afm:
                 if not magmoms:
                     raise ValueError('You are running afm calculations but provided no magmoms, generate these first, then pass to LaunchTools')
-    
+
+        # include gga+u calcs w/ mp standards if we're comparing to MP
         if configs['compare_to_mp']:
             to_launch['mp'] = ['ggau']
 
+        # add the required arguments to our configs file
         configs['top_level'] = top_level
         configs['unique_ID'] = unique_ID
         configs['calcs_dir'] = calcs_dir
         configs['to_launch'] = to_launch
 
-        
+        # store our magmoms and structure
         self.magmoms = magmoms
         self.structure = structure
 
+        # make a copy of our configs to prevent unwanted changes
         self.configs = configs.copy()
 
     @property
     def valid_mags(self):
+        """
+        Returns:
+            list of magnetic configuration names that make sense to run based on the inputs
+            
+        e.g., 
+            - if we have a nonmagnetic system, this might be ['nm']
+            - if we set n_afm_configs = 100, but our magmoms only has 3 configs, then this will just hold ['fm', 'afm_0', 'afm_1', 'afm_2']
+            
+        these are the set of "mags" that can be run given our inputs
+        
+        Note:
+            - configs['override_mag'] will force that we use configs['override_mag'] as our mag        
+        
+        """
+        # copy our configs
         configs = self.configs.copy()
+        
+        # return override_mag if we set it
         if configs['override_mag']:
             return configs['override_mag']
         
         structure = self.structure
+        
+        # if we're not magnetic, return nm
         if not MagTools(structure).could_be_magnetic:
             return ['nm']
         
+        # if we can't be AFM or we didn't ask for AFM, but we are magnetic, return fm
         if not MagTools(structure).could_be_afm or not configs['n_afm_configs']:
             return ['fm']
-               
+        
+        # figure out the max AFM index we can run based on what we asked for 
+        
         max_desired_afm_idx = configs['n_afm_configs']-1
         
         magmoms = self.magmoms 
@@ -148,44 +182,76 @@ class LaunchTools(object):
     def launch_dirs(self,
                     make_dirs=True):
         """
-        Returns the minimal list of directories that need a submission file to launch a chain of calcs
+        Args:
+            make_dirs (bool) - if True, make the launch_dir and populate it with a POSCAR
+        Returns:
+            a dictionary of:
+                {launch_dir (str) : {'xcs': [list of final_xcs to submit],
+                                     'magmom' : [list of magmoms for the structure in launch_dir]}}
+        
+        Returns the minimal list of directories that will house submission files (each of which launch a chain of calcs)
+            - note a chain of calcs must have the same structure and magnetic information, otherwise, there's no reason to chain them
         
         These launch_dirs have a very prescribed structure:
             calcs_dir / top_level / unique_ID / standard / mag
             
             e.g.,
-                this could be */calcs/Nd2O7Ru2/mp-19930/dmc/metagga/fm/relax
+                - ../calcs/Nd2O7Ru2/mp-19930/dmc/fm
+                - ../calcs/2/3/dmc/afm_4
+                    - (if (2) was a unique compositional indicator and (3) was a unique structural indicator) 
         """
         structure = self.structure
+        
+        # make a copy of our configs to prevent unwanted changes
         configs = self.configs.copy()
         
+        # the list of mags we can run
         mags = self.valid_mags
         
         magmoms = self.magmoms
         
+        # final_xcs we want to run for each standard
         to_launch = configs['to_launch']
     
+        # level0 houses all our launch_dirs
         level0 = configs['calcs_dir']
+        
+        # level1 describes the composition
         level1 = configs['top_level']
+        
+        # level2 describes the structure
         level2 = configs['unique_ID']
         
         launch_dirs = {}
         for standard in to_launch:
+            # for each standard we asked for, use that as level3
             level3 = standard
+            
+            # we asked for certain xcs at each standard, hold them here
             xcs = to_launch[standard]
+            
             for mag in mags:
+                # for each mag we can run, use that as level4
+                level4 = mag
                 magmom = None
                 if 'afm' in mag:
+                    # grab the magmom if our calc is AFM
                     idx = mag.split('_')[1]
                     if str(idx) in magmoms:
                         magmom = magmoms[str(idx)]
                     elif int(idx) in magmoms:
                         magmom = magmoms[int(idx)]
                         
-                level4 = mag
+                # our launch_dir is now defined
                 launch_dir = os.path.join(level0, level1, level2, level3, level4)
+                
+                # save the final_xcs we want to submit in this launch_dir
+                    # SubmitTools will make 1 submission script for each final_xc
+                # save the magmom as well. VASPSetUp will need that to set the INCARs for all calcs in this launch_dir
                 launch_dirs[launch_dir] = {'xcs' : xcs,
                                            'magmom' : magmom}
+                
+                # if make_dirs, make the launch_dir and put a POSCAR in there
                 if make_dirs:
                     if not os.path.exists(launch_dir):
                         os.makedirs(launch_dir)
@@ -195,24 +261,3 @@ class LaunchTools(object):
                         struc.to(fmt='poscar', filename=fposcar)                    
         
         return launch_dirs
-                
-    @property
-    def create_launch_dirs_and_make_POSCARs(self):
-        """
-        Loops through my launch_dirs and puts a POSCAR in each one
-        
-        SubmitTools will take it from there to
-            - create the other VASP inputs
-            - make and submit a submission file
-            - handle errors, etc
-        """
-        
-        launch_dirs = self.launch_dirs
-        for launch_dir in launch_dirs:
-            if not os.path.exists(launch_dir):
-                os.makedirs(launch_dir)
-        
-            fposcar = os.path.join(launch_dir, 'POSCAR')
-            if not os.path.exists(fposcar):
-                structure = Structure.from_dict(self.structure)
-                structure.to(fmt='poscar', filename=fposcar)

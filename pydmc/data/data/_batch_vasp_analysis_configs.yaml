@@ -1,9 +1,9 @@
-only_static: True
-check_relax: True
-include_meta: False
-include_calc_setup: True
-include_structure: True
-include_mag: False
-include_dos: False
-verbose: True
-n_procs: all
+only_static: True # only retrieve data from the static calculations
+check_relax: True # make sure the relax calculation and the static have similar energies
+include_meta: False # include metadata like INCAR, KPOINTS, POTCAR settings
+include_calc_setup: True # include things related to the calculation setup -- standard, mag, final_xc, etc
+include_structure: True # include the relaxed crystal structure as a dict
+include_mag: False # include the relaxed magnetization info as as dict
+include_dos: False # include the density of states
+verbose: True # print stuff as things get analyzed
+n_procs: all # how many cores to parallelize the analysis over

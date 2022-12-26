@@ -52,20 +52,27 @@ class VASPSetUp(object):
                 - there must be a POSCAR in calc_dir
                 - the other input files will be added automatically within this code
             user_configs (dict) - user-defined configs
-                - see below for more details
+                - options in vasp_configs_yaml
+            vasp_configs_yaml (os.PathLike) - path to yaml file with possible user_configs and default values
+            refresh_configs (bool) - if True, will copy pydmc baseline configs to your local directory
+                - this is useful if you've made changes to the configs files in the directory you're working in and want to start over           
                 
         Returns:
             calc_dir (os.PathLike) - directory where I want to execute VASP
             structure (pymatgen.Structure) - structure to be used for VASP calculation
                 - note: raises error if no POSCAR in calc_dir     
             configs (dict)
-            
-                standard: dmc # make mp if comparing to MP data
-                xc: gga # gga, ggau, or metagga
+                # VASPSetUp (general)
+                # these should get passed through LaunchTools
+                standard: # make mp if comparing to MP data
+                mag:  # **change** as desired
+                magmom: # you will need to pass this for AFM calcs {'magmom' : [list of magmoms (float)]}
+
+                # these should get passed through SubmitTools
+                xc_to_run:  # gga, ggau, or metagga
+                calc_to_run: # usually this is what we want unless you want an independent "static" or "loose" calc
+
                 fun: # usually this is fine
-                mag: fm # **change** as desired
-                magmom: # you will need to pass this for AFM calcs
-                calc: relax # usually this is what we want unless you want an independent "static" or "loose" calc
                 lobster_static: True # can make False if you don't want to run LOBSTER
 
                 # some output files
@@ -78,25 +85,24 @@ class VASPSetUp(object):
                 # POTCARs should be {el (str) : potcar flag (str)}
 
                 # loose calculations
-                loose_incar: {}
-                loose_kpoints: 
-                loose_potcar:
+                loose_incar: {} # e.g., {'ENCUT' : 555}
+                loose_kpoints: {} # e.g., {'length' : 25}
+                loose_potcar: {} # e.g., {'W' : 'W_pv'}
 
                 # relax calculations
                 relax_incar: {}
-                relax_kpoints: 
-                relax_potcar:
+                relax_kpoints: {}
+                relax_potcar: {}
 
                 # static calculations
                 static_incar: {}
-                static_kpoints:
-                static_potcar:
+                static_kpoints: {}
+                static_potcar: {}
 
                 # lobster calculations
                 lobster_incar: {}
-                lobster_kpoints: 
-                lobster_potcar: 
-
+                lobster_kpoints: {}
+                lobster_potcar: {}
 
                 # rarely need to change these:
                 mag_override: False # if True, allows user to run nm calcs for mag systems and vice versa
@@ -104,40 +110,61 @@ class VASPSetUp(object):
                 validate_magmom: False # probably don't change
         """
         
+        # this is where we will execute VASP
         self.calc_dir = calc_dir
+        
+        # we should have a POSCAR in calc_dir already 
+            # e.g., LaunchTools will set this up for you
         fpos = os.path.join(calc_dir, 'POSCAR')
         if not os.path.exists(fpos):
             raise FileNotFoundError('POSCAR not found in {}'.format(calc_dir))
         else:
             self.structure = Structure.from_file(fpos)
             
+        # write a local yaml with vasp configs
+            # if you don't have one or
+            # if you want to "refresh" them
         if not os.path.exists(vasp_configs_yaml) or refresh_configs:
             _vasp_configs = load_vasp_configs()
             write_yaml(_vasp_configs, vasp_configs_yaml)
         
+        # read local yaml to get baseline vasp_configs
         _vasp_configs = read_yaml(vasp_configs_yaml)
         
+        # augment baseline vasp_configs with user_configs
+            # NOTE: user_configs will overwrite any keys shared with vasp_configs
         configs = {**_vasp_configs, **user_configs}
-                                
+        
+        essential_configs = ['xc_to_run', 'calc_to_run', 'standard', 'mag']
+        for essential in essential_configs:
+            if essential not in configs.keys():
+                raise KeyError('{} must be specified in user_configs'.format(essential))
+        
+        # copy configs to prevent further changes                 
         self.configs = configs.copy()
 
     @property
     def get_vasp_input(self):
         """
-        Args:            
-            verbose (bool) - print stuff
-            **kwargs - additional arguments for VASPSet (see https://pymatgen.org/pymatgen.io.vasp.sets.html)
+        Returns:
+            vasp_input (pymatgen.io.vasp.sets.VaspInputSet
+            
+        Uses configs to modify pymatgen's VaspInputSets as required
         """
         
+        # copy configs to prevent unwanted updates
         configs = self.configs.copy()
         
-
-        # these are things that get updated based on other configs
-        
+        # initialize how we're going to modify each vasp input file with configs specs
         modify_incar = configs['%s_incar' % configs['calc_to_run']].copy()
         modify_kpoints = configs['%s_kpoints' % configs['calc_to_run']].copy()
         modify_potcar = configs['%s_potcar' % configs['calc_to_run']].copy()
+        
+        # initialize potcar functional
         potcar_functional = configs['potcar_functional']
+        
+        # this should be kept off in general, gives unuseful warnings (I think)
+        validate_magmom = configs['validate_magmom']
         
         # tell user what they are modifying in case they are trying to match MP or other people's calculations
         if configs['standard'] and modify_incar:
@@ -158,12 +185,15 @@ class VASPSetUp(object):
         
         structure = self.structure
         
-        # get MAGMOM
+        # add MAGMOM to structure
         if configs['mag'] == 'nm':
+            # if non-magnetic, MagTools takes care of this
             structure = MagTools(structure).get_nonmagnetic_structure
         elif configs['mag'] == 'fm':
+            # if ferromagnetic, MagTools takes care of this
             structure = MagTools(structure).get_ferromagnetic_structure
         elif 'afm' in configs['mag']:
+            # if antiferromagnetic, we need to aprovide a MAGMOM
             magmom = configs['magmom']
             if not magmom:
                 raise ValueError('you must specify a magmom for an AFM calculation\n')
@@ -173,22 +203,28 @@ class VASPSetUp(object):
         
         # MP wants to set W_pv but we don't have that one in PBE54 (no biggie)
         if configs['standard'] != 'mp':
-            if not modify_potcar:
-                modify_potcar = {'W' : 'W'}
-            elif isinstance(modify_potcar, dict):
-                modify_potcar['W'] = 'W'
+            modify_potcar['W'] = 'W'
             
         # don't mess with much if trying to match Materials Project
         if configs['standard'] == 'mp':
+            # use our default functional
             fun = None
-            if not modify_kpoints:
-                modify_kpoints = {'reciprocal_density' : 64}
-            elif isinstance(modify_kpoints, dict):
+            # set KPOINTS to be MP-consistent
+            if not isinstance(modify_kpoints, dict):
+                modify_kpoints = {}
                 modify_kpoints['reciprocal_density'] = 64
                 
         # setting DMC standards --> what to do on top of MPRelaxSet or MPScanRelaxSet (pymatgen defaults)
         if configs['standard'] == 'dmc':
+            # use our default functional
             fun = None
+            
+            # tweak a few INCAR settings
+                # converge using forces (EDIFFG < 0)
+                # stricter EDIFF
+                # ISMEAR = 0 (less convergence errors)
+                # fix ENCUT, ENAUG to be reasonable
+                # turn off symmetry (mostly, ISYM = 0)
             dmc_standard_settings = {'EDIFF' : 1e-6,
                                     'EDIFFG' : -0.03,
                                     'ISMEAR' : 0,
@@ -219,6 +255,8 @@ class VASPSetUp(object):
             vaspset = MPRelaxSet
             
             # use custom functional (eg PBEsol) if you want
+                # needs to be specified in user_configs['fun']
+                # otherwise use PBE for gga, gga+u
             if 'GGA' not in modify_incar:
                 if fun:
                     modify_incar['GGA'] = fun.upper()
@@ -235,6 +273,8 @@ class VASPSetUp(object):
             vaspset = MPScanRelaxSet
                 
             # use custom functional (eg SCAN) if you want
+                # needs to be specified in user_configs['fun']
+                # otherwise use r2SCAN for metagga           
             if 'METAGGA' not in modify_incar:
                 if fun:
                     modify_incar['METAGGA'] = fun.upper()
@@ -243,7 +283,9 @@ class VASPSetUp(object):
         
         # default "loose" relax
         if configs['calc_to_run'] == 'loose':
-            modify_kpoints = Kpoints() # only use 1 kpoint
+            # use only 1 kpoint
+            modify_kpoints = Kpoints() 
+            # make the settings a little looser
             loose_settings = {'ENCUT' : 400,
                              'ENAUG' : 800,
                              'ISIF' : 3,
@@ -255,6 +297,8 @@ class VASPSetUp(object):
         
         # default "static" claculation
         if configs['calc_to_run'] == 'static':
+            # don't optimize the geometry
+            # do save things like charge density
             static_settings= {'LCHARG' : True,
                               'LREAL' : False,
                               'NSW' : 0,
@@ -289,6 +333,9 @@ class VASPSetUp(object):
         # note: some of this gets handled later for us
         if configs['lobster_static'] and (configs['calc_to_run'] == 'static'):
             if configs['standard'] != 'mp':
+                # want more DOS points
+                # want to write charge densities
+                # new NBANDS so don't want to start from WAVECAR
                 lobster_incar_settings = {'NEDOS' : 4000,
                                           'ISTART' : 0,
                                           'LAECHG' : True}
@@ -318,7 +365,7 @@ class VASPSetUp(object):
                              user_kpoints_settings=modify_kpoints, 
                              user_potcar_settings=modify_potcar, 
                              user_potcar_functional=potcar_functional,
-                             validate_magmom=configs['validate_magmom'])
+                             validate_magmom=validate_magmom)
         
         return vasp_input
     
@@ -503,9 +550,10 @@ class VASPSetUp(object):
         """
         Automatic INCAR changes based on errors
             - note: also may remove WAVECAR and/or CHGCAR as needed
+            
         Returns {INCAR key (str) : INCAR value (str)}
         
-        This will get passed to VASPSetUp the next time we launch (using SubmitTools/LaunchTools)
+        This will get passed to VASPSetUp the next time we launch (using SubmitTools)
         
         These error fixes are mostly taken from custodian (https://github.com/materialsproject/custodian/blob/809d8047845ee95cbf0c9ba45f65c3a94840f168/custodian/vasp/handlers.py)
             + a few of my own fixes I've added over the years
