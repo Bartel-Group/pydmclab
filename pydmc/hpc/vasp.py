@@ -134,9 +134,9 @@ class VASPSetUp(object):
 
         # these are things that get updated based on other configs
         
-        modify_incar = configs['%s_incar' % configs['calc_to_run']]
-        modify_kpoints = configs['%s_kpoints' % configs['calc_to_run']]
-        modify_potcar = configs['%s_potcar' % configs['calc_to_run']]
+        modify_incar = configs['%s_incar' % configs['calc_to_run']].copy()
+        modify_kpoints = configs['%s_kpoints' % configs['calc_to_run']].copy()
+        modify_potcar = configs['%s_potcar' % configs['calc_to_run']].copy()
         potcar_functional = configs['potcar_functional']
         
         # tell user what they are modifying in case they are trying to match MP or other people's calculations
