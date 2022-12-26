@@ -123,9 +123,8 @@ class VASPSetUp(object):
         
         self.configs = configs
 
-    def get_vasp_input(self,
-                      verbose=False,
-                      **kwargs):
+    @property
+    def get_vasp_input(self):
         """
         Args:            
             verbose (bool) - print stuff
@@ -134,23 +133,22 @@ class VASPSetUp(object):
         
         configs = self.configs
         
-        if verbose:
-            # tell user what they are modifying in case they are trying to match MP or other people's calculations
-            if configs.standard and configs.modify_incar:
-                warnings.warn('you are attempting to generate consistent data, but modifying things in the INCAR\n')
-                #print('e.g., %s' % str(modify_incar))
-                
-            if configs.standard and configs.modify_kpoints:
-                warnings.warn('you are attempting to generate consistent data, but modifying things in the KPOINTS\n')
-                #print('e.g., %s' % str(modify_kpoints))
-
-            if configs.standard and configs.modify_potcar:
-                warnings.warn('you are attempting to generate consistent data, but modifying things in the POTCAR\n')
-                #print('e.g., %s' % str(modify_potcar))
+        # tell user what they are modifying in case they are trying to match MP or other people's calculations
+        if configs.standard and configs.modify_incar:
+            warnings.warn('you are attempting to generate consistent data, but modifying things in the INCAR\n')
+            #print('e.g., %s' % str(modify_incar))
             
-            # tell user they are doing a nonmagnetic calculation for a compound w/ magnetic elements
-            if MagTools(self.structure).could_be_magnetic and (configs.mag == 'nm'):
-                warnings.warn('structure could be magnetic, but you are performing a nonmagnetic calculation\n')
+        if configs.standard and configs.modify_kpoints:
+            warnings.warn('you are attempting to generate consistent data, but modifying things in the KPOINTS\n')
+            #print('e.g., %s' % str(modify_kpoints))
+
+        if configs.standard and configs.modify_potcar:
+            warnings.warn('you are attempting to generate consistent data, but modifying things in the POTCAR\n')
+            #print('e.g., %s' % str(modify_potcar))
+        
+        # tell user they are doing a nonmagnetic calculation for a compound w/ magnetic elements
+        if MagTools(self.structure).could_be_magnetic and (configs.mag == 'nm'):
+            warnings.warn('structure could be magnetic, but you are performing a nonmagnetic calculation\n')
         
         structure = self.structure
         
@@ -318,42 +316,41 @@ class VASPSetUp(object):
                              user_kpoints_settings=modify_kpoints, 
                              user_potcar_settings=modify_potcar, 
                              user_potcar_functional=potcar_functional,
-                             validate_magmom=configs.validate_magmom,
-                             **kwargs)
+                             validate_magmom=configs.validate_magmom)
         
         return vasp_input
     
-    def prepare_calc(self, **kwargs):
+    @property
+    def prepare_calc(self):
         """
         Write input files (INCAR, KPOINTS, POTCAR)
         """
         
         configs = self.configs
+        calc_dir = self.calc_dir
         
-        vasp_input = self.get_vasp_input(**kwargs)
+        vasp_input = self.get_vasp_input
         if not vasp_input:
             return None
 
         # write input files
-        vasp_input.write_input(self.calc_dir)
+        vasp_input.write_input(calc_dir)
         
         # for LOBSTER, use Janine George's Lobsterin approach (mainly to get NBANDS)
         if (configs.lobster_static) and (configs.calc == 'static'):
-            outputs = VASPOutputs(self.calc_dir)
-            if outputs.incar.as_dict()['NSW'] == 0:
-                INCAR_input = os.path.join(self.calc_dir, 'INCAR_input')
-                INCAR_output = os.path.join(self.calc_dir, 'INCAR')
-                copyfile(INCAR_output, INCAR_input)
-                POSCAR_input = os.path.join(self.calc_dir, 'POSCAR')
-                POTCAR_input = os.path.join(self.calc_dir, 'POTCAR')
-                lobsterin = Lobsterin.standard_calculations_from_vasp_files(POSCAR_input=POSCAR_input,
-                                                                            INCAR_input=INCAR_input,
-                                                                            POTCAR_input=POTCAR_input,
-                                                                            option='standard')
-                lobsterin.write_lobsterin(os.path.join(self.calc_dir, 'lobsterin'))
-                lobsterin.write_INCAR(incar_input=INCAR_input,
-                                      incar_output=INCAR_output,
-                                      poscar_input=POSCAR_input)
+            INCAR_input = os.path.join(calc_dir, 'INCAR_input')
+            INCAR_output = os.path.join(calc_dir, 'INCAR')
+            copyfile(INCAR_output, INCAR_input)
+            POSCAR_input = os.path.join(calc_dir, 'POSCAR')
+            POTCAR_input = os.path.join(calc_dir, 'POTCAR')
+            lobsterin = Lobsterin.standard_calculations_from_vasp_files(POSCAR_input=POSCAR_input,
+                                                                        INCAR_input=INCAR_input,
+                                                                        POTCAR_input=POTCAR_input,
+                                                                        option='standard')
+            lobsterin.write_lobsterin(os.path.join(calc_dir, 'lobsterin'))
+            lobsterin.write_INCAR(incar_input=INCAR_input,
+                                    incar_output=INCAR_output,
+                                    poscar_input=POSCAR_input)
                 
             
         return vasp_input

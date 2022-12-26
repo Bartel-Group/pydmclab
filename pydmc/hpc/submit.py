@@ -331,9 +331,13 @@ class SubmitTools(object):
                 
                 statuses[xc][xc_calc] = status
 
+                vsu_configs_before_error_catch = {**vasp_configs, **calc_configs}
+                
+                print('\n\n\n~~~~XC ENTERING FIRST vsu = %s~~~~\n\n\n' % vsu_configs_before_error_catch['xc'])
+
                 # (6) initialize VASPSetUp with current VASP configs for this calculation
                 vsu = VASPSetUp(calc_dir=calc_dir, 
-                                user_configs={**vasp_configs, **calc_configs})
+                                user_configs=vsu_configs_before_error_catch)
                 
                 # (6) check for errors in continuing jobs
                 incar_changes = {}
@@ -354,8 +358,14 @@ class SubmitTools(object):
 
                 print('--------- may be some warnings (POTCAR ones OK) ----------')
                 # (7) prepare calc_dir to launch  
-                VASPSetUp(calc_dir=calc_dir,
-                        user_configs={**vasp_configs, **calc_configs}).prepare_calc()
+                
+                vsu_configs = {**vasp_configs, **calc_configs}
+                
+                print('\n\n\n~~~~XC ENTERING SECOND vsu = %s~~~~\n\n\n' % vsu_configs['xc'])
+                vsu = VASPSetUp(calc_dir=calc_dir,
+                                user_configs=vsu_configs)
+                
+                vsu.prepare_calc
                 
                 print('-------------- warnings should be done ---------------')
                 print('\n~~~~~ prepared %s ~~~~~\n' % calc_dir)
