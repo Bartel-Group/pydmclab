@@ -120,7 +120,7 @@ class LaunchTools(object):
 
     @property
     def valid_mags(self):
-        configs = self.configs
+        configs = self.configs.copy()
         if configs.override_mag:
             return configs.override_mag
         
@@ -157,7 +157,7 @@ class LaunchTools(object):
                 this could be */calcs/Nd2O7Ru2/mp-19930/dmc/metagga/fm/relax
         """
         structure = self.structure
-        configs = self.configs
+        configs = self.configs.copy()
         
         mags = self.valid_mags
         

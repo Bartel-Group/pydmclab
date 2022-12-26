@@ -131,7 +131,7 @@ class VASPSetUp(object):
             **kwargs - additional arguments for VASPSet (see https://pymatgen.org/pymatgen.io.vasp.sets.html)
         """
         
-        configs = self.configs
+        configs = self.configs.copy()
         
         # tell user what they are modifying in case they are trying to match MP or other people's calculations
         if configs.standard and configs.modify_incar:
@@ -332,7 +332,7 @@ class VASPSetUp(object):
         Write input files (INCAR, KPOINTS, POTCAR)
         """
         
-        configs = self.configs
+        configs = self.configs.copy()
         calc_dir = self.calc_dir
         
         vasp_input = self.get_vasp_input
@@ -430,7 +430,7 @@ class VASPSetUp(object):
                 the calculation didn't reach ionic convergence
         """
         calc_dir = self.calc_dir
-        configs = self.configs
+        configs = self.configs.copy()
         analyzer = AnalyzeVASP(calc_dir)
         outputs = VASPOutputs(calc_dir)
         unconverged = []
@@ -483,7 +483,7 @@ class VASPSetUp(object):
         """
         True if no errors found and calc is fully converged, else False
         """
-        configs = self.configs
+        configs = self.configs.copy()
         calc_dir = self.calc_dir
         clean = False
         if AnalyzeVASP(calc_dir).is_converged:

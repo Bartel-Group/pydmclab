@@ -537,7 +537,7 @@ class AnalyzeBatch(object):
     def _results_for_calc_dir(self, 
                               calc_dir):
         
-        configs = self.configs
+        configs = self.configs.copy()
         verbose = configs['verbose']
         include_meta = configs['include_meta']
         include_calc_setup = configs['include_calc_setup']

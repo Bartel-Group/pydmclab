@@ -173,9 +173,9 @@ class SubmitTools(object):
         Returns dictionary of slurm options
             - nodes, ntasks, walltime, etc
         """
-        slurm_configs = self.slurm_configs
+        slurm_configs = self.slurm_configs.copy()
         options = {option : slurm_configs[option] for option in slurm_configs if slurm_configs[option]}
-        partitions = self.partitions
+        partitions = self.partitions.copy()
         partition_specs = partitions[options['partition']]
         if partition_specs['proc'] == 'gpu':
             options['nodes'] = 1
@@ -191,8 +191,8 @@ class SubmitTools(object):
         Returns command used to execute vasp
             e.g., 'srun -n 24 PATH_TO_VASP/vasp_std > vasp.o'
         """
-        sub_configs = self.sub_configs
-        vasp_configs = self.vasp_configs
+        sub_configs = self.sub_configs.copy()
+        vasp_configs = self.vasp_configs.copy()
         vasp_exec = os.path.join(sub_configs.vasp_dir, sub_configs.vasp)
         return '\n%s --ntasks=%s --mpi=pmi2 %s > %s\n' % (sub_configs.mpi_command, str(self.slurm_options['ntasks']), vasp_exec, vasp_configs.fvaspout)
     
@@ -246,8 +246,7 @@ class SubmitTools(object):
                       
         """
 
-        vasp_configs = self.vasp_configs
-        sub_configs = self.sub_configs
+        sub_configs = self.sub_configs.copy()
         fresh_restart = sub_configs.fresh_restart
         launch_dir = self.launch_dir
         final_xcs = self.final_xcs
@@ -261,7 +260,7 @@ class SubmitTools(object):
         for final_xc in final_xcs:
             statuses[final_xc] = {}
             for xc_calc in packing[final_xc]:
-                vasp_configs = self.vasp_configs
+                vasp_configs = self.vasp_configs.copy()
                 # start making vasp_configs just for this particular calculation
                 xc_to_run, calc_to_run = xc_calc.split('-')
                 
@@ -381,7 +380,7 @@ class SubmitTools(object):
         Will prevent you from messing with directories that have running/pending jobs
         """
         scripts_dir = os.getcwd()
-        sub_configs = self.sub_configs
+        sub_configs = self.sub_configs.copy()
         fqueue = os.path.join(scripts_dir, sub_configs.fqueue)
         with open(fqueue, 'w') as f:
             subprocess.call(['squeue', '-u', '%s' % os.getlogin(), '--name=%s' % job_name], stdout=f)
@@ -429,15 +428,15 @@ class SubmitTools(object):
 
         final_xcs = self.final_xcs
                 
-        vasp_configs = self.vasp_configs
-        sub_configs = self.sub_configs
+        vasp_configs = self.vasp_configs.copy()
+        sub_configs = self.sub_configs.copy()
         
         files_to_inherit = sub_configs.files_to_inherit
         
         launch_dir = self.launch_dir
         
         vasp_command = self.vasp_command
-        slurm_options = self.slurm_options
+        slurm_options = self.slurm_options.copy()
         queue_manager = self.queue_manager
 
 
