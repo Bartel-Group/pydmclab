@@ -119,7 +119,7 @@ class VASPSetUp(object):
         
         configs = {**_vasp_configs, **user_configs}
                                 
-        self.configs = configs
+        self.configs = configs.copy()
 
     @property
     def get_vasp_input(self):

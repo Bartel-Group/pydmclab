@@ -121,7 +121,7 @@ class SubmitTools(object):
                     user_configs_used.append(option)
         
         #write_yaml(slurm_configs, slurm_configs_yaml)
-        self.slurm_configs = slurm_configs
+        self.slurm_configs = slurm_configs.copy()
         
         sub_configs = read_yaml(sub_configs_yaml)
         for option in sub_configs:
@@ -132,7 +132,7 @@ class SubmitTools(object):
                     user_configs_used.append(option)
 
         #write_yaml(sub_configs, sub_configs_yaml)
-        self.sub_configs = sub_configs
+        self.sub_configs = sub_configs.copy()
 
         vasp_configs = read_yaml(vasp_configs_yaml)
         for option in vasp_configs:
@@ -147,7 +147,7 @@ class SubmitTools(object):
         vasp_configs['magmom'] = magmom
         
         #write_yaml(vasp_configs, vasp_configs_yaml)
-        self.vasp_configs = vasp_configs
+        self.vasp_configs = vasp_configs.copy()
         
         fpos = os.path.join(launch_dir, 'POSCAR')
         if not os.path.exists(fpos):

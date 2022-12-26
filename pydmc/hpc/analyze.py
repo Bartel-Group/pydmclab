@@ -514,7 +514,7 @@ class AnalyzeBatch(object):
         if configs['n_procs'] == 'all':
             configs['n_procs'] = multip.cpu_count() - 1 
         
-        self.configs = configs
+        self.configs = configs.copy()
     
     @property
     def calc_dirs(self):

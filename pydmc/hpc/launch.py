@@ -116,7 +116,7 @@ class LaunchTools(object):
         self.magmoms = magmoms
         self.structure = structure
 
-        self.configs = configs
+        self.configs = configs.copy()
 
     @property
     def valid_mags(self):
