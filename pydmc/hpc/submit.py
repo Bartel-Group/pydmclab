@@ -415,6 +415,7 @@ class SubmitTools(object):
         7) if lobster_static and calc is static, write LOBSTER and BADER commands
         """
 
+        xcs = self.xcs
                 
         vasp_configs = self.vasp_configs
         sub_configs = self.sub_configs
@@ -431,7 +432,7 @@ class SubmitTools(object):
         packing = sub_configs.packing
 
         statuses = self.prepare_directories
-        for xc in packing:
+        for xc in xcs:
             fsub = os.path.join(launch_dir, 'sub_%s.sh' % xc)
             fstatus = os.path.join(launch_dir, 'status_%s.o' % xc)
             job_name = '.'.join(launch_dir.split('/')[-4:]+[xc])
@@ -511,7 +512,7 @@ class SubmitTools(object):
             - if there's something to launch
                 (ie if all calcs are done, dont launch)
         """
-
+        xcs = self.xcs
         
         print('     now launching sub')
         scripts_dir = os.getcwd()
@@ -520,7 +521,7 @@ class SubmitTools(object):
         packing = sub_configs.packing
         flags_that_need_to_be_executed = ['srun', 'python', 'lobster', 'bader']
 
-        for xc in packing:
+        for xc in xcs:
 
             fsub = os.path.join(launch_dir, 'sub_%s.sh' % xc)
             with open(fsub) as f:
