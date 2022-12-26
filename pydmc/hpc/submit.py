@@ -451,7 +451,7 @@ class SubmitTools(object):
                 xc_calc_counter = -1
                 for xc_calc in packing[xc]:
                     xc_calc_counter += 1
-                    status = statuses[xc_calc]
+                    status = statuses[xc][xc_calc]
                     xc_to_run, calc_to_run = xc_calc.split('-')                    
                     calc_dir = os.path.join(launch_dir, xc_calc)
                     f.write('\necho working on %s >> %s\n' % (xc_calc, fstatus))

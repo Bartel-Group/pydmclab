@@ -126,13 +126,27 @@ each one of these "calcs" will require a VASP execution, meaning it needs VASP i
 Most of this is taken care of automatically in pydmc
 
 1) Use MPQuery to get crystal structures from Materials Project
+    - write to a dictionary: query.json
 2) [OPTIONAL] Transform those structures to generate new structures using StrucTools
+    - write to a dictionary: strucs.json
 3) [OPTIONAL] Create AFM orderings ("magmoms") for each structure using MagTools(structure).get_afm_magmoms
+    - write to a dictionary: magmoms.json
 4) Create a dictionary of "launch directories" using LaunchTools
     - this will look like: {top_level/unique_ID/standard : 
                                 {'xcs' : [XCs to use for that standard],
                                 'magmom' : [magmoms to use for that structure]}
-    - you 
+    - you should pass what XCs you want to run for each standard to LaunchTools as to_launch = {standard : [xcs to run]}
+    - you should pass magmoms to LaunchTools if you're running AFM
+    - you can also pass any argument in pydmc/data/_launch_configs.yaml in "user_configs" to LaunchTools
+    - write to a dictionary: launch_dirs.json
+5) Loop through the launch directories and prepare VASP inputs + submission files and launch each chain of VASP jobs using SubmitTools
+    - SubmitTools will figure out which jobs can be submitted together and how to order them for submission
+    - It will also prepare each VASP job accordingly
+    - You just need to pass it the launch_dir, which "xcs to run", and the "magmom" to use
+    - You can also pass any setting relevant to job packing (_sub_configs.yaml), VASP inputs (_vasp_configs.yaml), and slurm (_slurm_configs.yaml) using "user_configs"
+6) Crawl through the launch directories, and analyze every VASP calculation using AnalyzeBatch
+    - you can pass any setting relevant to analysis (_batch_vasp_analysis_configs.yaml) using "user_configs"
+    - write to a dictionary: results.json
 """
 # where is this file
 SCRIPTS_DIR = os.getcwd()
