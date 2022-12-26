@@ -196,6 +196,9 @@ VASP_CONFIGS = {'lobster_static' : False}
 ANALYSIS_CONFIGS = {'include_meta' : True}
 
 def main(): 
+    
+    if not os.path.exists(os.path.join(os.getcwd(), 'sub_launcher.sh')):
+        make_sub_for_launcher()
 
     remake_query = False
     print_query_check = True
@@ -496,7 +499,10 @@ def get_launch_dirs(strucs,
     for formula in strucs:
         for ID in strucs[formula]:
             structure = strucs[formula][ID]
-            curr_magmoms = magmoms[formula][ID]
+            if magmoms:
+                curr_magmoms = magmoms[formula][ID]
+            else:
+                curr_magmoms = None
             top_level = formula
             unique_ID = ID
             

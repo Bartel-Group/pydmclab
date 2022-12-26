@@ -495,7 +495,10 @@ def get_launch_dirs(strucs,
     for formula in strucs:
         for ID in strucs[formula]:
             structure = strucs[formula][ID]
-            curr_magmoms = magmoms[formula][ID]
+            if magmoms:
+                curr_magmoms = magmoms[formula][ID]
+            else:
+                curr_magmoms = None
             top_level = formula
             unique_ID = ID
             
