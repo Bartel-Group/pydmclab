@@ -17,6 +17,8 @@ force_postprocess: False # if True, run LOBSTER and Bader again if vasp_configs.
 
 files_to_inherit: ['WAVECAR', 'CONTCAR'] # usually no need to change
 
+execute_flags: ['srun', 'python', 'lobster', 'bader']
+
 packing: 
  gga: 
   - gga-loose

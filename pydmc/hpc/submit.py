@@ -525,18 +525,16 @@ class SubmitTools(object):
             - if there's something to launch
                 (ie if all calcs are done, dont launch)
         """
-        xcs = self.xcs
+        final_xcs = self.final_xcs
         
         print('     now launching sub')
         scripts_dir = os.getcwd()
         launch_dir = self.launch_dir
-        sub_configs = self.sub_configs   
-        packing = sub_configs.packing
-        flags_that_need_to_be_executed = ['srun', 'python', 'lobster', 'bader']
+        flags_that_need_to_be_executed = self.sub_configs.execute_flags
 
-        for xc in xcs:
+        for final_xc in final_xcs:
 
-            fsub = os.path.join(launch_dir, 'sub_%s.sh' % xc)
+            fsub = os.path.join(launch_dir, 'sub_%s.sh' % final_xc)
             with open(fsub) as f:
                 for line in f:
                     if 'job-name' in line:
@@ -554,7 +552,7 @@ class SubmitTools(object):
                 return
 
             os.chdir(launch_dir)
-            subprocess.call(['sbatch', 'sub_%s.sh' % xc])
+            subprocess.call(['sbatch', 'sub_%s.sh' % final_xc])
             os.chdir(scripts_dir)
 
 def main():

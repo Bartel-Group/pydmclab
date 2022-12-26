@@ -310,6 +310,8 @@ class VASPSetUp(object):
                 # gga-static will get ISYM = -1, so need to pass that to metagga relax otherwise WAVECAR from GGA doesnt help metagga
                 modify_incar['ISYM'] = -1
 
+
+        print('modify_incar = %s' % modify_incar)
         # initialize new VASPSet with all our settings   
         vasp_input = vaspset(structure, 
                              user_incar_settings=modify_incar, 
