@@ -365,6 +365,8 @@ class SubmitTools(object):
                 vsu = VASPSetUp(calc_dir=calc_dir,
                                 user_configs=vsu_configs)
                 
+                print('what got passed to vsu ----> %s <------' % vsu.configs['xc'])
+                
                 vsu.prepare_calc
                 
                 print('-------------- warnings should be done ---------------')
