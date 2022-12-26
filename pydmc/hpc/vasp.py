@@ -232,6 +232,10 @@ class VASPSetUp(object):
                 
         # start from MPScanRelaxSet for meta-GGA
         elif configs.xc_to_run == 'metagga':
+            
+            print('\n\nWOWOWOW Im in the metagga calculation????\n\n')
+            
+            
             vaspset = MPScanRelaxSet
                 
             # use custom functional (eg SCAN) if you want
@@ -246,7 +250,7 @@ class VASPSetUp(object):
             modify_kpoints = Kpoints() # only use 1 kpoint
             loose_settings = {'ENCUT' : 400,
                              'ENAUG' : 800,
-                             'ISIF' : 2,
+                             'ISIF' : 3,
                              'EDIFF' : 1e-5,
                              'NELM' : 40}
             for key in loose_settings:
