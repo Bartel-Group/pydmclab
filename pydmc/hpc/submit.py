@@ -135,9 +135,12 @@ class SubmitTools(object):
         self.sub_configs = dotdict(sub_configs)
 
         vasp_configs = read_yaml(vasp_configs_yaml)
-
-        user_configs = {option : user_configs[option] for option in user_configs if option not in user_configs_used}
-        vasp_configs = {**vasp_configs, **user_configs}
+        for option in vasp_configs:
+            if option in user_configs:
+                if option not in user_configs_used:
+                    new_value = user_configs[option]
+                    vasp_configs[option] = new_value
+                    user_configs_used.append(option)
         
         vasp_configs['standard'] = standard
         vasp_configs['mag'] = mag
@@ -258,13 +261,13 @@ class SubmitTools(object):
         for final_xc in final_xcs:
             statuses[final_xc] = {}
             for xc_calc in packing[final_xc]:
+                vasp_configs = self.vasp_configs
                 # start making vasp_configs just for this particular calculation
-                calc_configs = {}
                 xc_to_run, calc_to_run = xc_calc.split('-')
                 
                 # update vasp configs with the current xc and calc
-                calc_configs['xc_to_run'] = xc_to_run
-                calc_configs['calc_to_run'] = calc_to_run
+                vasp_configs['xc_to_run'] = xc_to_run
+                vasp_configs['calc_to_run'] = calc_to_run
                 
                 # (1) make calc_dir (or remove and remake if fresh_restart)
                 calc_dir = os.path.join(launch_dir, xc_calc)
@@ -330,14 +333,12 @@ class SubmitTools(object):
                     status = 'new'
                 
                 statuses[final_xc][xc_calc] = status
-
-                vsu_configs_before_error_catch = {**vasp_configs, **calc_configs}
                 
-                print('\n\n\n~~~~configs entering first vsu = %s~~~~\n\n\n' % vsu_configs_before_error_catch)
+                print('\n\n\n~~~~configs entering first vsu = %s~~~~\n\n\n' % vasp_configs)
 
                 # (6) initialize VASPSetUp with current VASP configs for this calculation
                 vsu = VASPSetUp(calc_dir=calc_dir, 
-                                user_configs=vsu_configs_before_error_catch)
+                                user_configs=vasp_configs)
                 
                 # (6) check for errors in continuing jobs
                 incar_changes = {}
@@ -350,20 +351,18 @@ class SubmitTools(object):
                 # if there are INCAR updates, add them to calc_configs
                 if incar_changes:
                     incar_key = '%s_incar' % calc_to_run
-                    if incar_key not in calc_configs:
-                        calc_configs[incar_key] = {}
+                    if incar_key not in vasp_configs:
+                        vasp_configs[incar_key] = {}
                     for setting in incar_changes:
-                        calc_configs[incar_key][setting] = incar_changes[setting]
+                        vasp_configs[incar_key][setting] = incar_changes[setting]
                             
 
                 print('--------- may be some warnings (POTCAR ones OK) ----------')
                 # (7) prepare calc_dir to launch  
-                
-                vsu_configs = {**vasp_configs, **calc_configs}
-                
-                print('\n\n\n~~~~configs entering second vsu = %s~~~~\n\n\n' % vsu_configs)
+                                
+                print('\n\n\n~~~~configs entering second vsu = %s~~~~\n\n\n' % vasp_configs)
                 vsu = VASPSetUp(calc_dir=calc_dir,
-                                user_configs=vsu_configs)
+                                user_configs=vasp_configs)
                 
                 print('XC passed to vsu ----> %s <------' % vsu.configs['xc_to_run'])
                 
