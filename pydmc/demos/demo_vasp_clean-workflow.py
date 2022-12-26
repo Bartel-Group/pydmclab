@@ -302,7 +302,7 @@ def check_subs(launch_dirs):
         launch_dirs_to_check = launch_dirs_to_check[:3] + launch_dirs_to_check[-3:]
 
     for d in launch_dirs_to_check:
-        xcs = launch_dirs_to_check[d]['xcs']
+        xcs = launch_dirs[d]['xcs']
         for xc in xcs:
             fsub = os.path.join(d, 'sub_%s.sh' % xc)
             with open(fsub) as f:

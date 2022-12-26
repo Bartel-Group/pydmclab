@@ -188,9 +188,10 @@ class SubmitTools(object):
         Returns command used to execute vasp
             e.g., 'srun -n 24 PATH_TO_VASP/vasp_std > vasp.o'
         """
-        configs = self.sub_configs
-        vasp_exec = os.path.join(configs.vasp_dir, configs.vasp)
-        return '\n%s --ntasks=%s --mpi=pmi2 %s > %s\n' % (configs.mpi_command, str(self.slurm_options['ntasks']), vasp_exec, configs.fvaspout)
+        sub_configs = self.sub_configs
+        vasp_configs = self.vasp_configs
+        vasp_exec = os.path.join(sub_configs.vasp_dir, sub_configs.vasp)
+        return '\n%s --ntasks=%s --mpi=pmi2 %s > %s\n' % (sub_configs.mpi_command, str(self.slurm_options['ntasks']), vasp_exec, vasp_configs.fvaspout)
     
     @property
     def lobster_command(self):
