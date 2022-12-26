@@ -523,7 +523,7 @@ class AnalyzeBatch(object):
         calcs = ['loose', 'relax', 'static'] if not self.configs['only_static'] else ['static']
         for launch_dir in launch_dirs:
             files_in_launch_dir = os.listdir(launch_dir)
-            calc_dirs = [os.path.join(c, launch_dir) 
+            calc_dirs = [os.path.join(launch_dir, c) 
                             for c in files_in_launch_dir 
                                 if '-' in c 
                                 if c.split('-')[1] in ['loose', 'relax', 'static']]
