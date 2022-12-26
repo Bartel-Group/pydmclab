@@ -131,16 +131,24 @@ class VASPSetUp(object):
         
         configs = self.configs.copy()
         
+
+        # these are things that get updated based on other configs
+        
+        modify_incar = configs['%s_incar' % configs['calc_to_run']]
+        modify_kpoints = configs['%s_kpoints' % configs['calc_to_run']]
+        modify_potcar = configs['%s_potcar' % configs['calc_to_run']]
+        potcar_functional = configs['potcar_functional']
+        
         # tell user what they are modifying in case they are trying to match MP or other people's calculations
-        if configs['standard'] and configs['modify_incar']:
+        if configs['standard'] and modify_incar:
             warnings.warn('you are attempting to generate consistent data, but modifying things in the INCAR\n')
             #print('e.g., %s' % str(modify_incar))
             
-        if configs['standard'] and configs['modify_kpoints']:
+        if configs['standard'] and modify_kpoints:
             warnings.warn('you are attempting to generate consistent data, but modifying things in the KPOINTS\n')
             #print('e.g., %s' % str(modify_kpoints))
 
-        if configs['standard'] and configs['modify_potcar']:
+        if configs['standard'] and modify_potcar:
             warnings.warn('you are attempting to generate consistent data, but modifying things in the POTCAR\n')
             #print('e.g., %s' % str(modify_potcar))
         
@@ -162,13 +170,6 @@ class VASPSetUp(object):
             if (min(magmom) >= 0) and (max(magmom) <= 0):
                 raise ValueError('provided magmom that is not AFM, but you are trying to run an AFM calculation\n')
             structure.add_site_property('magmom', magmom)
-
-        # these are things that get updated based on other configs
-        
-        modify_incar = configs['%s_incar' % configs['calc_to_run']]
-        modify_kpoints = configs['%s_kpoints' % configs['calc_to_run']]
-        modify_potcar = configs['%s_potcar' % configs['calc_to_run']]
-        potcar_functional = configs['potcar_functional']
         
         # MP wants to set W_pv but we don't have that one in PBE54 (no biggie)
         if configs['standard'] != 'mp':
