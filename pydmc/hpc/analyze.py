@@ -10,7 +10,7 @@ from pymatgen.io.lobster.outputs import Doscar
 
 from pydmc.core.struc import StrucTools, SiteTools
 from pydmc.core.comp import CompTools
-from pydmc.utils.handy import read_json, write_json, read_yaml, write_yaml, dotdict
+from pydmc.utils.handy import read_json, write_json, read_yaml, write_yaml
 from pydmc.data.configs import load_batch_vasp_analysis_configs
 
 class VASPOutputs(object):

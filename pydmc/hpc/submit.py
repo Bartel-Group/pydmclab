@@ -1,6 +1,6 @@
 from pydmc.hpc.vasp import VASPSetUp
 from pydmc.hpc.analyze import AnalyzeVASP
-from pydmc.utils.handy import read_yaml, write_yaml, dotdict
+from pydmc.utils.handy import read_yaml, write_yaml
 from pydmc.data.configs import load_vasp_configs, load_slurm_configs, load_sub_configs, load_partition_configs
 
 from pymatgen.core.structure import Structure

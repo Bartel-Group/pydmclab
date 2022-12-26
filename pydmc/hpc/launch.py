@@ -2,7 +2,7 @@ import os
 
 from pymatgen.core.structure import Structure
 
-from pydmc.utils.handy import read_yaml, write_yaml, dotdict, is_calc_valid
+from pydmc.utils.handy import read_yaml, write_yaml, is_calc_valid
 from pydmc.core.mag import MagTools
 from pydmc.data.configs import load_launch_configs
 
