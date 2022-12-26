@@ -526,7 +526,7 @@ class AnalyzeBatch(object):
             calc_dirs = [os.path.join(launch_dir, c) 
                             for c in files_in_launch_dir 
                                 if '-' in c 
-                                if c.split('-')[1] in ['loose', 'relax', 'static']]
+                                if c.split('-')[1] in calcs]
             calc_dirs = [c for c in calc_dirs if os.path.exists(os.path.join(c, 'POSCAR'))]
         
         return calc_dirs
