@@ -167,7 +167,35 @@ API_KEY = '***REMOVED***'
 # lets put a tag on all the files we save
 FILE_TAG = 'test-template'
 
-def main():   
+# what to query MP for
+COMPOSITIONS = None 
+
+# how to transform MP structures
+TRANSFORM_STRUCS = False
+
+# whether or not you want to generate MAGMOMs
+GEN_MAGMOMS = False
+
+# what {standard : [final_xcs]} to calculate
+TO_LAUNCH = {}
+
+# any configurations related to LaunchTools
+LAUNCH_CONFIGS = {}
+
+# any configurations related to SubmitTools
+SUB_CONFIGS = {}
+
+# any configurations related to Slurm
+SLURM_CONFIGS = {}
+
+# any configurations related to VASPSetUp
+VASP_CONFIGS = {}
+
+# any configurations related to AnalyzeBatch
+ANALYSIS_CONFIGS = {}
+
+def main(): 
+
     remake_query = False
     print_query_check = True
     
@@ -186,25 +214,28 @@ def main():
     remake_results = True
     print_results_check = True
     
-    comp = COMPOSITIONS_TO_QUERY
+    comp = COMPOSITIONS
     query = get_query(comp=comp,
                       remake=remake_query)
     if print_query_check:
         check_query(query)
     
-    transform_strucs = COMPOSITION_PARAMETERS # or None
+    transform_strucs = TRANSFORM_STRUCS
     strucs = get_strucs(query=query,
                         transform_strucs=transform_strucs,
                         remake=remake_strucs)
     if print_strucs_check:
         check_strucs(strucs)
 
-    magmoms = get_magmoms(strucs=strucs,
-                          remake=remake_magmoms)
-    if print_magmoms_check:
-        check_magmoms(magmoms)
+    if not GEN_MAGMOMS:
+        magmoms = get_magmoms(strucs=strucs,
+                            remake=remake_magmoms)
+        if print_magmoms_check:
+            check_magmoms(magmoms)
+    else:
+        magmoms = None
     
-    to_launch = XCS_TO_LAUNCH_BY_STANDARD
+    to_launch = TO_LAUNCH
     launch_configs = LAUNCH_CONFIGS
     launch_dirs = get_launch_dirs(strucs=strucs,
                                   magmoms=magmoms,
@@ -367,7 +398,7 @@ def get_strucs(query,
                 structools = StrucTools(structure=initial_structure,
                                         ox_states=ox_states)
                 
-                species_mapping = SOMETHING_THAT_DEPENDS_ON_X
+                species_mapping = None # *NOTE*: you should customize this for your desired transformation
                 
                 strucs = structools.replace_species(species_mapping=species_mapping,
                                                     n_strucs=max_strucs_per_starting_struc)
