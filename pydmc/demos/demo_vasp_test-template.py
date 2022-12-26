@@ -168,31 +168,32 @@ API_KEY = '***REMOVED***'
 FILE_TAG = 'test-template'
 
 # what to query MP for
-COMPOSITIONS = None 
+COMPOSITIONS = ['MnF2', 'LiCl'] 
 
 # how to transform MP structures
 TRANSFORM_STRUCS = False
 
 # whether or not you want to generate MAGMOMs
-GEN_MAGMOMS = False
+GEN_MAGMOMS = True
 
 # what {standard : [final_xcs]} to calculate
-TO_LAUNCH = {}
+TO_LAUNCH = {'dmc' : ['metagga']}
 
 # any configurations related to LaunchTools
-LAUNCH_CONFIGS = {}
+LAUNCH_CONFIGS = {'compare_to_mp' : True,
+                  'n_afm_configs' : 1}
 
 # any configurations related to SubmitTools
 SUB_CONFIGS = {}
 
 # any configurations related to Slurm
-SLURM_CONFIGS = {}
+SLURM_CONFIGS = {'ntasks' : 24}
 
 # any configurations related to VASPSetUp
-VASP_CONFIGS = {}
+VASP_CONFIGS = {'lobster_static' : False}
 
 # any configurations related to AnalyzeBatch
-ANALYSIS_CONFIGS = {}
+ANALYSIS_CONFIGS = {'include_meta' : True}
 
 def main(): 
 
@@ -269,7 +270,7 @@ if __name__ == '__main__':
 def get_query(comp, 
               properties=None, 
               criteria=None, 
-              only_gs=False, 
+              only_gs=True, 
               include_structure=True,
               supercell_structure=False,
               max_Ehull=None,
