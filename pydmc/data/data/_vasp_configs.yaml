@@ -22,23 +22,23 @@ fvasperrors: errors.o # where vasp errors go in calc_dir for each vasp run
 
 # loose calculations
 loose_incar: {} # e.g., {'ENCUT' : 555}
-loose_kpoints: # e.g., {'length' : 25}
-loose_potcar: # e.g., {'W' : 'W_pv'}
+loose_kpoints: {} # e.g., {'length' : 25}
+loose_potcar: {} # e.g., {'W' : 'W_pv'}
 
 # relax calculations
 relax_incar: {}
-relax_kpoints: 
-relax_potcar:
+relax_kpoints: {}
+relax_potcar: {}
 
 # static calculations
 static_incar: {}
-static_kpoints:
-static_potcar:
+static_kpoints: {}
+static_potcar: {}
 
 # lobster calculations
 lobster_incar: {}
-lobster_kpoints: 
-lobster_potcar: 
+lobster_kpoints: {}
+lobster_potcar: {}
 
 # rarely need to change these:
 mag_override: False # if True, allows user to run nm calcs for mag systems and vice versa
