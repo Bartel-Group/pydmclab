@@ -333,7 +333,7 @@ class SubmitTools(object):
 
                 vsu_configs_before_error_catch = {**vasp_configs, **calc_configs}
                 
-                print('\n\n\n~~~~XC ENTERING FIRST vsu = %s~~~~\n\n\n' % vsu_configs_before_error_catch['xc_to_run'])
+                print('\n\n\n~~~~configs entering first vsu = %s~~~~\n\n\n' % vsu_configs_before_error_catch)
 
                 # (6) initialize VASPSetUp with current VASP configs for this calculation
                 vsu = VASPSetUp(calc_dir=calc_dir, 
@@ -361,11 +361,11 @@ class SubmitTools(object):
                 
                 vsu_configs = {**vasp_configs, **calc_configs}
                 
-                print('\n\n\n~~~~XC ENTERING SECOND vsu = %s~~~~\n\n\n' % vsu_configs['xc_to_run'])
+                print('\n\n\n~~~~configs entering second vsu = %s~~~~\n\n\n' % vsu_configs)
                 vsu = VASPSetUp(calc_dir=calc_dir,
                                 user_configs=vsu_configs)
                 
-                print('what got passed to vsu ----> %s <------' % vsu.configs['xc_to_run'])
+                print('XC passed to vsu ----> %s <------' % vsu.configs['xc_to_run'])
                 
                 vsu.prepare_calc
                 
