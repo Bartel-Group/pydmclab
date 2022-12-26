@@ -428,7 +428,7 @@ class SubmitTools(object):
         7) if lobster_static and calc is static, write LOBSTER and BADER commands
         """
 
-        xcs = self.xcs
+        final_xcs = self.final_xcs
                 
         vasp_configs = self.vasp_configs
         sub_configs = self.sub_configs
@@ -445,10 +445,10 @@ class SubmitTools(object):
         packing = sub_configs.packing
 
         statuses = self.prepare_directories
-        for xc in xcs:
-            fsub = os.path.join(launch_dir, 'sub_%s.sh' % xc)
-            fstatus = os.path.join(launch_dir, 'status_%s.o' % xc)
-            job_name = '.'.join(launch_dir.split('/')[-4:]+[xc])
+        for final_xc in final_xcs:
+            fsub = os.path.join(launch_dir, 'sub_%s.sh' % final_xc)
+            fstatus = os.path.join(launch_dir, 'status_%s.o' % final_xc)
+            job_name = '.'.join(launch_dir.split('/')[-4:]+[final_xc])
             print('\nchecking if %s is in q' % launch_dir)
             if self.is_job_in_queue(job_name):
                 return
@@ -463,9 +463,9 @@ class SubmitTools(object):
                 f.write('ulimit -s unlimited\n')
                 print('\n:::: writing sub now - %s ::::' % fsub)
                 xc_calc_counter = -1
-                for xc_calc in packing[xc]:
+                for xc_calc in packing[final_xc]:
                     xc_calc_counter += 1
-                    status = statuses[xc][xc_calc]
+                    status = statuses[final_xc][xc_calc]
                     xc_to_run, calc_to_run = xc_calc.split('-')                    
                     calc_dir = os.path.join(launch_dir, xc_calc)
                     f.write('\necho working on %s >> %s\n' % (xc_calc, fstatus))
@@ -483,7 +483,7 @@ class SubmitTools(object):
                         
                         pass_info = False if xc_calc_counter == 0 else True                    
                         if pass_info:
-                            parent_xc_calc = packing[xc][xc_calc_counter - 1]
+                            parent_xc_calc = packing[final_xc][xc_calc_counter - 1]
                             src_dir = os.path.join(launch_dir, parent_xc_calc)
                             f.write('isInFile=$(cat %s | grep -c %s)\n' % (os.path.join(src_dir, 'OUTCAR'), 'Elaps'))
                             f.write('if [ $isInFile -eq 0 ]; then\n')
