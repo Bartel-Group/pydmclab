@@ -218,7 +218,7 @@ You'll want to customize these depending on your calculations
 
 def get_query(comp, 
               properties=None, 
-              criteria={'nelements' : {'$gte' : 1}}, 
+              criteria={'nelements' : {'$in' : [2,3]}}, 
               only_gs=True, 
               include_structure=True,
               supercell_structure=False,
