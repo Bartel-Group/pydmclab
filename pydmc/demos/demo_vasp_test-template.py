@@ -195,81 +195,6 @@ VASP_CONFIGS = {'lobster_static' : False}
 # any configurations related to AnalyzeBatch
 ANALYSIS_CONFIGS = {'include_meta' : True}
 
-def main(): 
-    
-    if not os.path.exists(os.path.join(os.getcwd(), 'sub_launcher.sh')):
-        make_sub_for_launcher()
-
-    remake_query = False
-    print_query_check = True
-    
-    remake_strucs = False
-    print_strucs_check = True
-    
-    remake_magmoms = False
-    print_magmoms_check = True
-    
-    remake_launch_dirs = False
-    print_launch_dirs_check = True
-    
-    remake_subs = True
-    ready_to_launch = True
-    
-    remake_results = True
-    print_results_check = True
-    
-    comp = COMPOSITIONS
-    query = get_query(comp=comp,
-                      remake=remake_query)
-    if print_query_check:
-        check_query(query)
-    
-    transform_strucs = TRANSFORM_STRUCS
-    strucs = get_strucs(query=query,
-                        transform_strucs=transform_strucs,
-                        remake=remake_strucs)
-    if print_strucs_check:
-        check_strucs(strucs)
-
-    if not GEN_MAGMOMS:
-        magmoms = get_magmoms(strucs=strucs,
-                            remake=remake_magmoms)
-        if print_magmoms_check:
-            check_magmoms(magmoms)
-    else:
-        magmoms = None
-    
-    to_launch = TO_LAUNCH
-    launch_configs = LAUNCH_CONFIGS
-    launch_dirs = get_launch_dirs(strucs=strucs,
-                                  magmoms=magmoms,
-                                  to_launch=to_launch,
-                                  user_configs=launch_configs,
-                                  remake=remake_launch_dirs)
-    if print_launch_dirs_check:
-        check_launch_dirs(launch_dirs)
-    
-    sub_configs = SUB_CONFIGS
-    slurm_configs = SLURM_CONFIGS
-    vasp_configs = VASP_CONFIGS
-    user_sub_configs = {**sub_configs, **slurm_configs, **vasp_configs}
-    if remake_subs:
-        submit_calcs(launch_dirs=launch_dirs,
-                     user_configs=user_sub_configs,
-                     ready_to_launch=ready_to_launch)
-        
-    analysis_configs = ANALYSIS_CONFIGS
-    results = get_results(launch_dirs=launch_dirs,
-                          user_configs=analysis_configs,
-                          remake=remake_results)
-    if print_results_check:
-        check_results(results)
-    
-    return
-
-if __name__ == '__main__':
-    main()
-
 def get_query(comp, 
               properties=None, 
               criteria=None, 
@@ -636,3 +561,78 @@ def check_results(results):
             print(data['structure'])
     
     print('\n\n %i/%i converged' % (converged, len(keys_to_check)))  
+    
+def main(): 
+    
+    if not os.path.exists(os.path.join(os.getcwd(), 'sub_launcher.sh')):
+        make_sub_for_launcher()
+
+    remake_query = False
+    print_query_check = True
+    
+    remake_strucs = False
+    print_strucs_check = True
+    
+    remake_magmoms = False
+    print_magmoms_check = True
+    
+    remake_launch_dirs = False
+    print_launch_dirs_check = True
+    
+    remake_subs = True
+    ready_to_launch = True
+    
+    remake_results = True
+    print_results_check = True
+    
+    comp = COMPOSITIONS
+    query = get_query(comp=comp,
+                      remake=remake_query)
+    if print_query_check:
+        check_query(query)
+    
+    transform_strucs = TRANSFORM_STRUCS
+    strucs = get_strucs(query=query,
+                        transform_strucs=transform_strucs,
+                        remake=remake_strucs)
+    if print_strucs_check:
+        check_strucs(strucs)
+
+    if not GEN_MAGMOMS:
+        magmoms = get_magmoms(strucs=strucs,
+                            remake=remake_magmoms)
+        if print_magmoms_check:
+            check_magmoms(magmoms)
+    else:
+        magmoms = None
+    
+    to_launch = TO_LAUNCH
+    launch_configs = LAUNCH_CONFIGS
+    launch_dirs = get_launch_dirs(strucs=strucs,
+                                  magmoms=magmoms,
+                                  to_launch=to_launch,
+                                  user_configs=launch_configs,
+                                  remake=remake_launch_dirs)
+    if print_launch_dirs_check:
+        check_launch_dirs(launch_dirs)
+    
+    sub_configs = SUB_CONFIGS
+    slurm_configs = SLURM_CONFIGS
+    vasp_configs = VASP_CONFIGS
+    user_sub_configs = {**sub_configs, **slurm_configs, **vasp_configs}
+    if remake_subs:
+        submit_calcs(launch_dirs=launch_dirs,
+                     user_configs=user_sub_configs,
+                     ready_to_launch=ready_to_launch)
+        
+    analysis_configs = ANALYSIS_CONFIGS
+    results = get_results(launch_dirs=launch_dirs,
+                          user_configs=analysis_configs,
+                          remake=remake_results)
+    if print_results_check:
+        check_results(results)
+    
+    return
+
+if __name__ == '__main__':
+    main()

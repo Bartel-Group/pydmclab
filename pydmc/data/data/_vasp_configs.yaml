@@ -9,7 +9,7 @@ xc_to_run:  # gga, ggau, or metagga
 calc_to_run: # usually this is what we want unless you want an independent "static" or "loose" calc
 
 fun: # usually this is fine
-lobster_static: True # can make False if you don't want to run LOBSTER
+lobster_static: False # can make False if you don't want to run LOBSTER
 
 # some output files
 fvaspout: vasp.o # where vasp output goes in calc_dir for each vasp run
