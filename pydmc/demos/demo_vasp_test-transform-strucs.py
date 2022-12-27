@@ -358,8 +358,8 @@ def get_strucs(query,
                                         ox_states=ox_states)
                 
                 species_mapping = {'Ru' : 
-                                    {'Ru' : 1-x/max(x),
-                                     'Ir' : x/(max(x))}
+                                    {'Ru' : 1-x/max(transform_strucs),
+                                     'Ir' : x/(max(transform_strucs))}
                                     } # *NOTE*: you should customize this for your desired transformation
                 
                 # strucs will have the form {index_identifier : structure}
