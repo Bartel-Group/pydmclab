@@ -165,7 +165,7 @@ for d in [CALCS_DIR, DATA_DIR]:
 API_KEY = '***REMOVED***'
 
 # lets put a tag on all the files we save
-FILE_TAG = 'test-transform-strucs'
+FILE_TAG = CALCS_DIR.split('/')[-2]
 
 # what to query MP for
 ## e.g., 'MnO2', ['MnO2', 'TiO2'], 'Ca-Ti-O, etc
@@ -305,7 +305,7 @@ def check_query(query):
 def get_strucs(query,
                transform_strucs,
                max_strucs_per_starting_struc=2,
-               ox_states={'Ru' : 4, 'Ir' : 4, 'O' : -2},
+               ox_states={'V' : 4, 'Ti' : 4, 'O' : -2},
                savename='strucs_%s.json' % FILE_TAG,
                remake=False):
     """

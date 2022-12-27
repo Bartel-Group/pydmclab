@@ -165,7 +165,7 @@ for d in [CALCS_DIR, DATA_DIR]:
 API_KEY = '***REMOVED***'
 
 # lets put a tag on all the files we save
-FILE_TAG = 'template'
+FILE_TAG = CALCS_DIR.split('/')[-2]
 
 # what to query MP for
 ## e.g., 'MnO2', ['MnO2', 'TiO2'], 'Ca-Ti-O, etc
