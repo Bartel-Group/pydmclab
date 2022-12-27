@@ -165,7 +165,7 @@ for d in [CALCS_DIR, DATA_DIR]:
 API_KEY = '***REMOVED***'
 
 # lets put a tag on all the files we save
-FILE_TAG = 'test-template'
+FILE_TAG = 'template'
 
 # what to query MP for
 ## e.g., 'MnO2', ['MnO2', 'TiO2'], 'Ca-Ti-O, etc
@@ -219,12 +219,12 @@ You'll want to customize these depending on your calculations
 def get_query(comp, 
               properties=None, 
               criteria=None, 
-              only_gs=False, 
+              only_gs=True, 
               include_structure=True,
               supercell_structure=False,
-              max_Ehull=None,
-              max_sites_per_structure=None,
-              max_strucs_per_cmpd=None,
+              max_Ehull=0.05,
+              max_sites_per_structure=65,
+              max_strucs_per_cmpd=4,
               savename='query_%s.json' % FILE_TAG,
               remake=False):
     """
@@ -616,11 +616,12 @@ def main():
     if print_strucs_check:
         check_strucs(strucs)
 
-    if not GEN_MAGMOMS:
+    if GEN_MAGMOMS:
         magmoms = get_magmoms(strucs=strucs,
                             remake=remake_magmoms)
         if print_magmoms_check:
-            check_magmoms(magmoms)
+            check_magmoms(strucs=strucs,
+                          magmoms=magmoms)
     else:
         magmoms = None
     

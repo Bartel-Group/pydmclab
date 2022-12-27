@@ -165,28 +165,28 @@ for d in [CALCS_DIR, DATA_DIR]:
 API_KEY = '***REMOVED***'
 
 # lets put a tag on all the files we save
-FILE_TAG = 'test-template'
+FILE_TAG = 'test-mp-chemsys'
 
 # what to query MP for
 ## e.g., 'MnO2', ['MnO2', 'TiO2'], 'Ca-Ti-O, etc
-COMPOSITIONS = 'MnO2' 
+COMPOSITIONS = 'Li-Mg-Cl' 
 
 # how to transform MP structures
-## e.g., [x/8 for x in range(9)]
+## e.g., [x for x in range(5)] ([0,1,2,3,4])
 ## NOTE: you need to modify get_strucs to make this work (hard to generalize)
 TRANSFORM_STRUCS = False
 
 # whether or not you want to generate MAGMOMs
 ## True if you're running AFM, else False
-GEN_MAGMOMS = True
+GEN_MAGMOMS = False
 
 # what {standard : [final_xcs]} to calculate
 ## e.g., {'dmc' : ['metagga', 'ggau']} if you want to run METAGGA + GGA+U at DMC standards
-TO_LAUNCH = {'dmc' : ['metagga', 'ggau']}
+TO_LAUNCH = {'mp' : ['ggau']}
 
 # any configurations related to LaunchTools
 ## e.g., {'compare_to_mp' : True, 'n_afm_configs' : 4}
-LAUNCH_CONFIGS = {'compare_to_mp' : True, 'n_afm_configs' : 1}
+LAUNCH_CONFIGS = {'compare_to_mp' : True, 'n_afm_configs' : 0}
 
 # any configurations related to SubmitTools
 ## usually no need to change these
@@ -198,7 +198,7 @@ SLURM_CONFIGS = {'ntasks' : 16, 'time' : int(24*60)}
 
 # any configurations related to VASPSetUp
 ## e.g., {'lobster_static' : True, 'relax_incar' : {'ENCUT' : 555}}
-VASP_CONFIGS = {'lobster_static' : True, 'relax_incar' : {'ENCUT' : 555}}
+VASP_CONFIGS = {'lobster_static' : False}
 
 # any configurations related to AnalyzeBatch
 ## e.g., {'include_meta' : True, 'include_mag' : True, 'n_procs' : 4}
@@ -218,7 +218,7 @@ You'll want to customize these depending on your calculations
 
 def get_query(comp, 
               properties=None, 
-              criteria=None, 
+              criteria={'nelements' : {'$gte' : 1}}, 
               only_gs=True, 
               include_structure=True,
               supercell_structure=False,
@@ -303,8 +303,8 @@ def check_query(query):
 
 def get_strucs(query,
                transform_strucs,
-               max_strucs_per_starting_struc=1,
-               ox_states=None,
+               max_strucs_per_starting_struc=2,
+               ox_states={'Ru' : 4, 'Ir' : 4, 'O' : -2},
                savename='strucs_%s.json' % FILE_TAG,
                remake=False):
     """
@@ -357,7 +357,10 @@ def get_strucs(query,
                 structools = StrucTools(structure=initial_structure,
                                         ox_states=ox_states)
                 
-                species_mapping = None # *NOTE*: you should customize this for your desired transformation
+                species_mapping = {'Ru' : 
+                                    {'Ru' : 1-x/max(x),
+                                     'Ir' : x/(max(x))}
+                                    } # *NOTE*: you should customize this for your desired transformation
                 
                 # strucs will have the form {index_identifier : structure}
                 strucs = structools.replace_species(species_mapping=species_mapping,
