@@ -201,12 +201,12 @@ class MPQuery(object):
                           comp, 
                           properties=None, 
                           criteria=None, 
-                          only_gs=False, 
+                          only_gs=True, 
                           include_structure=True,
                           supercell_structure=False,
-                          max_Ehull=None,
-                          max_sites_per_structure=None,
-                          max_strucs_per_cmpd=None):
+                          max_Ehull=0.1,
+                          max_sites_per_structure=100,
+                          max_strucs_per_cmpd=5):
         """
         Args:
             comp (list or str)
