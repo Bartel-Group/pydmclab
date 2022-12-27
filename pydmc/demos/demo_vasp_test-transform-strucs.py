@@ -174,7 +174,8 @@ COMPOSITIONS = 'RuO2'
 # how to transform MP structures
 ## e.g., [x for x in range(5)] ([0,1,2,3,4])
 ## NOTE: you need to modify get_strucs to make this work (hard to generalize)
-TRANSFORM_STRUCS = [x for x in range(5)]
+divide_by = 3
+TRANSFORM_STRUCS = [x for x in range(divide_by+1)]
 
 # whether or not you want to generate MAGMOMs
 ## True if you're running AFM, else False
@@ -221,7 +222,7 @@ def get_query(comp,
               criteria=None, 
               only_gs=True, 
               include_structure=True,
-              supercell_structure=False,
+              supercell_structure=[1,2,3],
               max_Ehull=0.05,
               max_sites_per_structure=65,
               max_strucs_per_cmpd=4,
