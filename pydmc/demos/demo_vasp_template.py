@@ -168,31 +168,53 @@ API_KEY = '***REMOVED***'
 FILE_TAG = 'test-template'
 
 # what to query MP for
+## e.g., 'MnO2', ['MnO2', 'TiO2'], 'Ca-Ti-O, etc
 COMPOSITIONS = None 
 
 # how to transform MP structures
+## e.g., [x/8 for x in range(9)]
+## NOTE: you need to modify get_strucs to make this work (hard to generalize)
 TRANSFORM_STRUCS = False
 
 # whether or not you want to generate MAGMOMs
+## True if you're running AFM, else False
 GEN_MAGMOMS = False
 
 # what {standard : [final_xcs]} to calculate
+## e.g., {'dmc' : ['metagga', 'ggau']} if you want to run METAGGA + GGA+U at DMC standards
 TO_LAUNCH = {}
 
 # any configurations related to LaunchTools
+## e.g., {'compare_to_mp' : True, 'n_afm_configs' : 4}
 LAUNCH_CONFIGS = {}
 
 # any configurations related to SubmitTools
+## usually no need to change these
 SUB_CONFIGS = {}
 
 # any configurations related to Slurm
+## e.g., {'ntasks' : 16, 'time' : int(24*60)}
 SLURM_CONFIGS = {}
 
 # any configurations related to VASPSetUp
+## e.g., {'lobster_static' : True, 'relax_incar' : {'ENCUT' : 555}}
 VASP_CONFIGS = {}
 
 # any configurations related to AnalyzeBatch
+## e.g., {'include_meta' : True, 'include_mag' : True, 'n_procs' : 4}
 ANALYSIS_CONFIGS = {}
+
+"""
+Don't forget to inspect the arguments to:
+    get_query
+    get_strucs
+    get_magmoms
+    get_launch_dirs
+    submit_calcs
+    get_results
+
+You'll want to customize these depending on your calculations
+"""
 
 def get_query(comp, 
               properties=None, 
@@ -256,17 +278,19 @@ def get_query(comp,
     if os.path.exists(fjson) and not remake:
        return read_json(fjson)
     
+    # initialize MPQuery with your API key
     mpq = MPQuery(api_key=API_KEY)
     
-    data = mpq.get_data_for_comp(comp, 
-                                properties=properties, 
-                                criteria=criteria, 
-                                only_gs=only_gs, 
-                                include_structure=include_structure,
-                                supercell_structure=supercell_structure,
-                                max_Ehull=max_Ehull,
-                                max_sites_per_structure=max_sites_per_structure,
-                                max_strucs_per_cmpd=max_strucs_per_cmpd)
+    # get the data from MP
+    data = mpq.get_data_for_comp(comp=comp, 
+                                 properties=properties, 
+                                 criteria=criteria, 
+                                 only_gs=only_gs, 
+                                 include_structure=include_structure,
+                                 supercell_structure=supercell_structure,
+                                 max_Ehull=max_Ehull,
+                                 max_sites_per_structure=max_sites_per_structure,
+                                 max_strucs_per_cmpd=max_strucs_per_cmpd)
     
     write_json(data, fjson) 
     return read_json(fjson)
@@ -275,7 +299,7 @@ def check_query(query):
     for mpid in query:
         print('\nmpid: %s' % mpid)
         print('\tcmpd: %s' % query[mpid]['cmpd'])
-        print('\tstructure has %i sites' % len(StrucTools(query[mpid]['structure']).structure))
+        print('\tstructure formula: %s' % len(StrucTools(query[mpid]['structure']).formula))
 
 def get_strucs(query,
                transform_strucs,
@@ -308,26 +332,34 @@ def get_strucs(query,
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
     
+    # get all unique chemical formulas in the query
     formulas_in_query = sorted(list(set([query[mpid]['cmpd'] for mpid in query])))
+    
     data = {}
     for formula in formulas_in_query:
+        # get all MP IDs in your query having that formula
         mpids = [mpid for mpid in query if query[mpid]['cmpd'] == formula]
         if not transform_strucs:
+            # if no transformations, just return the structures from MP
             data[formula] = {mpid : query[mpid]['structure'] for mpid in mpids}
         else:
+            # now you need to customize this for whatever transformations you want
             if len(mpids) > 1:
                 print('WARNING: %s has %i mpids' % (formula, len(mpids)))
                 raise NotImplementedError('folder structure is not super amenable to this... Reconfiguring recommended')
             
+            # take our 1 MP ID of interest and transform it
             mpid = mpids[0]
             initial_structure = query[mpid]['structure']
             for x in transform_strucs:
+                # make a new "formula" that includes are iterator in the transformation
                 key = '_'.join([formula, str(x)])
                 structools = StrucTools(structure=initial_structure,
                                         ox_states=ox_states)
                 
                 species_mapping = None # *NOTE*: you should customize this for your desired transformation
                 
+                # strucs will have the form {index_identifier : structure}
                 strucs = structools.replace_species(species_mapping=species_mapping,
                                                     n_strucs=max_strucs_per_starting_struc)
                 
@@ -341,8 +373,8 @@ def check_strucs(strucs):
         for ID in strucs[formula]:
             print('\nformula: %s' % formula)
             print('\tID: %s' % ID)
-            for struc in strucs[formula][ID]:
-                print(StrucTools(struc).formula)
+            struc = strucs[formula][ID]
+            print('\tstructure formula: %s' % StrucTools(struc).formula)
 
 def get_magmoms(strucs,
                 max_afm_combos=50,
@@ -369,6 +401,7 @@ def get_magmoms(strucs,
     for formula in strucs:
         magmoms[formula] = {}
         for ID in strucs[formula]:
+            # for each unique structure, get AFM magmom orderings
             structure = strucs[formula][ID]
             magtools = MagTools(structure=structure,
                                 max_afm_combos=max_afm_combos,
@@ -419,9 +452,10 @@ def get_launch_dirs(strucs,
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
     
-    all_launch_dirs = []
+    all_launch_dirs = {}
     for formula in strucs:
         for ID in strucs[formula]:
+            # for each unique structure, generate our launch directories
             structure = strucs[formula][ID]
             if magmoms:
                 curr_magmoms = magmoms[formula][ID]
@@ -441,14 +475,10 @@ def get_launch_dirs(strucs,
             
             launch_dirs = launch.launch_dirs(make_dirs=make_launch_dirs)
             
-            all_launch_dirs += launch_dirs
-    
-    out = {}    
-    for d in all_launch_dirs:
-        for key in d:
-            out[key] = d[key]    
+            for launch_dir in launch_dirs:
+                all_launch_dirs[launch_dir] = launch_dirs[launch_dir]  
 
-    write_json(out, fjson) 
+    write_json(all_launch_dirs, fjson) 
     return read_json(fjson)  
 
 def check_launch_dirs(launch_dirs):
@@ -474,8 +504,11 @@ def submit_calcs(launch_dirs,
     """
     
     for launch_dir in launch_dirs:
-
+        
+        # what are our terminal xcs for that launch_dir
         final_xcs = launch_dirs[launch_dir]['xcs']
+        
+        # what magmoms apply to that launch_dir
         magmom = launch_dirs[launch_dir]['magmom']
         
         sub = SubmitTools(launch_dir=launch_dir,
@@ -484,25 +517,12 @@ def submit_calcs(launch_dirs,
                           user_configs=user_configs,
                           refresh_configs=refresh_configs)
         
+        # prepare VASP directories and write submission script
         sub.write_sub
+        
+        # submit submission script to the queue
         if ready_to_launch:
             sub.launch_sub
-            
-def check_subs(launch_dirs):
-    print('\nanalyzing submission scripts')
-    launch_dirs_to_check = list(launch_dirs.keys())
-    if len(launch_dirs_to_check) > 6:
-        launch_dirs_to_check = launch_dirs_to_check[:3] + launch_dirs_to_check[-3:]
-
-    for d in launch_dirs_to_check:
-        xcs = launch_dirs[d]['xcs']
-        for xc in xcs:
-            fsub = os.path.join(d, 'sub_%s.sh' % xc)
-            with open(fsub) as f:
-                print('\nanalyzing %s' % fsub)
-                for line in f:
-                    if 'working' in line:
-                        print(line)
                     
 def get_results(launch_dirs,
                 user_configs,
@@ -548,16 +568,18 @@ def check_results(results):
         if convergence:
             converged += 1
             print('E (static) = %.2f' % data['results']['E_per_at'])
-            print('E (relax) = %.2f' % data['meta']['E_relax'])
-            print('EDIFFG = %i' % data['meta']['incar']['EDIFFG'])
-            print('1st POTCAR = %s' % data['meta']['potcar'][0])
-            if mag != 'nm':
+            if ANALYSIS_CONFIGS['include_meta']:
+                print('E (relax) = %.2f' % data['meta']['E_relax'])
+                print('EDIFFG = %i' % data['meta']['incar']['EDIFFG'])
+                print('1st POTCAR = %s' % data['meta']['potcar'][0])
+            if (mag != 'nm') and (ANALYSIS_CONFIGS['include_mag']):
                 magnetization = data['magnetization']
                 an_el = list(magnetization.keys())[0]
                 an_idx = list(magnetization[an_el].keys())[0]
                 that_mag = magnetization[an_el][an_idx]['mag']
                 print('mag on %s (%s) = %.2f' % (an_el, str(an_idx), that_mag))
-            print(data['structure'])
+            if ANALYSIS_CONFIGS['include_struc']:
+                print(data['structure'])
     
     print('\n\n %i/%i converged' % (converged, len(keys_to_check)))  
     
