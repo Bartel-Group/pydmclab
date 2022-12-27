@@ -169,7 +169,7 @@ FILE_TAG = 'test-transform-strucs'
 
 # what to query MP for
 ## e.g., 'MnO2', ['MnO2', 'TiO2'], 'Ca-Ti-O, etc
-COMPOSITIONS = 'RuO2' 
+COMPOSITIONS = 'VO2' 
 
 # how to transform MP structures
 ## e.g., [x for x in range(5)] ([0,1,2,3,4])
@@ -358,9 +358,9 @@ def get_strucs(query,
                 structools = StrucTools(structure=initial_structure,
                                         ox_states=ox_states)
                 
-                species_mapping = {'Ru' : 
-                                    {'Ru' : 1-x/max(transform_strucs),
-                                     'Ir' : x/(max(transform_strucs))}
+                species_mapping = {'V' : 
+                                    {'V' : 1-x/max(transform_strucs),
+                                     'Ti' : x/(max(transform_strucs))}
                                     } # *NOTE*: you should customize this for your desired transformation
                 
                 # strucs will have the form {index_identifier : structure}

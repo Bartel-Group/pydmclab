@@ -169,7 +169,7 @@ FILE_TAG = 'test-mp-chemsys'
 
 # what to query MP for
 ## e.g., 'MnO2', ['MnO2', 'TiO2'], 'Ca-Ti-O, etc
-COMPOSITIONS = ['Ca2Ru2O7', 'Nd2Ru2O7']
+COMPOSITIONS = ['ZnMo3N4', 'ZnMoN2']
 
 # how to transform MP structures
 ## e.g., [x for x in range(5)] ([0,1,2,3,4])
@@ -218,10 +218,10 @@ You'll want to customize these depending on your calculations
 
 def get_query(comp, 
               properties=None, 
-              criteria={'nelements' : {'$gte' : 1}}, 
+              criteria=None, 
               only_gs=True, 
               include_structure=True,
-              supercell_structure=False,
+              supercell_structure=[2,1,1],
               max_Ehull=0.05,
               max_sites_per_structure=65,
               max_strucs_per_cmpd=4,
