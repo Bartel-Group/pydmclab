@@ -279,6 +279,29 @@ class SubmitTools(object):
         chgsum = '/home/cbartel/shared/bin/bader/chgsum.pl AECCAR0 AECCAR2'
         bader = '/home/cbartel/shared/bin/bader/bader CHGCAR -ref CHGCAR_sum'
         return '\n%s\n%s\n' % (chgsum, bader)
+    
+    def is_job_in_queue(self, job_name):
+        """
+        Returns:
+            True if this job-name is already in the queue, else False
+            
+        Will prevent you from messing with directories that have running/pending jobs
+        """
+        scripts_dir = os.getcwd()
+        sub_configs = self.sub_configs.copy()
+        fqueue = os.path.join(scripts_dir, sub_configs['fqueue'])
+        with open(fqueue, 'w') as f:
+            subprocess.call(['squeue', '-u', '%s' % os.getlogin(), '--name=%s' % job_name], stdout=f)
+        names_in_q = []
+        with open(fqueue) as f:
+            for line in f:
+                if 'PARTITION' not in line:
+                    names_in_q.append([v for v in line.split(' ') if len(v) > 0][2])
+        if len(names_in_q) > 0:
+            print(' !!! job already in queue, not messing with it')
+            return True
+        
+        return False
           
     @property
     def prepare_directories(self):
@@ -338,6 +361,10 @@ class SubmitTools(object):
         statuses = {}
         # looping through each chain
         for final_xc in final_xcs:
+            job_name = '.'.join(launch_dir.split('/')[-4:]+[final_xc])
+            print('\nchecking if %s is in q' % job_name)
+            if self.is_job_in_queue(job_name):
+                continue            
             statuses[final_xc] = {}
             
             # looping through each VASP calc in that chain
@@ -460,30 +487,6 @@ class SubmitTools(object):
                 print('-------------- warnings should be done ---------------')
                 print('\n~~~~~ prepared %s ~~~~~\n' % calc_dir)
         return statuses
-   
-   
-    def is_job_in_queue(self, job_name):
-        """
-        Returns:
-            True if this job-name is already in the queue, else False
-            
-        Will prevent you from messing with directories that have running/pending jobs
-        """
-        scripts_dir = os.getcwd()
-        sub_configs = self.sub_configs.copy()
-        fqueue = os.path.join(scripts_dir, sub_configs['fqueue'])
-        with open(fqueue, 'w') as f:
-            subprocess.call(['squeue', '-u', '%s' % os.getlogin(), '--name=%s' % job_name], stdout=f)
-        names_in_q = []
-        with open(fqueue) as f:
-            for line in f:
-                if 'PARTITION' not in line:
-                    names_in_q.append([v for v in line.split(' ') if len(v) > 0][2])
-        if len(names_in_q) > 0:
-            print(' !!! job already in queue, not messing with it')
-            return True
-        
-        return False
         
     @property
     def write_sub(self):
@@ -538,7 +541,7 @@ class SubmitTools(object):
             # statuses = {final_xc : {xc_calc : status}}
             # e.g., statuses['metagga']['gga-relax'] = 'done'
         statuses = self.prepare_directories
-        for final_xc in final_xcs:
+        for final_xc in statuses:
             # initialize a submission script for this chain
             fsub = os.path.join(launch_dir, 'sub_%s.sh' % final_xc)
             # initialize a status log file for this chain
@@ -546,9 +549,9 @@ class SubmitTools(object):
             # create a job name based on the launch_dir
                 # e.g., formula.ID.standard.mag.final_xc
             job_name = '.'.join(launch_dir.split('/')[-4:]+[final_xc])
-            print('\nchecking if %s is in q' % fsub)
+            print('\nchecking if %s is in q' % job_name)
             if self.is_job_in_queue(job_name):
-                return
+                continue
             slurm_options['job-name'] = job_name
             # if job isnt in queue already, start writing a new submission script
             with open(fsub, 'w') as f:
