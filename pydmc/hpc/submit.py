@@ -301,6 +301,7 @@ class SubmitTools(object):
             print(' !!! job already in queue, not messing with it')
             return True
         
+        print(' not in queue, onward --> ')
         return False
           
     @property
