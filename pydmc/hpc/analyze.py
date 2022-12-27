@@ -285,6 +285,8 @@ class AnalyzeVASP(object):
         Returns {site index (int) : element (str) for every site in structure}
         """
         contcar = self.outputs.contcar
+        if not contcar:
+            return None
         return {idx : SiteTools(contcar, idx).el for idx in range(len(contcar))}
 
     @property
