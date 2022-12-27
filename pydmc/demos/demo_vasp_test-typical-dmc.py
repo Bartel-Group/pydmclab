@@ -169,7 +169,7 @@ FILE_TAG = CALCS_DIR.split('/')[-2]
 
 # what to query MP for
 ## e.g., 'MnO2', ['MnO2', 'TiO2'], 'Ca-Ti-O, etc
-COMPOSITIONS = ['ZnMo3N4', 'ZnMoN2']
+COMPOSITIONS = ['Zn3MoN4', 'ZnMoN2']
 
 # how to transform MP structures
 ## e.g., [x for x in range(5)] ([0,1,2,3,4])

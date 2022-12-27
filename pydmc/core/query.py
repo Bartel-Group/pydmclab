@@ -200,7 +200,7 @@ class MPQuery(object):
     def get_data_for_comp(self, 
                           comp, 
                           properties=None, 
-                          criteria=None, 
+                          criteria={}, 
                           only_gs=True, 
                           include_structure=True,
                           supercell_structure=False,
