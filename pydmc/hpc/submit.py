@@ -573,7 +573,7 @@ class SubmitTools(object):
                     status = statuses[final_xc][xc_calc]
                     xc_to_run, calc_to_run = xc_calc.split('-')                    
                     calc_dir = os.path.join(launch_dir, xc_calc)
-                    f.write('\necho working on %s (%s) >> %s\n' % (xc_calc, status, fstatus))
+                    f.write('\necho working on %s _%s_ >> %s\n' % (xc_calc, status, fstatus))
                     if status == 'done':
                         # write postprocessing commands if needed
                         if vasp_configs['lobster_static']:
