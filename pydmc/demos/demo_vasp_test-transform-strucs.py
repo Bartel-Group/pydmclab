@@ -576,13 +576,13 @@ def check_results(results):
                 print('E (relax) = %.2f' % data['meta']['E_relax'])
                 print('EDIFFG = %i' % data['meta']['incar']['EDIFFG'])
                 print('1st POTCAR = %s' % data['meta']['potcar'][0])
-            if (mag != 'nm') and (ANALYSIS_CONFIGS['include_mag']):
+            if (mag != 'nm') and ('include_mag' in ANALYSIS_CONFIGS) and (ANALYSIS_CONFIGS['include_mag']):
                 magnetization = data['magnetization']
                 an_el = list(magnetization.keys())[0]
                 an_idx = list(magnetization[an_el].keys())[0]
                 that_mag = magnetization[an_el][an_idx]['mag']
                 print('mag on %s (%s) = %.2f' % (an_el, str(an_idx), that_mag))
-            if ANALYSIS_CONFIGS['include_struc']:
+            if ('include_structure' not in ANALYSIS_CONFIGS) or (ANALYSIS_CONFIGS['include_structure']):
                 print(data['structure'])
     
     print('\n\n %i/%i converged' % (converged, len(keys_to_check)))  
