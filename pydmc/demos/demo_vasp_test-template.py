@@ -1,5 +1,6 @@
 import os
 import numpy as np
+import multiprocessing as multip
 
 from pydmc.utils.handy import read_json, write_json, make_sub_for_launcher
 from pydmc.core.query import MPQuery
@@ -189,8 +190,9 @@ TO_LAUNCH = {'dmc' : ['metagga', 'ggau']}
 LAUNCH_CONFIGS = {'compare_to_mp' : True, 'n_afm_configs' : 1}
 
 # any configurations related to SubmitTools
-## usually no need to change these
-SUB_CONFIGS = {}
+## usually no need to change anything but n_procs... n_procs will 
+## NOTE: do not set n_procs = 'all' unless you are running on a compute node (ie not a login node)
+SUB_CONFIGS = {'n_procs' : 1}
 
 # any configurations related to Slurm
 ## e.g., {'ntasks' : 16, 'time' : int(24*60)}
@@ -202,6 +204,7 @@ VASP_CONFIGS = {'lobster_static' : True, 'relax_incar' : {'ENCUT' : 555}}
 
 # any configurations related to AnalyzeBatch
 ## e.g., {'include_meta' : True, 'include_mag' : True, 'n_procs' : 4}
+## NOTE: do not set n_procs = 'all' unless you are running on a compute node (ie not a login node)
 ANALYSIS_CONFIGS = {'include_meta' : True, 'include_mag' : True, 'n_procs' : 4}
 
 """
@@ -487,11 +490,53 @@ def check_launch_dirs(launch_dirs):
         print('\nlaunching from %s' % d)
         print('   these final xcs: %s' % launch_dirs[d]['xcs'])
         
+def submit_one_calc(launch_dir,
+                    launch_dirs,
+                    user_configs={},
+                    refresh_configs=[],
+                    ready_to_launch=True):
+    
+    """
+    Prepares VASP inputs, writes submission script, and launches job for one launch_dir
+    
+    Args:
+        launch_dir (str) - (formula/ID/standard/mag) to write and launch submission script in
+        launch_dirs (dict) - {launch_dir (formula/ID/standard/mag) : {'xcs' : [list of final_xcs], 'magmoms' : [list of magmoms for each site in structure in launch_dir]}}
+        user_configs (dict) - optional sub, slurm, or VASP configurations
+        refresh_configs (list) - list of which configs to refresh
+        ready_to_launch (bool) - write (True) and launch (True) or just write (False) submission scripts (False
+    
+    Returns:
+        None
+    
+    """
+    # what are our terminal xcs for that launch_dir
+    final_xcs = launch_dirs[launch_dir]['xcs']
+
+    # what magmoms apply to that launch_dir
+    magmom = launch_dirs[launch_dir]['magmom']
+
+    sub = SubmitTools(launch_dir=launch_dir,
+                      final_xcs=final_xcs,
+                      magmom=magmom,
+                      user_configs=user_configs,
+                      refresh_configs=refresh_configs)
+
+    # prepare VASP directories and write submission script
+    sub.write_sub
+
+    # submit submission script to the queue
+    if ready_to_launch:
+        sub.launch_sub
+    
 def submit_calcs(launch_dirs,
                  user_configs={},
                  refresh_configs=['vasp', 'sub', 'slurm'],
-                 ready_to_launch=True):
+                 ready_to_launch=True,
+                 n_procs=1):
     """
+    Prepares VASP inputs, writes submission script, and launches job for all launch_dirs
+    
     Args:
         launch_dirs (dict) - {launch_dir (formula/ID/standard/mag) : {'xcs' : [list of final_xcs], 'magmoms' : [list of magmoms for each site in structure in launch_dir]}}
         user_configs (dict) - optional sub, slurm, or VASP configurations
@@ -503,26 +548,27 @@ def submit_calcs(launch_dirs,
     
     """
     
-    for launch_dir in launch_dirs:
-        
-        # what are our terminal xcs for that launch_dir
-        final_xcs = launch_dirs[launch_dir]['xcs']
-        
-        # what magmoms apply to that launch_dir
-        magmom = launch_dirs[launch_dir]['magmom']
-        
-        sub = SubmitTools(launch_dir=launch_dir,
-                          final_xcs=final_xcs,
-                          magmom=magmom,
-                          user_configs=user_configs,
-                          refresh_configs=refresh_configs)
-        
-        # prepare VASP directories and write submission script
-        sub.write_sub
-        
-        # submit submission script to the queue
-        if ready_to_launch:
-            sub.launch_sub
+    if n_procs == 1:
+        print('\n\n Submitting calculations in serial\n\n')
+        for launch_dir in launch_dirs:
+            submit_one_calc(launch_dir=launch_dir,
+                            launch_dirs=launch_dirs,
+                            user_configs=user_configs,
+                            refresh_configs=refresh_configs,
+                            ready_to_launch=ready_to_launch)
+        return
+    elif n_procs == 'all':
+        n_procs = multip.cpu_count()-1
+    
+    print('\n\n submitting calculations in parallel\n\n')
+    print('not refreshing configs for parallel --> causes trouble')
+    refresh_configs = False
+    pool = multip.Pool(processes=n_procs)
+    pool.starmap(submit_one_calc, 
+                 [(launch_dir, launch_dirs, user_configs, refresh_configs, ready_to_launch) 
+                    for launch_dir in launch_dirs])
+    
+    return
                     
 def get_results(launch_dirs,
                 user_configs,
@@ -642,7 +688,8 @@ def main():
     if remake_subs:
         submit_calcs(launch_dirs=launch_dirs,
                      user_configs=user_sub_configs,
-                     ready_to_launch=ready_to_launch)
+                     ready_to_launch=ready_to_launch,
+                     n_procs=sub_configs['n_procs'])
         
     analysis_configs = ANALYSIS_CONFIGS
     results = get_results(launch_dirs=launch_dirs,
