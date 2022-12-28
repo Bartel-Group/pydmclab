@@ -92,7 +92,7 @@ def make_sub_for_launcher():
     with open(flauncher_sub, 'w') as f:
         f.write('#!/bin/bash -l\n')
         f.write('#SBATCH --nodes=1\n')
-        f.write('#SBATCH --ntasks=1\n')
+        f.write('#SBATCH --ntasks=8\n')
         f.write('#SBATCH --time=4:00:00\n')
         f.write('#SBATCH --error=_log_launcher.e\n')
         f.write('#SBATCH --output=_log_launcher.o\n')

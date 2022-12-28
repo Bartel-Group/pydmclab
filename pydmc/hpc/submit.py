@@ -288,8 +288,7 @@ class SubmitTools(object):
         Will prevent you from messing with directories that have running/pending jobs
         """
         scripts_dir = os.getcwd()
-        sub_configs = self.sub_configs.copy()
-        fqueue = os.path.join(scripts_dir, sub_configs['fqueue'])
+        fqueue = os.path.join(scripts_dir, '_'.join(['q', job_name]+'.o'))
         with open(fqueue, 'w') as f:
             subprocess.call(['squeue', '-u', '%s' % os.getlogin(), '--name=%s' % job_name], stdout=f)
         names_in_q = []
@@ -297,6 +296,7 @@ class SubmitTools(object):
             for line in f:
                 if 'PARTITION' not in line:
                     names_in_q.append([v for v in line.split(' ') if len(v) > 0][2])
+        os.remove(fqueue)
         if len(names_in_q) > 0:
             print(' !!! job already in queue, not messing with it')
             return True
