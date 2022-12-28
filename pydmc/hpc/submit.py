@@ -288,7 +288,7 @@ class SubmitTools(object):
         Will prevent you from messing with directories that have running/pending jobs
         """
         scripts_dir = os.getcwd()
-        fqueue = os.path.join(scripts_dir, '_'.join(['q', job_name]+'.o'))
+        fqueue = os.path.join(scripts_dir, '_'.join(['q', job_name])+'.o')
         with open(fqueue, 'w') as f:
             subprocess.call(['squeue', '-u', '%s' % os.getlogin(), '--name=%s' % job_name], stdout=f)
         names_in_q = []
