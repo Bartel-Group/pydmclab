@@ -593,12 +593,15 @@ def submit_calcs(launch_dirs,
     statuses = pool.map(submit_one_calc, list_of_submit_args)
     pool.close()
     
-    for status in statuses:
-        if not status['success']:
-            launch_dir = status['launch_dir']
-            curr_submit_args = submit_args.copy()
-            curr_submit_args['launch_dir'] = launch_dir
-            submit_one_calc(curr_submit_args)          
+    submitted_w_multiprorcessing = [status for status in statuses if status['success']]
+    failed_w_multiprocessing = [status for status in statuses if not status['success']]
+    
+    print('%i/%i calculations submitted with multiprocessing' % (len(submitted_w_multiprorcessing), len(statuses)))
+    for status in failed_w_multiprocessing:
+        launch_dir = status['launch_dir']
+        curr_submit_args = submit_args.copy()
+        curr_submit_args['launch_dir'] = launch_dir
+        submit_one_calc(curr_submit_args)          
     
     return
                     
