@@ -190,7 +190,7 @@ TO_LAUNCH = {'dmc' : ['metagga', 'ggau']}
 LAUNCH_CONFIGS = {'compare_to_mp' : True, 'n_afm_configs' : 1}
 
 # any configurations related to SubmitTools
-## usually no need to change anything but n_procs... n_procs will 
+## usually no need to change anything but n_procs... n_procs will determine how to parallelize over launch_dirs
 ## NOTE: do not set n_procs = 'all' unless you are running on a compute node (ie not a login node)
 SUB_CONFIGS = {'n_procs' : 1}
 
@@ -562,7 +562,7 @@ def submit_calcs(launch_dirs,
     
     print('\n\n submitting calculations in parallel\n\n')
     print('not refreshing configs for parallel --> causes trouble')
-    refresh_configs = False
+    refresh_configs = []
     pool = multip.Pool(processes=n_procs)
     pool.starmap(submit_one_calc, 
                  [(launch_dir, launch_dirs, user_configs, refresh_configs, ready_to_launch) 
