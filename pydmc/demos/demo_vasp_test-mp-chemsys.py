@@ -194,10 +194,6 @@ LAUNCH_CONFIGS = {'compare_to_mp' : True, 'n_afm_configs' : 0}
 ## NOTE: do not set n_procs = 'all' unless you are running on a compute node (ie not a login node)
 SUB_CONFIGS = {'n_procs' : 1}
 
-# any configurations related to SubmitTools
-## usually no need to change these
-SUB_CONFIGS = {}
-
 # any configurations related to Slurm
 ## e.g., {'ntasks' : 16, 'time' : int(24*60)}
 SLURM_CONFIGS = {'ntasks' : 16, 'time' : int(24*60)}
@@ -669,7 +665,7 @@ def check_results(results):
             if ('include_structure' not in ANALYSIS_CONFIGS) or (ANALYSIS_CONFIGS['include_structure']):
                 print(data['structure'])
     
-    print('\n\n %i/%i converged' % (converged, len(keys_to_check)))   
+    print('\n\n SUMMARY: %i/%i converged' % (converged, len(keys_to_check)))   
     
 def main(): 
 

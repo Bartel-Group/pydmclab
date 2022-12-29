@@ -666,7 +666,7 @@ def check_results(results):
             if ('include_structure' not in ANALYSIS_CONFIGS) or (ANALYSIS_CONFIGS['include_structure']):
                 print(data['structure'])
     
-    print('\n\n %i/%i converged' % (converged, len(keys_to_check)))  
+    print('\n\n SUMMARY: %i/%i converged' % (converged, len(keys_to_check)))  
     
 def main(): 
     
