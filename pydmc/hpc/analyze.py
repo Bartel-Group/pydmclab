@@ -308,7 +308,26 @@ class AnalyzeVASP(object):
                 {idx : 
                     {'mag' : mag[idx]['tot']} 
                         for idx in sorted([i for i in sites_to_els if sites_to_els[i] == el])} 
-                            for el in els}    
+                            for el in els}  
+        
+    @property
+    def gap_properties(self):
+        """
+        Returns {'bandgap' : bandgap (eV),
+                 'is_direct' : True if gap is direct else False,
+                 'cbm' : cbm (eV),
+                 'vbm' : vbm (eV)}
+        """
+        vr = self.outputs.vasprun
+        if vr:
+            props = vr.eigenvalue_band_properties
+            return {'bandgap' : props[0],
+                    'cbm' : props[1],
+                    'vbm' : props[2],
+                    'is_direct' : props[3]}
+        else:
+            return None
+        
     @property
     def els_to_orbs(self):
         """
@@ -478,7 +497,8 @@ class AnalyzeVASP(object):
                 include_calc_setup=False,
                 include_structure=False,
                 include_mag=False,
-                include_dos=False):
+                include_dos=False,
+                include_gap=True):
         data = {}
         data['results'] = self.basic_info
         if include_meta:
@@ -493,6 +513,8 @@ class AnalyzeVASP(object):
             data['magnetization'] = self.magnetization
         if include_dos:
             raise NotImplementedError('still working on DOS processing')
+        if include_gap:
+            data['gap'] = self.gap_properties
         return data   
 
 class AnalyzeBatch(object):
@@ -507,6 +529,7 @@ class AnalyzeBatch(object):
             launch_dirs (dict) : {launch directory : {'xcs' : [final_xcs for each chain of jobs], 'magmom' : [list of magmoms for that launch directory]}}
             user_configs (dict) : any configs relevant to analysis
                 only_static: True # only retrieve data from the static calculations
+                one_xc: if None, retrieve all xcs, else retrieve only the one specified
                 check_relax: True # make sure the relax calculation and the static have similar energies
                 include_meta: False # include metadata like INCAR, KPOINTS, POTCAR settings
                 include_calc_setup: True # include things related to the calculation setup -- standard, mag, final_xc, etc

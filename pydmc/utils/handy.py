@@ -138,3 +138,29 @@ def is_calc_valid(structure,
             return False
         
     return True
+
+def crawl_and_purge(head_dir,
+                    files_to_purge,
+                    safety='on'):
+    """
+    Args:
+        head_dir (str) - directory to start crawling beneath
+        files_to_purge (list) - list of file names to purge
+        safety (str) - 'on' or 'off' to turn on/off safety
+            - if safety is on, won't actually delete files
+    """
+    purged_files = []
+    mem_created = 0
+    for subdir, dirs, files in os.walk(head_dir):
+        for f in files:
+            if f in files_to_purge:
+                path_to_f = os.path.join(subdir, f)
+                mem_created += os.stat(path_to_f)
+                if safety == 'off':
+                    os.remove(path_to_f)
+    if safety == 'off':
+        print('You purged %i files, freeing up %.2f GB of memory' % (len(purged_files), mem_created/1e9))
+    if safety == 'on':
+        print('You had the safety on\n If it were off, you would have purged %i files, freeing up %.2f GB of memory' % (len(purged_files), mem_created/1e9))
+        
+                

@@ -635,7 +635,8 @@ def get_results(launch_dirs,
     write_json(data, fjson) 
     return read_json(fjson)
 
-def check_results(results):
+def check_results(results,
+                  print_structure=False):
 
     keys_to_check = list(results.keys())
 
@@ -659,10 +660,10 @@ def check_results(results):
                 an_idx = list(magnetization[an_el].keys())[0]
                 that_mag = magnetization[an_el][an_idx]['mag']
                 print('mag on %s (%s) = %.2f' % (an_el, str(an_idx), that_mag))
-            if ('include_structure' not in ANALYSIS_CONFIGS) or (ANALYSIS_CONFIGS['include_structure']):
+            if (print_structure) and ('include_structure' not in ANALYSIS_CONFIGS) or (ANALYSIS_CONFIGS['include_structure']):
                 print(data['structure'])
     
-    print('\n\n %i/%i converged' % (converged, len(keys_to_check)))  
+    print('\n\n SUMMARY: %i/%i converged' % (converged, len(keys_to_check)))  
     
 def main(): 
 
