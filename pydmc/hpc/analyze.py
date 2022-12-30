@@ -54,11 +54,18 @@ class VASPOutputs(object):
         """
         Returns dict of VASP input settings from vasprun.xml
         """
+        fincar = os.path.join(self.calc_dir, 'INCAR')
+        if os.path.exists(fincar):
+            return Incar.from_file(os.path.join(self.calc_dir, 'INCAR'))
+        else:
+            return {}          
+        
+    @property
+    def all_input_settings(self):
         vr = self.vasprun
         if vr:
             return vr.parameters
-        else:
-            return Incar.from_file(os.path.join(self.calc_dir, 'INCAR'))
+        return {}
         
     @property
     def kpoints(self):
@@ -476,10 +483,22 @@ class AnalyzeVASP(object):
     @property
     def metadata(self):
         outputs = self.outputs
-        return {'calc_dir' : self.calc_dir,
-                'incar' : outputs.incar.as_dict(),
-                'kpoints' : outputs.kpoints.as_dict(),
-                'potcar' : outputs.potcar}
+        meta = {}
+        incar_data = outputs.incar
+        meta['incar'] = incar_data if isinstance(incar_data, dict) else incar_data.as_dict()
+        
+        kpoints_data = outputs.kpoints
+        meta['kpoints'] = kpoints_data if isinstance(kpoints_data, dict) else kpoints_data.as_dict()
+        
+        potcar_data = outputs.potcar
+        meta['potcar'] = potcar_data if isinstance(potcar_data, dict) else potcar_data.as_dict()
+        
+        input_settings_data = outputs.input_settings
+        meta['input_settings'] = input_settings_data if isinstance(input_settings_data, dict) else input_settings_data.as_dict()
+        
+        meta['calc_dir'] = self.calc_dir
+            
+        return meta
         
     @property
     def calc_setup(self):
