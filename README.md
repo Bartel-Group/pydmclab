@@ -1,92 +1,102 @@
 # pydmc
-- writing a common framework the group can use to do routine things related to running and processing DFT calculations
-- a more organized version of compmatscipy
-- meant to leverage pymatgen w/ more ease of use due to the limited scope
+- common framework to rely upon for typical calculations and analysis done in the Bartel research group
 
+## [core](pydmc/core)
+- core utilities common to work in the group
 
-## CompTools
+### [comp](pydmc/core/comp.py)
+- for manipulating and parsing chemical compositions
 
-#### Summary
-- for handling and manipulating chemical formulas
-- built around the base convention that we usually want formulas that are:
-    - sorted by element
-    - have "1"s 
-    - don't have decimals
-    - are reduced
+### [hulls](pydmc/core/hulls.py)
+- for performing the convex hull analysis to compute phase stability
 
-#### TO DO
-- experiment + add capabilities
+### [mag](pydmc/core/mag.py)
+- for generating MAGMOMs for spin-polarized DFT calculations
 
+### [query](pydmc/core/query.py)
+- for retrieving and processing data from Materials Project
 
-## StrucTools
-
-#### Summary:
+### [struc](pydmc/core/struc.py)
 - for manipulating and analyzing crystal structures
 
-#### TO DO:
-- making supercells
-- making slabs
-- assigning oxidation states
-- ordering disordered structures
-- creating defects
+## [hpc](pydmc/hpc)
+- utilities related to setting up, running, and processing DFT calculations
+
+### [analyze](pydmc/hpc/analyze.py)
+- for processing VASP outputs into compact .json
+- *@TODO*: 
+    - Bader/Mulliken/Lowdin charge analysis
+    - DOS analysis (test and polish)
+    - COHP/COOP/DOE/COBI analysis
+
+### [launch](pydmc/hpc/launch.py)
+- for managing the set up of high-throughput DFT calculations
+
+### [submit](pydmc/hpc/submit.py)
+- for preparing HPC submission scripts to run chains of DFT calculations
+
+### [vasp](pydmc/hpc/vasp.py)
+- for making and editing VASP input files
+
+## [data](pydmc/data)
+- for loading datasets and configuration files
+
+### [configs](pydmc/data/configs.py)
+- baseline configurations for high-throughput executiong and analysis of DFT calculations
+
+### [thermochem](pydmc/data/thermochem.py)
+- elemental reference energies
+- experimental thermochem data
+- *@TODO*:
+    - incorporate r2SCAN mus calculated with DMC standards
+    - incorporate more Materials Project correction business
+
+### [features](pydmc/data/features.py)
+- for loading elemental property data (called by Gibbs energy calculator)
+
+## [utils](pydmc/utils)
+- standalone, simple helper functions
+
+### [handy](pydmc/utils/handy.py)
+- handy little functions like reading/writing .json
+
+### [plotting](pydmc/utils/plotting.py)
+- stores colors and matplotlib settings
+- *@TODO*:
+    - consider migrating to loadable matplotlib "style" and include in data/configs
+
+## [dev](pydmc/dev)
+- work in progress
+
+### [energies](pydmc/dev/energies.py)
+- to compute formation energies
+- to be moved to pydmc/core
+- *@TODO*:
+    - test + polish
+    - decide on whether to strictly follow MP reference energy rules
+
+### [entries](pydmc/dev/entries.py)
+- to play with MP's ComputedEntry functionality
+- might be needed for phase diagram stuff beyond standard hulls
+- *@TODO*:
+    - set up basic functionality
+
+### [grand](pydmc/dev/grand.py)
+- for computing grand potential phase diagrams
+- *@TODO*:
+    - set up basic functionality
+
+### [reactions](pydmc/dev/reactions.py)
+- for computing reaction energies
+- *@TODO*:
+    - set up basic functionality
+
+## [demos](pydmc/demos)
+- demonstrations of how to perform typical actions with pydmc
+
+## Future developments
 - unit tests
-
-## QueryMP
-
-#### Summary:
-- for retrieving typical data from Materials Project
-
-#### TO DO:
-- unit tests
-
-## VASPTools
-#### Summary:
-- for setting up and analyzing typical DFT calculations (e.g., geometry optimizations)
-### VASPSetUp
-#### Summary:
-- for setting up DFT calculations
-
-#### TO DO:
-- experiment + add capabilities
-- unit tests
-
-### VASPAnalysis
-#### Summary:
-- for analyzing DFT calculations (mainly convergence, energies)
-
-#### TO DO:
-- clean up compmatscipy version
-- leverage pymatgen a bit more
-- unit tests
-
-## SubmitTools
-#### Summary:
-- for figuring out which jobs to run and running them
-
-#### TO DO:
-- experiment + add capabilities
-- leverage pymatgen a bit more
-
-## ThermoTools
-- for computing thermodynamic properties
-
-## DOSTools
-- for analyzing DOS-like objects
-### DOSAnalysis
-- for analyzing density of states
-### LOBSTERAnalysis
-- for analyzing COOP, COHP, etc
-
-## DiffusionTools
-### NEBSetUp
-- for setting up NEB calculations
-### NEBAnalysis
-- for analyzing NEB calculations
-### AIMDSetUp
-- for setting up AIMD calculations
-### AIMDAnalysis
-- for analyzing AIMD calculations
-
-## utils
-### handy
-### plotting
+- NEB set up and analysis
+- AIMD set up and analysis
+- ML IP set up and analysis
+- more sophisticated plotting tools/standards
