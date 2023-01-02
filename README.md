@@ -91,10 +91,11 @@
 - *@TODO*:
     - set up basic functionality
 
-## demos
+## [demos](pydmc/demos)
 - demonstrations of how to perform typical actions with pydmc
 
 ## Future developments
+- unit tests
 - NEB set up and analysis
 - AIMD set up and analysis
 - ML IP set up and analysis
