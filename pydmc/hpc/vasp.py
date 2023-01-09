@@ -21,8 +21,12 @@ Here's the workflow I used:
     4) Extract the tar INSIDE a directory: FULL_PATH/bin/pp/potpaw_PBE
     5) $ cd FULL_PATH/bin
     6) $ pmg config -p FULL_PATH/bin/pp pymatgen_pot
-    7) $ pmg config -add PMG_VASP_PSP_DIR FULL_PATH/bin/pymatgen_pot
+    7) $ pmg config --add PMG_VASP_PSP_DIR FULL_PATH/bin/pymatgen_pot
     8) $ pmg config --add PMG_DEFAULT_FUNCTIONAL PBE_54
+    
+Now that this has been done, new users must just do:
+    1) $ pmg config --add PMG_VASP_PSP_DIR FULL_PATH/bin/pymatgen_pot
+    2) $ pmg config --add PMG_DEFAULT_FUNCTIONAL PBE_54
 
 """
 
