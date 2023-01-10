@@ -150,9 +150,9 @@ class VASPSetUp(object):
         
         perturbation = self.configs['perturb_struc']
         if perturbation:
-            structure = self.structure.copy()
-            structure = StrucTools(structure).perturb(perturbation)
-            self.structure = structure
+            initial_structure = self.structure.copy()
+            perturbed_structure = StrucTools(initial_structure).perturb(perturbation)
+            self.structure = perturbed_structure
 
     @property
     def get_vasp_input(self):

@@ -5,6 +5,7 @@ from pymatgen.core.structure import Structure
 from pydmc.utils.handy import read_yaml, write_yaml, is_calc_valid
 from pydmc.core.mag import MagTools
 from pydmc.data.configs import load_launch_configs
+from pydmc.core.struc import StrucTools
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -258,6 +259,15 @@ class LaunchTools(object):
                     fposcar = os.path.join(launch_dir, 'POSCAR')
                     if not os.path.exists(fposcar):
                         struc = Structure.from_dict(structure)
-                        struc.to(fmt='poscar', filename=fposcar)                    
+                        if configs['perturb_launch_poscar']:
+                            initial_structure = struc.copy()
+                            if isinstance(configs['perturb_launch_poscar'], bool):
+                                perturbation = 0.05
+                            else:
+                                perturbation = configs['perturb_launch_poscar']
+                            perturbed_structure = StrucTools(initial_structure).perturb(perturbation)
+                            perturbed_structure.to(fmt='poscar', filename=fposcar)
+                        else:
+                            struc.to(fmt='poscar', filename=fposcar)                    
         
         return launch_dirs
