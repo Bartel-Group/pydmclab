@@ -12,6 +12,8 @@ files_to_inherit: ['WAVECAR', 'CONTCAR'] # usually no need to change
 
 execute_flags: ['srun', 'python', 'lobster', 'bader'] # what to look for in a submission script to see if it should be launched
 
+perturb_first_struc: 0.1 # if float, perturb internal coordinates of all ions for POSCAR of first structure by perturb_first_struc
+
 # this defines what jobs should be chained together and in what order they should be executed
 # if you only wanted to run a static calculation for metagga, you might pass packing['metagga'] = ['metagga-static']
 packing: 

@@ -1,5 +1,6 @@
 from pydmc.hpc.vasp import VASPSetUp
 from pydmc.hpc.analyze import AnalyzeVASP
+from pydmc.core.struc import StrucTools
 from pydmc.utils.handy import read_yaml, write_yaml
 from pydmc.data.configs import load_vasp_configs, load_slurm_configs, load_sub_configs, load_partition_configs
 
@@ -454,9 +455,12 @@ class SubmitTools(object):
                 
                 # making sure we dont perturb POSCARs once calculations get rolling
                 # note: not thoroughly tested, but the idea is that for the very first structure optimization (eg gga-loose), we might want to break symmetries
-                if counter != 1:
-                    calc_configs['perturb_poscar'] = False
-                
+                if (counter == 1) and (status == 'new') and sub_configs['perturb_first_struc']:
+                    if isinstance(sub_configs['perturb_first_struc'], bool):
+                        sub_configs['perturb_first_struc'] = 0.1
+                    initial_structure = Structure.from_file(fpos_dst)
+                    perturbed_structure = StrucTools(initial_structure).perturb(perturbation=sub_configs['perturb_first_struc'])
+                    perturbed_structure.to(filename=fpos_dst, format='poscar')
                 # set our user_configs based on our vasp_configs + our calc_configs
                     # note: vasp_configs should hold the baseline vasp_configs + our user_configs
                     # note: calc_configs should just hold xc_to_run and calc_to_run as of now
