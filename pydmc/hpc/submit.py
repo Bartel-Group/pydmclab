@@ -369,7 +369,9 @@ class SubmitTools(object):
             statuses[final_xc] = {}
             
             # looping through each VASP calc in that chain
+            counter = 0
             for xc_calc in packing[final_xc]:
+                counter += 1
                 
                 # initialize configs that are particular to this particular VASP calc in this chain
                 calc_configs = {}
@@ -449,6 +451,11 @@ class SubmitTools(object):
                     status = 'new'
                 
                 statuses[final_xc][xc_calc] = status
+                
+                # making sure we dont perturb POSCARs once calculations get rolling
+                # note: not thoroughly tested, but the idea is that for the very first structure optimization (eg gga-loose), we might want to break symmetries
+                if counter != 1:
+                    calc_configs['perturb_poscar'] = False
                 
                 # set our user_configs based on our vasp_configs + our calc_configs
                     # note: vasp_configs should hold the baseline vasp_configs + our user_configs

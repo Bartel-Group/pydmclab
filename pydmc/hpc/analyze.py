@@ -165,7 +165,7 @@ class VASPOutputs(object):
     def lobsterin(self):
         s_orbs = ['s']
         p_orbs = ['p_x', 'p_y', 'p_z']
-        d_orbs = ['d_xy', 'd_yz', 'd_z^2', 'd_xz', 'd_(x^2-y^2)']
+        d_orbs = ['d_xy', 'd_yz', 'd_z^2', 'd_xz', 'd_x^2-y^2']
         f_orbs = ['f_y(3x^2-y^2)', 'f_xyz', 'f_yz^2', 'f_z^3', 'f_xz^2', 'f_z(x^2-y^2)', 'f_x(x^2-3y^2)']
         all_orbitals = {'s' : s_orbs,
                         'p' : p_orbs,
@@ -441,7 +441,7 @@ class AnalyzeVASP(object):
         if os.path.exists(fjson) and not remake:
             return read_json(fjson)       
         if not pdos:
-            pdos = self.pdos
+            pdos = self.pdos()
         if not pdos:
             return None
         out = {}

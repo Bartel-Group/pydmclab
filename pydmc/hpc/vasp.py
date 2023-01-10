@@ -1,4 +1,5 @@
 from pydmc.core.mag import MagTools
+from pydmc.core.struc import StrucTools
 from pydmc.hpc.analyze import AnalyzeVASP, VASPOutputs
 from pydmc.data.configs import load_vasp_configs
 from pydmc.utils.handy import read_yaml, write_yaml, dotdict
@@ -146,6 +147,12 @@ class VASPSetUp(object):
         
         # copy configs to prevent further changes                 
         self.configs = configs.copy()
+        
+        perturbation = self.configs['perturb_struc']
+        if perturbation:
+            structure = self.structure.copy()
+            structure = StrucTools(structure).perturb(perturbation)
+            self.structure = structure
 
     @property
     def get_vasp_input(self):

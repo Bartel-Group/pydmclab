@@ -64,7 +64,18 @@ class StrucTools(object):
         print('making supercell with grid %s\n' % str(grid))
         structure.make_supercell(grid)
         return structure
-        
+    
+    def perturb(self, perturbation=0.1):
+        """
+        Args:
+            perturbation (float) - distance in Angstrom to randomly perturb each atom
+            
+        Returns:
+            Structure w/ perturbations
+        """
+        structure = self.structure
+        structure.perturb(perturbation)
+        return structure
     
     @property
     def decorate_with_ox_states(self):
