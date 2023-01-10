@@ -7,4 +7,4 @@ include_structure: True # include the relaxed crystal structure as a dict
 include_mag: False # include the relaxed magnetization info as as dict
 include_dos: False # include the density of states
 verbose: True # print stuff as things get analyzed
-n_procs: all # how many cores to parallelize the analysis over
+n_procs: 1 # how many cores to parallelize the analysis over
