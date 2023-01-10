@@ -429,6 +429,8 @@ class SubmitTools(object):
                 # for jobs that are not DONE:
 
                 # (4) check for POSCAR
+                # flag to check whether POSCAR is newly copied (don't want to perturb already-perturbed structures)
+                freshly_copied = True
                 fpos_dst = os.path.join(calc_dir, 'POSCAR')
                 if os.path.exists(fpos_dst):
                     # if there is a POSCAR, make sure its not empty
@@ -436,6 +438,8 @@ class SubmitTools(object):
                     # if its empty, copy the initial structure to calc_dir
                     if len(contents) == 0:
                         copyfile(fpos_src, fpos_dst)
+                    else:
+                        freshly_copied = False
                 # if theres no POSCAR, copy the initial structure to calc_dir
                 if not os.path.exists(fpos_dst):
                     copyfile(fpos_src, fpos_dst)
@@ -455,7 +459,11 @@ class SubmitTools(object):
                 
                 # making sure we dont perturb POSCARs once calculations get rolling
                 # note: not thoroughly tested, but the idea is that for the very first structure optimization (eg gga-loose), we might want to break symmetries
-                if (counter == 1) and (status == 'new') and sub_configs['perturb_first_struc']:
+                # counter == 1 --> first calculation in chain
+                # status == 'new' --> CONTCAR hasn't been generated yet
+                # sub_configs['perturb_first_struc'] --> checks if we want to perturb
+                # freshly_copied --> (approximately) makes sure we haven't already perturbed
+                if (counter == 1) and (status == 'new') and sub_configs['perturb_first_struc'] and freshly_copied:
                     if isinstance(sub_configs['perturb_first_struc'], bool):
                         sub_configs['perturb_first_struc'] = 0.1
                     initial_structure = Structure.from_file(fpos_dst)
