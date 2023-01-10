@@ -1,6 +1,5 @@
 from pydmc.hpc.vasp import VASPSetUp
 from pydmc.hpc.analyze import AnalyzeVASP
-from pydmc.core.struc import StrucTools
 from pydmc.utils.handy import read_yaml, write_yaml
 from pydmc.data.configs import load_vasp_configs, load_slurm_configs, load_sub_configs, load_partition_configs
 
@@ -430,7 +429,6 @@ class SubmitTools(object):
 
                 # (4) check for POSCAR
                 # flag to check whether POSCAR is newly copied (don't want to perturb already-perturbed structures)
-                freshly_copied = True
                 fpos_dst = os.path.join(calc_dir, 'POSCAR')
                 if os.path.exists(fpos_dst):
                     # if there is a POSCAR, make sure its not empty
@@ -438,8 +436,6 @@ class SubmitTools(object):
                     # if its empty, copy the initial structure to calc_dir
                     if len(contents) == 0:
                         copyfile(fpos_src, fpos_dst)
-                    else:
-                        freshly_copied = False
                 # if theres no POSCAR, copy the initial structure to calc_dir
                 if not os.path.exists(fpos_dst):
                     copyfile(fpos_src, fpos_dst)
@@ -457,18 +453,6 @@ class SubmitTools(object):
                 
                 statuses[final_xc][xc_calc] = status
                 
-                # making sure we dont perturb POSCARs once calculations get rolling
-                # note: not thoroughly tested, but the idea is that for the very first structure optimization (eg gga-loose), we might want to break symmetries
-                # counter == 1 --> first calculation in chain
-                # status == 'new' --> CONTCAR hasn't been generated yet
-                # sub_configs['perturb_first_struc'] --> checks if we want to perturb
-                # freshly_copied --> (approximately) makes sure we haven't already perturbed
-                if (counter == 1) and (status == 'new') and sub_configs['perturb_first_struc'] and freshly_copied:
-                    if isinstance(sub_configs['perturb_first_struc'], bool):
-                        sub_configs['perturb_first_struc'] = 0.1
-                    initial_structure = Structure.from_file(fpos_dst)
-                    perturbed_structure = StrucTools(initial_structure).perturb(perturbation=sub_configs['perturb_first_struc'])
-                    perturbed_structure.to(filename=fpos_dst, format='poscar')
                 # set our user_configs based on our vasp_configs + our calc_configs
                     # note: vasp_configs should hold the baseline vasp_configs + our user_configs
                     # note: calc_configs should just hold xc_to_run and calc_to_run as of now
