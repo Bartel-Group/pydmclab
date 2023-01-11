@@ -302,7 +302,7 @@ def check_query(query):
     for mpid in query:
         print('\nmpid: %s' % mpid)
         print('\tcmpd: %s' % query[mpid]['cmpd'])
-        print('\tstructure formula: %s' % len(StrucTools(query[mpid]['structure']).formula))
+        print('\tstructure formula: %s' % StrucTools(query[mpid]['structure']).formula)
 
 def get_strucs(query,
                transform_strucs,
