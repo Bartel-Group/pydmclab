@@ -135,3 +135,15 @@ pydmc/examples/*/calcs/*/*/*/*/*
 
 # bash-run stuff
 pydmc/*.py~
+
+.DS_Store
+*/.DS_Store
+**/.DS_Store
+
+**/~*
+~*
+*/~*
+
+.vscode
+.vscode/settings.json
+.vscode/*
