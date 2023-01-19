@@ -491,19 +491,30 @@ class AnalyzeVASP(object):
         outputs = self.outputs
         meta = {}
         incar_data = outputs.incar
-        meta["incar"] = (
-            incar_data if isinstance(incar_data, dict) else incar_data.as_dict()
-        )
+        if not incar_data:
+            meta["incar"] = {}
+        else:
+            meta["incar"] = (
+                incar_data if isinstance(incar_data, dict) else incar_data.as_dict()
+            )
 
         kpoints_data = outputs.kpoints
-        meta["kpoints"] = (
-            kpoints_data if isinstance(kpoints_data, dict) else kpoints_data.as_dict()
-        )
+        if not kpoints_data:
+            meta["kpoints"] = {}
+        else:
+            meta["kpoints"] = (
+                kpoints_data
+                if isinstance(kpoints_data, dict)
+                else kpoints_data.as_dict()
+            )
 
         potcar_data = outputs.potcar
-        meta["potcar"] = (
-            potcar_data if isinstance(potcar_data, dict) else potcar_data.as_dict()
-        )
+        if not potcar_data:
+            meta["potcar"] = {}
+        else:
+            meta["potcar"] = (
+                potcar_data if isinstance(potcar_data, dict) else potcar_data.as_dict()
+            )
 
         input_settings_data = outputs.input_settings
         meta["input_settings"] = (
