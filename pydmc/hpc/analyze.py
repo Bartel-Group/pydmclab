@@ -516,11 +516,11 @@ class AnalyzeVASP(object):
                 potcar_data if isinstance(potcar_data, dict) else potcar_data.as_dict()
             )
 
-        input_settings_data = outputs.input_settings
-        meta["input_settings"] = (
-            input_settings_data
-            if isinstance(input_settings_data, dict)
-            else input_settings_data.as_dict()
+        all_input_settings = outputs.all_input_settings
+        meta["all_input_settings"] = (
+            all_input_settings
+            if isinstance(all_input_settings, dict)
+            else all_input_settings.as_dict()
         )
 
         meta["calc_dir"] = self.calc_dir
