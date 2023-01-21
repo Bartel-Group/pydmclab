@@ -10,6 +10,7 @@ from pydmc.data.thermochem import (
 )
 from pydmc.data.features import atomic_masses
 from pydmc.core.comp import CompTools
+from pydmc.utils.handy import eVat_to_kJmol, kJmol_to_eVat
 
 
 class ChemPots(object):
@@ -25,6 +26,7 @@ class ChemPots(object):
         standard="dmc",
         partial_pressures={},  # atm
         diatomics=["H", "N", "O", "F", "Cl"],
+        oxide_type="oxide",
         R=8.6173303e-5,  # eV/K
         user_chempots={},
         user_dmus={},
@@ -38,7 +40,10 @@ class ChemPots(object):
             partial_pressures (dict) - {el (str) : partial pressure (atm)}
                 - adjusts chemical potential of gaseous species based on RTln(p/p0)
             diatomics (list) - list of diatomic elements
-                - if el is in diatomics, will use 0.5 * partial pressure effect on mu
+                - if el is in diatomics, will use 0.5 * partial pressure effecton mu
+            oxide_type (str) - type of oxide
+                - this only affects MP Formation energies
+                - they use different corrections for oxides, peroxides, and superoxides
             user_chempots (dict) - {el (str) : chemical potential (eV/at)}
                 - specifies the chemical potential you want to use for el
                 - will override everything
@@ -52,6 +57,7 @@ class ChemPots(object):
         self.standard = standard
         self.partial_pressures = partial_pressures
         self.diatomics = diatomics
+        self.oxide_type = oxide_type
         self.R = R
         if standard == "mp":
             mp_dmus = mp2020_compatibility_dmus()
@@ -60,6 +66,10 @@ class ChemPots(object):
             if xc == "ggau":
                 for el in mp_dmus["U"]:
                     user_dmus[el] = -mp_dmus["U"][el]
+            if self.oxide_type == "peroxide":
+                user_dmus[el] = --mp_dmus["peroxide"]["O"]
+            elif self.oxide_type == "superoxide":
+                user_dmus[el] = --mp_dmus["superoxide"]["O"]
 
         self.user_dmus = user_dmus
         self.user_chempots = user_chempots
@@ -235,3 +245,98 @@ class FormationEnergy(object):
             n_atoms = CompTools(self.formula).n_atoms
 
             return (1 / n_atoms) * (G * n_atoms - weighted_elemental_energies)
+
+class ReactionEnergy(object):
+    
+    def __init__(self,
+                 formation_energies,
+                 reactants,
+                 products,
+                 open_to=[],
+                 norm='atom',
+                 allowed_filler=['O2', 'N2']):
+        """        
+
+        Args:
+            formation_energies (dict): {formula (str): formation energy (eV/at)}
+                - formation energies should account for chemical potentials (e.g., due to partial pressures)
+            reactants (dict): {formula (str) : stoichiometry (int)}
+            products (dict): {formula (str) : stoichiometry (int)}
+            open_to (list): list of elements to be considered "open" in the reaction. Defaults to None.
+            norm (str, dict): if 'atom', then calculate reaction energy per atom of products formed
+                - otherwise, specify a basis like: {'O' : 3} to normalize per three moles of O in the products formed
+        """
+        
+        self.formation_energies = formation_energies
+        self.reactants = reactants
+        self.products = products
+        self.open_to = open_to
+        self.norm = norm
+        
+    @property
+    def species(self):
+        """
+        puts the reactants and products in the same dictionary
+
+        Returns:
+            {formula (str) : {'side' : 'left' for reactants, 'right' for products},
+                              'amt' : stoichiometry (float) in reaction}}
+        """
+        species = {}
+        reactants, products = self.reactants, self.products
+        energies = self.formation_energies
+        for r in reactants:
+            species[CompTools(r).clean] = {'side' : 'left',
+                                            'amt' : reactants[r],
+                                            'Ef' : energies[r]}
+        for p in products:
+            species[CompTools(p).clean] = {'side' : 'right',
+                                             'amt' : products[p],
+                                            'Ef' : energies[p]}
+        return species
+    
+    def check_species_balance(self, species):
+        """
+        Args:
+            species (dict): {formula (str) : {'side' : 'left' for reactants, 'right' for products},
+                              'amt' : stoichiometry (float) in reaction}}
+        Returns:
+            {element (str) : 0 if balanced, else < 0 if more on left, > 0 if more on right}
+        """
+        
+        involved_elements = [CompTools(formula).els for formula in species]
+        involved_elements = sorted(list(set([item for sublist in involved_elements for item in sublist])))
+        balance = {}
+        for el in involved_elements:
+            left, right = 0, 0
+            for formula in species:
+                if el in CompTools(formula).els:
+                    if species[formula]['side'] == 'left':
+                        left += CompTools(formula).els[el] * species[formula]['amt']
+                    elif species[formula]['side'] == 'right':
+                        right += CompTools(formula).els[el] * species[formula]['amt']
+            balance[el] = left + right
+
+        return left + ' --> ' + right
+        
+    @property
+    def E_rxn(self):
+        species = self.species
+        dE_rxn = 0
+        for formula in species:
+            if CompTools(formula).n_els == 1:
+                continue
+
+            if species[formula]['side'] == 'left':
+                sign = -1
+            elif species[formula]['side'] == 'right':
+                sign = 1
+            else:
+                raise ValueError
+            coef = species[formula]['amt']
+            Ef = species[formula]['Ef']
+            Ef = eVat_to_kJmol(Ef, formula)
+            dE_rxn += sign*coef*Ef
+
+        return dE_rxn
+    
