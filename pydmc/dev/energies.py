@@ -173,6 +173,7 @@ class FormationEnergy(object):
 
     TO DO:
         - write tests/demo
+        - test ideal mixing entropy?
     """
 
     def __init__(
@@ -182,6 +183,10 @@ class FormationEnergy(object):
         chempots,  # from ThermoTools.ChemPots.chempots
         structure=False,
         atomic_volume=False,
+        x_config=None,
+        n_config=1,
+        include_Svib=True,
+        include_Sconfig=False,
     ):
 
         """
@@ -191,18 +196,41 @@ class FormationEnergy(object):
                 - or any formation enthalpy at T <= 298 K
             chempots (dict) - {el (str) : chemical potential (eV/at)}
                 - probably generated using ChemPots.chempots
-
-            Only required for getting temperature-dependent formation energies:
-                structure (Structure) - pymatgen structure object
-                atomic_volume (float) - atomic volume (A^3/atom)
-                override_Ef_0K (float) - formation energy at 0 K (eV/at)
-                    - if False, compute Ef_0K using FormationEnergy.Ef_0K
+            structure (Structure) - pymatgen structure object
+                - either structure or atomic_volume needed for vibrational entropy calculation
+            atomic_volume (float) - atomic volume (A^3/atom)
+                - either structure or atomic_volume needed for vibrational entropy calculation
+            override_Ef_0K (float) - formation energy at 0 K (eV/at)
+                - if False, compute Ef_0K using FormationEnergy.Ef_0K
+            x_config (float) - partial occupancy parameter to compute configurational entropy
+                - needed to compute configurational entropy
+            n_config (int) - number of systems exhibiting ideal solution behavior
+                - this would be one if I have one site that is partially occupied by two ions
+                - this would be two if I have two sites that are each partially occupied by two ions
+            include_Svib (bool) - whether to include vibrational entropy
+            include_Sconfig (bool) - whether to include configurational entropy
         """
         self.formula = CompTools(formula).clean
         self.Ef = Ef
         self.chempots = chempots
         self.structure = structure
         self.atomic_volume = atomic_volume
+        self.include_Svib = include_Svib
+        self.include_Sconfig = include_Sconfig
+        self.x_config = x_config
+        self.n_config = n_config
+
+        if include_Svib:
+            if not structure and not atomic_volume:
+                raise ValueError(
+                    "Must provide structure and atomic volume to compute Svib"
+                )
+
+        if include_Sconfig:
+            if not (x_config and n_config):
+                raise ValueError(
+                    "Must provide x_config and n_config to compute Sconfig"
+                )
 
     @property
     def weighted_elemental_energies(self):
@@ -263,25 +291,50 @@ class FormationEnergy(object):
         if T == 0:
             return Ef_0K
         else:
-            m = self.reduced_mass
-            if self.atomic_volume:
-                V = self.atomic_volume
-            elif self.structure:
-                V = self.structure.volume / len(self.structure)
+            if self.include_Svib:
+                m = self.reduced_mass
+                if self.atomic_volume:
+                    V = self.atomic_volume
+                elif self.structure:
+                    V = self.structure.volume / len(self.structure)
+                else:
+                    raise ValueError("Need atomic volume or structure to compute G(T)")
+
+                Gd_sisso = (
+                    (-2.48e-4 * np.log(V) - 8.94e-5 * m / V) * T
+                    + 0.181 * np.log(T)
+                    - 0.882
+                )
+                weighted_elemental_energies = self.weighted_elemental_energies
+                G = Ef_0K + Gd_sisso
+                n_atoms = CompTools(self.formula).n_atoms
+
+                dGf = (1 / n_atoms) * (G * n_atoms - weighted_elemental_energies)
             else:
-                raise ValueError("Need atomic volume or structure to compute G(T)")
-
-            Gd_sisso = (
-                (-2.48e-4 * np.log(V) - 8.94e-5 * m / V) * T + 0.181 * np.log(T) - 0.882
-            )
-            weighted_elemental_energies = self.weighted_elemental_energies
-            G = Ef_0K + Gd_sisso
-            n_atoms = CompTools(self.formula).n_atoms
-
-            return (1 / n_atoms) * (G * n_atoms - weighted_elemental_energies)
+                dGf = Ef_0K
+                if self.include_Sconfig:
+                    x, n = self.x_config, self.n_config
+                    kB = 8.617e-5  # eV/K
+                    S_config = (
+                        -kB * n * (x * np.log(x) + (1 - x) * np.log(1 - x))
+                    ) / CompTools(formula).n_atoms
+                    dGf += -T * S_config
+            return dGf
 
 
 class ReactionEnergy(object):
+
+    """
+    This is a work in progress
+
+    TO DO:
+        - write tests/demo
+        - incorporate filler
+        - incorporate normalization
+        - incorporate balance checks
+
+    """
+
     def __init__(
         self,
         formation_energies,
