@@ -7,6 +7,7 @@ from pydmc.data.thermochem import (
     mus_at_0K,
     mus_at_T,
     mus_from_mp_no_corrections,
+    mus_from_bartel2019_npj,
 )
 from pydmc.data.features import atomic_masses
 from pydmc.core.comp import CompTools
@@ -21,7 +22,6 @@ class ChemPots(object):
     def __init__(
         self,
         temperature=0,
-        xc="gga",
         functional="pbe",
         standard="dmc",
         partial_pressures={},  # atm
@@ -34,7 +34,6 @@ class ChemPots(object):
         """
         Args:
             temperature (int) - temperature in Kelvin
-            xc (str) - xc for DFT calculations
             functional (str) - explicit functional for DFT claculations (don't include +U in name)
             standard (str) - standard for DFT calculations
             partial_pressures (dict) - {el (str) : partial pressure (atm)}
@@ -52,7 +51,6 @@ class ChemPots(object):
                 - will override everything except user_chempots
         """
         self.temperature = temperature
-        self.xc = xc
         self.functional = functional
         self.standard = standard
         self.partial_pressures = partial_pressures
@@ -63,13 +61,13 @@ class ChemPots(object):
             mp_dmus = mp2020_compatibility_dmus()
             for el in mp_dmus["anions"]:
                 user_dmus[el] = -mp_dmus["anions"][el]
-            if xc == "ggau":
+            if functional == "pbeu":
                 for el in mp_dmus["U"]:
                     user_dmus[el] = -mp_dmus["U"][el]
             if self.oxide_type == "peroxide":
-                user_dmus[el] = --mp_dmus["peroxide"]["O"]
+                user_dmus[el] = -mp_dmus["peroxide"]["O"]
             elif self.oxide_type == "superoxide":
-                user_dmus[el] = --mp_dmus["superoxide"]["O"]
+                user_dmus[el] = -mp_dmus["superoxide"]["O"]
 
         self.user_dmus = user_dmus
         self.user_chempots = user_chempots
@@ -82,13 +80,11 @@ class ChemPots(object):
         """
 
         if self.temperature == 0:
-            if (self.standard == "dmc") or ("meta" in self.xc):
+            if (self.standard == "dmc") or (self.functional in ["scan", "r2scan"]):
                 all_mus = mus_at_0K()
-                els = sorted(list(all_mus[self.standard][self.functional].keys()))
-                mus = {
-                    el: all_mus[self.standard][self.functional][el]["mu"] for el in els
-                }
-            elif (self.standard == "mp") and ("meta" not in self.xc):
+                els = sorted(list(all_mus[self.functional].keys()))
+                mus = {el: all_mus[self.functional][el]["mu"] for el in els}
+            else:
                 mus = mus_from_mp_no_corrections()
         else:
             allowed_Ts = list(range(300, 2100, 100))
@@ -119,8 +115,10 @@ class ChemPots(object):
         return mus
 
 
-class FormationEnergy(object):
+class FormationEnthalpy(object):
     """
+    For computing formation energies (~equivalently enthalpies) at 0 K
+
     TO DO:
         - write tests/demo
     """
@@ -130,9 +128,6 @@ class FormationEnergy(object):
         formula,
         E_DFT,  # eV/at
         chempots,  # from ThermoTools.ChemPots.chempots
-        structure=False,
-        atomic_volume=False,
-        override_Ef_0K=False,
     ):
 
         """
@@ -142,18 +137,10 @@ class FormationEnergy(object):
             chempots (dict) - {el (str) : chemical potential (eV/at)}
                 - probably generated using ChemPots.chempots
 
-            Only required for getting temperature-dependent formation energies:
-                structure (Structure) - pymatgen structure object
-                atomic_volume (float) - atomic volume (A^3/atom)
-                override_Ef_0K (float) - formation energy at 0 K (eV/at)
-                    - if False, compute Ef_0K using FormationEnergy.Ef_0K
         """
         self.formula = CompTools(formula).clean
         self.E_DFT = E_DFT
         self.chempots = chempots
-        self.structure = structure
-        self.atomic_volume = atomic_volume
-        self.override_Ef_0K = override_Ef_0K
 
     @property
     def weighted_elemental_energies(self):
@@ -166,18 +153,66 @@ class FormationEnergy(object):
         return np.sum([mus[el] * els_to_amts[el] for el in els_to_amts])
 
     @property
-    def Ef_0K(self):
+    def Ef(self):
         """
         Returns:
             formation energy at 0 K (eV/at)
         """
-        if self.override_Ef_0K:
-            return self.override_Ef_0K
         formula = self.formula
         n_atoms = CompTools(formula).n_atoms
         weighted_elemental_energies = self.weighted_elemental_energies
         E_per_fu = self.E_DFT * n_atoms
         return (1 / n_atoms) * (E_per_fu - weighted_elemental_energies)
+
+
+class FormationEnergy(object):
+    """
+    This class is for computing formation energies at T > 0 K
+
+    Automatically uses the Bartel2018 model: https://doi.org/10.1038/s41467-018-06682-4
+
+    TO DO:
+        - write tests/demo
+    """
+
+    def __init__(
+        self,
+        formula,
+        Ef,  # eV/at
+        chempots,  # from ThermoTools.ChemPots.chempots
+        structure=False,
+        atomic_volume=False,
+    ):
+
+        """
+        Args:
+            formula (str) - chemical formula
+            Ef (float) - DFT formation enthalpy at 0 K (eV/at)
+                - or any formation enthalpy at T <= 298 K
+            chempots (dict) - {el (str) : chemical potential (eV/at)}
+                - probably generated using ChemPots.chempots
+
+            Only required for getting temperature-dependent formation energies:
+                structure (Structure) - pymatgen structure object
+                atomic_volume (float) - atomic volume (A^3/atom)
+                override_Ef_0K (float) - formation energy at 0 K (eV/at)
+                    - if False, compute Ef_0K using FormationEnergy.Ef_0K
+        """
+        self.formula = CompTools(formula).clean
+        self.Ef = Ef
+        self.chempots = chempots
+        self.structure = structure
+        self.atomic_volume = atomic_volume
+
+    @property
+    def weighted_elemental_energies(self):
+        """
+        Returns:
+            weighted elemental energies (eV per formula unit)
+        """
+        mus = self.chempots
+        els_to_amts = CompTools(self.formula).amts
+        return np.sum([mus[el] * els_to_amts[el] for el in els_to_amts])
 
     @property
     def reduced_mass(self):
@@ -224,11 +259,10 @@ class FormationEnergy(object):
                 - see Chris B Nature Comms 2019
         """
         T = temperature
-        Ef_0K = self.Ef_0K
+        Ef_0K = self.Ef
         if T == 0:
             return Ef_0K
         else:
-            Ef_0K = self.Ef_0K
             m = self.reduced_mass
             if self.atomic_volume:
                 V = self.atomic_volume
@@ -246,16 +280,18 @@ class FormationEnergy(object):
 
             return (1 / n_atoms) * (G * n_atoms - weighted_elemental_energies)
 
+
 class ReactionEnergy(object):
-    
-    def __init__(self,
-                 formation_energies,
-                 reactants,
-                 products,
-                 open_to=[],
-                 norm='atom',
-                 allowed_filler=['O2', 'N2']):
-        """        
+    def __init__(
+        self,
+        formation_energies,
+        reactants,
+        products,
+        open_to=[],
+        norm="atom",
+        allowed_filler=["O2", "N2"],
+    ):
+        """
 
         Args:
             formation_energies (dict): {formula (str): formation energy (eV/at)}
@@ -266,13 +302,13 @@ class ReactionEnergy(object):
             norm (str, dict): if 'atom', then calculate reaction energy per atom of products formed
                 - otherwise, specify a basis like: {'O' : 3} to normalize per three moles of O in the products formed
         """
-        
+
         self.formation_energies = formation_energies
         self.reactants = reactants
         self.products = products
         self.open_to = open_to
         self.norm = norm
-        
+
     @property
     def species(self):
         """
@@ -286,15 +322,19 @@ class ReactionEnergy(object):
         reactants, products = self.reactants, self.products
         energies = self.formation_energies
         for r in reactants:
-            species[CompTools(r).clean] = {'side' : 'left',
-                                            'amt' : reactants[r],
-                                            'Ef' : energies[r]}
+            species[CompTools(r).clean] = {
+                "side": "left",
+                "amt": reactants[r],
+                "Ef": energies[r],
+            }
         for p in products:
-            species[CompTools(p).clean] = {'side' : 'right',
-                                             'amt' : products[p],
-                                            'Ef' : energies[p]}
+            species[CompTools(p).clean] = {
+                "side": "right",
+                "amt": products[p],
+                "Ef": energies[p],
+            }
         return species
-    
+
     def check_species_balance(self, species):
         """
         Args:
@@ -303,22 +343,24 @@ class ReactionEnergy(object):
         Returns:
             {element (str) : 0 if balanced, else < 0 if more on left, > 0 if more on right}
         """
-        
+
         involved_elements = [CompTools(formula).els for formula in species]
-        involved_elements = sorted(list(set([item for sublist in involved_elements for item in sublist])))
+        involved_elements = sorted(
+            list(set([item for sublist in involved_elements for item in sublist]))
+        )
         balance = {}
         for el in involved_elements:
             left, right = 0, 0
             for formula in species:
                 if el in CompTools(formula).els:
-                    if species[formula]['side'] == 'left':
-                        left += CompTools(formula).els[el] * species[formula]['amt']
-                    elif species[formula]['side'] == 'right':
-                        right += CompTools(formula).els[el] * species[formula]['amt']
+                    if species[formula]["side"] == "left":
+                        left += CompTools(formula).els[el] * species[formula]["amt"]
+                    elif species[formula]["side"] == "right":
+                        right += CompTools(formula).els[el] * species[formula]["amt"]
             balance[el] = left + right
 
-        return left + ' --> ' + right
-        
+        return left + " --> " + right
+
     @property
     def E_rxn(self):
         species = self.species
@@ -327,16 +369,40 @@ class ReactionEnergy(object):
             if CompTools(formula).n_els == 1:
                 continue
 
-            if species[formula]['side'] == 'left':
+            if species[formula]["side"] == "left":
                 sign = -1
-            elif species[formula]['side'] == 'right':
+            elif species[formula]["side"] == "right":
                 sign = 1
             else:
                 raise ValueError
-            coef = species[formula]['amt']
-            Ef = species[formula]['Ef']
+            coef = species[formula]["amt"]
+            Ef = species[formula]["Ef"]
             Ef = eVat_to_kJmol(Ef, formula)
-            dE_rxn += sign*coef*Ef
+            dE_rxn += sign * coef * Ef
 
         return dE_rxn
-    
+
+
+def main():
+
+    mus = ChemPots(functional="r2scan", standard="dmc")
+
+    Ef = FormationEnthalpy(
+        formula="IrO2", E_DFT=-0.10729517e04 / 48, chempots=mus.chempots
+    ).Ef
+
+    temperature = 2000
+    mus = ChemPots(temperature=temperature)
+
+    # return mus, mus
+    dGf = FormationEnergy(
+        formula="IrO2", Ef=Ef, chempots=mus.chempots, atomic_volume=10.76
+    ).dGf(temperature)
+    print(Ef)
+    print(dGf)
+
+    return mus, fe
+
+
+if __name__ == "__main__":
+    mus, fe = main()
