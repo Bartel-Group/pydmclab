@@ -523,6 +523,7 @@ class AnalyzeVASP(object):
                 continue
             out["total"] += np.array(out[el])
         for spin in ["up", "down"]:
+            out[spin]["total"] = np.zeros(len(energies))
             for el in out[spin]:
                 out[spin]["total"] += np.array
         out["E"] = energies
