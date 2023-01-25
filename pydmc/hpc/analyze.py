@@ -193,11 +193,11 @@ class VASPOutputs(object):
             are_cobis (bool) : if True, use COBI?
         """
         if are_coops:
-            flobster = os.path.join(self.calc_dir, "COOPCAR")
+            flobster = os.path.join(self.calc_dir, "COOPCAR.lobster")
         elif are_cobis:
-            flobster = os.path.join(self.calc_dir, "COBI?")
+            flobster = os.path.join(self.calc_dir, "COBICAR.lobster")
         else:
-            flobster = os.path.join(self.calc_dir, "COHPCAR")
+            flobster = os.path.join(self.calc_dir, "COHPCAR.lobster")
 
         if not os.path.exists(flobster):
             return None
@@ -487,11 +487,8 @@ class AnalyzeVASP(object):
             - also has a key "E" just like in pdos (1d array of energies aligning with each DOS)
             - also has keys "up" and "down" which separate everything by spin up or spin down
 
-        @TODO: add demo/test
-        @TODO: explore for magnetic materials
-        @TODO: add options for summing or not summing spins
+        @TODO: add demo/test (reasonably well tested now)
         @TODO: work on generic plotting
-        @TODO: work on COHPCAR/COOPCAR
         """
         if not fjson:
             fjson = os.path.join(self.calc_dir, "tdos.json")
@@ -525,10 +522,15 @@ class AnalyzeVASP(object):
         for spin in ["up", "down"]:
             out[spin]["total"] = np.zeros(len(energies))
             for el in out[spin]:
-                out[spin]["total"] += np.array
+                if el != 'total':
+                    out[spin]["total"] += np.array(out[spin][el])
         out["E"] = energies
         for k in out:
-            out[k] = list(out[k])
+            if k not in ['up', 'down']:
+                out[k] = list(out[k])
+        for spin in ['up', 'down']:
+            for k in out[spin]:
+                out[spin][k] = list(out[spin][k])
         return write_json(out, fjson)
 
     def pcohp(self, fjson=None, remake=False, are_coops=False, are_cobis=False):
@@ -569,6 +571,8 @@ class AnalyzeVASP(object):
 
         out = {}
         for bond_idx in cohp:
+            if bond_idx == 'average':
+                continue
             sites = cohp[bond_idx]["sites"]
             els = [sites_to_els[site] for site in sites]
             if sorted(els) == els:
@@ -585,15 +589,25 @@ class AnalyzeVASP(object):
                 "icohp": {"-1": {}, "1": {}},
                 "length": bond_length,
             }
+            out[el_tag][site_tag]['cohp']['total'] = np.zeros(len(energies))
+            out[el_tag][site_tag]['icohp']['total'] = np.zeros(len(energies))
             for spin in cohp[bond_idx]["COHP"]:
                 if spin.name == "up":
                     spin_tag = "1"
                 else:
                     spin_tag = "-1"
-                out[el_tag][site_tag]["cohp"][spin_tag] = cohp[bond_idx]["COHP"][spin]
-                out[el_tag][site_tag]["icohp"][spin_tag] = cohp[bond_idx]["ICOHP"][spin]
+                out[el_tag][site_tag]["cohp"][spin_tag] = list(cohp[bond_idx]["COHP"][spin])
+                out[el_tag][site_tag]["icohp"][spin_tag] = list(cohp[bond_idx]["ICOHP"][spin])
+                out[el_tag][site_tag]['cohp']['total'] += cohp[bond_idx]['COHP'][spin]
+                out[el_tag][site_tag]['icohp']['total'] += cohp[bond_idx]['ICOHP'][spin]
 
-        out["E"] = energies
+        for el_tag in out:
+            for site_tag in out[el_tag]:
+                for key in ['cohp', 'icohp']:
+                    tmp = out[el_tag][site_tag][key]['total']
+                    out[el_tag][site_tag][key]['total'] = list(tmp)
+
+        out["E"] = list(energies)
 
         return write_json(out, fjson)
 
@@ -634,6 +648,13 @@ class AnalyzeVASP(object):
                     out[el_tag]["icohp"] += np.array(
                         pcohp[el_tag][site_tag]["cohp"][spin]
                     )
+                    
+        for el_tag in out:
+            if el_tag == 'E':
+                continue
+            for key in ['cohp', 'icohp']:
+                tmp = out[el_tag][key]
+                out[el_tag][key] = list(tmp)
 
         return write_json(out, fjson)
 
