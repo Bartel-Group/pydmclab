@@ -5,6 +5,16 @@ include_meta: False # include metadata like INCAR, KPOINTS, POTCAR settings
 include_calc_setup: True # include things related to the calculation setup -- standard, mag, final_xc, etc
 include_structure: True # include the relaxed crystal structure as a dict
 include_mag: False # include the relaxed magnetization info as as dict
-include_dos: False # include the density of states
+include_tdos: False # include the light version of the density of states
+include_pdos: False # include heavy dos
+include_charge: False # include partial chage info
+include_madelung: False # include Madelung energies
+include_tcohp: False # include light COHPCAR data
+include_pcohp: False # include heavy COHPCAR data
+include_tcoop: False # include light COOPCAR data
+include_pcoop: False # include heavy COOPCAR data
+include_tcobi: False # include light COBICAR data
+include_pcobi: False # include heavy COBICAR data
+create_cif: True # create a .cif file for each CONTCAR
 verbose: True # print stuff as things get analyzed
 n_procs: 1 # how many cores to parallelize the analysis over

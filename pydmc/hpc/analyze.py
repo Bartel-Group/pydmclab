@@ -5,17 +5,20 @@ import multiprocessing as multip
 from pymatgen.io.vasp.outputs import Vasprun, Outcar, Eigenval
 from pymatgen.core.structure import Structure
 from pymatgen.io.vasp.inputs import Kpoints, Incar
-from pymatgen.io.lobster.inputs import Lobsterin
-from pymatgen.io.lobster.outputs import Doscar
+from pymatgen.io.lobster.outputs import Doscar, Cohpcar, Charge, MadelungEnergies
 
 from pydmc.core.struc import StrucTools, SiteTools
-from pydmc.core.comp import CompTools
 from pydmc.utils.handy import read_json, write_json, read_yaml, write_yaml
 from pydmc.data.configs import load_batch_vasp_analysis_configs
 
 
 class VASPOutputs(object):
     def __init__(self, calc_dir):
+        """
+
+        Args:
+            calc_dir (str): path to where you ran VASP
+        """
 
         self.calc_dir = calc_dir
 
@@ -51,7 +54,7 @@ class VASPOutputs(object):
     @property
     def incar(self):
         """
-        Returns dict of VASP input settings from vasprun.xml
+        Returns dict of VASP input settings from INCAR
         """
         fincar = os.path.join(self.calc_dir, "INCAR")
         if os.path.exists(fincar):
@@ -61,6 +64,9 @@ class VASPOutputs(object):
 
     @property
     def all_input_settings(self):
+        """
+        Returns dict of VASP input settings from vasprun (ie what VASP actually used)
+        """
         vr = self.vasprun
         if vr:
             return vr.parameters
@@ -94,13 +100,29 @@ class VASPOutputs(object):
     @property
     def potcar(self):
         """
-        Returns list of POTCAR symbols from vasprun.xml
+        Returns {el : {'name' : POTCAR name, 'pp' : pseudopotential name, 'date' : date of POTCAR, 'nval' : number of valence electrons}}}
         """
-        vr = self.vasprun
-        if vr:
-            return vr.potcar_symbols
-        else:
+        fpot = os.path.join(self.calc_dir, "POTCAR")
+        if not os.path.exists(fpot):
             return None
+        out = {}
+        with open(fpot) as f:
+            for line in f:
+                if "VRHFIN" in line:
+                    el = line.split("=")[1].split(":")[0].strip()
+                if "TITEL" in line:
+                    tmp_dict = {}
+                    line = line.split("=")[1].split(" ")
+                    tmp_dict["name"] = line[1]
+                    tmp_dict["pp"] = line[2]
+                    tmp_dict["date"] = line[3][:-1]
+                if "ZVAL" in line:
+                    line = line.split(";")[1].split("=")[1].split("mass")[0]
+                    tmp_dict["nval"] = int(
+                        float("".join([val for val in line if val != " "]))
+                    )
+                    out[el] = tmp_dict
+        return out
 
     @property
     def contcar(self):
@@ -148,6 +170,9 @@ class VASPOutputs(object):
     def doscar(self, fdoscar="DOSCAR.lobster"):
         """
         fdoscar (str) - 'DOSCAR' or 'DOSCAR.lobster'
+
+        Returns:
+            Doscar object from DOSCAR in calc_dir
         """
         if not os.path.exists(fdoscar):
             return None
@@ -161,8 +186,37 @@ class VASPOutputs(object):
 
         return dos
 
+    def cohpcar(self, are_coops=False, are_cobis=False):
+        """
+        Args:
+            are_coops (bool) : if True, use COOPCAR
+            are_cobis (bool) : if True, use COBI?
+        """
+        if are_coops:
+            flobster = os.path.join(self.calc_dir, "COOPCAR")
+        elif are_cobis:
+            flobster = os.path.join(self.calc_dir, "COBI?")
+        else:
+            flobster = os.path.join(self.calc_dir, "COHPCAR")
+
+        if not os.path.exists(flobster):
+            return None
+
+        try:
+            cohp = Cohpcar(are_coops=are_coops, are_cobis=are_cobis)
+        except:
+            return None
+
+        return cohp
+
     @property
     def lobsterin(self):
+        """
+        helps set up Lobsterin file
+
+        Returns:
+            {el (str) : {'orbs' : [orbital names], 'basis' : basis name}}
+        """
         s_orbs = ["s"]
         p_orbs = ["p_x", "p_y", "p_z"]
         d_orbs = ["d_xy", "d_yz", "d_z^2", "d_xz", "d_x^2-y^2"]
@@ -224,7 +278,7 @@ class AnalyzeVASP(object):
         """
 
         self.calc_dir = calc_dir
-        if calc == "from_calc_dir":
+        if not calc:
             self.calc = os.path.split(calc_dir)[-1].split("-")[1]
         else:
             self.calc = calc
@@ -370,11 +424,6 @@ class AnalyzeVASP(object):
     def pdos(self, fjson=None, remake=False):
         """
         @TODO: add demo/test
-        @TODO: explore for magnetic materials
-        @TODO: add options for summing or not summing spins
-        @TODO: work on generic plotting
-        @TODO: work on COHPCAR/COOPCAR
-
 
         Returns complex dict of projected DOS data
             - uses DOSCAR.lobster as of now (must run LOBSTER first)
@@ -436,6 +485,7 @@ class AnalyzeVASP(object):
                 1d array of DOS (float) summed for all orbitals, spins, and sites having that element}
             - also has a key "total" : 1d array of total DOS (summed over all orbitals over all e-)
             - also has a key "E" just like in pdos (1d array of energies aligning with each DOS)
+            - also has keys "up" and "down" which separate everything by spin up or spin down
 
         @TODO: add demo/test
         @TODO: explore for magnetic materials
@@ -451,35 +501,266 @@ class AnalyzeVASP(object):
             pdos = self.pdos()
         if not pdos:
             return None
-        out = {}
+        out = {"up": {}, "down": {}}
         energies = pdos["E"]
         for el in pdos:
             if el == "E":
                 continue
             out[el] = np.zeros(len(energies))
+            out["up"][el] = np.zeros(len(energies))
+            out["down"][el] = np.zeros(len(energies))
             for site in pdos[el]:
                 for orb in pdos[el][site]:
                     for spin in pdos[el][site][orb]:
+                        if int(spin) == 1:
+                            out["up"][el] += np.array(pdos[el][site][orb][spin])
+                        elif int(spin) == -1:
+                            out["down"][el] += np.array(pdos[el][site][orb][spin])
                         out[el] += np.array(pdos[el][site][orb][spin])
         out["total"] = np.zeros(len(energies))
         for el in out:
-            if el == "total":
+            if el in ["up", "down", "total"]:
                 continue
             out["total"] += np.array(out[el])
-
+        for spin in ["up", "down"]:
+            for el in out[spin]:
+                out[spin]["total"] += np.array
         out["E"] = energies
         for k in out:
             out[k] = list(out[k])
         return write_json(out, fjson)
 
+    def pcohp(self, fjson=None, remake=False, are_coops=False, are_cobis=False):
+        """_summary_
+
+        Args:
+            fjson (_type_, optional): _description_. Defaults to None.
+            remake (bool, optional): _description_. Defaults to False.
+
+        Raises:
+            NotImplementedError: _description_
+
+        Returns:
+            _type_: _description_
+        """
+
+        if are_coops:
+            savename = "pcoop.json"
+        elif are_cobis:
+            savename = "pcobi.json"
+        else:
+            savename = "pcohp.json"
+
+        if not fjson:
+            fjson = os.path.join(self.calc_dir, savename)
+        if os.path.exists(fjson) and not remake:
+            return read_json(fjson)
+
+        cohpcar = self.outputs.cohpcar(are_coops=are_coops, are_cobis=are_cobis)
+        if not cohpcar:
+            return None
+
+        energies = cohpcar.energies
+
+        cohp = cohpcar.cohp_data
+
+        sites_to_els = self.sites_to_els
+
+        out = {}
+        for bond_idx in cohp:
+            sites = cohp[bond_idx]["sites"]
+            els = [sites_to_els[site] for site in sites]
+            if sorted(els) == els:
+                sorted_sites = sites
+            else:
+                sorted_sites = (sites[1], sites[0])
+            el_tag = "-".join(sorted(els))
+            site_tag = "-".join([str(site) for site in sorted_sites])
+            bond_length = cohp[bond_idx]["length"]
+            if el_tag not in out:
+                out[el_tag] = {}
+            out[el_tag][site_tag] = {
+                "cohp": {"1": {}, "-1": {}},
+                "icohp": {"-1": {}, "1": {}},
+                "length": bond_length,
+            }
+            for spin in cohp[bond_idx]["COHP"]:
+                if spin.name == "up":
+                    spin_tag = "1"
+                else:
+                    spin_tag = "-1"
+                out[el_tag][site_tag]["cohp"][spin_tag] = cohp[bond_idx]["COHP"][spin]
+                out[el_tag][site_tag]["icohp"][spin_tag] = cohp[bond_idx]["ICOHP"][spin]
+
+        out["E"] = energies
+
+        return write_json(out, fjson)
+
+    def tcohp(
+        self, pcohp=None, fjson=None, remake=False, are_coops=False, are_cobis=False
+    ):
+        """ """
+
+        if are_coops:
+            savename = "tcoop.json"
+        elif are_cobis:
+            savename = "tcobi.json"
+        else:
+            savename = "tcohp.json"
+
+        if not fjson:
+            fjson = os.path.join(self.calc_dir, savename)
+
+        if os.path.exists(fjson) and not remake:
+            return read_json(fjson)
+        if not pcohp:
+            pcohp = self.pcohp(are_coops=are_coops, are_cobis=are_cobis)
+        if not pcohp:
+            return None
+
+        out = {"E": pcohp["E"]}
+        for el_tag in pcohp:
+            if el_tag == "E":
+                continue
+            out[el_tag] = {}
+            out[el_tag]["cohp"] = np.zeros(len(out["E"]))
+            out[el_tag]["icohp"] = np.zeros(len(out["E"]))
+            for site_tag in pcohp[el_tag]:
+                for spin in pcohp[el_tag][site_tag]["cohp"]:
+                    out[el_tag]["cohp"] += np.array(
+                        pcohp[el_tag][site_tag]["cohp"][spin]
+                    )
+                    out[el_tag]["icohp"] += np.array(
+                        pcohp[el_tag][site_tag]["cohp"][spin]
+                    )
+
+        return write_json(out, fjson)
+
+    def charge(self, source="bader", fjson=None, remake=False):
+        """
+
+        for obtaining partial charges resulting from dft calculations
+
+        Args:
+            fjson (_type_, optional): _description_. Defaults to None.
+            remake (bool, optional): _description_. Defaults to False.
+
+        Raises:
+            NotImplementedError: _description_
+
+        Returns:
+            {el (str) : {site index (int) : {charge (float)}}}
+        """
+        if not fjson:
+            fjson = os.path.join(self.calc_dir, "tdos.json")
+        if os.path.exists(fjson) and not remake:
+            return read_json(fjson)
+
+        if source == "bader":
+            fcharge = os.path.join(self.calc_dir, "ACF.dat")
+            if not os.path.exists(fcharge):
+                return None
+            sites_to_els = self.sites_to_els
+            nsites = len(self.outputs.contcar)
+            pseudos = self.outputs.potcar
+            data = {}
+            with open(fcharge) as f:
+                count = 0
+                for line in f:
+                    count += 1
+                    if count < 3:
+                        continue
+                    if count > 3 + nsites:
+                        break
+                    line = [v for v in line[:-1].split(" ") if v != ""]
+                    idx, charge = int(line[0]) - 1, float(line[4])
+                    el = sites_to_els[idx]
+                    nval = pseudos[el]["nval"]
+                    delta_charge = nval - charge
+                    data[idx] = {"el": el, "charge": delta_charge}
+            out = {el: {} for el in list(set(sites_to_els.values()))}
+            for idx in data:
+                el = data[idx]["el"]
+                out[el][idx] = data[idx]["charge"]
+
+        elif source in ["mulliken", "lowdin"]:
+            chg = Charge(os.path.join(self.calc_dir, "CHARGE.lobster"))
+            sites_to_els = self.sites_to_els
+            charges = chg.Mulliken if source == "mulliken" else chg.Loewdin
+            out = {el: {} for el in list(set(sites_to_els.values()))}
+            for idx in sites_to_els:
+                el = sites_to_els[idx]
+                out[el][idx] = charges[idx]
+
+        return write_json(out, fjson)
+
+    def charged_structure(self, source, structure=False):
+        """
+        decorates structure with charges calculated from bader, mulliken, lowdin, etc
+
+        Args:
+            source (_type_): _description_
+            structure (bool, optional): _description_. Defaults to False.
+
+        Returns:
+            _type_: _description_
+        """
+        if not structure:
+            structure = self.outputs.contcar
+        charges = self.charge(source=source)
+        charges_by_site = {
+            idx: charge for el in charges for idx, charge in charges[el].items()
+        }
+        sorted_charges = [charges_by_site[idx] for idx in range(len(structure))]
+        structure.add_site_property(source, sorted_charges)
+        return structure
+
+    def magnetic_structure(self, structure=False):
+        """
+        decorates structures with optimized magnetic moments
+
+        Args:
+            structure (bool, optional): _description_. Defaults to False.
+
+        Raises:
+            NotImplementedError: _description_
+
+        Returns:
+            _type_: _description_
+        """
+        if not structure:
+            structure = self.outputs.contcar
+        mags = self.magnetization
+        mags_by_site = {idx: mag for el in mags for idx, mag in mags[el].items()}
+        sorted_charges = [mags_by_site[idx] for idx in range(len(structure))]
+        structure.add_site_property("final_magmom", sorted_charges)
+        return structure
+
+    def E_madelung(self, source):
+        fmadelung = os.path.join(self.calc_dir, "MadelungEnergies.lobster")
+        return {
+            "mulliken": MadelungEnergies(filename=fmadelung).madelungenergies_Mulliken,
+            "lowdin": MadelungEnergies(filename=fmadelung).madelungenergies_Loewdin,
+        }
+
     @property
     def basic_info(self):
+        """
+        Returns:
+            {'convergence' : True if calc converged else False,
+            'E_per_at' : energy per atom if calc converged else None}
+        """
         E_per_at = self.E_per_at
         convergence = True if E_per_at else False
         return {"convergence": convergence, "E_per_at": E_per_at}
 
     @property
     def relaxed_structure(self):
+        """
+
+        Returns:
+            pymatgen Structure.as_dict() for relaxed structure
+        """
         structure = self.outputs.contcar
         if structure:
             return structure.as_dict()
@@ -488,6 +769,15 @@ class AnalyzeVASP(object):
 
     @property
     def metadata(self):
+        """returns compiled metadata
+
+        Returns:
+            {'incar' : incar.as_dict(),
+             'all_input_settings' : all_input_settings.as_dict(),
+             'kpoints' : kpoints.as_dict(),
+             'potcar' : potcar.as_dict(),
+             'calc_dir' : calc_dir,}
+        """
         outputs = self.outputs
         meta = {}
         incar_data = outputs.incar
@@ -512,9 +802,7 @@ class AnalyzeVASP(object):
         if not potcar_data:
             meta["potcar"] = {}
         else:
-            meta["potcar"] = (
-                potcar_data if isinstance(potcar_data, dict) else potcar_data.as_dict()
-            )
+            meta["potcar"] = potcar_data
 
         all_input_settings = outputs.all_input_settings
         meta["all_input_settings"] = (
@@ -529,6 +817,11 @@ class AnalyzeVASP(object):
 
     @property
     def calc_setup(self):
+        """
+
+        Returns:
+            self explanatory?
+        """
         calc_dir = self.calc_dir
         formula, ID, standard, mag, xc_calc = calc_dir.split("/")[-5:]
         return {
@@ -546,9 +839,35 @@ class AnalyzeVASP(object):
         include_calc_setup=False,
         include_structure=False,
         include_mag=False,
-        include_dos=False,
+        include_tdos=False,
+        include_pdos=False,
         include_gap=True,
+        include_charge=True,
+        include_madelung=True,
+        include_tcohp=False,
+        include_pcohp=False,
+        include_tcoop=False,
+        include_pcoop=False,
+        include_tcobi=False,
+        include_pcobi=False,
     ):
+        """
+        Returns all desired data for post-processing DFT calculations
+
+        Args:
+            include_meta (bool, optional): _description_. Defaults to False.
+            include_calc_setup (bool, optional): _description_. Defaults to False.
+            include_structure (bool, optional): _description_. Defaults to False.
+            include_mag (bool, optional): _description_. Defaults to False.
+            include_dos (bool, optional): _description_. Defaults to False.
+            include_gap (bool, optional): _description_. Defaults to True.
+
+        Raises:
+            NotImplementedError: _description_
+
+        Returns:
+            _type_: _description_
+        """
         data = {}
         data["results"] = self.basic_info
         if include_meta:
@@ -561,10 +880,29 @@ class AnalyzeVASP(object):
             data["structure"] = self.relaxed_structure
         if include_mag:
             data["magnetization"] = self.magnetization
-        if include_dos:
-            raise NotImplementedError("still working on DOS processing")
+        if include_tdos:
+            data["tdos"] = self.tdos()
+        if include_pdos:
+            data["pdos"] = self.pdos()
         if include_gap:
             data["gap"] = self.gap_properties
+        if include_charge:
+            for source in ["bader", "mulliken", "lowdin"]:
+                data["charge"] = {source: self.charge(source)}
+        if include_madelung:
+            data["madelung"] = self.E_madelung
+        if include_tcohp:
+            data["tcohp"] = self.tcohp()
+        if include_pcohp:
+            data["pcohp"] = self.pcohp()
+        if include_tcoop:
+            data["tcoop"] = self.tcohp(are_coops=True)
+        if include_pcoop:
+            data["pcoop"] = self.pcohp(are_coops=True)
+        if include_tcobi:
+            data["tcobi"] = self.tcohp(are_cobis=True)
+        if include_pcobi:
+            data["pcobi"] = self.pcohp(are_cobis=True)
         return data
 
 
@@ -671,8 +1009,9 @@ class AnalyzeBatch(object):
         include_calc_setup = configs["include_calc_setup"]
         include_structure = configs["include_structure"]
         include_mag = configs["include_mag"]
-        include_dos = configs["include_dos"]
+        include_tdos = configs["include_tdos"]
         check_relax = configs["check_relax"]
+        create_cif = configs["create_cif"]
 
         if verbose:
             print("analyzing %s" % calc_dir)
@@ -684,7 +1023,7 @@ class AnalyzeBatch(object):
             include_calc_setup=include_calc_setup,
             include_structure=include_structure,
             include_mag=include_mag,
-            include_dos=include_dos,
+            include_tdos=include_tdos,
         )
 
         # store the relax energy if we asked to
@@ -698,6 +1037,9 @@ class AnalyzeBatch(object):
         # save the data in a dictionary with a key for that calc_dir
         key = self._key_for_calc_dir(calc_dir)
 
+        if create_cif and summary["results"]["convergence"] and include_structure:
+            s = Structure.from_dict(summary["structure"])
+            s.to(fmt="cif", filename=os.path.join(calc_dir, key + ".cif"))
         return {key: summary}
 
     @property
