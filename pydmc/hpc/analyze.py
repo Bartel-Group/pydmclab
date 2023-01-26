@@ -370,7 +370,7 @@ class AnalyzeVASP(object):
         els = sorted(list(set(sites_to_els.values())))
         return {
             el: {
-                idx: {"mag": mag[idx]["tot"]}
+                str(idx): {"mag": mag[idx]["tot"]}
                 for idx in sorted([i for i in sites_to_els if sites_to_els[i] == el])
             }
             for el in els
@@ -428,18 +428,29 @@ class AnalyzeVASP(object):
         Returns complex dict of projected DOS data
             - uses DOSCAR.lobster as of now (must run LOBSTER first)
 
+        Args:
+            fjson (os.PathLike) - path to json file to save pdos data to
+            remake (bool) - if True, remake pdos data even if fjson exists
+
         Returns:
-            {element (str) :
-                {site index in CONTCAR (int) :
+            - dictionary (let's call it d)
+            - list(d.keys()) = ['E'] + [list of elements (str)]
+                - e.g., if I calculate Ca2Ru2O7, the keys will be ['E', 'Ca', 'Ru', 'O']
+            - d['E'] = 1d array of energies corresponding with DOS
+            - d[el] =
+                {site index in CONTCAR (str) :
                     {orbital (str) (e.g., '2p_x') :
-                        {spin (str) (e.g., '1' or ???) :
-                            {DOS (float)}}}}}
-            NOTE: there is one more key in the first level
-                {'E' : 1d array of energies corresponding with DOS}
-                - so when looping through elements, you must
-                    for el in pdos:
-                        if el != 'E':
-                            ...
+                        spin (str) (e.g., '1' (spin up) or '-1' (spin down) :
+                            DOS (1d array)}}
+                - elaborating
+                    - d[el].keys() would be all the sites where that element appears in the structure ['4', '5', '6', ...]
+                    - d[el][site].keys() would be the orbitals for all valence electrons in the calculation ['4d_xy', '4d_xz', '4d_yz', ...]
+                    - d[el][site][orb].keys() would be the spins ['1', '-1']
+
+            - so if I wanted to plot the spin-up 4d_xy DOS for Ru on site 8, it would be:
+                energies = d['E']
+                dos = d['Ru']['8']['4d_xy']['1']
+                plt.plot(dos, energies)
 
         """
 
@@ -463,15 +474,15 @@ class AnalyzeVASP(object):
             el = sites_to_els[site_idx]
             orbitals = sites_to_orbs[site_idx]
             if el not in out:
-                out[el] = {site_idx: {}}
+                out[el] = {str(site_idx): {}}
             else:
-                out[el][site_idx] = {}
+                out[el][str(site_idx)] = {}
             for orbital in orbitals:
-                out[el][site_idx][orbital] = {}
+                out[el][str(site_idx)][orbital] = {}
                 dos = complete_dos.get_site_orbital_dos(site, orbital).as_dict()
                 energies = dos["energies"]
                 for spin in dos["densities"]:
-                    out[el][site_idx][orbital][spin] = dos["densities"][spin]
+                    out[el][str(site_idx)][orbital][spin] = dos["densities"][spin]
         out["E"] = energies
         return write_json(out, fjson)
 
@@ -480,12 +491,30 @@ class AnalyzeVASP(object):
         Returns more compact dict than pdos
             - uses DOSCAR.lobster as of now (must run LOBSTER first)
 
+        Args:
+            pdos (dict or None) - if you don't pass the pdos dictionary, it will make it before working on tdos
+            fjson (os.PathLike) - path to json file to save pdos data to
+            remake (bool) - if True, remake pdos data even if fjson exists
+
         Returns:
-            {element (str) :
-                1d array of DOS (float) summed for all orbitals, spins, and sites having that element}
-            - also has a key "total" : 1d array of total DOS (summed over all orbitals over all e-)
-            - also has a key "E" just like in pdos (1d array of energies aligning with each DOS)
-            - also has keys "up" and "down" which separate everything by spin up or spin down
+            - dictionary (let's call it d)
+            - list(d.keys()) = ['E', 'total', 'up', 'down'] + [list of elements (str)]
+            - d['E'] = 1d array of energies corresponding with DOS
+            - d[el] = 1d array of DOS for that element (sums all sites, orbitals, and spins)
+            - d['total'] = 1d array of DOS for structure (sums all elements, sites, orbitals, spins)
+            - d['up'] or d['down']:
+                - keys are ['total'] + [list of elements (str)]
+                - d['up']['total'] = 1d array of spin-up DOS for structure
+                - d['down'][el] = 1d array of spin-down DOS for that element
+                - etc
+
+            - so if I wanted to plot the total DOS for my structure and separate spin up (+ DOS) and spin down (- DOS)
+
+                energies = d['E']
+                dos_up = d['up']['total']
+                dos_down = d['down']['total']
+                plt.plot(dos_up, energies)
+                plt.plot(-1*dos_down, energies)
 
         @TODO: add demo/test (reasonably well tested now)
         @TODO: work on generic plotting
@@ -522,29 +551,60 @@ class AnalyzeVASP(object):
         for spin in ["up", "down"]:
             out[spin]["total"] = np.zeros(len(energies))
             for el in out[spin]:
-                if el != 'total':
+                if el != "total":
                     out[spin]["total"] += np.array(out[spin][el])
         out["E"] = energies
         for k in out:
-            if k not in ['up', 'down']:
+            if k not in ["up", "down"]:
                 out[k] = list(out[k])
-        for spin in ['up', 'down']:
+        for spin in ["up", "down"]:
             for k in out[spin]:
                 out[spin][k] = list(out[spin][k])
         return write_json(out, fjson)
 
     def pcohp(self, fjson=None, remake=False, are_coops=False, are_cobis=False):
-        """_summary_
+        """
+        @TODO: add demo/test
+
+        Returns complex dict of projected COHP, COOP, or COBI data
+            - must run LOBSTER first
+            - note: COHP, COOP, and COBI have similar format so they get processed the same way. If you want all three, you might do:
+                for bonding in ["cohp", "coop", "cobi"]:
+                    cohp_data = self.pcohp(are_coops=False, are_cobis=False)
+                    coop_data = self.pcohp(are_coops=True, are_cobis=False)
+                    cobi_data = self.pcohp(are_coops=False, are_cobis=True)
 
         Args:
-            fjson (_type_, optional): _description_. Defaults to None.
-            remake (bool, optional): _description_. Defaults to False.
-
-        Raises:
-            NotImplementedError: _description_
+            fjson (os.PathLike) - path to json file to save pdos data to
+            remake (bool) - if True, remake pchohp data even if fjson exists
+            are_coops (bool) - True if you want COOP analysis
+            are_cobis (bool) - True if you want COBI analysis
+                - both False = COHP analysis
 
         Returns:
-            _type_: _description_
+            - dictionary (let's call it d)
+            - list(d.keys()) = ['E'] + [el1-el2 (str) for all pairs of elements in structure that might be bonding]
+                - note: el1-el2 is sorted alphabetically
+                - e.g., the keys for Ca2Ru2O7 might be: ['Ca-Ca', 'Ca-Ru', 'Ca-O', 'Ru-Ru', 'O-Ru', 'O-O', 'E']
+            - d['E'] = 1d array of energies corresponding with DOS
+            - for each "bond type" (el1-el2), we have particular bonds:
+                - d[el1-el2].keys() might be ['16-8', '17-8', '18-8', '16-9', ...]
+                    - indicating specific between el1 on site 16 and el2 on site 8, etc
+                - for each specific bond, we have three keys:
+                    d[el1-el2][site1-site].keys() = ['cohp', 'icohp', 'length']
+                    - 'length' returns simply the bond length in Angstrom (float)
+                    - 'cohp' and 'icohp' have the same structure
+                        - 'cohp' refers to the absolute COHP/COOP/COBI and 'icohp' refers to the integrated COHP/COOP/COBI (don't remember exactly how this integral is done but I remember not loving it...)
+                        - d[el1-el2][site1-site]['cohp'].keys() = ['1', '-1', 'total']
+                            - '1' and '-1' refer to spin up and spin down, respectively
+                            - 'total' means summing over these two spins
+                            - d[el1-el2][site1-site]['cohp']['1' or '-1' or 'total'] gives a 1d array of populations
+
+            - so if I wanted to plot the total COHP for the interaction between Ru on site 8 and O on site 16, I would do:
+                energies = d['E']
+                cohp = d['O-Ru']['16-8']['cohp']['total']
+                plt.plot(cohp, energies)
+
         """
 
         if are_coops:
@@ -571,7 +631,7 @@ class AnalyzeVASP(object):
 
         out = {}
         for bond_idx in cohp:
-            if bond_idx == 'average':
+            if bond_idx == "average":
                 continue
             sites = cohp[bond_idx]["sites"]
             els = [sites_to_els[site] for site in sites]
@@ -589,23 +649,27 @@ class AnalyzeVASP(object):
                 "icohp": {"-1": {}, "1": {}},
                 "length": bond_length,
             }
-            out[el_tag][site_tag]['cohp']['total'] = np.zeros(len(energies))
-            out[el_tag][site_tag]['icohp']['total'] = np.zeros(len(energies))
+            out[el_tag][site_tag]["cohp"]["total"] = np.zeros(len(energies))
+            out[el_tag][site_tag]["icohp"]["total"] = np.zeros(len(energies))
             for spin in cohp[bond_idx]["COHP"]:
                 if spin.name == "up":
                     spin_tag = "1"
                 else:
                     spin_tag = "-1"
-                out[el_tag][site_tag]["cohp"][spin_tag] = list(cohp[bond_idx]["COHP"][spin])
-                out[el_tag][site_tag]["icohp"][spin_tag] = list(cohp[bond_idx]["ICOHP"][spin])
-                out[el_tag][site_tag]['cohp']['total'] += cohp[bond_idx]['COHP'][spin]
-                out[el_tag][site_tag]['icohp']['total'] += cohp[bond_idx]['ICOHP'][spin]
+                out[el_tag][site_tag]["cohp"][spin_tag] = list(
+                    cohp[bond_idx]["COHP"][spin]
+                )
+                out[el_tag][site_tag]["icohp"][spin_tag] = list(
+                    cohp[bond_idx]["ICOHP"][spin]
+                )
+                out[el_tag][site_tag]["cohp"]["total"] += cohp[bond_idx]["COHP"][spin]
+                out[el_tag][site_tag]["icohp"]["total"] += cohp[bond_idx]["ICOHP"][spin]
 
         for el_tag in out:
             for site_tag in out[el_tag]:
-                for key in ['cohp', 'icohp']:
-                    tmp = out[el_tag][site_tag][key]['total']
-                    out[el_tag][site_tag][key]['total'] = list(tmp)
+                for key in ["cohp", "icohp"]:
+                    tmp = out[el_tag][site_tag][key]["total"]
+                    out[el_tag][site_tag][key]["total"] = list(tmp)
 
         out["E"] = list(energies)
 
@@ -614,7 +678,42 @@ class AnalyzeVASP(object):
     def tcohp(
         self, pcohp=None, fjson=None, remake=False, are_coops=False, are_cobis=False
     ):
-        """ """
+        """
+        @TODO: add demo/test
+
+        Returns simpler dict of projected COHP, COOP, or COBI data
+            - must run LOBSTER first
+            - note: COHP, COOP, and COBI have similar format so they get processed the same way. If you want all three, you might do:
+                for bonding in ["cohp", "coop", "cobi"]:
+                    cohp_data = self.pcohp(are_coops=False, are_cobis=False)
+                    coop_data = self.pcohp(are_coops=True, are_cobis=False)
+                    cobi_data = self.pcohp(are_coops=False, are_cobis=True)
+
+        Args:
+            pcohp (dict) - if you already have pcohp data, you can pass it in here
+            fjson (os.PathLike) - path to json file to save pdos data to
+            remake (bool) - if True, remake pchohp data even if fjson exists
+            are_coops (bool) - True if you want COOP analysis
+            are_cobis (bool) - True if you want COBI analysis
+                - both False = COHP analysis
+
+        Returns:
+            - dictionary (let's call it d)
+            - list(d.keys()) = ['E'] + [el1-el2 (str) for all pairs of elements in structure that might be bonding]
+                - note: el1-el2 is sorted alphabetically
+                - e.g., the keys for Ca2Ru2O7 might be: ['Ca-Ca', 'Ca-Ru', 'Ca-O', 'Ru-Ru', 'O-Ru', 'O-O', 'E']
+            - d['E'] = 1d array of energies corresponding with DOS
+            - for each "bond type" (el1-el2), we have two keys: ['cohp', 'icohp']
+                - cohp --> absolute populations
+                - icohp --> integrated populations
+                - d[el1-el2]['cohp' or 'icohp'] will return a 1d array of populations summed over all interactions of el1-el2 in the structure, summed over all spins
+
+            - so if I wanted to plot the total COHP for the interaction between Ru and O throughout the structure:
+                energies = d['E']
+                cohp = d['O-Ru']['cohp']
+                plt.plot(cohp, energies)
+
+        """
 
         if are_coops:
             savename = "tcoop.json"
@@ -648,11 +747,11 @@ class AnalyzeVASP(object):
                     out[el_tag]["icohp"] += np.array(
                         pcohp[el_tag][site_tag]["cohp"][spin]
                     )
-                    
+
         for el_tag in out:
-            if el_tag == 'E':
+            if el_tag == "E":
                 continue
-            for key in ['cohp', 'icohp']:
+            for key in ["cohp", "icohp"]:
                 tmp = out[el_tag][key]
                 out[el_tag][key] = list(tmp)
 
@@ -671,10 +770,10 @@ class AnalyzeVASP(object):
             NotImplementedError: _description_
 
         Returns:
-            {el (str) : {site index (int) : {charge (float)}}}
+            {el (str) : {site index (str) : {charge (float)}}}
         """
         if not fjson:
-            fjson = os.path.join(self.calc_dir, "tdos.json")
+            fjson = os.path.join(self.calc_dir, "charge-%s.json" % source)
         if os.path.exists(fjson) and not remake:
             return read_json(fjson)
 
@@ -703,7 +802,7 @@ class AnalyzeVASP(object):
             out = {el: {} for el in list(set(sites_to_els.values()))}
             for idx in data:
                 el = data[idx]["el"]
-                out[el][idx] = data[idx]["charge"]
+                out[el][str(idx)] = data[idx]["charge"]
 
         elif source in ["mulliken", "lowdin"]:
             chg = Charge(os.path.join(self.calc_dir, "CHARGE.lobster"))
@@ -712,7 +811,7 @@ class AnalyzeVASP(object):
             out = {el: {} for el in list(set(sites_to_els.values()))}
             for idx in sites_to_els:
                 el = sites_to_els[idx]
-                out[el][idx] = charges[idx]
+                out[el][str(idx)] = charges[idx]
 
         return write_json(out, fjson)
 
@@ -733,7 +832,7 @@ class AnalyzeVASP(object):
         charges_by_site = {
             idx: charge for el in charges for idx, charge in charges[el].items()
         }
-        sorted_charges = [charges_by_site[idx] for idx in range(len(structure))]
+        sorted_charges = [charges_by_site[str(idx)] for idx in range(len(structure))]
         structure.add_site_property(source, sorted_charges)
         return structure
 
@@ -754,7 +853,7 @@ class AnalyzeVASP(object):
             structure = self.outputs.contcar
         mags = self.magnetization
         mags_by_site = {idx: mag for el in mags for idx, mag in mags[el].items()}
-        sorted_charges = [mags_by_site[idx] for idx in range(len(structure))]
+        sorted_charges = [mags_by_site[str(idx)] for idx in range(len(structure))]
         structure.add_site_property("final_magmom", sorted_charges)
         return structure
 
