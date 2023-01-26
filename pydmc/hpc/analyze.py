@@ -358,7 +358,7 @@ class AnalyzeVASP(object):
         """
         Returns {element (str) :
                     {site index (int) :
-                        {'mag' : total magnetization on site}}}
+                        total magnetization on site (float)}}
         """
         oc = self.outputs.outcar
         if not oc:
@@ -370,7 +370,7 @@ class AnalyzeVASP(object):
         els = sorted(list(set(sites_to_els.values())))
         return {
             el: {
-                str(idx): {"mag": mag[idx]["tot"]}
+                str(idx): mag[idx]["tot"]
                 for idx in sorted([i for i in sites_to_els if sites_to_els[i] == el])
             }
             for el in els
@@ -817,14 +817,15 @@ class AnalyzeVASP(object):
 
     def charged_structure(self, source, structure=False):
         """
-        decorates structure with charges calculated from bader, mulliken, lowdin, etc
+        decorates structures with optimized magnetic moments
 
         Args:
-            source (_type_): _description_
-            structure (bool, optional): _description_. Defaults to False.
+            source (str): source of charge, e.g. "bader", "mulliken", "lowdin"
+            structure (bool, optional): if you pass a structure, it will start from it. otherwise, it will use the CONTCAR
 
         Returns:
-            _type_: _description_
+            structure where each site has a "site property" called source
+            - so, if s = AnalyzeVASP(calc_dir).charged_structure(source='bader'), then s[0].properties["bader"] will give you the bader charge for that site
         """
         if not structure:
             structure = self.outputs.contcar
@@ -841,13 +842,11 @@ class AnalyzeVASP(object):
         decorates structures with optimized magnetic moments
 
         Args:
-            structure (bool, optional): _description_. Defaults to False.
-
-        Raises:
-            NotImplementedError: _description_
+            structure (bool, optional): if you pass a structure, it will start from it. otherwise, it will use the CONTCAR
 
         Returns:
-            _type_: _description_
+            structure where each site has a "site property" called "final_magmom"
+            - so, if s = AnalyzeVASP(calc_dir).magnetic_structure(), then s[0].properties["final_magmom"] will give you the optimized magnetic moment of the first site
         """
         if not structure:
             structure = self.outputs.contcar
@@ -857,7 +856,16 @@ class AnalyzeVASP(object):
         structure.add_site_property("final_magmom", sorted_charges)
         return structure
 
-    def E_madelung(self, source):
+    @property
+    def E_madelung(self):
+        """
+        Returns the Madelung energy for a structure
+            - must run lobster
+
+        Returns:
+            {'mulliken' : Madelung energy using Mulliken charges,
+            'lowdin' : Madelung energy using Lowdin charges}
+        """
         fmadelung = os.path.join(self.calc_dir, "MadelungEnergies.lobster")
         return {
             "mulliken": MadelungEnergies(filename=fmadelung).madelungenergies_Mulliken,
