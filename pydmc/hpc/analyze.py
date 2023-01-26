@@ -780,7 +780,7 @@ class AnalyzeVASP(object):
         if source == "bader":
             fcharge = os.path.join(self.calc_dir, "ACF.dat")
             if not os.path.exists(fcharge):
-                return None
+                return {}
             sites_to_els = self.sites_to_els
             nsites = len(self.outputs.contcar)
             pseudos = self.outputs.potcar
@@ -805,6 +805,9 @@ class AnalyzeVASP(object):
                 out[el][str(idx)] = data[idx]["charge"]
 
         elif source in ["mulliken", "lowdin"]:
+            fcharge = os.path.join(self.calc_dir, "CHARGE.lobster")
+            if not os.path.exists(fcharge):
+                return {}
             chg = Charge(os.path.join(self.calc_dir, "CHARGE.lobster"))
             sites_to_els = self.sites_to_els
             charges = chg.Mulliken if source == "mulliken" else chg.Loewdin
@@ -830,6 +833,8 @@ class AnalyzeVASP(object):
         if not structure:
             structure = self.outputs.contcar
         charges = self.charge(source=source)
+        if not charges:
+            return structure
         charges_by_site = {
             idx: charge for el in charges for idx, charge in charges[el].items()
         }
@@ -851,6 +856,8 @@ class AnalyzeVASP(object):
         if not structure:
             structure = self.outputs.contcar
         mags = self.magnetization
+        if not mags:
+            return structure
         mags_by_site = {idx: mag for el in mags for idx, mag in mags[el].items()}
         sorted_charges = [mags_by_site[str(idx)] for idx in range(len(structure))]
         structure.add_site_property("final_magmom", sorted_charges)
@@ -867,10 +874,14 @@ class AnalyzeVASP(object):
             'lowdin' : Madelung energy using Lowdin charges}
         """
         fmadelung = os.path.join(self.calc_dir, "MadelungEnergies.lobster")
-        return {
-            "mulliken": MadelungEnergies(filename=fmadelung).madelungenergies_Mulliken,
-            "lowdin": MadelungEnergies(filename=fmadelung).madelungenergies_Loewdin,
-        }
+        if os.path.exists(fmadelung):
+            return {
+                "mulliken": MadelungEnergies(
+                    filename=fmadelung
+                ).madelungenergies_Mulliken,
+                "lowdin": MadelungEnergies(filename=fmadelung).madelungenergies_Loewdin,
+            }
+        return {}
 
     @property
     def basic_info(self):
