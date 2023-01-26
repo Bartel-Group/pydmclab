@@ -325,9 +325,9 @@ class FormationEnergy(object):
 class ReactionEnergy(object):
 
     """
-    This is a work in progress
+    *** This is a work in progress ***
 
-    TO DO:
+    @TODO:
         - write tests/demo
         - incorporate filler
         - incorporate normalization
