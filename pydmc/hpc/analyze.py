@@ -791,7 +791,7 @@ class AnalyzeVASP(object):
                     count += 1
                     if count < 3:
                         continue
-                    if count > 3 + nsites:
+                    if count > 2 + nsites:
                         break
                     line = [v for v in line[:-1].split(" ") if v != ""]
                     idx, charge = int(line[0]) - 1, float(line[4])
