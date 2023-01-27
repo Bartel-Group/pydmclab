@@ -161,9 +161,9 @@ class MagTools(object):
             el = SiteTools(structure, idx).el
             if el in magnetic_ions:
                 magnetic_sites += 1
-            if magnetic_sites > 1:
-                if magnetic_sites % 2 == 0:
-                    return True
+        if magnetic_sites > 1:
+            if magnetic_sites % 2 == 0:
+                return True
 
     @property
     def get_nonmagnetic_structure(self):
