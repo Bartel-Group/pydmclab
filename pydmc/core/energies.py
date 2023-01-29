@@ -13,7 +13,6 @@ from pydmc.data.features import atomic_masses
 from pydmc.core.comp import CompTools
 
 
-
 class ChemPots(object):
     """
     return dictionary of chemical potentials {el : chemical potential (eV/at)} based on user inputs
@@ -100,7 +99,7 @@ class ChemPots(object):
                 else:
                     factor = 1
                 mus[el] += (
-                    -self.R
+                    self.R
                     * self.temperature
                     * factor
                     * np.log(self.partial_pressures[el])
