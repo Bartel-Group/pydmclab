@@ -229,8 +229,10 @@ class VASPSetUp(object):
             structure.add_site_property("magmom", magmom)
 
         # MP wants to set W_pv but we don't have that one in PBE54 (no biggie)
+        """
         if configs["standard"] != "mp":
             modify_potcar["W"] = "W"
+        """
 
         # don't mess with much if trying to match Materials Project
         if configs["standard"] == "mp":
@@ -294,7 +296,7 @@ class VASPSetUp(object):
 
             # for strict comparison to Materials Project GGA(+U) calculations, we need to use the old POTCARs
             if configs["standard"] == "mp":
-                potcar_functional = None
+                potcar_functional = "PBE"
 
         # start from MPScanRelaxSet for meta-GGA
         elif configs["xc_to_run"] == "metagga":
