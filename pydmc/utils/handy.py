@@ -1,6 +1,7 @@
 import json, os, yaml, subprocess
 from pydmc.core.mag import MagTools
 from pydmc.core.comp import CompTools
+from pydmc.hpc.analyze import AnalyzeVASP
 
 
 def read_json(fjson):
@@ -147,7 +148,7 @@ def is_calc_valid(structure, standard, xc, calc, mag, magmom, mag_override):
     return True
 
 
-def crawl_and_purge(head_dir, files_to_purge, safety="on"):
+def crawl_and_purge(head_dir, files_to_purge, safety="on", check_convergence=True):
     """
     Args:
         head_dir (str) - directory to start crawling beneath
@@ -158,12 +159,24 @@ def crawl_and_purge(head_dir, files_to_purge, safety="on"):
     purged_files = []
     mem_created = 0
     for subdir, dirs, files in os.walk(head_dir):
-        for f in files:
-            if f in files_to_purge:
-                path_to_f = os.path.join(subdir, f)
-                mem_created += os.stat(path_to_f)
-                if safety == "off":
-                    os.remove(path_to_f)
+        ready = False
+        if check_convergence:
+            if "POTCAR" in files:
+                av = AnalyzeVASP(subdir)
+                if av.is_converged:
+                    ready = True
+                else:
+                    ready = False
+        else:
+            ready = True
+        if ready:
+            for f in files:
+                if f in files_to_purge:
+                    path_to_f = os.path.join(subdir, f)
+                    mem_created += os.stat(path_to_f)
+                    purged_files.append(path_to_f)
+                    if safety == "off":
+                        os.remove(path_to_f)
     if safety == "off":
         print(
             "You purged %i files, freeing up %.2f GB of memory"
