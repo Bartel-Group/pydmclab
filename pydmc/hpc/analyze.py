@@ -1214,9 +1214,12 @@ class AnalyzeBatch(object):
         return out
 
 
-
-
-def crawl_and_purge(head_dir, files_to_purge, safety="on", check_convergence=True):
+def crawl_and_purge(
+    head_dir,
+    files_to_purge=["WAVECAR", "CHGCAR", "CHG", "PROCAR"],
+    safety="on",
+    check_convergence=True,
+):
     """
     Args:
         head_dir (str) - directory to start crawling beneath
@@ -1243,7 +1246,7 @@ def crawl_and_purge(head_dir, files_to_purge, safety="on", check_convergence=Tru
             for f in files:
                 if f in files_to_purge:
                     path_to_f = os.path.join(subdir, f)
-                    mem_created += os.stat(path_to_f)
+                    mem_created += os.stat(path_to_f).st_size
                     purged_files.append(path_to_f)
                     if safety == "off":
                         os.remove(path_to_f)
