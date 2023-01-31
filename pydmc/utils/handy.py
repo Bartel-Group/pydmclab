@@ -167,6 +167,8 @@ def crawl_and_purge(head_dir, files_to_purge, safety="on", check_convergence=Tru
                     ready = True
                 else:
                     ready = False
+            else:
+                ready = True
         else:
             ready = True
         if ready:
