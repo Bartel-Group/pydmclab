@@ -355,7 +355,10 @@ class VASPSetUp(object):
 
         # add more ionic steps
         if "NSW" not in modify_incar:
-            modify_incar["NSW"] = 199
+            if configs["calc_to_run"] == "static":
+                modify_incar["NSW"] = 0
+            else:
+                modify_incar["NSW"] = 199
 
         # make sure spin is off for nm calculations
         if configs["mag"] == "nm":
