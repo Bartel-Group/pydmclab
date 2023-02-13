@@ -10,6 +10,8 @@ from pymatgen.analysis.structure_matcher import StructureMatcher
 from pymatgen.core.composition import Element, Composition
 from pymatgen.core.ion import Ion
 
+import os
+
 
 class StrucTools(object):
     """
@@ -20,14 +22,32 @@ class StrucTools(object):
         """
         Args:
             structure (Structure): pymatgen Structure object
+                - if dict, assumes it is Structure.as_dict(); converts to Structure object
+                - if str, assumes it is a path to a structure file, converts to Structure object
             ox_states (dict): dictionary of oxidation states {el (str) : oxidation state (int)}
                 - or None
 
         """
         if isinstance(structure, dict):
             structure = Structure.from_dict(structure)
+        if isinstance(structure, str):
+            if os.path.exists(structure):
+                structure = Structure.from_file(structure)
+            else:
+                raise ValueError(
+                    "you passed a string to StrucTools > this means a path to a structure > but the path is empty ..."
+                )
         self.structure = structure
         self.ox_states = ox_states
+
+    @property
+    def structure_as_dict(self):
+        """
+
+        Returns:
+            dict: pymatgen Structure.as_dict()
+        """
+        return self.structure.as_dict()
 
     @property
     def compact_formula(self):
