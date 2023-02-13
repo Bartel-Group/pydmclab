@@ -251,15 +251,14 @@ class MagTools(object):
         print("%i magnetic sites" % len(magnetic_sites))
         # enumerate all possible ways to yield afm ordering
         combos = itertools.product(range(len(spins)), repeat=len(magnetic_sites))
-        combos = list(combos)
-        print("%i combos" % len(combos))
+
         combos = [c for c in combos if sum(c) == 0.5 * len(magnetic_sites)]
         print("%i afm combos" % len(combos))
 
         # randomly reduce list if too big for practical usage
         if len(combos) > max_combos:
             combos = random.Random(0).sample(combos, max_combos)
-            print("%i afm combos" % len(combos))
+            print("reduced to: %i afm combos" % len(combos))
 
         # decorate structures w/ magmoms for all afm orderings
         for j in range(len(combos)):
