@@ -1,16 +1,16 @@
 only_static: True # only retrieve data from the static calculations
 one_xc: # if None, retrieve all xcs, else retrieve only the one specified
 check_relax: True # make sure the relax calculation and the static have similar energies
-include_meta: False # include metadata like INCAR, KPOINTS, POTCAR settings
+include_meta: True # include metadata like INCAR, KPOINTS, POTCAR settings
 include_calc_setup: True # include things related to the calculation setup -- standard, mag, final_xc, etc
 include_structure: True # include the relaxed crystal structure as a dict
-include_mag: False # include the relaxed magnetization info as as dict
-include_tdos: False # include the light version of the density of states
-include_pdos: False # include heavy dos
-include_charge: False # include partial chage info
-include_madelung: False # include Madelung energies
-include_tcohp: False # include light COHPCAR data
-include_pcohp: False # include heavy COHPCAR data
+include_mag: True # include the relaxed magnetization info as as dict
+include_tdos: True # include the light version of the density of states
+include_pdos: True # include heavy dos
+include_charge: True # include partial chage info
+include_madelung: True # include Madelung energies
+include_tcohp: True # include light COHPCAR data
+include_pcohp: True # include heavy COHPCAR data
 include_tcoop: False # include light COOPCAR data
 include_pcoop: False # include heavy COOPCAR data
 include_tcobi: False # include light COBICAR data
