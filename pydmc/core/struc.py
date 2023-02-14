@@ -168,7 +168,15 @@ class StrucTools(object):
         """
         structure = self.structure
         print("replacing species with %s\n" % str(species_mapping))
-        structure.replace_species(species_mapping)
+
+        for el_to_replace in species_mapping:
+            if (len(species_mapping[el_to_replace]) == 1) and (
+                list(species_mapping[el_to_replace].values())[0] == 0
+            ):
+                structure.remove_species(species=[el_to_replace])
+                del species_mapping[el_to_replace]
+        if species_mapping:
+            structure.replace_species(species_mapping)
         if structure.is_ordered:
             return {0: structure.as_dict()}
         else:
