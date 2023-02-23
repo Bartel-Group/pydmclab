@@ -306,7 +306,11 @@ class AnalyzeVASP(object):
         """
         if self.is_converged:
             vr = self.outputs.vasprun
-            return vr.final_energy / self.nsites
+            nsites = self.nsites
+            
+            if nsites and vr.final_energy:
+                return vr.final_energy / nsites
+            return None
         else:
             return None
 
@@ -315,7 +319,12 @@ class AnalyzeVASP(object):
         """
         Returns number of sites in POSCAR
         """
-        return len(self.outputs.poscar)
+        poscar = self.outputs.poscar
+        if poscar:
+            return len(poscar)
+        else:
+            return None
+
 
     @property
     def nbands(self):
