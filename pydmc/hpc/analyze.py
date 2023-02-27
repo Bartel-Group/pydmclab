@@ -1224,7 +1224,16 @@ class AnalyzeBatch(object):
 
 def crawl_and_purge(
     head_dir,
-    files_to_purge=["WAVECAR", "CHGCAR", "CHG", "PROCAR"],
+    files_to_purge=[
+        "WAVECAR",
+        "CHGCAR",
+        "CHG",
+        "PROCAR",
+        "LOCPOT",
+        "AECCAR0",
+        "AECCAR1",
+        "AECCAR2",
+    ],
     safety="on",
     check_convergence=True,
     verbose=False,
