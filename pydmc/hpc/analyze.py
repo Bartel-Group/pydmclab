@@ -307,7 +307,7 @@ class AnalyzeVASP(object):
         if self.is_converged:
             vr = self.outputs.vasprun
             nsites = self.nsites
-            
+
             if nsites and vr.final_energy:
                 return vr.final_energy / nsites
             return None
@@ -324,7 +324,6 @@ class AnalyzeVASP(object):
             return len(poscar)
         else:
             return None
-
 
     @property
     def nbands(self):
@@ -1248,7 +1247,7 @@ def crawl_and_purge(
                 else:
                     ready = False
             else:
-                ready = True
+                ready = False
         else:
             ready = True
         if ready:
