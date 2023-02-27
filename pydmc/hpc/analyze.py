@@ -1227,6 +1227,7 @@ def crawl_and_purge(
     files_to_purge=["WAVECAR", "CHGCAR", "CHG", "PROCAR"],
     safety="on",
     check_convergence=True,
+    verbose=False,
 ):
     """
     Args:
@@ -1254,6 +1255,8 @@ def crawl_and_purge(
             for f in files:
                 if f in files_to_purge:
                     path_to_f = os.path.join(subdir, f)
+                    if verbose:
+                        print(path_to_f)
                     mem_created += os.stat(path_to_f).st_size
                     purged_files.append(path_to_f)
                     if safety == "off":
