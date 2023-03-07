@@ -132,7 +132,7 @@ class GetHullInputData(object):
             d = write_json(d, fjson)
         return d["hull_spaces"]
 
-    def hullin_data(self, fjson=False, remake=False):
+    def hullin_data(self, fjson=False, remake=True):
         """
 
         Args:
@@ -149,27 +149,28 @@ class GetHullInputData(object):
         """
         if not fjson:
             fjson = "hull_input_data.json"
-        if (remake == True) or not os.path.exists(fjson):
-            hullin_data = {}
-            hull_spaces = self.hull_spaces()
-            compounds = self.compounds
-            compound_to_energy = self.compound_to_energy
-            for space in hull_spaces:
-                for el in space:
-                    compound_to_energy[el] = 0
-                relevant_compounds = [
-                    c for c in compounds if set(CompTools(c).els).issubset(set(space))
-                ] + list(space)
-                hullin_data["_".join(list(space))] = {
-                    c: {
-                        "E": compound_to_energy[c],
-                        "amts": {el: CompTools(c).mol_frac(el=el) for el in space},
-                    }
-                    for c in relevant_compounds
-                }
-            return write_json(hullin_data, fjson)
-        else:
+        if os.path.exists(fjson) and not remake:
             return read_json(fjson)
+
+        hullin_data = {}
+        hull_spaces = self.hull_spaces()
+        compounds = self.compounds
+        compound_to_energy = self.compound_to_energy
+        for space in hull_spaces:
+            for el in space:
+                compound_to_energy[el] = 0
+            relevant_compounds = [
+                c for c in compounds if set(CompTools(c).els).issubset(set(space))
+            ] + list(space)
+            hullin_data["_".join(list(space))] = {
+                c: {
+                    "E": compound_to_energy[c],
+                    "amts": {el: CompTools(c).mol_frac(el=el) for el in space},
+                }
+                for c in relevant_compounds
+            }
+        write_json(hullin_data, fjson)
+        return read_json(hullin_data, fjson)
 
 
 class AnalyzeHull(object):
