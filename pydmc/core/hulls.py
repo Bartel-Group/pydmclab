@@ -170,7 +170,7 @@ class GetHullInputData(object):
                 for c in relevant_compounds
             }
         write_json(hullin_data, fjson)
-        return read_json(hullin_data, fjson)
+        return read_json(fjson)
 
 
 class AnalyzeHull(object):
@@ -180,7 +180,7 @@ class AnalyzeHull(object):
     Output can be a dictionary with hull results for one chemical space or can be run for specified compounds
     """
 
-    def __init__(self, hullin_data, chemical_space):
+    def __init__(self, hullin_data, chemical_space, exclude_els=False):
         """
         Args:
             hullin_data (dict) - dictionary generated in GetHullInputData().hullin_data
@@ -199,6 +199,10 @@ class AnalyzeHull(object):
 
             chemical_space (tuple) - chemical space to analyze
                 - changes chemical space to tuple (el1, el2, ...)
+
+            exclude_els (bool) - if True, the energies of the elements will be made very high
+                - this is useful when computing mixing energies (e.g., for voltage curves)
+
         """
         hullin_data = hullin_data[chemical_space]
 
@@ -208,13 +212,15 @@ class AnalyzeHull(object):
         }
 
         els = chemical_space.split("_")
+
         for el in els:
             hullin_data[el] = {
-                "E": 0,
+                "E": 0 if not exclude_els else 0.1,
                 "amts": {
                     els[i]: CompTools(el).mol_frac(els[i]) for i in range(len(els))
                 },
             }
+
         self.hullin_data = hullin_data
 
         self.chemical_space = tuple(els)
@@ -425,7 +431,7 @@ class AnalyzeHull(object):
         A = self.A_for_decomp_solver(compound, competing_compounds)
         b = self.b_for_decomp_solver(compound)
         Es = self.Es_for_decomp_solver(competing_compounds)
-        n0 = [0.1 for c in competing_compounds]
+        n0 = [0 for c in competing_compounds]
         max_bound = CompTools(compound).n_atoms
         bounds = [(0, max_bound) for c in competing_compounds]
 

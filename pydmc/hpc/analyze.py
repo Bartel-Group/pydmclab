@@ -337,21 +337,6 @@ class AnalyzeVASP(object):
             return None
 
     @property
-    def formula(self):
-        """
-        Returns formula of structure from POSCAR (full)
-        """
-        return self.outputs.poscar.formula
-
-    @property
-    def compact_formula(self):
-        """
-        Returns formula of structure from POSCAR (compact)
-            - use this w/ E_per_at
-        """
-        return StrucTools(self.outputs.poscar).compact_formula
-
-    @property
     def sites_to_els(self):
         """
         Returns {site index (int) : element (str) for every site in structure}
@@ -492,7 +477,8 @@ class AnalyzeVASP(object):
                 for spin in dos["densities"]:
                     out[el][str(site_idx)][orbital][spin] = dos["densities"][spin]
         out["E"] = energies
-        return write_json(out, fjson)
+        write_json(out, fjson)
+        return read_json(fjson)
 
     def tdos(self, pdos=None, fjson=None, remake=False):
         """
@@ -568,7 +554,8 @@ class AnalyzeVASP(object):
         for spin in ["up", "down"]:
             for k in out[spin]:
                 out[spin][k] = list(out[spin][k])
-        return write_json(out, fjson)
+        write_json(out, fjson)
+        return read_json(fjson)
 
     def pcohp(self, fjson=None, remake=False, are_coops=False, are_cobis=False):
         """
@@ -681,7 +668,8 @@ class AnalyzeVASP(object):
 
         out["E"] = list(energies)
 
-        return write_json(out, fjson)
+        write_json(out, fjson)
+        return read_json(fjson)
 
     def tcohp(
         self, pcohp=None, fjson=None, remake=False, are_coops=False, are_cobis=False
@@ -763,7 +751,8 @@ class AnalyzeVASP(object):
                 tmp = out[el_tag][key]
                 out[el_tag][key] = list(tmp)
 
-        return write_json(out, fjson)
+        write_json(out, fjson)
+        return read_json(fjson)
 
     def charge(self, source="bader", fjson=None, remake=False):
         """
@@ -824,7 +813,8 @@ class AnalyzeVASP(object):
                 el = sites_to_els[idx]
                 out[el][str(idx)] = charges[idx]
 
-        return write_json(out, fjson)
+        write_json(out, fjson)
+        return read_json(fjson)
 
     def charged_structure(self, source, structure=False):
         """
@@ -867,9 +857,26 @@ class AnalyzeVASP(object):
         if not mags:
             return structure
         mags_by_site = {idx: mag for el in mags for idx, mag in mags[el].items()}
-        sorted_charges = [mags_by_site[str(idx)] for idx in range(len(structure))]
-        structure.add_site_property("final_magmom", sorted_charges)
+        sorted_mags = [mags_by_site[str(idx)] for idx in range(len(structure))]
+        structure.add_site_property("final_magmom", sorted_mags)
         return structure
+
+    def decorated_structure(self, charge_source="bader", structure=None):
+        """
+        decorates structures with optimized magnetic moments
+
+        Args:
+            structure (bool, optional): if you pass a structure, it will start from it. otherwise, it will use the CONTCAR
+
+        Returns:
+            structure where each site has two "site properties": ["final_magmom", charge_source]
+            - so, if s = AnalyzeVASP(calc_dir).magnetic_structure(), then s[0].properties["final_magmom"] will give you the optimized magnetic moment of the first site
+        """
+        if not structure:
+            structure = self.outputs.contcar
+        mag_struc = self.magnetic_structure(structure=structure)
+        dec_struc = self.charged_structure(source=charge_source, structure=mag_struc)
+        return dec_struc
 
     @property
     def E_madelung(self):
@@ -892,15 +899,36 @@ class AnalyzeVASP(object):
         return {}
 
     @property
+    def formula(self):
+        """
+        returns the compact formula of the calculated structure
+
+        Returns:
+            compact formula (str) or None
+        """
+        contcar = self.outputs.contcar
+        if contcar:
+            return StrucTools(contcar).compact_formula
+        poscar = self.outputs.poscar
+        if poscar:
+            return StrucTools(poscar).compact_formula
+        return None
+
+    @property
     def basic_info(self):
         """
         Returns:
             {'convergence' : True if calc converged else False,
-            'E_per_at' : energy per atom if calc converged else None}
+            'E_per_at' : energy per atom if calc converged else None,
+            'formula' : compact formula of computed structure}
         """
         E_per_at = self.E_per_at
         convergence = True if E_per_at else False
-        return {"convergence": convergence, "E_per_at": E_per_at}
+        return {
+            "convergence": convergence,
+            "E_per_at": E_per_at,
+            "formula": self.formula,
+        }
 
     @property
     def relaxed_structure(self):
@@ -973,7 +1001,7 @@ class AnalyzeVASP(object):
         calc_dir = self.calc_dir
         formula, ID, standard, mag, xc_calc = calc_dir.split("/")[-5:]
         return {
-            "formula": formula,
+            "formula_tag": formula,
             "ID": ID,
             "standard": standard,
             "mag": mag,
@@ -1025,7 +1053,9 @@ class AnalyzeVASP(object):
                 data["meta"] = {}
             data["meta"]["setup"] = self.calc_setup
         if include_structure:
-            data["structure"] = self.relaxed_structure
+            data["structure"] = self.decorated_structure(
+                charge_source="bader", structure=None
+            )
         if include_mag:
             data["magnetization"] = self.magnetization
         if include_tdos:
@@ -1035,8 +1065,9 @@ class AnalyzeVASP(object):
         if include_gap:
             data["gap"] = self.gap_properties
         if include_charge:
+            data["charge"] = {}
             for source in ["bader", "mulliken", "lowdin"]:
-                data["charge"] = {source: self.charge(source)}
+                data["charge"][source] = self.charge(source)
         if include_madelung:
             data["madelung"] = self.E_madelung
         if include_tcohp:
