@@ -1070,15 +1070,19 @@ class AnalyzeVASP(object):
                 data["meta"] = {}
             data["meta"]["setup"] = self.calc_setup
         if include_structure:
-            data["structure"] = self.decorated_structure(
-                charge_source="bader", structure=None
-            )
+            # data["structure"] = self.decorated_structure(
+            #    charge_source="bader", structure=None
+            # )
+            data["structure"] = self.relaxed_structure
         if include_mag:
             data["magnetization"] = self.magnetization
         if include_tdos:
-            data["tdos"] = self.tdos()
+            pdos = self.pdos()
+            tdos = self.tdos(pdos=pdos)
+            data["tdos"] = tdos
         if include_pdos:
-            data["pdos"] = self.pdos()
+            pdos = self.pdos()
+            data["pdos"] = pdos
         if include_gap:
             data["gap"] = self.gap_properties
         if include_charge:
@@ -1088,9 +1092,12 @@ class AnalyzeVASP(object):
         if include_madelung:
             data["madelung"] = self.E_madelung
         if include_tcohp:
-            data["tcohp"] = self.tcohp()
+            pcohp = self.pcohp()
+            tcohp = self.tcohp(pcohp=pcohp)
+            data["tcohp"] = tcohp
         if include_pcohp:
-            data["pcohp"] = self.pcohp()
+            pcohp = self.pcohp()
+            data["pcohp"] = pcohp
         if include_tcoop:
             data["tcoop"] = self.tcohp(are_coops=True)
         if include_pcoop:
