@@ -9,6 +9,7 @@ from pymatgen.transformations.standard_transformations import (
 from pymatgen.analysis.structure_matcher import StructureMatcher
 from pymatgen.core.composition import Element, Composition
 from pymatgen.core.ion import Ion
+from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
 import os
 
@@ -220,6 +221,50 @@ class StrucTools(object):
                 species_mapping, n_strucs=n_strucs
             )
 
+    @property
+    def spacegroup_info(self):
+        """
+        Returns:
+            dict of spacegroup info with 'tight' or 'loose' symmetry tolerance
+            e.g.,
+                data['tight']['number'] returns spacegroup number with tight tolerance
+                data['loose']['symbol'] returns spacegroup symbol with loose tolerance
+
+        """
+        data = {
+            "tight": {"symprec": 0.01, "number": None, "symbol": None},
+            "loose": {"symprec": 0.1, "number": None, "symbol": None},
+        }
+        for symprec in [0.01, 0.1]:
+            sga = SpacegroupAnalyzer(self.structure, symprec=symprec)
+            number = sga.get_space_group_number()
+            symbol = sga.get_space_group_symbol()
+
+            if symprec == 0.01:
+                key = "tight"
+            elif symprec == 0.1:
+                key = "loose"
+
+            data[key]["number"] = number
+            data[key]["symbol"] = symbol
+
+        return data
+
+    def sg(self, number_or_symbol="symbol", loose_or_tight="loose"):
+        """
+
+        returns spacegroup number of symbol with loose or tight tolerance
+
+        Args:
+            number_or_symbol (str, optional): _description_. Defaults to 'symbol'.
+            loose_or_tight (str, optional): _description_. Defaults to 'loose'.
+
+        Returns:
+            spacegroup number or symbol with loose or tight tolerance
+        """
+        sg_info = self.spacegroup_info
+        return sg_info[loose_or_tight][number_or_symbol]
+
 
 class SiteTools(object):
     """
@@ -312,4 +357,4 @@ def main():
 
 
 if __name__ == "__main__":
-    out = main()
+    main()

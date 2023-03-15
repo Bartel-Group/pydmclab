@@ -915,12 +915,28 @@ class AnalyzeVASP(object):
         return None
 
     @property
+    def spacegroup_info(self):
+        """
+        Returns:
+            dict of spacegroup info with 'tight' or 'loose' symmetry tolerance
+            e.g.,
+                data['tight']['number'] returns spacegroup number with tight tolerance
+                data['loose']['symbol'] returns spacegroup symbol with loose tolerance
+
+        """
+        if self.outputs.contcar:
+            return StrucTools(self.outputs.contcar).spacegroup_info
+        else:
+            return None
+
+    @property
     def basic_info(self):
         """
         Returns:
             {'convergence' : True if calc converged else False,
             'E_per_at' : energy per atom if calc converged else None,
-            'formula' : compact formula of computed structure}
+            'formula' : compact formula of computed structure,
+            'sg' : dict of spacegroup information}
         """
         E_per_at = self.E_per_at
         convergence = True if E_per_at else False
@@ -928,6 +944,7 @@ class AnalyzeVASP(object):
             "convergence": convergence,
             "E_per_at": E_per_at,
             "formula": self.formula,
+            "sg": self.spacegroup_info,
         }
 
     @property
