@@ -21,6 +21,7 @@ def get_colors(palette):
         {color (str) : rgb (tuple)}
 
         so, to use this you could do:
+            from pydmc.utils.plotting import get_colors
             my_colors = get_colors('tab10')
             ax = plt.scatter(x, y, color=my_colors['blue'])
     """
