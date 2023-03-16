@@ -99,6 +99,32 @@ class StrucTools(object):
         structure.perturb(perturbation)
         return structure
 
+    def change_occ(self, site_idx, new_occ, structure=None):
+        """
+
+        return a structure with a new occupation for some site
+
+        Args:
+            site_idx (int): index of site in structure to change
+            new_occ (dict): dictionary telling me the new occupation on that site
+                e.g., {'Li' : 0.5, 'Fe' : 0.5}
+
+            structure (None or pymatgen Structure object):
+                if None, start from self.structure
+                else, start from structure
+
+        Returns:
+            _type_: _description_
+        """
+
+        if not structure:
+            structure = self.structure
+
+        s = structure.copy()
+
+        s[site_idx].species = new_occ
+        return s
+
     @property
     def decorate_with_ox_states(self):
         """
