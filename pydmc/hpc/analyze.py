@@ -174,6 +174,7 @@ class VASPOutputs(object):
         Returns:
             Doscar object from DOSCAR in calc_dir
         """
+        fdoscar = os.path.join(self.calc_dir, fdoscar)
         if not os.path.exists(fdoscar):
             return None
 
