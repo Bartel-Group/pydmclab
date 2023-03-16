@@ -114,7 +114,7 @@ class StrucTools(object):
                 else, start from structure
 
         Returns:
-            _type_: _description_
+            pymatgen Structure object with new occupation
         """
 
         if not structure:
