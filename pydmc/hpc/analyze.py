@@ -1242,8 +1242,11 @@ class AnalyzeBatch(object):
         key = self._key_for_calc_dir(calc_dir)
 
         if create_cif and summary["results"]["convergence"] and include_structure:
-            s = Structure.from_dict(summary["structure"])
-            s.to(fmt="cif", filename=os.path.join(calc_dir, key + ".cif"))
+            if summary["structure"]:
+                s = Structure.from_dict(summary["structure"])
+                s.to(fmt="cif", filename=os.path.join(calc_dir, key + ".cif"))
+            else:
+                print("no structure, cant make cif")
         return {key: summary}
 
     @property
