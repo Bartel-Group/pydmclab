@@ -12,6 +12,7 @@ from pymatgen.core.ion import Ion
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
 import os
+import numpy as np
 
 
 class StrucTools(object):
@@ -122,7 +123,10 @@ class StrucTools(object):
 
         s = structure.copy()
 
-        s[site_idx].species = new_occ
+        if np.sum(list(new_occ.values())) == 0:
+            s.remove_sites([site_idx])
+        else:
+            s[site_idx].species = new_occ
         return s
 
     @property
