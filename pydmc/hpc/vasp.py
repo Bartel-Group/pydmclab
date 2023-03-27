@@ -652,6 +652,8 @@ class VASPSetUp(object):
             incar_changes["LREAL"] = False
         if "bad_sym" in errors:
             incar_changes["ISYM"] = -1
+        if "amin" in errors:
+            incar_changes["AMIN"] = 0.01
         return incar_changes
 
 
