@@ -1214,6 +1214,13 @@ class AnalyzeBatch(object):
         include_structure = configs["include_structure"]
         include_mag = configs["include_mag"]
         include_tdos = configs["include_tdos"]
+        include_pdos = configs["include_pdos"]
+        include_tcohp = configs["include_tcohp"]
+        include_pcohp = configs["include_pcohp"]
+        include_tcoop = configs["include_tcoop"]
+        include_pcoop = configs["include_pcoop"]
+        include_tcobi = configs["include_tcobi"]
+        include_pcobi = configs["include_pcobi"]
         check_relax = configs["check_relax"]
         create_cif = configs["create_cif"]
 
@@ -1228,6 +1235,13 @@ class AnalyzeBatch(object):
             include_structure=include_structure,
             include_mag=include_mag,
             include_tdos=include_tdos,
+            include_pdos=include_pdos,
+            include_tcohp=include_tcohp,
+            include_pcohp=include_pcohp,
+            include_tcoop=include_tcoop,
+            include_pcoop=include_pcoop,
+            include_tcobi=include_tcobi,
+            include_pcobi=include_pcobi,
         )
 
         # store the relax energy if we asked to
