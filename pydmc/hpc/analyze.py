@@ -204,7 +204,7 @@ class VASPOutputs(object):
             return None
 
         try:
-            cohp = Cohpcar(are_coops=are_coops, are_cobis=are_cobis)
+            cohp = Cohpcar(are_coops=are_coops, are_cobis=are_cobis, filename=flobster)
         except:
             return None
 
