@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import multiprocessing as multip
+import json
 
 from pymatgen.io.vasp.outputs import Vasprun, Outcar, Eigenval
 from pymatgen.core.structure import Structure
@@ -451,7 +452,10 @@ class AnalyzeVASP(object):
         if not fjson:
             fjson = os.path.join(self.calc_dir, "pdos.json")
         if os.path.exists(fjson) and not remake:
-            return read_json(fjson)
+            try:
+                return read_json(fjson)
+            except json.decoder.JSONDecodeError:
+                pass
 
         doscar = self.outputs.doscar()
         if not doscar:
@@ -517,7 +521,10 @@ class AnalyzeVASP(object):
         if not fjson:
             fjson = os.path.join(self.calc_dir, "tdos.json")
         if os.path.exists(fjson) and not remake:
-            return read_json(fjson)
+            try:
+                return read_json(fjson)
+            except json.decoder.JSONDecodeError:
+                pass
         if not pdos:
             pdos = self.pdos()
         if not pdos:
@@ -613,7 +620,10 @@ class AnalyzeVASP(object):
         if not fjson:
             fjson = os.path.join(self.calc_dir, savename)
         if os.path.exists(fjson) and not remake:
-            return read_json(fjson)
+            try:
+                return read_json(fjson)
+            except json.decoder.JSONDecodeError:
+                pass
 
         cohpcar = self.outputs.cohpcar(are_coops=are_coops, are_cobis=are_cobis)
         if not cohpcar:
@@ -723,7 +733,10 @@ class AnalyzeVASP(object):
             fjson = os.path.join(self.calc_dir, savename)
 
         if os.path.exists(fjson) and not remake:
-            return read_json(fjson)
+            try:
+                return read_json(fjson)
+            except json.decoder.JSONDecodeError:
+                pass
         if not pcohp:
             pcohp = self.pcohp(are_coops=are_coops, are_cobis=are_cobis)
         if not pcohp:
