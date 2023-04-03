@@ -1,6 +1,6 @@
 import json, os, yaml, subprocess
-from pydmc.core.mag import MagTools
-from pydmc.core.comp import CompTools
+from pydmclab.core.mag import MagTools
+from pydmclab.core.comp import CompTools
 
 
 def read_json(fjson):

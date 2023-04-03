@@ -1,9 +1,9 @@
 import numpy as np
 import os, json
 
-from pydmc.core.comp import CompTools
-from pydmc.core.query import MPQuery
-from pydmc.utils.handy import write_json, read_json
+from pydmclab.core.comp import CompTools
+from pydmclab.core.query import MPQuery
+from pydmclab.utils.handy import write_json, read_json
 
 this_dir, this_filename = os.path.split(__file__)
 DATA_PATH = os.path.join(this_dir, "data")

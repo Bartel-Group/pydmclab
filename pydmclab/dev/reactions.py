@@ -1,5 +1,5 @@
-from pydmc.core.comp import CompTools
-from pydmc.utils.handy import eVat_to_kJmol, kJmol_to_eVat
+from pydmclab.core.comp import CompTools
+from pydmclab.utils.handy import eVat_to_kJmol, kJmol_to_eVat
 
 
 class ReactionEnergy(object):

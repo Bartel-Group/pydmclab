@@ -2,15 +2,15 @@ import numpy as np
 import math
 from itertools import combinations
 
-from pydmc.data.thermochem import (
+from pydmclab.data.thermochem import (
     mp2020_compatibility_dmus,
     mus_at_0K,
     mus_at_T,
     mus_from_mp_no_corrections,
     mus_from_bartel2019_npj,
 )
-from pydmc.data.features import atomic_masses
-from pydmc.core.comp import CompTools
+from pydmclab.data.features import atomic_masses
+from pydmclab.core.comp import CompTools
 
 
 class ChemPots(object):

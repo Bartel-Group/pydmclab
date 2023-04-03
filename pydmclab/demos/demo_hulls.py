@@ -1,9 +1,9 @@
-from pydmc.core.comp import CompTools
-from pydmc.core.query import MPQuery
-from pydmc.core.hulls import GetHullInputData, AnalyzeHull, ParallelHulls
-from pydmc.utils.handy import read_json, write_json
-from pydmc.utils.plotting import set_rc_params, tableau_colors
-from pydmc.data.thermochem import mus_at_0K, mus_at_T
+from pydmclab.core.comp import CompTools
+from pydmclab.core.query import MPQuery
+from pydmclab.core.hulls import GetHullInputData, AnalyzeHull, ParallelHulls
+from pydmclab.utils.handy import read_json, write_json
+from pydmclab.utils.plotting import set_rc_params, tableau_colors
+from pydmclab.data.thermochem import mus_at_0K, mus_at_T
 
 import matplotlib.pyplot as plt
 

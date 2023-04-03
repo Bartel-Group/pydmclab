@@ -1,6 +1,6 @@
-from pydmc.core.query import MPQuery
-from pydmc.core.struc import StrucTools
-from pydmc.utils.handy import read_json, write_json
+from pydmclab.core.query import MPQuery
+from pydmclab.core.struc import StrucTools
+from pydmclab.utils.handy import read_json, write_json
 
 
 import os

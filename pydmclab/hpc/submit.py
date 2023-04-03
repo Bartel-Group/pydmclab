@@ -1,7 +1,7 @@
-from pydmc.hpc.vasp import VASPSetUp
-from pydmc.hpc.analyze import AnalyzeVASP
-from pydmc.utils.handy import read_yaml, write_yaml
-from pydmc.data.configs import (
+from pydmclab.hpc.vasp import VASPSetUp
+from pydmclab.hpc.analyze import AnalyzeVASP
+from pydmclab.utils.handy import read_yaml, write_yaml
+from pydmclab.data.configs import (
     load_vasp_configs,
     load_slurm_configs,
     load_sub_configs,

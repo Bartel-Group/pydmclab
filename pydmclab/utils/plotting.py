@@ -1,5 +1,5 @@
 import matplotlib as mpl
-from pydmc.data.plotting_configs import get_color_palettes
+from pydmclab.data.plotting_configs import get_color_palettes
 
 
 def get_colors(palette):

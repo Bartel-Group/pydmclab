@@ -8,9 +8,9 @@ from pymatgen.core.structure import Structure
 from pymatgen.io.vasp.inputs import Kpoints, Incar
 from pymatgen.io.lobster.outputs import Doscar, Cohpcar, Charge, MadelungEnergies
 
-from pydmc.core.struc import StrucTools, SiteTools
-from pydmc.utils.handy import read_json, write_json, read_yaml, write_yaml
-from pydmc.data.configs import load_batch_vasp_analysis_configs
+from pydmclab.core.struc import StrucTools, SiteTools
+from pydmclab.utils.handy import read_json, write_json, read_yaml, write_yaml
+from pydmclab.data.configs import load_batch_vasp_analysis_configs
 
 
 class VASPOutputs(object):

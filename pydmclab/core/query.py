@@ -1,5 +1,5 @@
-from pydmc.core.comp import CompTools
-from pydmc.core.struc import StrucTools
+from pydmclab.core.comp import CompTools
+from pydmclab.core.struc import StrucTools
 
 from pymatgen.ext.matproj import MPRester
 

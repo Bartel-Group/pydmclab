@@ -1,13 +1,13 @@
-from pydmc.core.comp import CompTools
-from pydmc.core.struc import StrucTools
-from pydmc.utils.handy import read_json, write_json
-from pydmc.data.thermochem import (
+from pydmclab.core.comp import CompTools
+from pydmclab.core.struc import StrucTools
+from pydmclab.utils.handy import read_json, write_json
+from pydmclab.data.thermochem import (
     mus_at_0K,
     mus_at_T,
     mp2020_compatibility_dmus,
     mus_from_mp_no_corrections,
 )
-from pydmc.data.features import atomic_masses
+from pydmclab.data.features import atomic_masses
 
 import os
 import numpy as np

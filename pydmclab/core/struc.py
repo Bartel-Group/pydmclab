@@ -1,4 +1,4 @@
-from pydmc.core.comp import CompTools
+from pydmclab.core.comp import CompTools
 
 from pymatgen.core.structure import Structure
 from pymatgen.transformations.standard_transformations import (

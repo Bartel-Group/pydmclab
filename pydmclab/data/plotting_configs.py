@@ -1,7 +1,7 @@
 import matplotlib as mpl
 import os
 import numpy as np
-from pydmc.utils.handy import read_json, write_json
+from pydmclab.utils.handy import read_json, write_json
 
 this_dir, this_filename = os.path.split(__file__)
 DATA_PATH = os.path.join(this_dir, "data")

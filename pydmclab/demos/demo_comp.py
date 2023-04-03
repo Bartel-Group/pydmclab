@@ -1,4 +1,4 @@
-from pydmc.core.comp import CompTools
+from pydmclab.core.comp import CompTools
 
 """
 This file currently tests the following classes in CompTools

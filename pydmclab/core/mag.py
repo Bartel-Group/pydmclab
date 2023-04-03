@@ -1,4 +1,4 @@
-from pydmc.core.struc import StrucTools, SiteTools
+from pydmclab.core.struc import StrucTools, SiteTools
 import itertools
 import random
 from pymatgen.core.structure import Structure

@@ -1,5 +1,5 @@
-from pydmc.core.struc import StrucTools, SiteTools
-from pydmc.core.query import MPQuery
+from pydmclab.core.struc import StrucTools, SiteTools
+from pydmclab.core.query import MPQuery
 
 from pymatgen.core.structure import Structure
 

@@ -2,13 +2,13 @@ import os
 import numpy as np
 import multiprocessing as multip
 
-from pydmc.utils.handy import read_json, write_json, make_sub_for_launcher
-from pydmc.core.query import MPQuery
-from pydmc.core.mag import MagTools
-from pydmc.core.struc import StrucTools
-from pydmc.hpc.launch import LaunchTools
-from pydmc.hpc.submit import SubmitTools
-from pydmc.hpc.analyze import AnalyzeBatch
+from pydmclab.utils.handy import read_json, write_json, make_sub_for_launcher
+from pydmclab.core.query import MPQuery
+from pydmclab.core.mag import MagTools
+from pydmclab.core.struc import StrucTools
+from pydmclab.hpc.launch import LaunchTools
+from pydmclab.hpc.submit import SubmitTools
+from pydmclab.hpc.analyze import AnalyzeBatch
 
 """
 Basic framework

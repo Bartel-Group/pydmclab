@@ -1,7 +1,7 @@
-include pydmc/core/*
-include pydmc/data/*
-include pydmc/data/data/*
-include pydmc/demos/*
-include pydmc/dev/*
-include pydmc/hpc/*
-include pydmc/utils/*
+include pydmclab/core/*
+include pydmclab/data/*
+include pydmclab/data/data/*
+include pydmclab/demos/*
+include pydmclab/dev/*
+include pydmclab/hpc/*
+include pydmclab/utils/*

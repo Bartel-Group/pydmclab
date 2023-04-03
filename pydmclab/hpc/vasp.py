@@ -1,8 +1,8 @@
-from pydmc.core.mag import MagTools
-from pydmc.core.struc import StrucTools
-from pydmc.hpc.analyze import AnalyzeVASP, VASPOutputs
-from pydmc.data.configs import load_vasp_configs
-from pydmc.utils.handy import read_yaml, write_yaml, dotdict
+from pydmclab.core.mag import MagTools
+from pydmclab.core.struc import StrucTools
+from pydmclab.hpc.analyze import AnalyzeVASP, VASPOutputs
+from pydmclab.data.configs import load_vasp_configs
+from pydmclab.utils.handy import read_yaml, write_yaml, dotdict
 
 import os
 import warnings
