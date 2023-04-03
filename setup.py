@@ -5,13 +5,13 @@ from shutil import rmtree
 
 from setuptools import find_packages, setup, Command
 
-NAME = 'pydmc'
+NAME = 'pydmclab'
 DESCRIPTION = 'Package to facilitate DFT calculations and analysis'
-URL = 'https://github.umn.edu/bartel-group/pydmc'
+URL = 'https://github.umn.edu/bartel-group/pydmclab'
 EMAIL = 'cbartel@umn.edu'
 AUTHOR = 'Chris Bartel'
 REQUIRES_PYTHON = '>=3.6.0'
-VERSION = '1.1.0'
+VERSION = '0.0.1'
 
 REQUIRED = ['numpy', 
             'pymatgen']
@@ -77,7 +77,7 @@ setup(
     python_requires=REQUIRES_PYTHON,
     url=URL,
     packages=find_packages(exclude=["tests", "*.tests", "*.tests.*", "tests.*"]),
-    package_data={'pydmc' : ['pydmc/data/data/*']},
+    package_data={'pydmclab' : ['pydmc/data/data/*']},
     install_requires=REQUIRED,
     extras_require=EXTRAS,
     include_package_data=True,
