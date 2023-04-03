@@ -283,12 +283,19 @@ class SubmitTools(object):
         sub_configs = self.sub_configs.copy()
         vasp_configs = self.vasp_configs.copy()
         vasp_exec = os.path.join(sub_configs["vasp_dir"], sub_configs["vasp"])
-        return "\n%s --ntasks=%s --mpi=pmi2 %s > %s\n" % (
-            sub_configs["mpi_command"],
-            str(self.slurm_options["ntasks"]),
-            vasp_exec,
-            vasp_configs["fvaspout"],
-        )
+        if sub_configs['mpi_command'] == 'srun':
+            return "\n%s --ntasks=%s --mpi=pmi2 %s > %s\n" % (
+                sub_configs["mpi_command"],
+                str(self.slurm_options["ntasks"]),
+                vasp_exec,
+                vasp_configs["fvaspout"]
+            )
+        elif sub_configs['mpi_command'] == 'mpirun':
+            return '\n%s -np=%s %s > %s\n' % (
+                sub_configs['mpi_command'],
+                str(self.slurm_options['ntasks']),
+                vasp_exec,
+                vasp_configs['fvaspout'])
 
     @property
     def lobster_command(self):

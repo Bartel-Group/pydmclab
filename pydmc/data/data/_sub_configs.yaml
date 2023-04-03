@@ -1,6 +1,6 @@
 vasp: vasp_std # use vasp_gam for "loose" calcs (havent implemented yet)
 vasp_dir: /home/cbartel/shared/bin/vasp/ # where vasp executable lives
-mpi_command: srun # how to launch on multicore/multinode (may be mpirun depending on compilation)
+mpi_command: mpirun # how to launch on multicore/multinode (may be mpirun depending on compilation)
 manager: '#SBATCH' # how to manage interactions with the queue (some machines dont use slurm)
 
 fqueue: q.o # this will be created in the folder where you execute python
@@ -10,7 +10,7 @@ force_postprocess: False # if True, run LOBSTER and Bader again if vasp_configs.
 
 files_to_inherit: ['WAVECAR', 'CONTCAR'] # usually no need to change
 
-execute_flags: ['srun', 'python', 'lobster', 'bader'] # what to look for in a submission script to see if it should be launched
+execute_flags: ['srun', 'python', 'lobster', 'bader', 'mpirun'] # what to look for in a submission script to see if it should be launched
 
 perturb_first_struc: 0.1 # if float, perturb internal coordinates of all ions for POSCAR of first structure by perturb_first_struc
 
