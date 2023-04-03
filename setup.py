@@ -11,7 +11,7 @@ URL = 'https://github.umn.edu/bartel-group/pydmc'
 EMAIL = 'cbartel@umn.edu'
 AUTHOR = 'Chris Bartel'
 REQUIRES_PYTHON = '>=3.6.0'
-VERSION = '1.0.0'
+VERSION = '1.1.0'
 
 REQUIRED = ['numpy', 
             'pymatgen']
