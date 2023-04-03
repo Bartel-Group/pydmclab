@@ -131,10 +131,10 @@ dmypy.json
 .pyre/
 
 # VASP calcs
-pydmc/examples/*/calcs/*/*/*/*/*
+pydmclab/examples/*/calcs/*/*/*/*/*
 
 # bash-run stuff
-pydmc/*.py~
+pydmclab/*.py~
 
 .DS_Store
 */.DS_Store
