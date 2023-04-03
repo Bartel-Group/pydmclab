@@ -693,6 +693,7 @@ def check_results(results):
         if convergence:
             converged += 1
             print("E (static) = %.2f" % data["results"]["E_per_at"])
+            continue
             if ANALYSIS_CONFIGS["include_meta"]:
                 print("E (relax) = %.2f" % data["meta"]["E_relax"])
                 print("EDIFFG = %i" % data["meta"]["incar"]["EDIFFG"])
