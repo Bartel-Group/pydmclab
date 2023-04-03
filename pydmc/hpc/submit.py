@@ -624,7 +624,8 @@ class SubmitTools(object):
                         )
                 f.write("\n\n")
                 f.write("ulimit -s unlimited\n")
-
+                if sub_configs['mpi_command'] == 'mpirun':
+                    f.write('module load impi/2018/release_multithread\n')
                 # now write what is needed for the chain of VASP calcs + postprocessing
                 print("\n:::: writing sub now - %s ::::" % fsub)
 
