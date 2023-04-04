@@ -25,14 +25,15 @@ pip install pydmclab
 - note:
   - you can specify which python version you want to install this under with:
 
-        ```bash
-        pip install pydmclab --prefix=<path to your python version>
-        ```
-  - e.g.,
+```bash
+pip install pydmclab --prefix=<path to your python version>
+```
 
-        ```bash
-        pip install pydmclab --prefix=/home/cbartel/cbartel/bin/anaconda3
-        ```
+- e.g.,
+
+```bash
+pip install pydmclab --prefix=/home/cbartel/cbartel/bin/anaconda3
+```
 
 ### Installing the "development" version
 
@@ -63,15 +64,15 @@ pip install .
 - note:
   - you can specify which python version you want to install this under with:
 
-    ```bash
-    pip install . --prefix=<path to your python version>
-    ```
+```bash
+pip install . --prefix=<path to your python version>
+```
 
-  - e.g.,
+- e.g.,
 
-    ```bash
-    pip install . --prefix=/home/cbartel/cbartel/bin/anaconda3
-    ```
+```bash
+pip install . --prefix=/home/cbartel/cbartel/bin/anaconda3
+```
 
 ### Configuring your pseudopotentials with pymatgen
 

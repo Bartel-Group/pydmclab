@@ -71,11 +71,11 @@
 - for now, we just need a starting point
 - this function should return something like:
 
-    ```python
-    query = {<globally unique ID> : 
-                'structure' : <structure object>,
-                'formula' : <formula string>}
-    ```
+```python
+query = {<globally unique ID> : 
+            'structure' : <structure object>,
+            'formula' : <formula string>}
+```
 
 - it's OK if there's other stuff, but you at least need to map an ID to a formula and a structure
 
@@ -94,19 +94,19 @@
   - they must be the cell sizes we want
 - the result of this function should look like
 
-    ```python
-    strucs = {<composition : 
-                {<unique ID for that composition> 
-                    : <structure object>}}
-    ```
+```python
+strucs = {<composition : 
+            {<unique ID for that composition> 
+                : <structure object>}}
+```
 
-- <composition>
-    - could be a chemical formula (e.g., one generated using `pydmclab.core.comp.CompTools(<formula>).clean`)
-    - could be some unique identifier you used to transform a structure (e.g., `Li2MP2S6_3` indicating I took 3 Li out per cell)
-- <unique ID for that composition>
-    - could be a Materials Project ID indicating a certain polymorph for that composition (e.g., `mp-1234`)
-    - could be your own ID (e.g., `my-12345`)
-    - could be an index from an ordered structure enumeration procedure (e.g., `0`, `1`, `2`, etc.)
+- `<composition>`
+  - could be a chemical formula (e.g., one generated using `pydmclab.core.comp.CompTools(<formula>).clean`)
+  - could be some unique identifier you used to transform a structure (e.g., `Li2MP2S6_3` indicating I took 3 Li out per cell)
+- `<unique ID for that composition>`
+  - could be a Materials Project ID indicating a certain polymorph for that composition (e.g., `mp-1234`)
+  - could be your own ID (e.g., `my-12345`)
+  - could be an index from an ordered structure enumeration procedure (e.g., `0`, `1`, `2`, etc.)
 
 ### `get_magmoms`
 
@@ -117,15 +117,15 @@
 - for AFM configuration generation, this function will generate a finite set of randomly and symmetrically distinct magnetic orderings (spin up, spin down) for each unique crystal structure
 - the result of this function should look like
 
-    ```python
-    magmoms = {<composition> : 
-                {<unique ID for that composition> 
-                    : {<unique ID for that magnetic configuration> 
-                        : <list of magnetic moments>}}}
-    ```
+```python
+magmoms = {<composition> : 
+            {<unique ID for that composition> 
+                : {<unique ID for that magnetic configuration> 
+                    : <list of magnetic moments>}}}
+```
 
-- <unique ID for that magnetic configuration>
-    - this will be `0`, `1`, `2`, etc. for randomly generated magnetic configurations
+- `<unique ID for that magnetic configuration>`
+  - this will be `0`, `1`, `2`, etc. for randomly generated magnetic configurations
 
 ### `get_launch_dirs`
 
@@ -136,12 +136,12 @@
 - we use a common directory structure here. assuming our `launcher.py` file (this script) is in `*/scripts`, then our "launch_dirs" will spawn in `*/calcs/<composition>/<unique ID for that composition>/<standard>/<unique ID for that magnetic configuration>`
 - the result of this function should look like
 
-    ```python
-    launch_dirs = {<composition>/<unique ID for that composition>/<standard>/<unique ID for that magnetic configuration> : {'xcs' : [list of (final) exchange correlation methods to run for this launch directory],
-    'magmoms' : [list of magmoms associated with calculations in that directory]}}
-    ```
+```python
+launch_dirs = {<composition>/<unique ID for that composition>/<standard>/<unique ID for that magnetic configuration> : {'xcs' : [list of (final) exchange correlation methods to run for this launch directory],
+'magmoms' : [list of magmoms associated with calculations in that directory]}}
+```
 
-- <standard> could be `dmc` for our general group standard or `mp` for Materials Project consistency (I'll get into configurations shortly)
+- `<standard>` could be `dmc` for our general group standard or `mp` for Materials Project consistency (I'll get into configurations shortly)
 
 ### `submit_calcs`
 
@@ -160,16 +160,16 @@
 - this function will update a dictionary/.json of a (detailed) summary of the results from all successful calculations executed in all your launch directories
 - the result of this function looks like:
 
-    ```python
-    {<key> : 
-        {'meta' : {<meta data>},
-         'results' : {<summary of results>},
-         'structure' : {<relaxed structure>},
-         etc.}}
-    ```
+```python
+{<key> : 
+    {'meta' : {<meta data>},
+      'results' : {<summary of results>},
+      'structure' : {<relaxed structure>},
+      etc.}}
+```
 
-  - <key> has the form of each VASP calculation with folders joined by '.'
-    - e.g., `LiMn2O4.mp-1234.dmc.fm.metagga-static`
+- `<key>` has the form of each VASP calculation with folders joined by '.'
+  - e.g., `LiMn2O4.mp-1234.dmc.fm.metagga-static`
 
 ### `<custom functions>`
 
