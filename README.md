@@ -72,3 +72,14 @@ pip install .
     ```bash
     pip install . --prefix=/home/cbartel/cbartel/bin/anaconda3
     ```
+
+### Configuring your pseudopotentials with pymatgen
+
+- if you are getting lots of POTCAR errors after installing, do this
+
+```bash
+pmg config --add PMG_VASP_PSP_DIR /home/cbartel/shared/bin/pymatgen_pot
+pmg config --add PMG_DEFAULT_FUNCTIONAL PBE_54
+```
+
+- you should only have to do this one time, not for each successive installation of pydmclab
