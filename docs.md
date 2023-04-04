@@ -309,3 +309,7 @@
 20. Repeat 17-19 until calcs are done or you want to move data locally to start more analysis
 
 21. Create the smallest .json file you can that contains all the data you need for your analysis and transfer that to your local computer for more analysis (use `scp` or `Globus` for the file transfer)
+
+## FAQ
+
+- please add questions!
