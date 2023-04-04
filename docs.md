@@ -1,3 +1,7 @@
+# Installation
+
+- see [README](#./README.md)
+
 # General best practices
 
 - if you are going to do something twice, write a function
