@@ -1,16 +1,107 @@
+# Contents
+
+- [Installation](#installation)
+- [General best practices](#general-best-practices)
+- [VASP](#for-vasp)
+  - [general setup](#general-setup)
+  - [the hpc set of modules](#the-hpc-set-of-modules)
+  - [the launcher script](#the-launcher-script)
+  - [a typical flow](#a-typical-flow)
+- [Thermodynamics](#for-thermodynamics)
+  - [formation energies](#formation-energies)
+  - [decomposition energies](#decomposition-energies)
+- [Supporting modules](#supporting-modules)
+- [Development](#development)
+- [FAQ](#faq)
+
 # Installation
 
-- see [README](#./README.md)
+## Installation instructions
+
+- there will always be two versions of pydmclab available:
+  - the "release" version
+    - each new release will have a new version number (e.g., 0.0.2)
+    - this is always a stable version of the code
+    - this version will only be updated periodically (i.e., not after each git commit)
+  - the "development" version
+    - this is the latest version of the code
+    - this version will be updated after each git commit
+    - this version may include features not present in the "release" version
+      - it may also include bugs not present in the "release" version
+
+### Installing the "release" version
+
+```bash
+pip install pydmclab
+```
+
+- this can be executed from anywhere on your computer (or cluster)
+- note:
+  - you can specify which python version you want to install this under with:
+
+```bash
+pip install pydmclab --prefix=<path to your python version>
+```
+
+- e.g.,
+
+```bash
+pip install pydmclab --prefix=/home/cbartel/cbartel/bin/anaconda3
+```
+
+### Installing the "development" version
+
+- clone the repository if you have not already:
+
+```bash
+git clone https://github.umn.edu/bartel-group/pydmclab.git
+```
+
+- navigate to the repository:
+
+```bash
+cd pydmclab
+```
+
+- pull the repository:
+
+```bash
+git pull
+```
+
+- install the repository:
+
+```bash
+pip install .
+```
+
+- note:
+  - you can specify which python version you want to install this under with:
+
+```bash
+pip install . --prefix=<path to your python version>
+```
+
+- e.g.,
+
+```bash
+pip install . --prefix=/home/cbartel/cbartel/bin/anaconda3
+```
+
+### Configuring your pseudopotentials with pymatgen
+
+- if you are getting lots of POTCAR errors after installing, do this
+
+```bash
+pmg config --add PMG_VASP_PSP_DIR /home/cbartel/shared/bin/pymatgen_pot
+pmg config --add PMG_DEFAULT_FUNCTIONAL PBE_54
+```
+
+- you should only have to do this one time, not for each successive installation of `pydmclab`
 
 # General best practices
 
-- if you are going to do something twice, write a function
-- if you are going to perform some analysis more than once, save the output to a `.json` file
-- write very clear documentation
-  - and read the documentation within `pydmclab` ! This should not be a black box
-- python files should be a collection of functions/classes and a `main()` function that allows you to execute any sequence of them
-- if you are going to use parallel processing on a supercomputer, you must submit whatever is using multiple cores to a compute node, not a login node
-  - note: this happens automatically for VASP jobs, but it is often useful to parallelize the execution of the launcher script which spawns many VASP jobs
+- see our [group wiki](https://github.umn.edu/bartel-group/dmc/wiki/research_output#code) for coding best practices
 
 # For VASP
 
@@ -314,6 +405,262 @@ launch_dirs = {<composition>/<unique ID for that composition>/<standard>/<unique
 
 21. Create the smallest .json file you can that contains all the data you need for your analysis and transfer that to your local computer for more analysis (use `scp` or `Globus` for the file transfer)
 
-## FAQ
+## demos
+
+- see `pydmclab/demos/demo_vasp_*.py` for example launcher scripts
+
+# For thermodynamics
+
+- two main modules:
+  - `pydmclab.core.energies` for computing formation energies
+  - `pydmclab.core.hulls` for computing decomposition energies (stabilities)
+
+- [Chris B's review](https://bartel.cems.umn.edu/sites/bartel.cems.umn.edu/files/2022-07/bartel.bartel_2022-j.mater_.sci_.pdf) should be a useful reference to understand how/why this works
+
+## formation energies
+
+- the mapping from total (internal) energies computed with DFT to formation energies requires a comparison to elemental reference states (chemical potentials)
+
+```math
+\Delta E_{\mathrm{f}} = E_{\mathrm{DFT}} - \sum_{i} \mu_i n_i
+```
+
+- where the sum goes over all elements in the compound and is weighted by the stoichiometry (composition) of the formula of interest
+
+- the basic idea:
+  - start with a DFT total energy
+  - decide the conditions you want to compute the formation energy at (e.g., 0 K or finite T)
+  - generate the appropriate chemical potentials
+  - modify the DFT total energy if needed (eg to account for finite T)
+
+### zero temperature
+
+- at zero temperature, the total (internal) energies of compounds and elements come from DFT
+- these energies must be computed in a compatible manner
+- note that 0 K DFT formation energies are often compared to experimental formation enthalpies at ambient conditions (298 K)
+- at 0 K, we'll make use of `pydmclab.core.energies.FormationEnthalpy`, which takes as input:
+  - the chemical formula
+  - the DFT total energy
+  - the elemental reference states (chemical potentials)
+
+- chemical potentials can be obtained using `pydmclab.core.energies.ChemPots`
+  - need to tell it specifics of your DFT calculations
+  - don't worry about temperature, partial pressures, etc. b/c T = 0
+
+### finite temperature
+
+- at finite temperature and a closed system, the Gibbs energy is what we care about:
+
+```math
+\Delta G_{\mathrm{f}} = G_{\mathrm{DFT}} - \sum_{i} G_i n_i
+```
+
+- entropy contributes to the energy of compounds as well as elements. there are four contributors to the entropy
+
+- for solids, there are four contributors to the entropy:
+  - vibrational
+    - related to phonon dispersion
+  - configurational
+    - related to (quasi)random occupation of certain sites by >1 atom
+  - electronic
+    - related to (quasi)random occupation of certain sites by the same atom having different valence states (sort of..)
+  - magnetic
+    - related to (quasi)random occupation of certain sites by the same atom having different spin states (sort of..)
+- for non-solids, we also have rotational and translational entropy
+
+#### computing Gibbs energies
+
+- just like with 0 K formation energies, we'll need to:
+  - determine our reference energies using `pydmc.core.energies.ChemPots`
+  - compute the formation energy, this time using `pydmc.core.energies.FormationEnergy` (instead of "...Enthalpy")
+
+- for elements, we fortuntely have nice experimental data for Gibbs energies as a function of temperature (retrieve as dictionary with `pydmclab.data.thermochem.mus_at_T`)
+  - we can also modify these reference energies by accounting for the activity of gaseous species (i.e., when p_i < 1 atm)
+
+  ```math
+  G_i(T, p_i) = G_i(T) + k_B T ln(p_i)
+  ```
+
+  - this essentially says that the free energy for an element to be a gas becomes more negative (more favorable) as the concentration of that element in the gase phase decreases
+  - note that most gases are diatomic, so we need to use a 1/2 somewhere
+
+- for solid compounds, we need to modify the DFT energies on our own:
+  - vibrational entropy: [Bartel 2018](https://www.nature.com/articles/s41467-018-06682-4)
+  - configurational entropy: ideal mixing is a decent first approximation
+
+  ```math
+  S_{\mathrm{mix}}/f.u.= -k_B[xlnx - (1-x)ln(1-x)]
+  ```
+
+  - for binary partial occupation of some site with concentrations (x, 1-x)
+
+  - electronic entropy: usually ignore (though important for [LiFePO4](https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.97.155704) and [CeO2](https://www.nature.com/articles/s41467-017-00381-2)! among other materials..)
+  - magnetic entropy: usually ignore
+
+- finite temperature also allows us to consider the effects of partial pressures of gaseous species (e.g., elements like O2) in the system
+
+- so the procedure looks like:
+  - get the elemental reference energies (chemical potentials) at the conditions of interest using `pydmc.core.energies.ChemPots`
+  - modify the DFT energies to account for finite temperature and compute the formation energy with respect to these chemical potentials using `pydmc.core.energies.FormationEnergy`
+  - a common approach would be to loop through a range of temperatures and compute the formation energy at each temperature
+
+## decomposition energies
+
+- now we'll take the formation energies we computed for all compounds in a given chemical space (or many chemical spaces) and perform the convex hull analysis to obtain the thermodynamic stability at the conditions where we computed the formation energies
+
+- for this, we'll use `pydmclab.core.hulls` which has two basic functions:
+  - assemble a dictionary of formation energies for a given chemical space (create the input to the convex hull analysis)
+    - `pydmclab.core.hulls.GetHullInputData`
+  - perform the convex hull analysis for each chemical space that was prepared
+    - `pydmclab.core.hulls.AnalyzeHull`
+- the result is a dictionary including stability info for every compound of interest that looks like:
+
+```python
+{<formula> : {'Ef' : formation energy (the one you inputted, hopefully),
+              'Ed' : decomposition energy (as calculated from the hull analysis),
+              'stability' : True if on the hull else False,
+              'rxn' : the decomposition reaction that defines stability }}
+```
+
+- this can also be done in parallel (i.e., parallelized over chemical (sub)spaces) using `pydmclab.core.hulls.ParallelHulls`
+  
+## demos
+
+- decomposition energies: `pydmclab/pydmclab/demos/demo_hulls.py`
+- formation energies: **@TODO**
+
+# Supporting modules
+
+## core
+
+- core `pydmclab` module used by `pydmclab.energies` and `pydmclab.hpc`
+
+### Chemical compositions
+
+- `pydmclab.core.comp.CompTools` will allow you to systematically generate and analyze chemical formulas
+  - make a systematic string format for any chemical formula
+  - determine what elements are in a compound
+  - determine how many of each element are in a compound
+  - etc.
+
+### Query Materials Project
+
+- `pydmclab.core.query.MPQuery` will allow you to systematically query Materials Project and parse the data in typical ways (e.g., to collect only ground-states for some chemical space or chemical formula of interest)
+
+### Crystal structures
+
+- `pydmclab.core.struc.StrucTools` will allow you to parse and manipulate crystal structures
+  - figure out how many sites
+  - make a supercell
+  - replace species
+  - order disordered structures
+  - etc.
+
+- `pydmclab.core.struc.SiteTools` will allow you to parse and manipulate individual sites within a crystal structure
+  - e.g., get the occupation
+
+### Magnetic sampling
+
+- `pydmclab.core.mag.MagTools` will prepare `MAGMOM` strings for crystal structures
+  - for AFM orderings (for which there are often very many options), this module will enumerate symmetrically distinct orderings
+
+## utils
+
+- "utilities" that are convenient but not worthy of their own modules
+
+### handy functions
+
+- `pydmclab.utils.handy` provides several standalone functions that help you do stuff
+  - e.g., read and write a .json file in one line
+  - e.g., convert kJ/mol to eV/atom
+
+### plotting functions
+
+- `pydmclab.utils.plotting` provides several functions that help with consistent plotting
+  - e.g., retrieve color palettes
+  - e.g., set our `maplotlib` "rc parameters"
+- typical use case. let's say you are creating a `.py` file to plot stuff. at the top of this script, do the following:
+
+  ```python
+  from pydmclab.utils.plotting import set_rc_params, get_colors
+
+  set_rc_params()
+  my_palette = <one of the strings accepted by `get_colors`>
+  colors = get_colors(my_palette)
+  ```
+
+## data
+
+- data files are stored in `pydmclab.data.data` and loaded in `pydmc.data.*`
+
+### `pydmclab.data.configs`
+
+- this mainly pertains to loading `.yaml` files for the `pydmclab.hpc.*` modules (related to running VASP)
+- here, you'll find the default configurations associated with running VASP, as described in the [VASP section](#for-vasp)
+
+### `pydmclab.data.thermochem`
+
+- this loads mainly elemental reference energies (chemical potentials) for use by `pydmclab.core.energies.ChemPots` as described in the [thermodynamics section](#for-thermodynamics)
+
+### `pydmclab.data.plotting_configs`
+
+- this holds data used by `pydmclab.utils.plotting` as described in the [plotting section](#plotting-functions)
+
+### `pydmclab.data.features`
+
+- this holds the atomic masses of the elements, which is needed for applying the Bartel 2018 vibrational entropy model used in `pydmclab.core.energies.FormationEnergy` as described in the [thermodynamics section](#for-thermodynamics)
+
+## demos
+
+- this holds various demo scripts to illustrate how different modules work
+
+## dev
+
+- this is where we can work on developing new things before integrating with existing modules (or creating new ones)
+
+## old
+
+- this is where we (temporarily) save stuff that might be useful but is not currently integrated
+
+## hpc
+
+- these modules are covered in detail in the [VASP section](#for-vasp)
+
+## energies
+
+- these modules are covered in detail in the [thermodynamics section](#for-thermodynamics)
+
+# Development
+
+## Small things
+
+- `pydmclab.core.energies`
+  - formation energy demo
+
+## Medium things
+
+- `pydmclab.core.query`
+  - move to new API
+- `pydmclab.utils.plotting`
+  - plot DOS-like things
+    - tdos, pdos, tcohp, pcohp
+  - plot phase diagrams
+    - binary
+    - ternary
+- `pydmclab.core.struc`
+  - more analysis capabilities
+    - e.g., using `pymatgen.analysis.local_env` and `pymatgen.analysis.chemenv`
+  - capabilities for surfaces
+
+## Big things
+
+- `pydmclab.hpc.*`
+  - handling surface calculations
+  - handling optimization with ML potentials
+  - handling NEB calculations
+- `pydmclab.ml.*`
+  - modules for using/tuning ML potentials
+  
+# FAQ
 
 - please add questions!
