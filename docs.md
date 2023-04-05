@@ -18,7 +18,7 @@
 
 ## Installation instructions
 
-- there will always be two versions of pydmclab available:
+- there will always be two versions of `pydmclab` available:
   - the "release" version
     - each new release will have a new version number (e.g., 0.0.2)
     - this is always a stable version of the code
@@ -208,7 +208,7 @@ strucs = {<composition :
 - you will rarely need to modify this
 - starts with the results of `get_strucs`
 - if we are running AFM calculations, we need to associate various initial magnetic configurations with each unique crystal structure we want to calculate
-- if we are not running AFM calculations, then `pydmc.core.mag` takes care of this for us and we do not need to execute this function
+- if we are not running AFM calculations, then `pydmclab.core.mag` takes care of this for us and we do not need to execute this function
 - for AFM configuration generation, this function will generate a finite set of randomly and symmetrically distinct magnetic orderings (spin up, spin down) for each unique crystal structure
 - the result of this function should look like
 
@@ -471,8 +471,8 @@ launch_dirs = {<composition>/<unique ID for that composition>/<standard>/<unique
 #### computing Gibbs energies
 
 - just like with 0 K formation energies, we'll need to:
-  - determine our reference energies using `pydmc.core.energies.ChemPots`
-  - compute the formation energy, this time using `pydmc.core.energies.FormationEnergy` (instead of "...Enthalpy")
+  - determine our reference energies using `pydmclab.core.energies.ChemPots`
+  - compute the formation energy, this time using `pydmclab.core.energies.FormationEnergy` (instead of "...Enthalpy")
 
 - for elements, we fortuntely have nice experimental data for Gibbs energies as a function of temperature (retrieve as dictionary with `pydmclab.data.thermochem.mus_at_T`)
   - we can also modify these reference energies by accounting for the activity of gaseous species (i.e., when p_i < 1 atm)
@@ -500,8 +500,8 @@ launch_dirs = {<composition>/<unique ID for that composition>/<standard>/<unique
 - finite temperature also allows us to consider the effects of partial pressures of gaseous species (e.g., elements like O2) in the system
 
 - so the procedure looks like:
-  - get the elemental reference energies (chemical potentials) at the conditions of interest using `pydmc.core.energies.ChemPots`
-  - modify the DFT energies to account for finite temperature and compute the formation energy with respect to these chemical potentials using `pydmc.core.energies.FormationEnergy`
+  - get the elemental reference energies (chemical potentials) at the conditions of interest using `pydmclab.core.energies.ChemPots`
+  - modify the DFT energies to account for finite temperature and compute the formation energy with respect to these chemical potentials using `pydmclab.core.energies.FormationEnergy`
   - a common approach would be to loop through a range of temperatures and compute the formation energy at each temperature
 
 ## decomposition energies
@@ -591,7 +591,7 @@ launch_dirs = {<composition>/<unique ID for that composition>/<standard>/<unique
 
 ## data
 
-- data files are stored in `pydmclab.data.data` and loaded in `pydmc.data.*`
+- data files are stored in `pydmclab.data.data` and loaded in `pydmclab.data.*`
 
 ### `pydmclab.data.configs`
 
