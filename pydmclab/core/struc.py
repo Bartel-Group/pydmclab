@@ -295,6 +295,28 @@ class StrucTools(object):
         sg_info = self.spacegroup_info
         return sg_info[loose_or_tight][number_or_symbol]
 
+    def scale_structure(self, scale_factor, structure=None):
+        """_summary_
+
+        Args:
+            scale_factor (float): fractional scaling of the structure volume
+                - e.g., 1.2 will increase each lattice vector by 20%
+                - e.g., 0.8 will make eaech lattice vector 80% of the initial length
+                - e.g., 1.0 will do nothing
+
+            structure (Structure, optional): structure to scale. Defaults to None.
+                - if None will use self.structure fed to initialization
+
+        Returns:
+            pymatgen structure object
+        """
+        structure = self.structure.copy()
+        orig_vol = structure.volume
+        new_vol = orig_vol * scale_factor
+        structure.scale_lattice(new_vol)
+
+        return structure
+
 
 class SiteTools(object):
     """
