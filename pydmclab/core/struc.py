@@ -310,7 +310,10 @@ class StrucTools(object):
         Returns:
             pymatgen structure object
         """
-        structure = self.structure.copy()
+        if not structure:
+            structure = self.structure.copy()
+        else:
+            structure = structure.copy()
         orig_vol = structure.volume
         new_vol = orig_vol * scale_factor
         structure.scale_lattice(new_vol)
