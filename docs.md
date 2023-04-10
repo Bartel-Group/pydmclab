@@ -636,6 +636,8 @@ launch_dirs = {<composition>/<unique ID for that composition>/<standard>/<unique
 
 - `pydmclab.core.energies`
   - formation energy demo
+- create `requirements.txt` file
+- create `pydmclab` conda environment
 
 ## Medium things
 
@@ -660,6 +662,10 @@ launch_dirs = {<composition>/<unique ID for that composition>/<standard>/<unique
   - handling NEB calculations
 - `pydmclab.ml.*`
   - modules for using/tuning ML potentials
+- `pydmclab.md.*`
+  - modules for running MD with ASE
+- `pydmclab.tests`
+  - thorough unit tests
   
 # FAQ
 
