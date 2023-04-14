@@ -721,13 +721,14 @@ def get_Efs(
 
 
 def check_Efs(Efs):
+    print("\nchecking formation enthalpies")
 
     for standard in Efs:
         print("\n\nworking on %s standard" % standard)
         for xc in Efs[standard]:
             print("\nxc = %s" % xc)
             for formula in Efs[standard][xc]:
-                print("%s : %s eV/at" % (formula, Efs[standard][xc][formula]))
+                print("%s : %s eV/at" % (formula, Efs[standard][xc][formula]["Ef"]))
     return
 
 
