@@ -9,6 +9,7 @@ from pydmclab.core.struc import StrucTools
 from pydmclab.hpc.launch import LaunchTools
 from pydmclab.hpc.submit import SubmitTools
 from pydmclab.hpc.analyze import AnalyzeBatch
+from pydmclab.core.energies import ChemPots, FormationEnthalpy
 
 """
 Basic framework
@@ -674,7 +675,7 @@ def get_results(
     return read_json(fjson)
 
 
-def check_results(results, print_structure=False):
+def check_results(results):
 
     keys_to_check = list(results.keys())
 
@@ -688,29 +689,139 @@ def check_results(results, print_structure=False):
         if convergence:
             converged += 1
             print("E (static) = %.2f" % data["results"]["E_per_at"])
-            continue
-            if ANALYSIS_CONFIGS["include_meta"]:
-                print("E (relax) = %.2f" % data["meta"]["E_relax"])
-                print("EDIFFG = %i" % data["meta"]["incar"]["EDIFFG"])
-                print("1st POTCAR = %s" % data["meta"]["potcar"][0])
-            if (
-                (mag != "nm")
-                and ("include_mag" in ANALYSIS_CONFIGS)
-                and (ANALYSIS_CONFIGS["include_mag"])
-            ):
-                magnetization = data["magnetization"]
-                an_el = list(magnetization.keys())[0]
-                an_idx = list(magnetization[an_el].keys())[0]
-                that_mag = magnetization[an_el][an_idx]["mag"]
-                print("mag on %s (%s) = %.2f" % (an_el, str(an_idx), that_mag))
-            if (
-                (print_structure)
-                and ("include_structure" not in ANALYSIS_CONFIGS)
-                or (ANALYSIS_CONFIGS["include_structure"])
-            ):
-                print(data["structure"])
 
     print("\n\n SUMMARY: %i/%i converged" % (converged, len(keys_to_check)))
+
+
+def get_gs(
+    results, include_structure=False, savename="gs_%s.json" % FILE_TAG, remake=False
+):
+    """
+    Args:
+        results (dict) - {'formula.ID.standard.mag.xc_calc' : {scraped results from VASP calculation}}
+        include_structure (bool) - include the structure or not
+        savename (str) - filename for fjson in DATA_DIR
+        remake (bool) - write (True) or just read (False) fjson
+
+    Returns:
+    {xc (str, the exchange-correlation method) :}
+        {formula (str) :
+            {'E' : energy of the ground-structure,
+             'key' : formula.ID.standard.mag.xc_calc for the ground-state structure,
+             'structure' : structure of the ground-state structure,
+             'n_started' : how many polymorphs you tried to calculate,
+             'n_converged' : how many polymorphs are converged,
+             'complete' : True if n_converged = n_started (i.e., all structures for this formula at this xc are done)}
+    """
+    fjson = os.path.join(DATA_DIR, savename)
+    if os.path.exists(fjson) and not remake:
+        return read_json(fjson)
+
+    xcs = sorted(list(set([key.split(".")[-1].split("-")[0] for key in results])))
+
+    unique_formulas = sorted(
+        list(set([results[key]["results"]["formula"] for key in results]))
+    )
+
+    gs = {xc: {formula: {} for formula in unique_formulas} for xc in xcs}
+
+    for xc in xcs:
+        for formula in unique_formulas:
+            relevant_keys = [
+                k
+                for k in results
+                if results[k]["results"]["formula"] == formula
+                if k.split(".")[-1].split("-")[0] == xc
+            ]
+            converged_relevant_keys = [
+                k for k in relevant_keys if results[k]["results"]["convergence"]
+            ]
+            energies = [
+                results[k]["results"]["E_per_at"] for k in converged_relevant_keys
+            ]
+            gs_energy = min(energies)
+            gs_key = converged_relevant_keys[energies.index(gs_energy)]
+            gs_structure = results[gs_key]["structure"]
+            complete = (
+                True if len(relevant_keys) == len(converged_relevant_keys) else False
+            )
+            gs[xc][formula] = {
+                "E": gs_energy,
+                "key": gs_key,
+                "n_started": len(relevant_keys),
+                "n_converged": len(converged_relevant_keys),
+                "complete": complete,
+            }
+            if include_structure:
+                gs[xc][formula]["structure"] = gs_structure
+
+    write_json(gs, fjson)
+    return read_json(fjson)
+
+
+def check_gs(gs):
+    """
+    checks that this dictionary is generated properly
+
+    Args:
+        gs (_type_): _description_
+
+    """
+
+    print("\nchecking ground-states")
+    print("%i xcs" % len(gs.keys()))
+    print("%i unique formulas" % len(gs[gs.keys()[0]].keys()))
+    for xc in gs:
+        n_formulas = len(gs[xc].keys())
+        n_formulas_complete = len([k for k in gs[xc] if gs[xc][k]["complete"]])
+    print(
+        "%i/%i formulas with all calculations completed"
+        % (n_formulas_complete, n_formulas)
+    )
+
+
+def get_Efs(
+    gs, standard="dmc", functional=None, savename="Efs_%s.json" % FILE_TAG, remake=False
+):
+    """
+    Args:
+        gs (dict) - {formula (str) : {basic stuff for ground-states}}
+        standard (str) - 'dmc' or 'mp'
+        functional (str or None) - if None, use default functionals
+        savename (str) - filename for fjson in DATA_DIR
+        remake (bool) - write (True) or just read (False) fjson
+
+    Returns:
+    {xc (str, the exchange-correlation method) :}
+        {formula (str) :
+            {'E' : energy of the ground-structure,
+             'key' : formula.ID.standard.mag.xc_calc for the ground-state structure,
+             'structure' : structure of the ground-state structure,
+             'n_started' : how many polymorphs you tried to calculate,
+             'n_converged' : how many polymorphs are converged,
+             'complete' : True if n_converged = n_started (i.e., all structures for this formula at this xc are done),
+             'Ef' : formation enthalpy at 0 K (float)}
+    """
+    fjson = os.path.join(DATA_DIR, savename)
+    if os.path.exists(fjson) and not remake:
+        return read_json(fjson)
+    for xc in gs:
+        if not functional:
+            functional = "r2scan" if xc == "metagga" else "pbe"
+        mus = ChemPots(functional=functional, standard=standard).chempots
+        for formula in gs[xc]:
+            E = gs[xc][formula]["E"]
+            Ef = FormationEnthalpy(formula=formula, E_DFT=E, chempots=mus).Ef
+            gs[xc][formula]["Ef"] = Ef
+
+    write_json(gs, fjson)
+    return read_json(fjson)
+
+
+def check_Efs(Efs):
+
+    print("havent written a quick check for Efs yet")
+    return
 
 
 def main():
@@ -732,6 +843,12 @@ def main():
 
     remake_results = True
     print_results_check = True
+
+    remake_gs = True
+    print_gs_check = True
+
+    remake_Efs = True
+    print_Efs_check = True
 
     comp = COMPOSITIONS
     query = get_query(comp=comp, remake=remake_query)
@@ -782,6 +899,16 @@ def main():
     )
     if print_results_check:
         check_results(results)
+
+    gs = get_gs(results=results, remake=remake_gs)
+
+    if print_gs_check:
+        check_gs(gs)
+
+    Efs = get_Efs(gs=gs, remake=remake_Efs)
+
+    if print_Efs_check:
+        check_Efs(Efs)
 
     return
 
