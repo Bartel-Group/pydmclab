@@ -583,28 +583,48 @@ def get_gs(
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
 
-    standards = sorted(list(set([results[key]['meta']['setup']['standard'] for key in results]))
+    standards = sorted(
+        list(set([results[key]["meta"]["setup"]["standard"] for key in results]))
+    )
 
-    gs = {standard : 
-            {xc : {} for xc in sorted(list(set([results[key]['meta']['setup']['xc'] 
-                                                for key in results 
-                                                if results[key]['meta']['setup']['standard'] == standard])))}
-            for standard in standards}
+    gs = {
+        standard: {
+            xc: {}
+            for xc in sorted(
+                list(
+                    set(
+                        [
+                            results[key]["meta"]["setup"]["xc"]
+                            for key in results
+                            if results[key]["meta"]["setup"]["standard"] == standard
+                        ]
+                    )
+                )
+            )
+        }
+        for standard in standards
+    }
 
     for standard in gs:
         for xc in gs[standard]:
-            keys = [k for k in results 
-                    if results[k]['meta']['setup']['standard'] == standard
-                    if results[k]['meta']['setup']['xc'] == xc]
-            
+            keys = [
+                k
+                for k in results
+                if results[k]["meta"]["setup"]["standard"] == standard
+                if results[k]["meta"]["setup"]["xc"] == xc
+            ]
+
             unique_formulas = sorted(
                 list(set([results[key]["results"]["formula"] for key in keys]))
             )
             for formula in unique_formulas:
-                formula_keys = [k for k in keys if results[k]["results"]["formula"] == formula]
+                gs[standard][xc][formula] = {}
+                formula_keys = [
+                    k for k in keys if results[k]["results"]["formula"] == formula
+                ]
                 converged_keys = [
-                k for k in formula_keys if results[k]["results"]["convergence"]
-            ]
+                    k for k in formula_keys if results[k]["results"]["convergence"]
+                ]
                 if not converged_keys:
                     gs_energy, gs_structure, gs_key = None, None, None
                 else:
@@ -614,18 +634,16 @@ def get_gs(
                     gs_energy = min(energies)
                     gs_key = converged_keys[energies.index(gs_energy)]
                     gs_structure = results[gs_key]["structure"]
-            complete = (
-                True if len(formula_keys) == len(converged_keys) else False
-            )
-            gs[xc][formula] = {
-                "E": gs_energy,
-                "key": gs_key,
-                "n_started": len(formula_keys),
-                "n_converged": len(converged_keys),
-                "complete": complete,
-            }
-            if include_structure:
-                gs[xc][formula]["structure"] = gs_structure
+                complete = True if len(formula_keys) == len(converged_keys) else False
+                gs[standard][xc][formula] = {
+                    "E": gs_energy,
+                    "key": gs_key,
+                    "n_started": len(formula_keys),
+                    "n_converged": len(converged_keys),
+                    "complete": complete,
+                }
+                if include_structure:
+                    gs[standard][xc][formula]["structure"] = gs_structure
 
     write_json(gs, fjson)
     return read_json(fjson)
@@ -642,25 +660,30 @@ def check_gs(gs):
 
     print("\nchecking ground-states")
     standards = gs.keys()
-    print('standards = ', % standards)
+    print("standards = ", standards)
     for standard in standards:
-        print('\nworking on %s standard' % standard)
+        print("\nworking on %s standard" % standard)
         xcs = list(gs[standard].keys())
         for xc in xcs:
-            print('  xc = %s' % xcs)
+            print("  xc = %s" % xcs)
             formulas = list(gs[standard][xc].keys())
             n_formulas = len(formulas)
-            n_formulas_complete = len([k for k in formulas if gs[standard][xc][k]["complete"]])
+            n_formulas_complete = len(
+                [k for k in formulas if gs[standard][xc][k]["complete"]]
+            )
         print(
             "%i/%i formulas with all calculations completed"
             % (n_formulas_complete, n_formulas)
         )
 
-def get_Efs(gs, functional=None, savename="Efs_%s.json" % FILE_TAG, remake=False):
+
+def get_Efs(
+    gs, non_default_functional=None, savename="Efs_%s.json" % FILE_TAG, remake=False
+):
     """
     Args:
         gs (dict) - {formula (str) : {basic stuff for ground-states}}
-        functional (str or None) - if None, use default functionals
+        non_default_functional (str or None) - if None, use default functionals
         savename (str) - filename for fjson in DATA_DIR
         remake (bool) - write (True) or just read (False) fjson
 
@@ -680,16 +703,18 @@ def get_Efs(gs, functional=None, savename="Efs_%s.json" % FILE_TAG, remake=False
         return read_json(fjson)
     for standard in gs:
         for xc in gs[standard]:
-            if not functional:
+            if not non_default_functional:
                 functional = "r2scan" if xc == "metagga" else "pbe"
+            else:
+                functional = non_default_functional
             mus = ChemPots(functional=functional, standard=standard).chempots
-            for formula in gs[xc]:
-                E = gs[xc][formula]["E"]
+            for formula in gs[standard][xc]:
+                E = gs[standard][xc][formula]["E"]
                 if E:
                     Ef = FormationEnthalpy(formula=formula, E_DFT=E, chempots=mus).Ef
                 else:
                     Ef = None
-                gs[xc][formula]["Ef"] = Ef
+                gs[standard][xc][formula]["Ef"] = Ef
 
     write_json(gs, fjson)
     return read_json(fjson)
@@ -697,7 +722,12 @@ def get_Efs(gs, functional=None, savename="Efs_%s.json" % FILE_TAG, remake=False
 
 def check_Efs(Efs):
 
-    print("havent written a quick check for Efs yet")
+    for standard in Efs:
+        print("\n\nworking on %s standard" % standard)
+        for xc in Efs[standard]:
+            print("\nxc = %s" % xc)
+            for formula in Efs[standard][xc]:
+                print("%s : %s eV/at" % (formula, Efs[standard][xc][formula]))
     return
 
 
