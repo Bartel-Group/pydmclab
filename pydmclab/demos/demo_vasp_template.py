@@ -12,142 +12,7 @@ from pydmclab.hpc.analyze import AnalyzeBatch
 from pydmclab.core.energies import ChemPots, FormationEnthalpy
 
 """
-Basic framework
-
-Initial crystal structures
-    a) Sometimes these are entries in Materials Project meeting some criteria:
-        - e.g., certain chemical space, chemical formula, E above hull, etc
-    b) Other times, we might start with an MP structure then perform some transformations to generate new structures
-        - e.g., replace x % of Ru with Ir in Ru_{1-x}Ir_{x}O_2 or extract x Li from Li_{1-x}CoO_2
-            - note: now we are disordering structures, so each chemical formula will have >= 1 enumerated structure
-                - i.e., Ru_0.5Ir_0.5O_2 has > 1 way to configure Ru/Ir on the cation sublattice
-    
-    The first two levels of our caculation directories will correspond to information relating to the crystal structure:
-        - top_level: the chemical formula (or some surrogate for the chemical formula)
-            - e.g., this could be RuO2 in 1(a) or it could be x in 1(b)
-        - unique_ID: some unique identifier for a crystal structure belonging to that "top_level"
-            - e.g., the Materials Project ID for the 1(a) case; or the index of 
-        
-    Each unique initial crytsal structure will be used for all directories below top_level/unique_ID
-    
-    Example tree #1:
-    calculating RuO2 and IrO2 ground-state polymorphs
-    -calcs
-     -RuO2
-      -mp-1234
-     -IrO2
-      -mp-5678
-      
-    Example tree #2:
-    calculating Ru_{2-x}Ir_{x}O4 for x = 0, 1, 2 for 2 ordered structures at each x
-    -calcs
-     -0
-      -0
-      -1
-     -1
-      -0
-      -1
-     -2
-      -0
-      -1
-         
-VASP input settings ("standard")
-
-    Usually we want to compute a group of structures with similar settings so that we can safely compare the resulting energies
-    
-    - right now, we have two standards:
-        - dmc: our group standard (to be evolved collectively)
-            - these are best practice settings for our group
-        - mp: settings to use for strict comparison to Materials Project data
-    - standards define the non-structure VASP input files (INCAR, KPOINTS, POTCAR)
-    
-    This will be the third level of our calculation directory: top_level/unique_ID/standard
-    
-    If we were calculating with dmc and mp standards, a part of the tree might look like:
-    
-    -calcs
-     -RuO2
-      -mp-1234
-       -dmc
-       -mp
-    
-Magnetic configuration (mag)
-
-    We need to define what initial magnetic configuration we want to calculate for each initial structure
-    - nm: non-magnetic (no spins)
-    - fm: ferromagnetic (all spins > 0)
-    - afm_*: antiferromagnetic (spins up and down with sum(spins) = 0)
-        - * is a unique identifier for the ordering of spins
-            - much like partially occupied / disordered structures have multiple ways to configure ions on the lattice,
-                - there are often many ways to configure spins on the lattice while still being AFM (sum(spins) = 0)
-        - if we want to do AFM calculations, we should first generate a "MAGMOM" (AFM ordering) file for each unique structure and save that data
-        - note: if we are computing AFM, we will also compute FM
-        
-    This will be the fourth level of our calculation directory: top_level/unique_ID/standard/mag
-    
-    -calcs
-     -RuO2
-      -mp-1234
-       -dmc
-        -afm_0
-
-        
-Exchange-correlation functional (xc)
-
-Now, we need to decide what flavor of DFT we want to use. Materials Project uses GGA+U. We will often use METAGGA.
-
-For each xc that we use, it's generally a good idea to run calculations in a sequence:
-    - a "loose" calculation that has fast-converging standards but not super accurate
-    - a "relax" calculation that will optimize the crystal structure with stricter standards
-    - a "static" calculation that will give us a better energy/electronic structure at that optimized geometry
-    - for METAGGA calculations, we need to first converge a GGA calculation before we start to optimize the geometry with metagga
-    
-We don't want to have to submit each of these individually to the queue, so we will "pack" them together:
-
-    So, if we're running gga, that means three calculations will get packed together: gga-loose --> gga-relax --> gga-static
-        - if we're running metagga, we'll have 5 calcs: gga-loose --> gga-relax --> gga-static --> metagga-relax --> metagga-static
-        - each packing or chain of jobs will need a submission script (i.e., something that gets submitted to the queue)
-        
-Each one of these "xc-calcs" (e.g., gga-relax) will require a VASP execution, meaning it needs VASP inputs and will generate VASP outputs,
-    so each xc-calc gets its own directory, becoming the 5th level of our calculation directory:
-    
-    top_level/unique_ID/standard/mag/xc-calc
-    
-    -calcs
-     -RuO2
-      -mp-1234
-       -dmc
-        -afm_0
-         -gga-loose
-         -gga-relax
-         -gga-static
-
-"""
-
-"""
-Most of this is taken care of automatically in pydmc
-
-1) Use MPQuery to get crystal structures from Materials Project
-    - write to a dictionary: query.json
-2) [OPTIONAL] Transform those structures to generate new structures using StrucTools
-    - write to a dictionary: strucs.json
-3) [OPTIONAL] Create AFM orderings ("magmoms") for each structure using MagTools(structure).get_afm_magmoms
-    - write to a dictionary: magmoms.json
-4) Create a dictionary of "launch directories" using LaunchTools
-    - customizable with various _launch_configs
-    - launch directories are the directories that hold submission scripts
-        - these launch directories are defined by the top_level, unique_ID, standard, and mag
-    - this will look like: {top_level/unique_ID/standard/mag : 
-                                {'xcs' : [XCs to use for that standard],
-                                'magmom' : [magmoms to use for that structure]}
-    - write to a dictionary: launch_dirs.json
-5) Loop through the launch directories and prepare VASP inputs + submission files and launch each chain of VASP jobs using SubmitTools
-    - customizable with _sub_configs, _vasp_configs, and _slurm_configs
-    - SubmitTools will figure out which jobs can be submitted together and how to order them for submission
-    - It will also prepare each VASP job accordingly
-6) Crawl through the launch directories, and analyze every VASP calculation using AnalyzeBatch
-    - customizable with _analysis_configs
-    - write to a dictionary: results.json
+see [pydmclab docs](https://github.umn.edu/bartel-group/pydmclab/blob/main/docs.md) for help
 """
 
 # where is this file
@@ -206,7 +71,7 @@ VASP_CONFIGS = {}
 # any configurations related to AnalyzeBatch
 ## e.g., {'include_meta' : True, 'include_mag' : True, 'n_procs' : 4}
 ## NOTE: do not set n_procs = 'all' unless you are running on a compute node (ie not a login node)
-ANALYSIS_CONFIGS = {}
+ANALYSIS_CONFIGS = {"n_procs": 1}
 
 """
 Don't forget to inspect the arguments to:
@@ -704,52 +569,59 @@ def get_gs(
         remake (bool) - write (True) or just read (False) fjson
 
     Returns:
-    {xc (str, the exchange-correlation method) :}
-        {formula (str) :
-            {'E' : energy of the ground-structure,
-             'key' : formula.ID.standard.mag.xc_calc for the ground-state structure,
-             'structure' : structure of the ground-state structure,
-             'n_started' : how many polymorphs you tried to calculate,
-             'n_converged' : how many polymorphs are converged,
-             'complete' : True if n_converged = n_started (i.e., all structures for this formula at this xc are done)}
+    {standard (str, the calculation standard) :
+        {xc (str, the exchange-correlation method) :
+            {formula (str) :
+                {'E' : energy of the ground-structure,
+                'key' : formula.ID.standard.mag.xc_calc for the ground-state structure,
+                'structure' : structure of the ground-state structure,
+                'n_started' : how many polymorphs you tried to calculate,
+                'n_converged' : how many polymorphs are converged,
+                'complete' : True if n_converged = n_started (i.e., all structures for this formula at this xc are done)}
     """
     fjson = os.path.join(DATA_DIR, savename)
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
 
-    xcs = sorted(list(set([key.split(".")[-1].split("-")[0] for key in results])))
+    standards = sorted(list(set([results[key]['meta']['setup']['standard'] for key in results]))
 
-    unique_formulas = sorted(
-        list(set([results[key]["results"]["formula"] for key in results]))
-    )
+    gs = {standard : 
+            {xc : {} for xc in sorted(list(set([results[key]['meta']['setup']['xc'] 
+                                                for key in results 
+                                                if results[key]['meta']['setup']['standard'] == standard])))}
+            for standard in standards}
 
-    gs = {xc: {formula: {} for formula in unique_formulas} for xc in xcs}
-
-    for xc in xcs:
-        for formula in unique_formulas:
-            relevant_keys = [
-                k
-                for k in results
-                if results[k]["results"]["formula"] == formula
-                if k.split(".")[-1].split("-")[0] == xc
+    for standard in gs:
+        for xc in gs[standard]:
+            keys = [k for k in results 
+                    if results[k]['meta']['setup']['standard'] == standard
+                    if results[k]['meta']['setup']['xc'] == xc]
+            
+            unique_formulas = sorted(
+                list(set([results[key]["results"]["formula"] for key in keys]))
+            )
+            for formula in unique_formulas:
+                formula_keys = [k for k in keys if results[k]["results"]["formula"] == formula]
+                converged_keys = [
+                k for k in formula_keys if results[k]["results"]["convergence"]
             ]
-            converged_relevant_keys = [
-                k for k in relevant_keys if results[k]["results"]["convergence"]
-            ]
-            energies = [
-                results[k]["results"]["E_per_at"] for k in converged_relevant_keys
-            ]
-            gs_energy = min(energies)
-            gs_key = converged_relevant_keys[energies.index(gs_energy)]
-            gs_structure = results[gs_key]["structure"]
+                if not converged_keys:
+                    gs_energy, gs_structure, gs_key = None, None, None
+                else:
+                    energies = [
+                        results[k]["results"]["E_per_at"] for k in converged_keys
+                    ]
+                    gs_energy = min(energies)
+                    gs_key = converged_keys[energies.index(gs_energy)]
+                    gs_structure = results[gs_key]["structure"]
             complete = (
-                True if len(relevant_keys) == len(converged_relevant_keys) else False
+                True if len(formula_keys) == len(converged_keys) else False
             )
             gs[xc][formula] = {
                 "E": gs_energy,
                 "key": gs_key,
-                "n_started": len(relevant_keys),
-                "n_converged": len(converged_relevant_keys),
+                "n_started": len(formula_keys),
+                "n_converged": len(converged_keys),
                 "complete": complete,
             }
             if include_structure:
@@ -769,24 +641,25 @@ def check_gs(gs):
     """
 
     print("\nchecking ground-states")
-    print("%i xcs" % len(gs.keys()))
-    print("%i unique formulas" % len(gs[gs.keys()[0]].keys()))
-    for xc in gs:
-        n_formulas = len(gs[xc].keys())
-        n_formulas_complete = len([k for k in gs[xc] if gs[xc][k]["complete"]])
-    print(
-        "%i/%i formulas with all calculations completed"
-        % (n_formulas_complete, n_formulas)
-    )
+    standards = gs.keys()
+    print('standards = ', % standards)
+    for standard in standards:
+        print('\nworking on %s standard' % standard)
+        xcs = list(gs[standard].keys())
+        for xc in xcs:
+            print('  xc = %s' % xcs)
+            formulas = list(gs[standard][xc].keys())
+            n_formulas = len(formulas)
+            n_formulas_complete = len([k for k in formulas if gs[standard][xc][k]["complete"]])
+        print(
+            "%i/%i formulas with all calculations completed"
+            % (n_formulas_complete, n_formulas)
+        )
 
-
-def get_Efs(
-    gs, standard="dmc", functional=None, savename="Efs_%s.json" % FILE_TAG, remake=False
-):
+def get_Efs(gs, functional=None, savename="Efs_%s.json" % FILE_TAG, remake=False):
     """
     Args:
         gs (dict) - {formula (str) : {basic stuff for ground-states}}
-        standard (str) - 'dmc' or 'mp'
         functional (str or None) - if None, use default functionals
         savename (str) - filename for fjson in DATA_DIR
         remake (bool) - write (True) or just read (False) fjson
@@ -805,14 +678,18 @@ def get_Efs(
     fjson = os.path.join(DATA_DIR, savename)
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
-    for xc in gs:
-        if not functional:
-            functional = "r2scan" if xc == "metagga" else "pbe"
-        mus = ChemPots(functional=functional, standard=standard).chempots
-        for formula in gs[xc]:
-            E = gs[xc][formula]["E"]
-            Ef = FormationEnthalpy(formula=formula, E_DFT=E, chempots=mus).Ef
-            gs[xc][formula]["Ef"] = Ef
+    for standard in gs:
+        for xc in gs[standard]:
+            if not functional:
+                functional = "r2scan" if xc == "metagga" else "pbe"
+            mus = ChemPots(functional=functional, standard=standard).chempots
+            for formula in gs[xc]:
+                E = gs[xc][formula]["E"]
+                if E:
+                    Ef = FormationEnthalpy(formula=formula, E_DFT=E, chempots=mus).Ef
+                else:
+                    Ef = None
+                gs[xc][formula]["Ef"] = Ef
 
     write_json(gs, fjson)
     return read_json(fjson)
