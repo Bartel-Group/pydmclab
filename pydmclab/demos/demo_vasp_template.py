@@ -665,16 +665,16 @@ def check_gs(gs):
         print("\nworking on %s standard" % standard)
         xcs = list(gs[standard].keys())
         for xc in xcs:
-            print("  xc = %s" % xcs)
+            print("  xc = %s" % xc)
             formulas = list(gs[standard][xc].keys())
             n_formulas = len(formulas)
             n_formulas_complete = len(
                 [k for k in formulas if gs[standard][xc][k]["complete"]]
             )
-        print(
-            "%i/%i formulas with all calculations completed"
-            % (n_formulas_complete, n_formulas)
-        )
+            print(
+                "%i/%i formulas with all calculations completed"
+                % (n_formulas_complete, n_formulas)
+            )
 
 
 def get_Efs(
