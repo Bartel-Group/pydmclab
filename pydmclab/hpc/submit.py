@@ -283,19 +283,20 @@ class SubmitTools(object):
         sub_configs = self.sub_configs.copy()
         vasp_configs = self.vasp_configs.copy()
         vasp_exec = os.path.join(sub_configs["vasp_dir"], sub_configs["vasp"])
-        if sub_configs['mpi_command'] == 'srun':
+        if sub_configs["mpi_command"] == "srun":
             return "\n%s --ntasks=%s --mpi=pmi2 %s > %s\n" % (
                 sub_configs["mpi_command"],
                 str(self.slurm_options["ntasks"]),
                 vasp_exec,
-                vasp_configs["fvaspout"]
+                vasp_configs["fvaspout"],
             )
-        elif sub_configs['mpi_command'] == 'mpirun':
-            return '\n%s -np=%s %s > %s\n' % (
-                sub_configs['mpi_command'],
-                str(self.slurm_options['ntasks']),
+        elif sub_configs["mpi_command"] == "mpirun":
+            return "\n%s -np=%s %s > %s\n" % (
+                sub_configs["mpi_command"],
+                str(self.slurm_options["ntasks"]),
                 vasp_exec,
-                vasp_configs['fvaspout'])
+                vasp_configs["fvaspout"],
+            )
 
     @property
     def lobster_command(self):
@@ -624,8 +625,8 @@ class SubmitTools(object):
                         )
                 f.write("\n\n")
                 f.write("ulimit -s unlimited\n")
-                if sub_configs['mpi_command'] == 'mpirun':
-                    f.write('module load impi/2018/release_multithread\n')
+                if sub_configs["mpi_command"] == "mpirun":
+                    f.write("module load impi/2018/release_multithread\n")
                 # now write what is needed for the chain of VASP calcs + postprocessing
                 print("\n:::: writing sub now - %s ::::" % fsub)
 
@@ -776,6 +777,197 @@ class SubmitTools(object):
             os.chdir(launch_dir)
             subprocess.call(["sbatch", "sub_%s.sh" % final_xc])
             os.chdir(scripts_dir)
+
+
+def get_sub_configs(
+    submit_calculations_in_parallel=False,
+    start_all_calculations_from_scratch=False,
+    rerun_lobster=False,
+    mpi_command="mpirun",
+    special_packing=False,
+):
+    """
+
+    configs related to preparing submission scripts and submitting VASP calculations
+        - see defaults in ***
+
+
+    Args:
+        submit_calculations_in_parallel (bool or int): whether to prepare submission scripts in parallel or not
+            False: use 1 processor
+            True: use all available processors
+            int: use that many processors
+
+        start_all_calculations_from_scratch (bool): if True, start all calculations over (ie delete all outputs)
+
+        rerun_lobster (bool) : if True, rerun lobster even if it has already been run
+
+        mpi_command (str): the command to use for mpi (eg mpirun, srun, etc)
+
+        special_packing (dict): if you want to change the loose --> relax --> static flow for some functional
+            e.g., {'metagga' : ['loose', 'static']}
+
+    Returns:
+        {config_name : config_value}
+
+    """
+    sub_configs = {}
+
+    if not submit_calculations_in_parallel:
+        n_procs = 1
+    else:
+        if isinstance(submit_calculations_in_parallel, int):
+            n_procs = submit_calculations_in_parallel
+        else:
+            n_procs = multip.cpu_count() - 1
+
+    sub_configs["n_procs"] = n_procs
+
+    if start_all_calculations_from_scratch:
+        sub_configs["fresh_restart"] = True
+
+    if rerun_lobster:
+        sub_configs["force_postprocess"] = True
+
+    sub_configs["mpi_command"] = mpi_command
+
+    if special_packing:
+        sub_configs["packing"] = {}
+        for xc in special_packing:
+            sub_configs["packing"]["xc"] = special_packing[xc]
+
+    return sub_configs
+
+
+def get_slurm_configs(
+    total_nodes=1,
+    cores_per_node=32,
+    walltime_in_hours=23,
+    partition="msismall",
+    error_file="log.e",
+    output_file="log.o",
+    account="cbartel",
+):
+    """
+
+    how to modify slurm configurations for each VASP job (see *** for defaults)
+
+    Args:
+        total_nodes (int, optional): how many nodes to run each VASP job on
+        cores_per_node (int, optional): how many cores per node to use for each VASP job
+        walltime_in_hours (int, optional): how long to run each VASP job
+        partition (str, optional): what part of the cluster to run each VASP job on
+        error_file (str, optional): where to send each VASP job error
+        output_file (str, optional): where to send each VASP job output
+        account (str, optional): what account to charge for your VASP jobs
+
+    Returns:
+        {slurm config name : slurm config value}
+    """
+    slurm_configs = {}
+
+    slurm_configs["nodes"] = total_nodes
+    slurm_configs["ntasks"] = int(total_nodes * cores_per_node)
+
+    slurm_configs["time"] = int(walltime_in_hours * 60)
+
+    if total_nodes > 1:
+        if "small" in partition:
+            print("WARNING: cant use small partition on > 1 node; switching to large")
+        partition = partition.replace("small", "large")
+        slurm_configs["partition"] = partition
+
+    slurm_configs["error_file"] = error_file
+    slurm_configs["output_file"] = output_file
+    slurm_configs["account"] = account
+
+    if total_nodes > 4:
+        print("WARNING: are you sure you need more than 4 nodes??")
+
+    if (total_nodes > 1) and (cores_per_node < 32):
+        print("WARNING: this seems like a small job. are you sure you need > 1 node??")
+
+    return slurm_configs
+
+
+def get_vasp_configs(
+    run_lobster=False,
+    modify_loose_incar=False,
+    modify_relax_incar=False,
+    modify_static_incar=False,
+    modify_loose_kpoints=False,
+    modify_relax_kpoints=False,
+    modify_static_kpoints=False,
+    modify_loose_potcar=False,
+    modify_relax_potcar=False,
+    modify_static_potcar=False,
+):
+    """
+
+    how to modify VASP calculations from the defaults (see pydmclab.hpc.vasp for defaults)
+
+    Args:
+        run_lobster (bool, optional): True to run LOBSTER
+
+        modify_loose_incar (bool, optional):
+            - dictionary of {incar flag (str) : setting for that flag}
+            - modifies only the "loose" calculations
+        modify_relax_incar (bool, optional):
+            - dictionary of {incar flag (str) : setting for that flag}
+            - modifies only the "relax" calculations
+        modify_static_incar (bool, optional):
+            - dictionary of {incar flag (str) : setting for that flag}
+            - modifies only the "static" calculations
+
+
+        modify_loose_kpoints (bool, optional):
+            - dictionary of non-default K-point setting. see pydmclab.hpc.vasp for format
+            - modifies only the "loose" calculations
+        modify_relax_kpoints (bool, optional):
+            - dictionary of non-default K-point setting. see pydmclab.hpc.vasp for format
+            - modifies only the "relax" calculations
+        modify_static_kpoints (bool, optional):
+            - dictionary of non-default K-point setting. see pydmclab.hpc.vasp for format
+            - modifies only the "static" calculations
+
+
+        modify_loose_potcar (bool, optional):
+            - dictionary of non-default POTCAR in format {element (str) : POTCAR to use (str)}
+            - modifies only the "loose" calculations
+        modify_relax_potcar (bool, optional):
+            - dictionary of non-default POTCAR in format {element (str) : POTCAR to use (str)}
+            - modifies only the "loose" calculations
+        modify_static_potcar (bool, optional):
+            - dictionary of non-default POTCAR in format {element (str) : POTCAR to use (str)}
+            - modifies only the "static" calculations
+
+    Returns:
+        dictionary of VASP_CONFIGS
+    """
+    vasp_configs = {"lobster_static": run_lobster}
+
+    if modify_loose_incar:
+        vasp_configs["loose_incar"] = modify_loose_incar
+    if modify_relax_incar:
+        vasp_configs["relax_incar"] = modify_relax_incar
+    if modify_static_incar:
+        vasp_configs["static_incar"] = modify_static_incar
+
+    if modify_loose_kpoints:
+        vasp_configs["loose_kpoints"] = modify_loose_kpoints
+    if modify_relax_kpoints:
+        vasp_configs["relax_kpoints"] = modify_relax_kpoints
+    if modify_static_kpoints:
+        vasp_configs["static_kpoints"] = modify_static_kpoints
+
+    if modify_loose_potcar:
+        vasp_configs["loose_potcar"] = modify_loose_potcar
+    if modify_relax_potcar:
+        vasp_configs["relax_potcar"] = modify_relax_potcar
+    if modify_static_potcar:
+        vasp_configs["static_potcar"] = modify_static_potcar
+
+    return vasp_configs
 
 
 def main():
