@@ -101,7 +101,7 @@ VASP_CONFIGS = get_vasp_configs(
 ## e.g., {'include_meta' : True, 'include_mag' : True, 'n_procs' : 4}
 ## NOTE: do not set n_procs = 'all' unless you are running on a compute node (ie not a login node)
 ANALYSIS_CONFIGS = get_analysis_configs(
-    n_procs=1,
+    analyze_calculations_in_parallel=False,
     analyze_structure=True,
     analyze_mag=False,
     analyze_charge=False,
@@ -354,7 +354,6 @@ def check_magmoms(strucs, magmoms):
 def get_launch_dirs(
     strucs,
     magmoms,
-    to_launch,
     user_configs,
     make_launch_dirs=True,
     refresh_configs=True,
@@ -365,7 +364,6 @@ def get_launch_dirs(
     Args:
         strucs (dict) - {formula : {ID : structure}}
         magmoms (dict) - {formula : {ID : {AFM configuration index : [list of magmoms on each site]}}
-        to_launch (dict) - {standard (str) : [list of final_xcs of interest]}
         user_configs (dict) - optional launch configurations
         make_launch_dirs (bool) - make launch directories (True) or just return launch dict (False)
         refresh_configs (bool) - refresh configs (True) or just use existing configs (False)
@@ -398,7 +396,6 @@ def get_launch_dirs(
 
             launch = LaunchTools(
                 calcs_dir=CALCS_DIR,
-                to_launch=to_launch,
                 user_configs=user_configs,
                 magmoms=curr_magmoms,
                 structure=structure,
@@ -915,12 +912,10 @@ def main():
     else:
         magmoms = None
 
-    to_launch = TO_LAUNCH
     launch_configs = LAUNCH_CONFIGS
     launch_dirs = get_launch_dirs(
         strucs=strucs,
         magmoms=magmoms,
-        to_launch=to_launch,
         user_configs=launch_configs,
         remake=remake_launch_dirs,
     )

@@ -1402,10 +1402,12 @@ def get_analysis_configs(
     if not analyze_calculations_in_parallel:
         n_procs = 1
     else:
-        if isinstance(analyze_calculations_in_parallel, int):
-            n_procs = analyze_calculations_in_parallel
-        else:
+        if analyze_calculations_in_parallel == True:
             n_procs = multip.cpu_count() - 1
+        elif analyze_calculations_in_paralle == False:
+            n_procs = 1
+        else:
+            n_procs = analyze_calculations_in_parallel
 
     analysis_configs["n_procs"] = n_procs
 

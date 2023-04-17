@@ -10,6 +10,7 @@ from pydmclab.data.configs import (
 
 from pymatgen.core.structure import Structure
 
+import multiprocessing as multip
 import os
 from shutil import copyfile, rmtree
 import subprocess
@@ -816,10 +817,12 @@ def get_sub_configs(
     if not submit_calculations_in_parallel:
         n_procs = 1
     else:
-        if isinstance(submit_calculations_in_parallel, int):
-            n_procs = submit_calculations_in_parallel
-        else:
+        if submit_calculations_in_parallel == True:
             n_procs = multip.cpu_count() - 1
+        elif submit_calculations_in_parallel == False:
+            n_procs = 1
+        else:
+            n_procs = submit_calculations_in_parallel
 
     sub_configs["n_procs"] = n_procs
 
