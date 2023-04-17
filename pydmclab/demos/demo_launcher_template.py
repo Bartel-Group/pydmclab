@@ -595,7 +595,7 @@ def check_results(results):
         print("convergence = %s" % convergence)
         if convergence:
             converged += 1
-            print("\n%s" % key)
+            # print("\n%s" % key)
             print("E (static) = %.2f" % data["results"]["E_per_at"])
 
     print("\n\n SUMMARY: %i/%i converged" % (converged, len(keys_to_check)))
@@ -795,7 +795,7 @@ def get_thermo_results(
         standard = results[key]["meta"]["setup"]["standard"]
         xc = results[key]["meta"]["setup"]["xc"]
         formula = results[key]["results"]["formula"]
-        ID = results[key]["meta"]["setup"]["unique_ID"]
+        ID = results[key]["meta"]["setup"]["ID"]
         E = results[key]["results"]["E_per_at"]
 
         tmp_thermo["E"] = E
@@ -852,11 +852,27 @@ def check_thermo_results(thermo):
                 gs_ID = [
                     k
                     for k in thermo[standard][xc][formula]
-                    if thermo[standard][xc][formula]["is_gs"]
+                    if thermo[standard][xc][formula][k]["is_gs"]
                 ]
                 if gs_ID:
                     gs_ID = gs_ID[0]
                     print("%s is the ground-state structure" % gs_ID)
+
+    print("\n\n  SUMMARY  ")
+    for standard in thermo:
+        for xc in thermo[standard]:
+            print("~~%s~~" % "_".join([standard, xc]))
+            converged_formulas = []
+            for formula in thermo[standard][xc]:
+                for ID in thermo[standard][xc][formula]:
+                    if thermo[standard][xc][formula][ID]["all_polymorphs_converged"]:
+                        converged_formulas.append(formula)
+
+            converged_formulas = list(set(converged_formulas))
+            print(
+                "%i/%i formulas have all polymorphs converged"
+                % (len(converged_formulas), len(thermo[standard][xc].keys()))
+            )
 
 
 def main():
