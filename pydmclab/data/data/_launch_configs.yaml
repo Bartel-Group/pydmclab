@@ -2,3 +2,6 @@ compare_to_mp: False # if True, launch will get everything it needs to generate 
 n_afm_configs: 0 # how many AFM configurations to run
 override_mag: False # could be ['nm'] if you only want to run nonmagnetic, won't check for whether structure is mag or not mag, it will just do as you say
 perturb_launch_poscar: False # if float, perturb initial POSCAR randomly by perturb_launch_poscar
+to_launch: 
+ dmc: 
+  - metagga

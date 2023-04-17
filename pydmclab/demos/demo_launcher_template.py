@@ -6,9 +6,15 @@ from pydmclab.utils.handy import read_json, write_json, make_sub_for_launcher
 from pydmclab.core.query import MPQuery
 from pydmclab.core.mag import MagTools
 from pydmclab.core.struc import StrucTools
-from pydmclab.hpc.launch import LaunchTools
-from pydmclab.hpc.submit import SubmitTools
+from pydmclab.hpc.launch import LaunchTools, get_launch_configs
+from pydmclab.hpc.submit import (
+    SubmitTools,
+    get_vasp_configs,
+    get_slurm_configs,
+    get_sub_configs,
+)
 from pydmclab.hpc.analyze import AnalyzeBatch, get_analysis_configs
+
 from pydmclab.core.energies import ChemPots, FormationEnthalpy
 
 """
@@ -29,7 +35,7 @@ for d in [CALCS_DIR, DATA_DIR]:
         os.makedirs(d)
 
 # if you need data from MP as a starting point (often the case), you need your API key
-API_KEY = "***REMOVED***"
+API_KEY = "__YOUR API KEY__"
 
 # lets put a tag on all the files we save
 FILE_TAG = CALCS_DIR.split("/")[-2]
@@ -43,30 +49,53 @@ COMPOSITIONS = None
 ## NOTE: you need to modify get_strucs to make this work (hard to generalize)
 TRANSFORM_STRUCS = False
 
-# whether or not you want to generate MAGMOMs
-## True if you're running AFM, else False
-GEN_MAGMOMS = False
-
-# what {standard : [final_xcs]} to calculate
-## e.g., {'dmc' : ['metagga', 'ggau']} if you want to run METAGGA + GGA+U at DMC standards
-TO_LAUNCH = {}
-
 # any configurations related to LaunchTools
 ## e.g., {'compare_to_mp' : True, 'n_afm_configs' : 4}
-LAUNCH_CONFIGS = {}
+LAUNCH_CONFIGS = get_launch_configs(
+    standards=["dmc"],
+    xcs=["metagga"],
+    use_mp_thermo_data=False,
+    n_afm_configs=0,
+    skip_xcs_for_standards={"mp": ["gga", "metagga"]},
+)
 
 # any configurations related to SubmitTools
 ## usually no need to change anything but n_procs... n_procs will determine how to parallelize over launch_dirs
 ## NOTE: do not set n_procs = 'all' unless you are running on a compute node (ie not a login node)
-SUB_CONFIGS = {"n_procs": 1}
+SUB_CONFIGS = get_sub_configs(
+    submit_calculations_in_parallel=False,
+    start_all_calculations_from_scratch=False,
+    rerun_lobster=False,
+    mpi_command="mpirun",
+    special_packing=False,
+)
 
 # any configurations related to Slurm
 ## e.g., {'ntasks' : 16, 'time' : int(24*60)}
-SLURM_CONFIGS = {}
+SLURM_CONFIGS = get_slurm_configs(
+    total_nodes=1,
+    cores_per_node=32,
+    walltime_in_hours=23,
+    partition="msismall",
+    error_file="log.e",
+    output_file="log.o",
+    account="cbartel",
+)
 
 # any configurations related to VASPSetUp
 ## e.g., {'lobster_static' : True, 'relax_incar' : {'ENCUT' : 555}}
-VASP_CONFIGS = {}
+VASP_CONFIGS = get_vasp_configs(
+    run_lobster=False,
+    modify_loose_incar=False,
+    modify_relax_incar=False,
+    modify_static_incar=False,
+    modify_loose_kpoints=False,
+    modify_relax_kpoints=False,
+    modify_static_kpoints=False,
+    modify_loose_potcar=False,
+    modify_relax_potcar=False,
+    modify_static_potcar=False,
+)
 
 # any configurations related to AnalyzeBatch
 ## e.g., {'include_meta' : True, 'include_mag' : True, 'n_procs' : 4}
@@ -80,6 +109,10 @@ ANALYSIS_CONFIGS = get_analysis_configs(
     analyze_bonding=False,
     exclude=[],
 )
+
+# whether or not you want to generate MAGMOMs
+## True if you're running AFM, else False
+GEN_MAGMOMS = True if LAUNCH_CONFIGS["n_afm_configs"] else False
 
 """
 Don't forget to inspect the arguments to:
@@ -745,7 +778,93 @@ def check_Efs(Efs):
     return
 
 
+def get_thermo_results(
+    results, Efs, savename="thermo_results_%s.json" % FILE_TAG, remake=False
+):
+    fjson = os.path.join(DATA_DIR, savename)
+    if os.path.exists(fjson) and not remake:
+        return read_json(fjson)
+
+    thermo_results = {
+        standard: {
+            xc: {formula: {} for formula in Efs[standard][xc]} for xc in Efs[standard]
+        }
+        for standard in Efs
+    }
+
+    for key in results:
+        tmp_thermo = {}
+
+        standard = results[key]["meta"]["setup"]["standard"]
+        xc = results[key]["meta"]["setup"]["xc"]
+        formula = results[key]["results"]["formula"]
+        ID = results[key]["meta"]["setup"]["unique_ID"]
+        E = results[key]["results"]["E_per_at"]
+
+        tmp_thermo["E"] = E
+        tmp_thermo["key"] = key
+
+        if E:
+            gs_key = Efs[standard][xc][formula]["key"]
+            gs_Ef = Efs[standard][xc][formula]["Ef"]
+            gs_E = Efs[standard][xc][formula]["E"]
+            delta_E_gs = E - gs_E
+
+            if key == gs_key:
+                tmp_thermo["is_gs"] = True
+            else:
+                tmp_thermo["is_gs"] = False
+
+            tmp_thermo["dE_gs"] = delta_E_gs
+            tmp_thermo["Ef"] = gs_Ef + delta_E_gs
+            tmp_thermo["all_polymorphs_converged"] = Efs[standard][xc][formula][
+                "complete"
+            ]
+
+        else:
+            tmp_thermo["dE_gs"] = None
+            tmp_thermo["Ef"] = None
+            tmp_thermo["is_gs"] = False
+            tmp_thermo["all_polymorphs_converged"] = False
+
+        thermo_results[standard][xc][formula][ID] = tmp_thermo
+
+    write_json(thermo_results, fjson)
+    return read_json(fjson)
+
+
+def check_thermo_results(thermo):
+    print("\nchecking thermo results")
+
+    for standard in thermo:
+        print("\n\nworking on %s standard" % standard)
+        for xc in thermo[standard]:
+            print("\nxc = %s" % xc)
+            for formula in thermo[standard][xc]:
+                print("formula = %s" % formula)
+                print(
+                    "%i polymorphs converged"
+                    % len(
+                        [
+                            k
+                            for k in thermo[standard][xc][formula]
+                            if thermo[standard][xc][formula][k]["E"]
+                        ]
+                    )
+                )
+                gs_ID = [
+                    k
+                    for k in thermo[standard][xc][formula]
+                    if thermo[standard][xc][formula]["is_gs"]
+                ]
+                if gs_ID:
+                    gs_ID = gs_ID[0]
+                    print("%s is the ground-state structure" % gs_ID)
+
+
 def main():
+
+    remake_sub_for_launcher = False
 
     remake_query = False
     print_query_check = True
@@ -770,6 +889,12 @@ def main():
 
     remake_Efs = True
     print_Efs_check = True
+
+    remake_thermo_results = True
+    print_thermo_results_check = True
+
+    if remake_sub_for_launcher:
+        make_sub_for_launcher()
 
     comp = COMPOSITIONS
     query = get_query(comp=comp, remake=remake_query)
@@ -830,6 +955,11 @@ def main():
 
     if print_Efs_check:
         check_Efs(Efs)
+
+    thermo = get_thermo_results(results=results, Efs=Efs, remake=remake_thermo_results)
+
+    if print_thermo_results_check:
+        check_thermo_results(thermo)
 
     return
 

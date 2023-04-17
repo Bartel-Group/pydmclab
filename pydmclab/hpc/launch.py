@@ -27,7 +27,6 @@ class LaunchTools(object):
         structure,
         top_level,
         unique_ID,
-        to_launch,
         magmoms=None,
         user_configs={},
         refresh_configs=True,
@@ -61,10 +60,6 @@ class LaunchTools(object):
                 - could be x in the LiCoO2 example I described previously
                 - it's really up to you, but it must be unique within the top_level directory
 
-            to_launch (dict) :
-                {standard (str) : [list of xcs (str)]}
-                - e.g., if I want to run gga+u and metagga with dmc standards, to_launch = {'dmc' : ['metagga', 'ggau']}
-
             magmoms (dict):
                 - if you are running AFM calculations
                     - {index of configuration index (int) : magmom (list)} generated using MagTools
@@ -78,7 +73,9 @@ class LaunchTools(object):
                     compare_to_mp: False # if True, launch will get everything it needs to generate MP-consistent data
                     n_afm_configs: 0 # how many AFM configurations to run
                     override_mag: False # could be ['nm'] if you only want to run nonmagnetic, won't check for whether structure is mag or not mag, it will just do as you say
-
+                    to_launch:
+                        - what xcs we want to launch for each standard
+                            - e.g., {'dmc' : ['metagga']}
 
             refresh_configs (bool) - if True, will copy pydmc baseline configs to your local directory
                 - this is useful if you've made changes to the configs files in the directory you're working in and want to start over
@@ -119,15 +116,10 @@ class LaunchTools(object):
                         "You are running afm calculations but provided no magmoms, generate these first, then pass to LaunchTools"
                     )
 
-        # include gga+u calcs w/ mp standards if we're comparing to MP
-        if configs["compare_to_mp"]:
-            to_launch["mp"] = ["ggau"]
-
         # add the required arguments to our configs file
         configs["top_level"] = top_level
         configs["unique_ID"] = unique_ID
         configs["calcs_dir"] = calcs_dir
-        configs["to_launch"] = to_launch
 
         # store our magmoms and structure
         self.magmoms = magmoms
@@ -276,3 +268,51 @@ class LaunchTools(object):
                             struc.to(fmt="poscar", filename=fposcar)
 
         return launch_dirs
+
+
+def get_launch_configs(
+    standards=["dmc"],
+    xcs=["metagga"],
+    use_mp_thermo_data=False,
+    n_afm_configs=0,
+    skip_xcs_for_standards={"mp": ["gga", "metagga"]},
+):
+    """
+
+    configs related to launching  chains of calculations
+
+    Args:
+        standards (list, optional): list of standards you'd like to calculate
+        xcs (list, optional): list of xcs you'd like to calculate for each standard
+        use_mp_thermo_data (bool, optional): True if you are going to use formation energies provided in Materials Project for phase stability analysis
+        n_afm_configs (int, optional): number of antiferromagnetic configurations to run for each structure (0 if you don't want to run AFM)
+        skip_xcs_for_standards (dict, optional): dictionary of xcs to skip for a given standard.
+            Defaults to {"mp": ["gga", "metagga"]}.
+                - e.g., we don't want to run GGA or MetaGGA MP calculations because MP uses GGA+U (for now)
+
+    Returns:
+        dictionary of launch configurations
+    """
+
+    launch_configs = {}
+
+    to_launch = {}
+
+    for standard in standards:
+        to_launch[standard] = xcs
+
+    if use_mp_thermo_data:
+        to_launch["mp"] = ["ggau"]
+
+    for standard in skip_xcs_for_standards:
+        for xc in skip_xcs_for_standards[standard]:
+            if xc in to_launch[standard]:
+                to_launch[standard].remove(xc)
+
+    launch_configs["to_launch"] = to_launch
+
+    launch_configs["compare_to_mp"] = use_mp_thermo_data
+
+    launch_configs["n_afm_configs"] = n_afm_configs
+
+    return launch_configs

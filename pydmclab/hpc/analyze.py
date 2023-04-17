@@ -1207,7 +1207,7 @@ class AnalyzeBatch(object):
             a string that can be used as a key for a dictionary
                 top_level.unique_ID.standard.mag.xc_calc
         """
-        return ".".join(calc_dir.split("/")[-5:])
+        return "--".join(calc_dir.split("/")[-5:])
 
     def _results_for_calc_dir(self, calc_dir):
         """
@@ -1366,3 +1366,70 @@ def crawl_and_purge(
             "You had the safety on\n If it were off, you would have purged %i files, freeing up %.2f GB of memory"
             % (len(purged_files), mem_created / 1e9)
         )
+
+def get_analysis_configs(
+    analyze_calculations_in_parallel=False,
+    analyze_structure=True,
+    analyze_mag=False,
+    analyze_charge=False,
+    analyze_dos=False,
+    analyze_bonding=False,
+    exclude=[],
+):
+    """
+
+    function for modifying analysis configs from the defaults (see *** for defaults)
+
+    Args:
+        analyze_calculations_in_parallel (bool or int): whether to analyze calculation results in parallel or not
+            False: use 1 processor
+            True: use all available processors
+            int: use that many processors
+        analyze_structure (bool, optional): True to include structure in your results
+        analyze_mag (bool, optional): True to include magnetization in your results
+        analyze_charge (bool, optional): True to include bader charge + lobster charges + madelung in your results
+        analyze_dos (bool, optional): True to include pdos, tdos in your results
+        analyze_bonding (bool, optional): True to include tcohp, pcohp, tcoop, pcoop, tcobi, pcobi in your results
+        exclude (list, optional): list of strings to exclude from analysis. Defaults to [].
+            - overwrites other options
+    Returns:
+        dictionary of ANALYSIS_CONFIGS
+            {'include_*' : True or False}
+    """
+
+    analysis_configs = {}
+
+    if not analyze_calculations_in_parallel:
+        n_procs = 1
+    else:
+        if isinstance(analyze_calculations_in_parallel, int):
+            n_procs = analyze_calculations_in_parallel
+        else:
+            n_procs = multip.cpu_count() - 1
+
+    analysis_configs["n_procs"] = n_procs
+
+    includes = []
+    if analyze_structure:
+        includes.append("structure")
+
+    if analyze_mag:
+        includes.append("mag")
+
+    if analyze_charge:
+        includes.extend(["charge", "madelung"])
+
+    if analyze_dos:
+        includes.extend(["tdos", "pdos"])
+
+    if analyze_bonding:
+        includes.extend(["tcohp", "pcohp", "tcoop", "pcoop", "tcobi", "pcobi"])
+
+    for include in includes:
+        analysis_configs["include_" + include] = True
+
+    if exclude:
+        for ex in exclude:
+            analysis_configs["include_" + ex] = False
+
+    return analysis_configs
