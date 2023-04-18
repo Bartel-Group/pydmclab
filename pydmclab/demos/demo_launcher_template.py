@@ -771,13 +771,31 @@ def check_Efs(Efs):
         for xc in Efs[standard]:
             print("\nxc = %s" % xc)
             for formula in Efs[standard][xc]:
-                print("%s : %s eV/at" % (formula, Efs[standard][xc][formula]["Ef"]))
+                print("%s : %.2f eV/at" % (formula, Efs[standard][xc][formula]["Ef"]))
     return
 
 
 def get_thermo_results(
     results, Efs, savename="thermo_results_%s.json" % FILE_TAG, remake=False
 ):
+    """
+
+    Args:
+        results (dict): full results dictionary
+        Efs (dict): dictionary of formation enthalpies
+        savename (str, optional): Defaults to "thermo_results_%s.json"%FILE_TAG.
+        remake (bool, optional): Defaults to False.
+
+    Returns:
+        {standard (str) :
+            {xc (str) :
+                {formula (str) :
+                    {'E' (float) : energy of the structure,
+                     'Ef' : formation enthalpy,
+                     'is_gs' : True if this is the lowest energy polymorph for this formula,
+                     'dE_gs' : how high above the ground-state this structure is in energy
+                     'all_polymorphs_converged' : True if every structure that was computed for this formula is converged}
+    """
     fjson = os.path.join(DATA_DIR, savename)
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
