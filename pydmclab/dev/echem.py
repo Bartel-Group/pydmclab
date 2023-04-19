@@ -449,6 +449,7 @@ def make_voltages():
 
 
 def main():
+    mixing = make_mixing_json()
     out = make_voltages()
     return out
 
