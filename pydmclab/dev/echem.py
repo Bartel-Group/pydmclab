@@ -71,6 +71,9 @@ class MixingHull(object):
 
         relevant_compounds = []
         for c in compounds:
+            if c in endmembers:
+                relevant_compounds.append(c)
+                continue
             els = CompTools(c).els
             counter = 0
             for el in elements_that_must_be_present:
@@ -449,10 +452,12 @@ def make_voltages():
 
 
 def main():
+    fjson = os.path.join("/users/cbartel", "Downloads", "Li2MP2S6_gga_gs_E_per_at.json")
+    energies = read_json(fjson)
     mixing = make_mixing_json()
-    out = make_voltages()
-    return out
+    voltages = make_voltages()
+    return energies, mixing, voltages
 
 
 if __name__ == "__main__":
-    out = main()
+    energies, mixing, voltages = main()
