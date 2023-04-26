@@ -2,7 +2,7 @@ from pydmclab.core.comp import CompTools
 from pydmclab.core.query import MPQuery
 from pydmclab.core.hulls import GetHullInputData, AnalyzeHull, ParallelHulls
 from pydmclab.utils.handy import read_json, write_json
-from pydmclab.utils.plotting import set_rc_params, tableau_colors
+from pydmclab.utils.plotting import set_rc_params, get_colors
 from pydmclab.data.thermochem import mus_at_0K, mus_at_T
 
 import matplotlib.pyplot as plt
@@ -25,7 +25,7 @@ TO-DO:
 API_KEY = "***REMOVED***"
 
 # chemical system to test on
-CHEMSYS = "Ca-Al-Ti-O-F"
+CHEMSYS = "Ca-Al-Ti-F"
 
 # where to save data
 DATA_DIR = os.path.join("output", "hulls", "data")
@@ -39,12 +39,17 @@ if not os.path.exists(FIG_DIR):
 
 
 def get_mp_data_for_chemsys(
-    chemsys=CHEMSYS,
+    comp=CHEMSYS,
+    properties=None,
+    criteria={},
     only_gs=True,
-    dict_key="cmpd",
-    remake=False,
+    include_structure=True,
+    supercell_structure=False,
+    max_Ehull=0.1,
+    max_sites_per_structure=100,
+    max_strucs_per_cmpd=5,
     data_dir=DATA_DIR,
-    api_key=API_KEY,
+    remake=False,
 ):
     """
     Args:
@@ -58,12 +63,19 @@ def get_mp_data_for_chemsys(
     Returns:
         gs (dict): dictionary of ground state data from MPQuery for chemsys
     """
-    fjson = os.path.join(data_dir, "query_" + chemsys + ".json")
+    fjson = os.path.join(data_dir, "query_" + comp + ".json")
     if not remake and os.path.exists(fjson):
         return read_json(fjson)
 
-    mpq = MPQuery(api_key)
-    out = mpq.get_data_for_comp(comp=chemsys, only_gs=only_gs, dict_key=dict_key)
+    mpq = MPQuery(API_KEY)
+    d = mpq.get_data_for_comp(comp=comp, only_gs=only_gs)
+
+    out = {}
+    formulas = list(set([d[k]["cmpd"] for k in d]))
+    for formula in formulas:
+        # NOTE: this only works because I know my query only has 1 structure per formula (only_gs = True)
+        gs_key = [k for k in d if d[k]["cmpd"] == formula][0]
+        out[formula] = d[gs_key]
     return write_json(out, fjson)
 
 
@@ -260,10 +272,6 @@ def main():
     # if True, generate figure to check results
     remake_hull_figure_check = True
 
-    # if True, test chemical potential stuff
-
-    remake_mus_figure_check = True
-
     # MP query for CHEMSYS
     gs = get_mp_data_for_chemsys(CHEMSYS, remake=remake_query)
 
@@ -288,6 +296,5 @@ def main():
 
 
 if __name__ == "__main__":
-
     # MP Query --> hull input data (serial) --> hull output data (serial) --> hull output data (parallel)
-    gs, hullin, hullout, p_hullout = main()
+    gs = main()
