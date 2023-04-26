@@ -26,7 +26,7 @@ class MixingHull(object):
         self.varying_element = varying_element
         self.shared_element_basis = shared_element_basis
         self.input_energies = input_energies
-        error_check = self._compatibility_check
+        # error_check = self._compatibility_check
 
     @property
     def _compatibility_check(self):
@@ -75,6 +75,12 @@ class MixingHull(object):
                 relevant_compounds.append(c)
                 continue
             els = CompTools(c).els
+            has_other_els = False
+            for el in els:
+                if el not in elements_in_relevant_compounds:
+                    has_other_els = True
+            if has_other_els:
+                continue
             counter = 0
             for el in elements_that_must_be_present:
                 if el in els:
@@ -451,7 +457,7 @@ def make_voltages():
     return out
 
 
-def main():
+def chrisc_main():
     fjson = os.path.join("/users/cbartel", "Downloads", "Li2MP2S6_gga_gs_E_per_at.json")
     energies = read_json(fjson)
     mixing = make_mixing_json()
@@ -459,5 +465,28 @@ def main():
     return energies, mixing, voltages
 
 
+def main():
+    print(os.getcwd())
+
+    fjson = "../data/input_energies.json"
+    energies = read_json(fjson)
+
+    energies["Ba1S3Zr1"] = {"E_per_at": -100}
+    out = {}
+    for M in ["Nb", "Ta"]:
+        mixing = MixingHull(
+            energies,
+            energy_key="E_per_at",
+            varying_element=M,
+            end_members=["BaZrS3", "Ba%sS3" % M],
+            shared_element_basis="Ba",
+        )
+
+        print(mixing.relevant_compounds)
+        out[M] = mixing.results
+
+    return energies, out
+
+
 if __name__ == "__main__":
-    energies, mixing, voltages = main()
+    energies, out = main()
