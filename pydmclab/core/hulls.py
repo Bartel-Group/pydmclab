@@ -862,3 +862,461 @@ class ParallelHulls(object):
         pool.close()
         data = dict(zip(compounds, results))
         return write_json(data, fjson)
+
+
+class MixingHull(object):
+    """
+
+    for computing mixing energies along one dimension
+        - i.e., between two end members
+
+    recommended use:
+        - specify:
+            - input_energies
+            - varying_element
+            - end_members
+            - shared_element_basis
+            - energy_key
+        - mixing_results = MixingHull(input_energies=input_energies,
+                                        varying_element=varying_element,
+                                        end_members=end_members,
+                                        shared_element_basis=shared_element_basis,
+                                        energy_key=energy_key).results
+        - this will have everything you need
+        - call other methods to debug
+
+    @TO-DO:
+        - generalize to N dimensions
+
+
+    """
+
+    def __init__(
+        self,
+        input_energies,
+        varying_element,
+        end_members,
+        shared_element_basis,
+        energy_key="E_per_at",
+    ):
+        """
+
+        Args:
+            input_energies (dict):
+                - the energies you collected from DFT calculations
+                    - {formula (str) :
+                        {energy_key (str) :
+                            DFT total energy in eV/atom (float)}}}
+                - these should be ground-state energies for all relevant formulas for a particular level of theory + standard
+                - it's OK if entries in this dictionary are not relevant to the mixing hull you are trying to calculate
+                    - this code will just ignore them
+                - formula should be in CompTools(orig_formula).clean format
+
+            varying_element (str):
+                - the single element that varies along the 1D mixing hull
+                - e.g., "Li" for a delithiation mixing hull
+
+            end_members (list):
+                - this should be a two-element list
+                - each element of the list should be a formula (str)
+                - this specifies the two "end members" of your mixing hull
+                    - e.g., ['FeP2S6', 'Li2FeP2S6']
+                        - if you were looking at the lithiation of FeP2S6 (e.g., to compute the insertion voltage)
+                    - e.g., ['BaZrS3', 'BaNbS3']
+                        - if you were looking at the formation of Ba(Zr_{1-x}Nb_x)S_3 phases
+
+            shared_element_basis (str):
+                - this is used to compute the formula unit basis
+                - your two end members (and all phases in between) should conserve the stoichiometry of (at least) one element
+                - e.g., for lithiation of FePO4, you might specify Fe as a basis
+                - e.g., for mixing of IrO2-RuO2, you might specify O as a basis
+                - e.g., for mixing of BaZrS3-BaNbS3, you might specify Ba as a basis
+
+            energy_key (str): Defaults to "E_per_at".
+                - the key inside of each formula in input_energies where the energy per atom lives
+                - e.g., input_energies['Li2FeP2S6']['E_per_at'] should return the DFT total energy per atom
+
+        """
+        # sanitize the input_energies
+        input_energies = {
+            CompTools(k).clean: {"E": input_energies[k][energy_key]}
+            for k in input_energies
+        }
+
+        # sanitize the end_members
+        self.end_members = [CompTools(c).clean for c in end_members]
+
+        self.varying_element = varying_element
+        self.shared_element_basis = shared_element_basis
+        self.input_energies = input_energies
+
+    @property
+    def shared_element_amt_basis(self):
+        """
+
+        using the shared_element_basis, determine how many of that element they're should be
+            - usually we specify the end-members to have the same number of this element already
+            - this is in case we don't do that for some reason.
+                - e.g., if our end-members are ['Li2FeP2S6', 'Li3Fe2P4S12']
+                    - and our shared_element_basis is 'Fe'
+                    - we need to decide whether a "formula unit" has 1 Fe or 2 Fe
+                    - this code will choose the larger of the two
+
+        Returns:
+            the amount (int) of the shared element basis
+        """
+        end_members = self.end_members
+        shared_element_basis = self.shared_element_basis
+
+        # get the amt of the shared element in the first end member
+        amt_1 = CompTools(end_members[0]).stoich(shared_element_basis)
+
+        # get the amt of the shared element in the second end member
+        amt_2 = CompTools(end_members[1]).stoich(shared_element_basis)
+
+        # choose the larger one
+        if amt_2 > amt_1:
+            return amt_2
+        else:
+            return amt_1
+
+    @property
+    def relevant_compounds(self):
+        """
+
+        some of the formulas in input_energies might not be relevant to the specified hull
+            - e.g., if I had mixed phases pertaining to Li2MP2S6 (M = Fe, Mn, Co, ...) in one dictionary,
+                - this code will use the end-members to ignore the irrelevant compounds
+
+        Returns:
+            list of unique compounds (str) that are relevant to the mixing hull
+        """
+        # get all my compounds
+        compounds = list(self.input_energies.keys())
+
+        endmembers = self.end_members
+        varying_element = self.varying_element
+
+        # get all the elements that are in the end members
+        elements_in_relevant_compounds = [CompTools(e).els for e in endmembers]
+
+        # flatten the list and make it unique
+        elements_in_relevant_compounds = list(
+            set(
+                [item for sublist in elements_in_relevant_compounds for item in sublist]
+            )
+        )
+
+        # figure out what elements must be present in a relevant compound
+        elements_that_must_be_present = [
+            el for el in elements_in_relevant_compounds if el != varying_element
+        ]
+
+        # determine the relevant compounds
+        relevant_compounds = []
+        for c in compounds:
+            # end members must be relevant
+            if c in endmembers:
+                relevant_compounds.append(c)
+                continue
+
+            els = CompTools(c).els
+
+            # make sure the compound we're checking doesn't have elements that are not in the endmembers
+            has_other_els = False
+            for el in els:
+                if el not in elements_in_relevant_compounds:
+                    has_other_els = True
+            if has_other_els:
+                continue
+
+            # make sure the compound we're checking has all the elements that are in the endmembers (except perhaps the varying element)
+            counter = 0
+            for el in elements_that_must_be_present:
+                if el in els:
+                    counter += 1
+            if counter == len(elements_that_must_be_present):
+                relevant_compounds.append(c)
+            elif counter == len(elements_in_relevant_compounds) - 1:
+                if varying_element in els:
+                    relevant_compounds.append(c)
+
+        return relevant_compounds
+
+    @property
+    def energies_with_fractional_composition(self):
+        """
+        re-configure input_energies to make it amenable to mixing calculations
+            - also make it include only relevant compounds
+
+        Returns:
+
+            {formula (str) :
+                {'E' : total energy per atom (float, eV/atom),
+                 'factor' : factor to multiply by to convert the maximally reduced formula unit into the appropriate basis formula unit (float),
+                 'n_varying' : number of varying element atoms in the basis formula unit (float),
+                 'n_atoms_basis' : number of atoms in the basis formula unit (float)}
+        """
+        shared_element_amt_basis = self.shared_element_amt_basis
+        shared_element_basis = self.shared_element_basis
+        varying_element = self.varying_element
+        input_energies = self.input_energies
+        relevant_compounds = self.relevant_compounds
+
+        # use only the relevant compounds
+        input_energies = {c: input_energies[c] for c in relevant_compounds}
+
+        for c in input_energies:
+            # figure out how to convert the reduced f.u. into the basis f.u.
+            amt_of_shared_el = CompTools(c).stoich(shared_element_basis)
+            factor = shared_element_amt_basis / amt_of_shared_el
+            input_energies[c]["factor"] = factor
+
+            # convert the number of the varying element into the basis f.u.
+            n_varying = CompTools(c).stoich(varying_element) * factor
+
+            # count the number of atoms in the basis f.u.
+            n_atoms_basis = CompTools(c).n_atoms * factor
+
+            input_energies[c]["factor"] = factor
+            input_energies[c]["n_varying"] = n_varying
+            input_energies[c]["n_atoms_basis"] = n_atoms_basis
+        return input_energies
+
+    @property
+    def mixing_energies(self):
+        """
+        compute the mixing energies
+
+        Returns:
+
+            {formula (str) :
+                {'E' : total energy per atom (float, eV/atom),
+                 'factor' : factor to multiply by to convert the maximally reduced formula unit into the appropriate basis formula unit (float),
+                 'n_varying' : number of varying element atoms in the basis formula unit (float),
+                 'n_atoms_basis' : number of atoms in the basis formula unit (float),
+                 'E_mix' : mixing energy (float, eV/atom),
+                 'x' : fraction of the varying element (float),
+                 'zero' : which end member has x == 0 (str, formula)}
+        """
+        input_energies = self.energies_with_fractional_composition
+        end_members = self.end_members
+
+        # get the energies, number of varying element, and basis for both end members
+        E_left = input_energies[end_members[0]]["E"]
+        E_right = input_energies[end_members[1]]["E"]
+        n_left = input_energies[end_members[0]]["n_varying"]
+        n_right = input_energies[end_members[1]]["n_varying"]
+        basis_left = input_energies[end_members[0]]["n_atoms_basis"]
+        basis_right = input_energies[end_members[1]]["n_atoms_basis"]
+
+        for c in input_energies:
+            E = input_energies[c]["E"]
+            n = input_energies[c]["n_varying"]
+            basis = input_energies[c]["n_atoms_basis"]
+
+            # determine which end member is "zero" (the left side of a traditional mixing hull)
+            # this affects which end member gets (1-x) and which gets (x) as a coef in the mixing energy calculation
+            # this also allows us to compute the fractional amount of the varying element (from n_varying --> x)
+            if n_left != 0:
+                x = n / n_left
+                zero = "right"
+            elif n_right != 0:
+                x = n / n_right
+                zero = "left"
+
+            # compute the mixing energy per basis f.u.
+            if zero == "right":
+                E_mix = E * basis - (
+                    x * E_left * basis_left + (1 - x) * E_right * basis_right
+                )
+            elif zero == "left":
+                E_mix = E * basis - (
+                    (1 - x) * E_left * basis_left + x * E_right * basis_right
+                )
+
+            # convert the mixing energy to eV/atom
+            E_mix = E_mix / basis
+
+            input_energies[c]["E_mix"] = E_mix
+            input_energies[c]["x"] = x
+
+            if zero == "left":
+                zero_compound = end_members[0]
+
+            elif zero == "right":
+                zero_compound = end_members[1]
+
+            input_energies[c]["zero"] = zero_compound
+
+        return input_energies
+
+    @property
+    def sorted_compounds(self):
+        """
+        Returns:
+            alphabetized list of relevant compounds (str) in the mixing hull
+        """
+        return sorted(list(self.mixing_energies.keys()))
+
+    def amts_matrix(self, compounds="all", chemical_space="all"):
+        """
+        Args:
+            compounds (str or list) - if 'all', use all compounds; else use specified list
+                - note: this gets modified for you as needed to minimize cpu time
+            chemical_space - if 'all', use entire space; else use specified tuple
+                - note: this gets modified for you as needed to minimize cpu time
+        Returns:
+            matrix (2D array) with the fractional composition of each element in each compound (float)
+                - each row is a different compound (ordered going down alphabetically)
+                - each column is a different element (ordered across alphabetically)
+        """
+        if chemical_space == "all":
+            # we're just doing binary mixing hulls so we are one-hot encoding the "chemical space" as (A, B)
+            chemical_space = ["A", "B"]
+
+        # use our computed mixing energies
+        mixing_energies = self.mixing_energies
+
+        # use all the relevant compounds
+        if compounds == "all":
+            compounds = self.sorted_compounds
+
+        # make our coefficients matrix using "x" from the mixing energies dict
+        A = np.zeros((len(compounds), len(chemical_space)))
+        for row in range(len(compounds)):
+            compound = compounds[row]
+            for col in range(len(chemical_space)):
+                A[row, col] = mixing_energies[compound]["x"]
+        return A
+
+    def formation_energy_array(self, compounds="all"):
+        """
+        Args:
+            compounds (str or list) - if 'all', use all compounds; else use specified list
+                - this gets modified for you as needed to minimize cpu time
+        Returns:
+            1D array of formation energies (float) for each compound ordered alphabetically
+        """
+        mixing_energies = self.mixing_energies
+        if compounds == "all":
+            compounds = self.sorted_compounds
+
+        # our "formation energies" for the hull calculation are the mixing energies we calculated
+        return np.array([mixing_energies[c]["E_mix"] for c in compounds])
+
+    def hull_input_matrix(self, compounds="all", chemical_space="all"):
+        """
+        Args:
+            compounds (str or list) - if 'all', use all compounds; else use specified list
+                - this gets modified for you as needed to minimize cpu time
+            chemical_space - if 'all', use entire space; else use specified tuple
+                - this gets modified for you as needed to minimize cpu time
+        Returns:
+            amts_matrix, but replacing the last column with the formation energy
+                - this is because convex hulls are defined by (n-1) composition axes
+                    - e.g., in a A-B phase diagram, specifying the fractional composition of A sets the composition of B
+        """
+        A = self.amts_matrix(compounds, chemical_space)
+        b = self.formation_energy_array(compounds)
+        X = np.zeros(np.shape(A))
+        for row in range(np.shape(X)[0]):
+            for col in range(np.shape(X)[1] - 1):
+                X[row, col] = A[row, col]
+            X[row, np.shape(X)[1] - 1] = b[row]
+        return X
+
+    @property
+    def hull(self):
+        """
+        Returns:
+            scipy.spatial.ConvexHull object for all compounds in a chemical space
+        """
+        return ConvexHull(self.hull_input_matrix())
+
+    @property
+    def hull_points(self):
+        """
+        Returns:
+            array of (composition, formation energy) points (2-element tuple) fed to ConvexHull
+        """
+        return self.hull.points
+
+    @property
+    def hull_vertices(self):
+        """
+        Returns:
+            array of indices (int) in hull_points corresponding with the points that are on the hull
+        """
+        return self.hull.vertices
+
+    @property
+    def hull_simplices(self):
+        """
+        Returns:
+            indices of points forming the simplical facets of the convex hull.
+        """
+        return self.hull.simplices
+
+    @property
+    def stable_compounds(self):
+        """
+        Returns:
+            list of compounds (str) that correspond with vertices on the mixing hull
+                - these are stable compounds (within the mixing hull analysis)
+                - remember: the nature of a mixing hull is:
+                    1) assuming that the end members are stable
+                    2) assuming that there are no other stable compounds in the chemical space that are orthogonal to the mixing axis
+                        - e.g., we might be mixing RuO2 and IrO2, but RuIrO5 would not appear on this hull because it is orthogonal
+
+        """
+        mixing_energies = self.mixing_energies
+        hull_vertices = self.hull_vertices
+        compounds = self.sorted_compounds
+
+        # compounds are stable if they have negative mixing energy and are on the hull
+        return [
+            compounds[i]
+            for i in hull_vertices
+            if mixing_energies[compounds[i]]["E_mix"] <= 0
+        ]
+
+    @property
+    def unstable_compounds(self):
+        """
+        Returns:
+            list of compounds that do not correspond with vertices (str)
+                - these are "above" the mixing hull
+
+        """
+        compounds = self.sorted_compounds
+        stable_compounds = self.stable_compounds
+        return [c for c in compounds if c not in stable_compounds]
+
+    @property
+    def results(self):
+        """
+
+        this is the only method that really needs to be called by the user
+
+        Returns:
+
+            {formula (str) :
+                {'E' : total energy per atom (float, eV/atom),
+                 'factor' : factor to multiply by to convert the maximally reduced formula unit into the appropriate basis formula unit (float),
+                 'n_varying' : number of varying element atoms in the basis formula unit (float),
+                 'n_atoms_basis' : number of atoms in the basis formula unit (float),
+                 'E_mix' : mixing energy (float, eV/atom),
+                 'x' : fraction of the varying element (float),
+                 'zero' : which end member has x == 0 (str, formula),
+                 'stability' : True if the compound is on the mixing hull else False}
+        """
+        stable_compounds = self.stable_compounds
+        unstable_compounds = self.unstable_compounds
+        mixing_energies = self.mixing_energies
+        for c in stable_compounds:
+            mixing_energies[c]["stability"] = True
+        for c in unstable_compounds:
+            mixing_energies[c]["stability"] = False
+
+        return mixing_energies
