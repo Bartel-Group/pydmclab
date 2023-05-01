@@ -25,7 +25,7 @@ TO-DO:
 API_KEY = "***REMOVED***"
 
 # chemical system to test on
-CHEMSYS = "Ca-Al-Ti-F"
+CHEMSYS = "Ca-Mg-Ti-F"
 
 # where to save data
 DATA_DIR = os.path.join("output", "hulls", "data")
