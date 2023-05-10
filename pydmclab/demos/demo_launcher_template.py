@@ -421,7 +421,6 @@ def check_launch_dirs(launch_dirs):
 
 
 def submit_one_calc(submit_args):
-
     """
     Prepares VASP inputs, writes submission script, and launches job for one launch_dir
 
@@ -579,7 +578,6 @@ def get_results(
 
 
 def check_results(results):
-
     keys_to_check = list(results.keys())
 
     converged = 0
@@ -771,7 +769,10 @@ def check_Efs(Efs):
         for xc in Efs[standard]:
             print("\nxc = %s" % xc)
             for formula in Efs[standard][xc]:
-                print("%s : %.2f eV/at" % (formula, Efs[standard][xc][formula]["Ef"]))
+                if Efs[standard][xc][formula]["Ef"]:
+                    print(
+                        "%s : %.2f eV/at" % (formula, Efs[standard][xc][formula]["Ef"])
+                    )
     return
 
 
@@ -894,7 +895,6 @@ def check_thermo_results(thermo):
 
 
 def main():
-
     remake_sub_for_launcher = False
 
     remake_query = False
