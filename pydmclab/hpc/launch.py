@@ -305,6 +305,8 @@ def get_launch_configs(
         to_launch["mp"] = ["ggau"]
 
     for standard in skip_xcs_for_standards:
+        if standard not in to_launch:
+            continue
         for xc in skip_xcs_for_standards[standard]:
             if xc in to_launch[standard]:
                 to_launch[standard].remove(xc)
