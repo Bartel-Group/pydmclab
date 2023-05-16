@@ -791,11 +791,12 @@ def get_thermo_results(
         {standard (str) :
             {xc (str) :
                 {formula (str) :
-                    {'E' (float) : energy of the structure,
-                     'Ef' : formation enthalpy,
-                     'is_gs' : True if this is the lowest energy polymorph for this formula,
-                     'dE_gs' : how high above the ground-state this structure is in energy
-                     'all_polymorphs_converged' : True if every structure that was computed for this formula is converged}
+                    {ID (str) :
+                        {'E' (float) : energy of the structure,
+                        'Ef' : formation enthalpy,
+                        'is_gs' : True if this is the lowest energy polymorph for this formula,
+                        'dE_gs' : how high above the ground-state this structure is in energy
+                        'all_polymorphs_converged' : True if every structure that was computed for this formula is converged}}
     """
     fjson = os.path.join(DATA_DIR, savename)
     if os.path.exists(fjson) and not remake:
