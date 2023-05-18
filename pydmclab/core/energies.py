@@ -11,6 +11,7 @@ from pydmclab.data.thermochem import (
 )
 from pydmclab.data.features import atomic_masses
 from pydmclab.core.comp import CompTools
+from pydmclab.core.struc import StrucTools
 
 
 class ChemPots(object):
@@ -128,7 +129,6 @@ class FormationEnthalpy(object):
         E_DFT,  # eV/at
         chempots,  # from ThermoTools.ChemPots.chempots
     ):
-
         """
         Args:
             formula (str) - chemical formula
@@ -179,7 +179,7 @@ class FormationEnergy(object):
         self,
         formula,
         Ef,  # eV/at
-        chempots,  # from ThermoTools.ChemPots.chempots
+        chempots,  # from ChemPots.chempots (probably)
         structure=False,
         atomic_volume=False,
         x_config=None,
@@ -187,7 +187,6 @@ class FormationEnergy(object):
         include_Svib=True,
         include_Sconfig=False,
     ):
-
         """
         Args:
             formula (str) - chemical formula
@@ -212,6 +211,8 @@ class FormationEnergy(object):
         self.formula = CompTools(formula).clean
         self.Ef = Ef
         self.chempots = chempots
+        if structure:
+            structure = StrucTools(structure).structure
         self.structure = structure
         self.atomic_volume = atomic_volume
         self.include_Svib = include_Svib
@@ -322,7 +323,6 @@ class FormationEnergy(object):
 
 
 def main():
-
     mus = ChemPots(functional="r2scan", standard="dmc")
 
     Ef = FormationEnthalpy(
