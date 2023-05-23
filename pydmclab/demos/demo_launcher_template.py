@@ -815,7 +815,12 @@ def get_thermo_results(
         standard = results[key]["meta"]["setup"]["standard"]
         xc = results[key]["meta"]["setup"]["xc"]
         formula = results[key]["results"]["formula"]
-        ID = results[key]["meta"]["setup"]["ID"]
+        ID = "__".join(
+            [
+                results[key]["meta"]["setup"]["formula_tag"],
+                results[key]["meta"]["setup"]["ID"],
+            ]
+        )
         E = results[key]["results"]["E_per_at"]
 
         tmp_thermo["E"] = E
