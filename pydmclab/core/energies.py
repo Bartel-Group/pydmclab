@@ -57,20 +57,24 @@ class ChemPots(object):
         self.diatomics = diatomics
         self.oxide_type = oxide_type
         self.R = R
-        if (standard == "mp") and (temperature == 0):
-            mp_dmus = mp2020_compatibility_dmus()
-            for el in mp_dmus["anions"]:
-                user_dmus[el] = -mp_dmus["anions"][el]
-            if functional == "pbeu":
-                for el in mp_dmus["U"]:
-                    user_dmus[el] = -mp_dmus["U"][el]
-            if self.oxide_type == "peroxide":
-                user_dmus[el] = -mp_dmus["peroxide"]["O"]
-            elif self.oxide_type == "superoxide":
-                user_dmus[el] = -mp_dmus["superoxide"]["O"]
-
         self.user_dmus = user_dmus
         self.user_chempots = user_chempots
+
+    @property
+    def apply_mp_corrections(self):
+        user_dmus = self.user_dmus.copy()
+        mp_dmus = mp2020_compatibility_dmus()
+        for el in mp_dmus["anions"]:
+            user_dmus[el] = -mp_dmus["anions"][el]
+        if self.functional == "pbeu":
+            for el in mp_dmus["U"]:
+                user_dmus[el] = -mp_dmus["U"][el]
+        if self.oxide_type == "peroxide":
+            user_dmus[el] = -mp_dmus["peroxide"]["O"]
+        elif self.oxide_type == "superoxide":
+            user_dmus[el] = -mp_dmus["superoxide"]["O"]
+
+        self.user_dmus = user_dmus.copy()
 
     @property
     def chempots(self):
@@ -78,41 +82,47 @@ class ChemPots(object):
         Returns:
             dictionary of chemical potentials {el : chemical potential (eV/at)} based on user inputs
         """
-
-        if self.temperature == 0:
-            if (self.standard == "dmc") or (self.functional in ["scan", "r2scan"]):
+        T = self.temperature
+        standard, functional = self.standard, self.functional
+        if T == 0:
+            if (standard == "dmc") or (functional in ["scan", "r2scan"]):
                 all_mus = mus_at_0K()
-                els = sorted(list(all_mus[self.functional].keys()))
-                mus = {el: all_mus[self.functional][el]["mu"] for el in els}
+                els = sorted(list(all_mus[functional].keys()))
+                mus = {el: all_mus[functional][el]["mu"] for el in els}
             else:
                 mus = mus_from_mp_no_corrections()
         else:
             allowed_Ts = list(range(300, 2100, 100))
-            if self.temperature not in allowed_Ts:
+            if T not in allowed_Ts:
                 raise ValueError("Temperature must be one of %s" % allowed_Ts)
             all_mus = mus_at_T()
-            mus = all_mus[str(self.temperature)].copy()
+            mus = all_mus[str(T)].copy()
 
-        if self.partial_pressures:
-            for el in self.partial_pressures:
-                if el in self.diatomics:
+        partial_pressures = self.partial_pressures
+        diatomics = self.diatomics
+        R = self.R
+        if partial_pressures:
+            for el in partial_pressures:
+                if el in diatomics:
                     factor = 1 / 2
                 else:
                     factor = 1
-                mus[el] += (
-                    self.R
-                    * self.temperature
-                    * factor
-                    * np.log(self.partial_pressures[el])
-                )
-        if self.user_dmus:
-            for el in self.user_dmus:
-                mus[el] += self.user_dmus[el]
-        if self.user_chempots:
-            for el in self.user_chempots:
-                mus[el] = self.user_chempots[el]
+                mus[el] += R * T * factor * np.log(partial_pressures[el])
 
-        return mus
+        if (standard == "mp") and (T == 0):
+            self.apply_mp_corrections
+
+        user_dmus = self.user_dmus
+        if user_dmus:
+            for el in user_dmus:
+                mus[el] += user_dmus[el]
+
+        user_chempots = self.user_chempots
+        if user_chempots:
+            for el in user_chempots:
+                mus[el] = user_chempots[el]
+
+        return mus.copy()
 
 
 class FormationEnthalpy(object):
