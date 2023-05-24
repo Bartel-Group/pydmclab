@@ -57,7 +57,7 @@ class ChemPots(object):
         self.diatomics = diatomics
         self.oxide_type = oxide_type
         self.R = R
-        if standard == "mp":
+        if (standard == "mp") and (temperature == 0):
             mp_dmus = mp2020_compatibility_dmus()
             for el in mp_dmus["anions"]:
                 user_dmus[el] = -mp_dmus["anions"][el]
@@ -91,7 +91,7 @@ class ChemPots(object):
             if self.temperature not in allowed_Ts:
                 raise ValueError("Temperature must be one of %s" % allowed_Ts)
             all_mus = mus_at_T()
-            mus = all_mus[str(self.temperature)]
+            mus = all_mus[str(self.temperature)].copy()
 
         if self.partial_pressures:
             for el in self.partial_pressures:
@@ -322,7 +322,7 @@ class FormationEnergy(object):
             return dGf
 
 
-def main():
+def test_dGf():
     mus = ChemPots(functional="r2scan", standard="dmc")
 
     Ef = FormationEnthalpy(
@@ -342,5 +342,10 @@ def main():
     return mus, fe
 
 
+def main():
+    chempots = ChemPots(temperature=300).chempots
+    print(chempots["O"])
+
+
 if __name__ == "__main__":
-    mus, fe = main()
+    main()
