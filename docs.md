@@ -632,6 +632,14 @@ launch_dirs = {<composition>/<unique ID for that composition>/<standard>/<unique
 
 # Development
 
+## Top priorities
+
+- (pseudo-)ternary phase diagrams
+- slabs
+- defects
+- universal potentials
+- tests
+
 ## Small things
 
 - `pydmclab.core.energies`
@@ -660,6 +668,7 @@ launch_dirs = {<composition>/<unique ID for that composition>/<standard>/<unique
   - handling surface calculations
   - handling optimization with ML potentials
   - handling NEB calculations
+  - handling (charged) defect calculations and analysis
 - `pydmclab.ml.*`
   - modules for using/tuning ML potentials
 - `pydmclab.md.*`

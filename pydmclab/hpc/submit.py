@@ -40,7 +40,6 @@ class SubmitTools(object):
         slurm_configs_yaml=os.path.join(os.getcwd(), "_slurm_configs.yaml"),
         sub_configs_yaml=os.path.join(os.getcwd(), "_sub_configs.yaml"),
     ):
-
         """
         Args:
             launch_dir (str) - directory to launch calculations from (to submit the submission file)
@@ -261,18 +260,19 @@ class SubmitTools(object):
             if slurm_configs[option]
         }
         partitions = self.partitions.copy()
-        partition_specs = partitions[options["partition"]]
+        if options["partition"] in partitions:
+            partition_specs = partitions[options["partition"]]
 
-        # make sure slurm_options align with partition configurations
-        if partition_specs["proc"] == "gpu":
-            options["nodes"] = 1
-            options["ntasks"] = 1
-            options["gres"] = "gpu:%s:%s" % (
-                options["partition"].split("-")[0],
-                str(options["nodes"]),
-            )
-        if not partition_specs["sharing"]:
-            options["ntasks"] = partition_specs["cores_per_node"]
+            # make sure slurm_options align with partition configurations
+            if partition_specs["proc"] == "gpu":
+                options["nodes"] = 1
+                options["ntasks"] = 1
+                options["gres"] = "gpu:%s:%s" % (
+                    options["partition"].split("-")[0],
+                    str(options["nodes"]),
+                )
+            if not partition_specs["sharing"]:
+                options["ntasks"] = partition_specs["cores_per_node"]
         return options
 
     @property
@@ -753,7 +753,6 @@ class SubmitTools(object):
         flags_that_need_to_be_executed = self.sub_configs["execute_flags"]
 
         for final_xc in final_xcs:
-
             # identify the submission script for this chain
             fsub = os.path.join(launch_dir, "sub_%s.sh" % final_xc)
             with open(fsub) as f:
@@ -878,7 +877,8 @@ def get_slurm_configs(
         if "small" in partition:
             print("WARNING: cant use small partition on > 1 node; switching to large")
         partition = partition.replace("small", "large")
-        slurm_configs["partition"] = partition
+
+    slurm_configs["partition"] = partition
 
     slurm_configs["error_file"] = error_file
     slurm_configs["output_file"] = output_file
@@ -974,7 +974,6 @@ def get_vasp_configs(
 
 
 def main():
-
     return
 
 
