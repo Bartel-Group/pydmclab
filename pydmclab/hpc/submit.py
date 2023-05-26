@@ -843,9 +843,9 @@ def get_sub_configs(
 
 def get_slurm_configs(
     total_nodes=1,
-    cores_per_node=32,
-    walltime_in_hours=23,
-    partition="msismall",
+    cores_per_node=8,
+    walltime_in_hours=95,
+    partition="msismall,msidmc",
     error_file="log.e",
     output_file="log.o",
     account="cbartel",

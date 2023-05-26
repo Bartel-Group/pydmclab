@@ -1,3 +1,10 @@
+msidmc:
+  cores_per_node: 128
+  sharing: True
+  max_wall: 96:00:00
+  mem_per_core: 4GB
+  max_nodes: 1
+  proc: cpu
 agsmall:
   cores_per_node: 128
   sharing: True
