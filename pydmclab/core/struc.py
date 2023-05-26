@@ -174,11 +174,11 @@ class StrucTools(object):
         out = transformer.apply_transformation(
             structure, return_ranked_list=return_ranked_list
         )
-        out = [i["structure"] for i in out]
         # print(out[0])
         if isinstance(out, list):
             print("getting unique structures\n")
             matcher = StructureMatcher()
+            out = [i["structure"] for i in out]
             groups = matcher.group_structures(out)
             out = [groups[i][0] for i in range(len(groups))]
             return {i: out[i].as_dict() for i in range(len(out))}
@@ -407,7 +407,6 @@ class SiteTools(object):
 
 
 def main():
-
     return
 
 
