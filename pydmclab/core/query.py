@@ -53,7 +53,6 @@ class NewMPQuery(object):
         ]
 
     def get_data_for_comp(self, comp):
-
         all_chemsyses = None
         all_formulas = None
         if isinstance(comp, str):
@@ -303,7 +302,9 @@ class MPQuery(object):
                 all_formulas = [CompTools(c).pretty for c in comp]
                 criteria["pretty_formula"] = {"$in": all_formulas}
 
-        list_from_mp = self.mpr.query(criteria, properties)
+        mpr = self.mpr
+        list_from_mp = mpr.query(criteria, properties)
+
         extra_keys = [k for k in list_from_mp[0] if k not in key_map]
         cleaned_list_from_mp = [
             {key_map[old_key]: entry[old_key] for old_key in key_map}
@@ -320,7 +321,6 @@ class MPQuery(object):
             )
 
         if only_gs:
-
             gs = {}
             for entry in query:
                 cmpd = CompTools(entry["pretty_formula"]).clean
@@ -387,6 +387,7 @@ class MPQuery(object):
 
                 return trimmed_query
 
+        mpr.session.close()
         return query
 
     def get_entry_by_material_id(
@@ -408,7 +409,8 @@ class MPQuery(object):
         Returns:
             ComputedEntry object
         """
-        return self.mpr.get_entry_by_material_id(
+        mpr = self.mpr
+        return mpr.get_entry_by_material_id(
             material_id, compatible_only, incl_structure, properties, conventional
         )
 
@@ -420,7 +422,8 @@ class MPQuery(object):
         Returns:
             Structure object
         """
-        return self.mpr.get_structure_by_material_id(material_id)
+        mpr = self.mpr
+        return mpr.get_structure_by_material_id(material_id)
 
     def get_incar(self, material_id):
         """
@@ -430,7 +433,8 @@ class MPQuery(object):
         Returns:
             dict of incar settings
         """
-        return self.mpr.query(material_id, ["input.incar"])[0]
+        mpr = self.mpr
+        return mpr.query(material_id, ["input.incar"])[0]
 
     def get_kpoints(self, material_id):
         """
@@ -440,9 +444,8 @@ class MPQuery(object):
         Returns:
             dict of kpoint settings
         """
-        return self.mpr.query(material_id, ["input.kpoints"])[0][
-            "input.kpoints"
-        ].as_dict()
+        mpr = self.mpr
+        return mpr.query(material_id, ["input.kpoints"])[0]["input.kpoints"].as_dict()
 
     def get_vasp_inputs(self, material_id):
         """
@@ -457,7 +460,8 @@ class MPQuery(object):
                 - 'structure' : Structure object as dict
         """
 
-        d = self.mpr.query(material_id, ["input"])[0]["input"]
+        mpr = self.mpr
+        d = mpr.query(material_id, ["input"])[0]["input"]
         d["kpoints"] = d["kpoints"].as_dict()
         d["kpoints"] = {
             "scheme": d["kpoints"]["generation_style"],
@@ -473,6 +477,10 @@ class MPQuery(object):
 
 
 def main():
+    API_KEY = "***REMOVED***"
+
+    mpq = MPQuery(API_KEY)
+    q = mpq.get_data_for_comp(comp="Al-O", only_gs=True)
 
     return
 

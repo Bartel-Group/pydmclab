@@ -336,8 +336,7 @@ class SiteTools(object):
         Returns:
             pymatgen Site object
         """
-        if isinstance(structure, dict):
-            structure = Structure.from_dict(structure)
+        structure = StrucTools(structure).structure
         self.site = structure[index]
 
     @property
@@ -383,7 +382,30 @@ class SiteTools(object):
             whatever is occupying site (str)
                 - could be multiple ions, multiple elements, one element, one ion, etc
         """
-        return self.site.species_string
+        d = self.site_dict
+        species = d["species"]
+        ions = []
+        for entry in species:
+            el = entry["element"]
+            ox = entry["oxidation_state"]
+            occ = entry["occu"]
+            if ox:
+                if ox < 0:
+                    ox = str(abs(ox)) + "-"
+                else:
+                    ox = str(ox) + "+"
+            else:
+                ox = ""
+            if occ == 1:
+                occ = ""
+            else:
+                occ = str(occ)
+            name = occ + el + ox
+            ions.append(name)
+        if len(ions) == 1:
+            return ions[0]
+        else:
+            return " ".join(ions)
 
     @property
     def el(self):
@@ -391,7 +413,23 @@ class SiteTools(object):
         Returns:
             just the element occupying the site (even if it has an oxidation state)
         """
-        return CompTools(Composition(self.ion).formula).els[0]
+        d = self.site_dict
+        species = d["species"]
+        ions = []
+        for entry in species:
+            el = entry["element"]
+            occ = entry["occu"]
+            ox = ""
+            if occ == 1:
+                occ = ""
+            else:
+                occ = str(occ)
+            name = occ + el + ox
+            ions.append(name)
+        if len(ions) == 1:
+            return ions[0]
+        else:
+            return " ".join(ions)
 
     @property
     def ox_state(self):
@@ -399,11 +437,13 @@ class SiteTools(object):
         Returns:
             oxidation state (float) of site
         """
-        if self.is_fully_occ:
-            return self.site_dict["species"][0]["oxidation_state"]
-        else:
-            print("cant determine ox state for partially occ site")
-            return None
+        d = self.site_dict
+        ox = 0
+        species = d["species"]
+        for entry in species:
+            if entry["oxidation_state"]:
+                ox += entry["oxidation_state"] * entry["occu"]
+        return ox
 
 
 def main():
