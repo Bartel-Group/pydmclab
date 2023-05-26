@@ -27,7 +27,6 @@ class ChemPots(object):
         partial_pressures={},  # atm
         diatomics=["H", "N", "O", "F", "Cl"],
         oxide_type="oxide",
-        R=8.6173303e-5,  # eV/K
         user_chempots={},
         user_dmus={},
     ):
@@ -56,7 +55,6 @@ class ChemPots(object):
         self.partial_pressures = partial_pressures
         self.diatomics = diatomics
         self.oxide_type = oxide_type
-        self.R = R
         self.user_dmus = user_dmus
         self.user_chempots = user_chempots
 
@@ -100,7 +98,8 @@ class ChemPots(object):
 
         partial_pressures = self.partial_pressures
         diatomics = self.diatomics
-        R = self.R
+        R = 8.6173303e-5  # eV/K
+
         if partial_pressures:
             for el in partial_pressures:
                 if el in diatomics:
@@ -233,14 +232,15 @@ class FormationEnergy(object):
         if include_Svib:
             if not structure and not atomic_volume:
                 raise ValueError(
-                    "Must provide structure and atomic volume to compute Svib"
+                    "Must provide structure or atomic volume to compute Svib"
                 )
 
         if include_Sconfig:
             if not (x_config and n_config):
-                raise ValueError(
-                    "Must provide x_config and n_config to compute Sconfig"
-                )
+                if x_config != 0:
+                    raise ValueError(
+                        "Must provide x_config and n_config to compute Sconfig"
+                    )
 
     @property
     def weighted_elemental_energies(self):
@@ -288,7 +288,18 @@ class FormationEnergy(object):
                 pair_red_lst.append(pair_red)
             return np.sum(pair_red_lst) / denom
 
-    def dGf(self, temperature=0):
+    @property
+    def S_config(self):
+        x, n = self.x_config, self.n_config
+        if x in [0, 1]:
+            return 0
+        kB = 8.617e-5  # eV/K
+        S_config = (-kB * n * (x * np.log(x) + (1 - x) * np.log(1 - x))) / CompTools(
+            self.formula
+        ).n_atoms
+        return S_config
+
+    def dGf(self, temperature):
         """
         Args:
             temperature (int) - temperature (K)
@@ -300,36 +311,30 @@ class FormationEnergy(object):
         Ef_0K = self.Ef
         if T == 0:
             return Ef_0K
-        else:
-            if self.include_Svib:
-                m = self.reduced_mass
-                if self.atomic_volume:
-                    V = self.atomic_volume
-                elif self.structure:
-                    V = self.structure.volume / len(self.structure)
-                else:
-                    raise ValueError("Need atomic volume or structure to compute G(T)")
-
-                Gd_sisso = (
-                    (-2.48e-4 * np.log(V) - 8.94e-5 * m / V) * T
-                    + 0.181 * np.log(T)
-                    - 0.882
-                )
-                weighted_elemental_energies = self.weighted_elemental_energies
-                G = Ef_0K + Gd_sisso
-                n_atoms = CompTools(self.formula).n_atoms
-
-                dGf = (1 / n_atoms) * (G * n_atoms - weighted_elemental_energies)
+        if self.include_Svib:
+            m = self.reduced_mass
+            if self.atomic_volume:
+                V = self.atomic_volume
+            elif self.structure:
+                V = self.structure.volume / len(self.structure)
             else:
+                raise ValueError("Need atomic volume or structure to compute G(T)")
+
+            Gd_sisso = (
+                (-2.48e-4 * np.log(V) - 8.94e-5 * m / V) * T + 0.181 * np.log(T) - 0.882
+            )
+            weighted_elemental_energies = self.weighted_elemental_energies
+            G = Ef_0K + Gd_sisso
+            n_atoms = CompTools(self.formula).n_atoms
+
+            dGf = (1 / n_atoms) * (G * n_atoms - weighted_elemental_energies)
+
+        if self.include_Sconfig:
+            if not self.include_Svib:
                 dGf = Ef_0K
-                if self.include_Sconfig:
-                    x, n = self.x_config, self.n_config
-                    kB = 8.617e-5  # eV/K
-                    S_config = (
-                        -kB * n * (x * np.log(x) + (1 - x) * np.log(1 - x))
-                    ) / CompTools(self.formula).n_atoms
-                    dGf += -T * S_config
-            return dGf
+            dGf += -T * self.S_config
+
+        return dGf
 
 
 def test_dGf():

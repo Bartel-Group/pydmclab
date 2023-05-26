@@ -300,7 +300,6 @@ class VASPSetUp(object):
 
         # start from MPScanRelaxSet for meta-GGA
         elif configs["xc_to_run"] == "metagga":
-
             vaspset = MPScanRelaxSet
 
             # use custom functional (eg SCAN) if you want
@@ -435,7 +434,15 @@ class VASPSetUp(object):
                 POTCAR_input=POTCAR_input,
                 option="standard",
             )
-            lobsterin.write_lobsterin(os.path.join(calc_dir, "lobsterin"))
+
+            lobsterin_dict = lobsterin.as_dict()
+
+            lobsterin_dict["COHPSteps"] = 4000
+            lobsterin = Lobsterin.from_dict(lobsterin_dict)
+
+            flobsterin = os.path.join(calc_dir, "lobsterin")
+            lobsterin.write_lobsterin(flobsterin)
+
             lobsterin.write_INCAR(
                 incar_input=INCAR_input,
                 incar_output=INCAR_output,
@@ -661,7 +668,6 @@ class VASPSetUp(object):
 
 
 def main():
-
     return
 
 

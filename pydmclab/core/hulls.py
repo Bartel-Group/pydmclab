@@ -647,7 +647,7 @@ class ParallelHulls(object):
         self.fresh_restart = fresh_restart
 
         self.compound_to_energy = {
-            k: compound_to_energy[k][formation_energy_key]
+            CompTools(k).clean: compound_to_energy[k][formation_energy_key]
             for k in compound_to_energy
             if len(CompTools(k).els) > 1
         }
