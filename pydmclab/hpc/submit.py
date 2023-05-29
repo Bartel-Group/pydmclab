@@ -186,7 +186,7 @@ class SubmitTools(object):
 
         # create copy of slurm_configs to prevent unwanted updates
         self.slurm_configs = slurm_configs.copy()
-
+        
         # update sub_configs based on user_configs
         sub_configs = read_yaml(sub_configs_yaml)
         for option in sub_configs:
@@ -285,6 +285,7 @@ class SubmitTools(object):
         vasp_configs = self.vasp_configs.copy()
         vasp_exec = os.path.join(sub_configs["vasp_dir"], sub_configs["vasp"])
         slurm_options = self.slurm_options.copy()
+
         if sub_configs["mpi_command"] == "srun":
             return "\n%s --ntasks=%s --mpi=pmi2 %s > %s\n" % (
                 sub_configs["mpi_command"],
@@ -903,11 +904,13 @@ def get_slurm_configs(
             "amdsmall",
             "amdlarge",
         ]:
-            slurm_configs["mem_per_cpu"] = "1900M"
+            mem_per_cpu = 1900
         else:
-            slurm_configs["mem_per_cpu"] = "4000M"
+            mem_per_cpu = 4000
     else:
-        slurm_configs["mem_per_cpu"] = str(mem_per_core)
+        mem_per_cpu = mem_per_core
+
+    slurm_configs['mem'] = str(int(mem_per_cpu * slurm_configs['ntasks']))+'M'
     return slurm_configs
 
 

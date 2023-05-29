@@ -6,6 +6,6 @@ output: log.o # where to write slurm output to in launch_dir
 account: cbartel # account to charge
 partition: msismall # partition to use
 job-name: # unique job name; if none provided, will default to formula.id.standard.mag.xc
-mem: # if you need more memory specify here (e.g., 128GB)
+mem: # if you need more memory specify here (e.g., 128GB) (total requested memory)
 constraint: # may not need this ever on MSI
 qos: # may not need this ever on MSI
