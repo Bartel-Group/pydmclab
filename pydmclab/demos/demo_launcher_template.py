@@ -144,7 +144,9 @@ def main():
         make_sub_for_launcher()
 
     comp = COMPOSITIONS
-    query = get_query(comp=comp, data_dir=DATA_DIR, remake=remake_query)
+    query = get_query(
+        comp=comp, api_key=API_KEY, data_dir=DATA_DIR, remake=remake_query
+    )
     if print_query_check:
         check_query(query)
 
