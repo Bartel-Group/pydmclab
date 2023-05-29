@@ -102,17 +102,32 @@ def get_slurm_configs(
 ):
     """
 
-    how to modify slurm configurations for each VASP job (see *** for defaults)
+    how to modify slurm configurations for each VASP job (see pydmclab.data.data._slurm_configs.yaml for defaults)
 
     Args:
-        total_nodes (int, optional): how many nodes to run each VASP job on
-        cores_per_node (int, optional): how many cores per node to use for each VASP job
-        walltime_in_hours (int, optional): how long to run each VASP job
-        mem_per_core (str, optional): if 'all', try to use all avaiable mem; otherwise use specified memory per core (cpu)
-        partition (str, optional): what part of the cluster to run each VASP job on
-        error_file (str, optional): where to send each VASP job error
-        output_file (str, optional): where to send each VASP job output
-        account (str, optional): what account to charge for your VASP jobs
+        total_nodes (int, optional):
+            how many nodes to run each VASP job on
+
+        cores_per_node (int, optional):
+            how many cores per node to use for each VASP job
+
+        walltime_in_hours (int, optional):
+            how long to run each VASP job
+
+        mem_per_core (str, optional):
+            if 'all', try to use all avaiable mem; otherwise use specified memory per core (cpu)
+
+        partition (str, optional):
+            what part of the cluster to run each VASP job on
+
+        error_file (str, optional):
+            where to send each VASP job error
+
+        output_file (str, optional):
+            where to send each VASP job output
+
+        account (str, optional):
+            what account to charge for your VASP jobs
 
     Returns:
         {slurm config name : slurm config value}
@@ -170,23 +185,26 @@ def get_sub_configs(
     """
 
     configs related to preparing submission scripts and submitting VASP calculations
-        - see defaults in ***
-
+        - see defaults in pydmclab.data.data._sub_configs.yaml
 
     Args:
         submit_calculations_in_parallel (bool or int): whether to prepare submission scripts in parallel or not
-            False: use 1 processor
-            True: use all available processors
-            int: use that many processors
+            - False: use 1 processor
+            - True: use all available processors
+            - int: use that many processors
 
-        start_all_calculations_from_scratch (bool): if True, start all calculations over (ie delete all outputs)
+        start_all_calculations_from_scratch (bool):
+            if True, start all calculations over (ie delete all outputs)
 
-        rerun_lobster (bool) : if True, rerun lobster even if it has already been run
+        rerun_lobster (bool) :
+            if True, rerun lobster even if it has already been run
 
-        mpi_command (str): the command to use for mpi (eg mpirun, srun, etc)
+        mpi_command (str):
+            the command to use for mpi (eg mpirun, srun, etc)
 
-        special_packing (dict): if you want to change the loose --> relax --> static flow for some functional
-            e.g., {'metagga' : ['loose', 'static']}
+        special_packing (dict):
+            if you want to change the loose --> relax --> static flow for some functional
+                e.g., {'metagga' : ['loose', 'static']}
 
     Returns:
         {config_name : config_value}
@@ -234,13 +252,22 @@ def get_launch_configs(
     configs related to launching  chains of calculations
 
     Args:
-        standards (list, optional): list of standards you'd like to calculate
-        xcs (list, optional): list of xcs you'd like to calculate for each standard
-        use_mp_thermo_data (bool, optional): True if you are going to use formation energies provided in Materials Project for phase stability analysis
-        n_afm_configs (int, optional): number of antiferromagnetic configurations to run for each structure (0 if you don't want to run AFM)
-        skip_xcs_for_standards (dict, optional): dictionary of xcs to skip for a given standard.
-            Defaults to {"mp": ["gga", "metagga"]}.
-                - e.g., we don't want to run GGA or MetaGGA MP calculations because MP uses GGA+U (for now)
+        standards (list, optional):
+            list of standards you'd like to calculate
+
+        xcs (list, optional):
+            list of xcs you'd like to calculate for each standard
+
+        use_mp_thermo_data (bool, optional):
+            True if you are going to use formation energies provided in Materials Project for phase stability analysis
+
+        n_afm_configs (int, optional):
+            number of antiferromagnetic configurations to run for each structure (0 if you don't want to run AFM)
+
+        skip_xcs_for_standards (dict, optional):
+            dictionary of xcs to skip for a given standard.
+                Defaults to {"mp": ["gga", "metagga"]}.
+                    - e.g., we don't want to run GGA or MetaGGA MP calculations because MP uses GGA+U (for now)
 
     Returns:
         dictionary of launch configurations
@@ -283,20 +310,32 @@ def get_analysis_configs(
 ):
     """
 
-    function for modifying analysis configs from the defaults (see *** for defaults)
+    function for modifying analysis configs from the defaults (see pydmclab.data.data._batch_analysis_configs.yaml for defaults)
 
     Args:
         analyze_calculations_in_parallel (bool or int): whether to analyze calculation results in parallel or not
-            False: use 1 processor
-            True: use all available processors
-            int: use that many processors
-        analyze_structure (bool, optional): True to include structure in your results
-        analyze_mag (bool, optional): True to include magnetization in your results
-        analyze_charge (bool, optional): True to include bader charge + lobster charges + madelung in your results
-        analyze_dos (bool, optional): True to include pdos, tdos in your results
-        analyze_bonding (bool, optional): True to include tcohp, pcohp, tcoop, pcoop, tcobi, pcobi in your results
-        exclude (list, optional): list of strings to exclude from analysis. Defaults to [].
-            - overwrites other options
+            - False: use 1 processor
+            - True: use all available processors
+            - int: use that many processors
+
+        analyze_structure (bool, optional):
+            True to include structure in your results
+
+        analyze_mag (bool, optional):
+            True to include magnetization in your results
+
+        analyze_charge (bool, optional):
+            True to include bader charge + lobster charges + madelung in your results
+
+        analyze_dos (bool, optional):
+            True to include pdos, tdos in your results
+
+        analyze_bonding (bool, optional):
+            True to include tcohp, pcohp, tcoop, pcoop, tcobi, pcobi in your results
+
+        exclude (list, optional):
+            list of strings to exclude from analysis. Defaults to [].
+                - overwrites other options
     Returns:
         dictionary of ANALYSIS_CONFIGS
             {'include_*' : True or False}
@@ -367,6 +406,9 @@ def get_query(
                 - chemical systems (str) of elements joined by "-"
                 - chemical formulas (str)
 
+        api_key (str):
+            your API key for Materials Project
+
         properties (list or None)
             list of properties to query
                 - if None, then use typical_properties
@@ -396,12 +438,18 @@ def get_query(
         max_strucs_per_cmpd (int)
             if not None, only retain the lowest energy structures for each composition until you reach max_strucs_per_cmpd
 
-        savename (str) - filename for fjson in DATA_DIR
+        data_dir (str)
+            directory to save fjson
 
-        remake (bool) - write (True) or just read (False) fjson
+        savename (str)
+            filename for fjson in data_dir
+
+        remake (bool)
+            write (True) or just read (False) fjson
 
     Returns:
-        {mpid : {DATA}}
+        {ID (str) : {'structure' : Pymatgen Structure as dict,
+                    < any other data you want to keep track of >}}
     """
 
     fjson = os.path.join(data_dir, savename)
@@ -443,15 +491,22 @@ def get_strucs(
 ):
     """
     Args:
-        query (dict) - {mpid : {DATA}}
-        savename (str) - filename for fjson in DATA_DIR
-        remake (bool) - write (True) or just read (False) fjson
+        query (dict)
+            {mpid : {DATA}}
+
+        data_dir (str)
+            directory to save fjson
+
+        savename (str)
+            filename for fjson in DATA_DIR
+
+        remake (bool)
+            write (True) or just read (False) fjson
 
     Returns:
-        if not transform_strucs:
-            {formula : {mpid : structure}
-        if transform_strucs:
-            {formula_identifier : {index_identifier : structure}}
+        {formula identifier (str) :
+            {structure identifier for that formula (str) :
+                Pymatgen Structure object as dict}}
     """
 
     fjson = os.path.join(data_dir, savename)
@@ -490,15 +545,29 @@ def get_magmoms(
 ):
     """
     Args:
-        strucs (dict) - {formula : {ID : structure}}
-        max_afm_combos (int): maximum number of AFM spin configurations to generate
-        treat_as_nm (list): any normally mag els you'd like to treat as nonmagnetic for AFM enumeration
-        savename (str) - filename for fjson in DATA_DIR
-        remake (bool) - write (True) or just read (False) fjson
+        strucs (dict)
+            {formula : {ID : structure}}
+
+        max_afm_combos (int)
+            maximum number of AFM spin configurations to generate
+
+        treat_as_nm (list)
+            any normally mag els you'd like to treat as nonmagnetic for AFM enumeration
+
+        data_dir (str)
+            directory to save fjson
+
+        savename (str)
+            filename for fjson in data_dir
+
+        remake (bool)
+            write (True) or just read (False) fjson
 
     Returns:
-        {formula : {ID : {AFM configuration index : [list of magmoms on each site]}
-    """
+        {formula identifier (str) :
+            {structure identifier for that formula (str) :
+                {AFM ordering identifier (str) :
+                    [list of magmoms (floats) for each site in the structure]}}}"""
 
     fjson = os.path.join(data_dir, savename)
     if not remake and os.path.exists(fjson):
@@ -543,17 +612,37 @@ def get_launch_dirs(
 ):
     """
     Args:
-        strucs (dict) - {formula : {ID : structure}}
-        magmoms (dict) - {formula : {ID : {AFM configuration index : [list of magmoms on each site]}}
-        user_configs (dict) - optional launch configurations
-        make_launch_dirs (bool) - make launch directories (True) or just return launch dict (False)
-        refresh_configs (bool) - refresh configs (True) or just use existing configs (False)
-        savename (str) - filename for fjson in DATA_DIR
-        remake (bool) - write (True) or just read (False) fjson
+        strucs (dict)
+            {formula : {ID : structure}}
+
+        magmoms (dict)
+            {formula : {ID : {AFM configuration index : [list of magmoms on each site]}}
+
+        user_configs (dict)
+            optional launch configurations
+
+        make_launch_dirs (bool)
+            make launch directories (True) or just return launch dict (False)
+
+        refresh_configs (bool)
+            refresh configs (True) or just use existing configs (False)
+
+        data_dir (str)
+            directory to save fjson
+
+        calcs_dir (str)
+            directory above all your calculations
+
+        savename (str)
+            filename for fjson in data_dir
+
+        remake (bool)
+            write (True) or just read (False) fjson
 
     Returns:
-        {launch_dir (formula/ID/standard/mag) : {'xcs' : [list of final_xcs],
-                                                 'magmoms' : [list of magmoms for each site in structure in launch_dir]}}
+        {launch dir (str, formula/ID/standard/mag) :
+            {'xcs' : [list of final xcs to run (str)],
+            'magmoms' : [list of magmoms (floats) for each site in the structure]}}
 
         also makes launch_dir and populates with POSCAR using strucs if make_dirs=True
 
@@ -607,17 +696,22 @@ def submit_one_calc(submit_args):
 
     Args:
         submit_args (dict) should contain:
-        {'launch_dir' :
-            launch_dir (str) - (formula/ID/standard/mag) to write and launch submission script in,
-         'launch_dirs' :
-            launch_dirs (dict) - {launch_dir (formula/ID/standard/mag) : {'xcs' : [list of final_xcs], 'magmoms' : [list of magmoms for each site in structure in launch_dir]}},
-         'user_configs' :
-            user_configs (dict) - optional sub, slurm, or VASP configurations,
-         'refresh_configs' :
-            refresh_configs (list) - list of which configs to refresh,
-         'ready_to_launch':
-            ready_to_launch (bool) - write (True) and launch (True) or just write (False) submission scripts (False)
-            }
+            {'launch_dir' :
+                launch_dir (str)
+                    (formula/ID/standard/mag) to write and launch submission script in,
+            'launch_dirs' :
+                launch_dirs (dict)
+                    {launch_dir (formula/ID/standard/mag) : {'xcs' : [list of final_xcs], 'magmoms' : [list of magmoms for each site in structure in launch_dir]}},
+            'user_configs' :
+                user_configs (dict)
+                    optional sub, slurm, or VASP configurations,
+            'refresh_configs' :
+                refresh_configs (list)
+                    list of which configs to refresh,
+            'ready_to_launch':
+                ready_to_launch (bool)
+                    write and launch (True) or just write submission scripts (False)
+                }
 
     Returns:
         None
@@ -670,10 +764,17 @@ def submit_calcs(
     Prepares VASP inputs, writes submission script, and launches job for all launch_dirs
 
     Args:
-        launch_dirs (dict) - {launch_dir (formula/ID/standard/mag) : {'xcs' : [list of final_xcs], 'magmoms' : [list of magmoms for each site in structure in launch_dir]}}
-        user_configs (dict) - optional sub, slurm, or VASP configurations
-        refresh_configs (list) - list of which configs to refresh
-        ready_to_launch (bool) - write (True) and launch (True) or just write (False) submission scripts (False
+        launch_dirs (dict)
+            {launch_dir (formula/ID/standard/mag) : {'xcs' : [list of final_xcs], 'magmoms' : [list of magmoms for each site in structure in launch_dir]}}
+
+        user_configs (dict)
+            optional sub, slurm, or VASP configurations
+
+        refresh_configs (list)
+            list of which configs to refresh
+
+        ready_to_launch (bool)
+            write and launch (True) or just write submission scripts (False
 
     Returns:
         None
@@ -735,14 +836,27 @@ def get_results(
 ):
     """
     Args:
-        launch_dirs (dict) - {launch_dir (formula/ID/standard/mag) : {'xcs' : [list of final_xcs], 'magmoms' : [list of magmoms for each site in structure in launch_dir]}}
-        user_configs (dict) - optional analysis configurations
-        refresh_configs (bool) - refresh configs (True) or just use existing configs (False)
-        savename (str) - filename for fjson in DATA_DIR
-        remake (bool) - write (True) or just read (False) fjson
+        launch_dirs (dict)
+            {launch_dir (formula/ID/standard/mag) : {'xcs' : [list of final_xcs], 'magmoms' : [list of magmoms for each site in structure in launch_dir]}}
+
+        user_configs (dict)
+            optional analysis configurations
+
+        refresh_configs (bool)
+            refresh configs (True) or just use existing configs (False)
+
+        data_dir (str)
+            directory to save fjson
+
+        savename (str)
+            filename for fjson in data_dir
+
+        remake (bool)
+            write (True) or just read (False) fjson
 
     Returns:
-        {'formula.ID.standard.mag.xc_calc' : {scraped results from VASP calculation}}
+        {formula--ID--standard--mag--xc-calc (str) :
+            {scraped results from VASP calculation}}
     """
 
     fjson = os.path.join(data_dir, savename)
@@ -791,10 +905,20 @@ def get_gs(
 ):
     """
     Args:
-        results (dict) - {'formula.ID.standard.mag.xc_calc' : {scraped results from VASP calculation}}
-        include_structure (bool) - include the structure or not
-        savename (str) - filename for fjson in DATA_DIR
-        remake (bool) - write (True) or just read (False) fjson
+        results (dict)
+            {formula--ID--standard--mag--xc-calc (str) : {scraped results from VASP calculation}}
+
+        include_structure (bool)
+            include the structure or not
+
+        data_dir (str)
+            directory to save fjson
+
+        savename (str)
+            filename for fjson in data_dir
+
+        remake (bool)
+            write (True) or just read (False) fjson
 
     Returns:
     {standard (str, the calculation standard) :
@@ -805,7 +929,8 @@ def get_gs(
                 'structure' : structure of the ground-state structure,
                 'n_started' : how many polymorphs you tried to calculate,
                 'n_converged' : how many polymorphs are converged,
-                'complete' : True if n_converged = n_started (i.e., all structures for this formula at this xc are done)}
+                'complete' : True if n_converged = n_started (i.e., all structures for this formula at this xc are done),
+                'Ef' : formation enthalpy at 0 K}
     """
     fjson = os.path.join(data_dir, savename)
     if os.path.exists(fjson) and not remake:
@@ -934,20 +1059,30 @@ def get_thermo_results(
     """
 
     Args:
-        results (dict): full results dictionary
-        Efs (dict): dictionary of formation enthalpies
-        savename (str, optional): Defaults to "thermo_results_%s.json"%FILE_TAG.
-        remake (bool, optional): Defaults to False.
+        results (dict):
+            full results dictionary
+
+        gs (dict):
+            dictionary of ground-state data
+
+        data_dir (str)
+            directory to save fjson
+
+        savename (str)
+            fjson name in data_dir
+
+        remake (bool)
+            Read (False) or write (True) json
 
     Returns:
         {standard (str) :
             {xc (str) :
                 {formula (str) :
                     {ID (str) :
-                        {'E' (float) : energy of the structure,
-                        'Ef' : formation enthalpy,
+                        {'E' : energy of the structure (DFT total energy in eV/atom),
+                        'Ef' : formation enthalpy at 0 K (eV/atom),
                         'is_gs' : True if this is the lowest energy polymorph for this formula,
-                        'dE_gs' : how high above the ground-state this structure is in energy
+                        'dE_gs' : how high above the ground-state this structure is in energy (eV/atom)
                         'all_polymorphs_converged' : True if every structure that was computed for this formula is converged}}
     """
     fjson = os.path.join(data_dir, savename)
@@ -1077,10 +1212,15 @@ def crawl_and_purge(
 ):
     """
     Args:
-        head_dir (str) - directory to start crawling beneath
-        files_to_purge (list) - list of file names to purge
-        safety (str) - 'on' or 'off' to turn on/off safety
-            - if safety is on, won't actually delete files
+        head_dir (str)
+            directory to start crawling beneath
+
+        files_to_purge (list)
+            list of file names to purge
+
+        safety (str)
+            'on' or 'off' to turn on/off safety
+                - if safety is on, won't actually delete files
     """
     purged_files = []
     mem_created = 0
@@ -1120,6 +1260,9 @@ def crawl_and_purge(
 
 
 def make_sub_for_launcher():
+    """
+    Creates sub_launcher.sh file to launch launcher on compute node
+    """
     flauncher_sub = os.path.join(os.getcwd(), "sub_launcher.sh")
     launch_job_name = "-".join([os.getcwd().split("/")[-2], "launcher"])
     with open(flauncher_sub, "w") as f:
