@@ -122,7 +122,7 @@ pmg config --add PMG_DEFAULT_FUNCTIONAL PBE_54
       - INCAR, POSCAR, KPOINTS, POTCAR
     - this module operates on a single crystal structure, with a single initial magnetic configuration, with a single set of inputs
     - this is the core of the onion
-  - `pydmclab.hpc.sub`
+  - `pydmclab.hpc.submit`
     - this is for configuring a submission script to launch a chain of VASP calculations
       - e.g., if we want to run a geometry optimization then a static calculation, we can configure our submission script to first run VASP to optimize the geometry then run VASP to perform a static (electronic) optimizatino
     - this module operates on a single crystal structure with a single initial magnetic configuration
@@ -146,7 +146,7 @@ pmg config --add PMG_DEFAULT_FUNCTIONAL PBE_54
     - e.g., a Li-containing material with varying fractions of Li for a voltage curve calculation
     - etc.
 
-- see `pydmclab/pydmclab/demos/demo_*vasp*.py` for examples
+- see `pydmclab/pydmclab/demos/demo_launcher_template.py` for a good starting template
 
 - the launcher script has a natural sequence of steps
 
@@ -156,6 +156,7 @@ pmg config --add PMG_DEFAULT_FUNCTIONAL PBE_54
 
 ### `get_query`
 
+- a generic version is available at `pydmclab.hpc.helpers.get_query`
 - you will often have to modify arguments in this function (and potentially modify the function itself!)
 - you need one or more structures to start with
 - these structures could come from Materials Project, experimental collaborators, your own previous calculations, someone else's calculations, etc.
@@ -176,6 +177,7 @@ query = {<globally unique ID> :
 
 ### `get_strucs`
 
+- a generic version is available at `pydmclab.hpc.helpers.get_strucs`
 - you will have to modify this unless you are calculating your structures exactly as they leave `get_query`
 - starts with the results of `get_query`
 - this is where we manipulate our starting structures (or not)
@@ -205,6 +207,7 @@ strucs = {<composition :
 
 ### `get_magmoms`
 
+- a generic version is available at `pydmclab.hpc.helpers.get_magmoms`
 - you will rarely need to modify this
 - starts with the results of `get_strucs`
 - if we are running AFM calculations, we need to associate various initial magnetic configurations with each unique crystal structure we want to calculate
@@ -224,6 +227,7 @@ magmoms = {<composition> :
 
 ### `get_launch_dirs`
 
+- a generic version is available at `pydmclab.hpc.helpers.get_launch_dirs`
 - you will rarely have to modify this
 - now that we have structures and magnetic configurations, we can enter our onion (described [above](#the-hpc-set-of-modules))
 - this function will generate all the directories and files we need to launch VASP jobs for every crystal structure + magnetic configuration we prepared
@@ -240,6 +244,7 @@ launch_dirs = {<composition>/<unique ID for that composition>/<standard>/<unique
 
 ### `submit_calcs`
 
+- a generic version is available at `pydmclab.hpc.helpers.submit_calcs`
 - you will rarely have to modify this
 - now we are going one level deeper into our onion to create/modify every submission script that launches VASP calculation chains from every launch directory we just created
 - this function is slow because it needs to check convergence and sort out errors in every one of our individual VASP calculations to figure out the best course of action to take
@@ -250,6 +255,7 @@ launch_dirs = {<composition>/<unique ID for that composition>/<standard>/<unique
 
 ### `get_results`
 
+- a generic version is available at `pydmclab.hpc.helpers.get_results`
 - you will rarely have to modify this
 - now we are going to collect the results of every VASP calculation within every chain within every launch directory
 - this function will update a dictionary/.json of a (detailed) summary of the results from all successful calculations executed in all your launch directories
@@ -263,8 +269,36 @@ launch_dirs = {<composition>/<unique ID for that composition>/<standard>/<unique
       etc.}}
 ```
 
-- `<key>` has the form of each VASP calculation with folders joined by '.'
-  - e.g., `LiMn2O4.mp-1234.dmc.fm.metagga-static`
+- `<key>` has the form of each VASP calculation with folders joined by '--'
+  - e.g., `LiMn2O4--mp-1234--dmc--fm--metagga-static`
+
+### `get_gs`
+
+- a generic version is available at `pydmclab.hpc.helpers.get_gs`
+- you will rarely have to modify this
+- this function collects data only for the lowest energy structure you calculated for each unique composition
+- the result of this function looks like:
+
+```python
+{<standard>:
+  {<xc> : 
+    {<formula> : 
+      {DATA}}}}
+```
+
+### `get_thermo_results`
+
+- a generic version is available at `pydmclab.hpc.helpers.get_thermo_results`
+- you will rarely have to modify this
+- this function grabs thermodynamic data for all your calculations, including ground-states and non-ground-states
+- the result of this function looks like:
+
+```python
+{<standard>:
+  {<xc> : 
+    {<formula> : 
+      {DATA}}}}
+```
 
 ### `<custom functions>`
 
@@ -274,7 +308,7 @@ launch_dirs = {<composition>/<unique ID for that composition>/<standard>/<unique
 
 ### `main`
 
-- you will have to add you `<custom functions>` to this if you have any
+- you will have to add your `<custom functions>` to this if you have any
 - you will likely want to toggle `remake` switches as you develop
 - this is the code that actually executes when you execute `python launcher.py`
 - the basic format is to include switches for each of the functions above
@@ -296,9 +330,7 @@ launch_dirs = {<composition>/<unique ID for that composition>/<standard>/<unique
 ### specify `CONFIGS`
 
 - at the top of `launcher.py`
-
 - you will generally have to modify these things!
-
 - these dictionaries allow a user to use non-default settings (configurations) in each of the above `pydmclab.hpc.*` modules
 - the default configs can be found in `pydmclab/pydmclab/data/data/*.yaml`
   - `_vasp_configs.yaml`
@@ -327,38 +359,28 @@ launch_dirs = {<composition>/<unique ID for that composition>/<standard>/<unique
 
 ### other high level settings
 
-- you will generally have to modify these!
 - `COMPOSITIONS`
+  - if you are using MP
   - an input to a Materials Project query (if appropriate)
   - could be a formula (like `Li2O`), a list of formulas, a chemical system (like `Ba-Zr-S`), or a list of chemical systems
   - used by `get_query`
-- `TRANSFORM_STRUCS`
-  - need to specify this if you want to systematically modify structures in `get_strucs`
-  - e.g., you might make this `[1, 2, 3, 4]` if looping through that will be meaningful during `get_strucs` (e.g., to insert 1, 2, 3, 4 Li)
-  - used by `get_strucs`
-- `GEN_MAGMOMS`
-  - set to True if running AFM calcs
-  - otherwise, not used
-  - if True, `get_magmoms` is executed
-- `TO_LAUNCH`
-  - tells `pydmclab` what kinds of calculations (i.e., standards and exchange-correlation methods) you're interested in.
-  - a common setting would be `TO_LAUNCH = {'dmc' : ['metagga']}` to run r2SCAN (meta-GGA) at DMC standards
+- `API_KEY`
+  - if you are using MP
 
 ## a typical flow
 
 1. I decide I want to run some calculations
 2. I create a folder on MSI: `/home/cbartel/<username>/<specific name>` (e.g., `/home/cbartel/cbartel/LiMn2O4`)
 3. I create a folder called `scripts` (e.g., `/home/cbartel/cbartel/LiMn2O4/scripts`)
-4. I copy a demo launcher script into this folder (e.g., `cp ~/bin/pydmclab/pydmclab/demos/demo_vasp_template.py /home/cbartel/cbartel/LiMn2O4/scripts/launcher.py`)
+4. I copy a demo launcher script into this folder (e.g., `cp ~/bin/pydmclab/pydmclab/demos/demo_launcher_template.py /home/cbartel/cbartel/LiMn2O4/scripts/launcher.py`)
 5. I start editing `launcher.py`
 
 - start at the top
 - what compositions do I want to query for (if any)?
 - do I want to run AFM or not?
-- am I going to transform my structures (e.g., replace species)?
 - what kind of standard/functional do I want?
 - what kind of configs do I want to use?
-  - while developing the launcher script, you should leave `n_procs = 1` in both the `SUB_CONFIGS` and the `ANALYSIS_CONFIGS` so that you can execute `python launcher.py` from the login node to quickly inspect what is printed
+  - while developing the launcher script, you should leave `...parallel=False` in both the `SUB_CONFIGS` and the `ANALYSIS_CONFIGS` so that you can execute `python launcher.py` from the login node to quickly inspect what is printed
 - how do I need to customize `get_query`?
 - how do I need to customize `get_strucs`?
 
@@ -374,7 +396,7 @@ launch_dirs = {<composition>/<unique ID for that composition>/<standard>/<unique
 - `from pydmclab.utils.handy import make_sub_for_launcher`
 - `make_sub_for_launcher()`
 
-13. All right, now I'll make sure `n_procs` in `SUB_CONFIGS` is the same as `n_procs` in `ANALYSIS_CONFIGS` and that they're both the same as `--ntasks` in `sub_launcher.sh`
+13. All right, now I'll make sure `...parallel` in `SUB_CONFIGS` is the same as `...parallel` in `ANALYSIS_CONFIGS` and that they're both the same as `--ntasks` in `sub_launcher.sh`
 
 - usually ~8-32 is a good number
 
@@ -404,10 +426,6 @@ launch_dirs = {<composition>/<unique ID for that composition>/<standard>/<unique
 20. Repeat 17-19 until calcs are done or you want to move data locally to start more analysis
 
 21. Create the smallest .json file you can that contains all the data you need for your analysis and transfer that to your local computer for more analysis (use `scp` or `Globus` for the file transfer)
-
-## demos
-
-- see `pydmclab/demos/demo_vasp_*.py` for example launcher scripts
 
 # For thermodynamics
 

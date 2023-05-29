@@ -1,5 +1,4 @@
 import os
-
 from pydmclab.hpc.helpers import (
     get_query,
     check_query,
@@ -24,111 +23,6 @@ from pydmclab.hpc.helpers import (
     make_sub_for_launcher,
 )
 
-"""
-see [pydmclab docs](https://github.umn.edu/bartel-group/pydmclab/blob/main/docs.md) for help
-
-The basic idea:
-
-1. get_query
-    - need some data to start with that has at least one crystal structure
-    - the imported `get_query` will use pydmclab.core.query.MPQuery to get MP data
-    - alternatively, you may want to use other starting points. e.g.,
-        - other calculations you've run
-        - experimental data
-    
-    Must return:
-        {ID (str) : {'structure' : Pymatgen Structure as dict,
-                     < any other data you want to keep track of >}}
-                     
-    Notes: 
-        - ID in this case must be a standalone identifier for that structure
-            - e.g., mp-123456
-
-2. get_strucs
-    - now we're going to convert our query into the POSCARs we want to calculate
-    - a "structure" corresponds with a chemical composition (formula) and a unique identifier for that formula (ID) 
-    - the imported `get_strucs` will only work if you are not transforming the structures present in your query
-    - you will often want to write your own version of this. e.g.,
-        - to replace species, change occupancies, etc from the structures you "queried" for 
-    
-    Must return:
-        {formula identifier (str) : 
-            {structure identifier for that formula (str) : 
-                Pymatgen Structure object as dict}}
-                
-    Notes:
-        - formula identifier in this case must be a standalone identifier for that formula
-        - ID only has to be unique within each formula
-            - e.g., if you calculate LiMnO2 with many different Li/Mn orderings, ID could be 0, 1, 2, ... for each ordering
-
-3. get_magmoms
-    - if we're running AFM calculations, this will get us our magmoms for each AFM ordering of each structure
-    - you can generally use the imported version of this function
-    
-    Must return:
-        {formula identifier (str) :
-            {structure identifier for that formula (str) : 
-                {AFM ordering identifier (str) :
-                    [list of magmoms (floats) for each site in the structure]}}}
-
-4. get_launch_dirs
-    - this will get us the directories we want to run our calculations in
-    - you can generally use the imported version of this function
-    - use LAUNCH_CONFIGS to specify what calculations get launched
-    
-    Must return:
-        {launch dir (str, formula/ID/stsandard/mag) : 
-            {'xcs' : [list of final xcs to run (str)],
-             'magmoms' : [list of magmoms (floats) for each site in the structure]}}
-
-5. submit_calcs
-    - this will write our submission scripts and submit our calculations
-    - you can generally use the imported version of this function
-    - use SUB_CONFIGS, SLURM_CONFIGS, VASP_CONFIGS to modify how these calculations are prepared
-    
-    Does not return anything
-    
-6. get_results
-    - this will collect all of the results we specified to collect
-    - you can generally use the imported version of this function
-    - use ANALYSIS_CONFIGS to modify what results are collected
-    
-    Must return:
-        {formula--ID--standard--mag--xc-calc (str) : 
-            {scraped results from VASP calculation}}
-            
-7. get_gs
-    - this will collect the ground-state (lowest energy) result for each calculated formula
-    - you can generally use the imported version of this function
-    
-    Must return:
-        {standard (str) :
-            {xc (str) :
-                {formula (str) : 
-                    {'E' : energy of the ground-structure,
-                     'key' : formula.ID.standard.mag.xc_calc for the ground-state structure,
-                     'structure' : structure of the ground-state structure,
-                     'n_started' : how many polymorphs you tried to calculate,
-                     'n_converged' : how many polymorphs are converged,
-                     'complete' : True if n_converged = n_started (i.e., all structures for this formula at this xc are done),
-                     'Ef' : the formation enthalpy (0 K)}                    
-
-8. get_thermo_results
-    - this will collect the thermodynamic results for all calculated structures (including non-ground-states)
-    - you can generally use the imported version of this function
-    
-    Must return:
-        {standard (str) :
-            {xc (str) :
-                {formula (str) :
-                    {ID (str) :
-                        {'E' : energy of the structure (DFT total energy in eV/atom),
-                        'Ef' : formation enthalpy at 0 K (eV/atom),
-                        'is_gs' : True if this is the lowest energy polymorph for this formula,
-                        'dE_gs' : how high above the ground-state this structure is in energy (eV/atom)
-                        'all_polymorphs_converged' : True if every structure that was computed for this formula is converged}}        
-"""
-
 # where is this file
 SCRIPTS_DIR = os.getcwd()
 
@@ -145,7 +39,7 @@ for d in [CALCS_DIR, DATA_DIR]:
 # if you need data from MP as a starting point (often the case), you need your API key
 API_KEY = "__YOUR API KEY__"
 
-# what to query MP for
+# what to query MP for (if you need MP data)
 ## e.g., 'MnO2', ['MnO2', 'TiO2'], 'Ca-Ti-O, etc
 COMPOSITIONS = None
 
@@ -204,9 +98,12 @@ ANALYSIS_CONFIGS = get_analysis_configs(
     exclude=[],
 )
 
-# whether or not you want to generate MAGMOMs
-## True if you're running AFM, else False
+# whether or not you want to generate MAGMOMs (only if you're running AFM)
 GEN_MAGMOMS = True if LAUNCH_CONFIGS["n_afm_configs"] else False
+
+# NOTE: the default is to use the imported functions from pydmclab.hpc.helpers
+# You will often want to write your own "get_query" and/or "get_strucs" functions instead
+# See below (or within pydmclab.hpc.helpers) for some more detailed docs
 
 
 def main():
@@ -232,9 +129,6 @@ def main():
 
     remake_gs = True
     print_gs_check = True
-
-    remake_Efs = True
-    print_Efs_check = True
 
     remake_thermo_results = True
     print_thermo_results_check = True
@@ -298,13 +192,8 @@ def main():
     if print_gs_check:
         check_gs(gs)
 
-    Efs = get_Efs(gs=gs, data_dir=DATA_DIR, remake=remake_Efs)
-
-    if print_Efs_check:
-        check_Efs(Efs)
-
     thermo = get_thermo_results(
-        results=results, Efs=Efs, data_dir=DATA_DIR, remake=remake_thermo_results
+        results=results, gs=gs, data_dir=DATA_DIR, remake=remake_thermo_results
     )
 
     if print_thermo_results_check:
@@ -315,3 +204,108 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+    """
+    see [pydmclab docs](https://github.umn.edu/bartel-group/pydmclab/blob/main/docs.md) for help
+
+    The basic idea:
+
+    1. get_query
+        - need some data to start with that has at least one crystal structure
+        - the imported `get_query` will use pydmclab.core.query.MPQuery to get MP data
+        - alternatively, you may want to use other starting points. e.g.,
+            - other calculations you've run
+            - experimental data
+
+        Must return:
+            {ID (str) : {'structure' : Pymatgen Structure as dict,
+                        < any other data you want to keep track of >}}
+
+        Notes:
+            - ID in this case must be a standalone identifier for that structure
+                - e.g., mp-123456
+
+    2. get_strucs
+        - now we're going to convert our query into the POSCARs we want to calculate
+        - a "structure" corresponds with a chemical composition (formula) and a unique identifier for that formula (ID)
+        - the imported `get_strucs` will only work if you are not transforming the structures present in your query
+        - you will often want to write your own version of this. e.g.,
+            - to replace species, change occupancies, etc from the structures you "queried" for
+
+        Must return:
+            {formula identifier (str) :
+                {structure identifier for that formula (str) :
+                    Pymatgen Structure object as dict}}
+
+        Notes:
+            - formula identifier in this case must be a standalone identifier for that formula
+            - ID only has to be unique within each formula
+                - e.g., if you calculate LiMnO2 with many different Li/Mn orderings, ID could be 0, 1, 2, ... for each ordering
+
+    3. get_magmoms
+        - if we're running AFM calculations, this will get us our magmoms for each AFM ordering of each structure
+        - you can generally use the imported version of this function
+
+        Must return:
+            {formula identifier (str) :
+                {structure identifier for that formula (str) :
+                    {AFM ordering identifier (str) :
+                        [list of magmoms (floats) for each site in the structure]}}}
+
+    4. get_launch_dirs
+        - this will get us the directories we want to run our calculations in
+        - you can generally use the imported version of this function
+        - use LAUNCH_CONFIGS to specify what calculations get launched
+
+        Must return:
+            {launch dir (str, formula/ID/stsandard/mag) :
+                {'xcs' : [list of final xcs to run (str)],
+                'magmoms' : [list of magmoms (floats) for each site in the structure]}}
+
+    5. submit_calcs
+        - this will write our submission scripts and submit our calculations
+        - you can generally use the imported version of this function
+        - use SUB_CONFIGS, SLURM_CONFIGS, VASP_CONFIGS to modify how these calculations are prepared
+
+        Does not return anything
+
+    6. get_results
+        - this will collect all of the results we specified to collect
+        - you can generally use the imported version of this function
+        - use ANALYSIS_CONFIGS to modify what results are collected
+
+        Must return:
+            {formula--ID--standard--mag--xc-calc (str) :
+                {scraped results from VASP calculation}}
+
+    7. get_gs
+        - this will collect the ground-state (lowest energy) result for each calculated formula
+        - you can generally use the imported version of this function
+
+        Must return:
+            {standard (str) :
+                {xc (str) :
+                    {formula (str) :
+                        {'E' : energy of the ground-structure,
+                        'key' : formula.ID.standard.mag.xc_calc for the ground-state structure,
+                        'structure' : structure of the ground-state structure,
+                        'n_started' : how many polymorphs you tried to calculate,
+                        'n_converged' : how many polymorphs are converged,
+                        'complete' : True if n_converged = n_started (i.e., all structures for this formula at this xc are done),
+                        'Ef' : the formation enthalpy (0 K)}
+
+    8. get_thermo_results
+        - this will collect the thermodynamic results for all calculated structures (including non-ground-states)
+        - you can generally use the imported version of this function
+
+        Must return:
+            {standard (str) :
+                {xc (str) :
+                    {formula (str) :
+                        {ID (str) :
+                            {'E' : energy of the structure (DFT total energy in eV/atom),
+                            'Ef' : formation enthalpy at 0 K (eV/atom),
+                            'is_gs' : True if this is the lowest energy polymorph for this formula,
+                            'dE_gs' : how high above the ground-state this structure is in energy (eV/atom)
+                            'all_polymorphs_converged' : True if every structure that was computed for this formula is converged}}
+    """
