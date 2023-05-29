@@ -284,17 +284,18 @@ class SubmitTools(object):
         sub_configs = self.sub_configs.copy()
         vasp_configs = self.vasp_configs.copy()
         vasp_exec = os.path.join(sub_configs["vasp_dir"], sub_configs["vasp"])
+        slurm_options = self.slurm_options.copy()
         if sub_configs["mpi_command"] == "srun":
             return "\n%s --ntasks=%s --mpi=pmi2 %s > %s\n" % (
                 sub_configs["mpi_command"],
-                str(self.slurm_options["ntasks"]),
+                str(slurm_options["ntasks"]),
                 vasp_exec,
                 vasp_configs["fvaspout"],
             )
         elif sub_configs["mpi_command"] == "mpirun":
             return "\n%s -np=%s %s > %s\n" % (
                 sub_configs["mpi_command"],
-                str(self.slurm_options["ntasks"]),
+                str(slurm_options["ntasks"]),
                 vasp_exec,
                 vasp_configs["fvaspout"],
             )
@@ -860,6 +861,7 @@ def get_slurm_configs(
         total_nodes (int, optional): how many nodes to run each VASP job on
         cores_per_node (int, optional): how many cores per node to use for each VASP job
         walltime_in_hours (int, optional): how long to run each VASP job
+        mem_per_core (str, optional): if 'all', try to use all avaiable mem; otherwise use specified memory per core (cpu)
         partition (str, optional): what part of the cluster to run each VASP job on
         error_file (str, optional): where to send each VASP job error
         output_file (str, optional): where to send each VASP job output
@@ -904,6 +906,8 @@ def get_slurm_configs(
             slurm_configs["mem_per_cpu"] = "1900M"
         else:
             slurm_configs["mem_per_cpu"] = "4000M"
+    else:
+        slurm_configs["mem_per_cpu"] = str(mem_per_core)
     return slurm_configs
 
 
