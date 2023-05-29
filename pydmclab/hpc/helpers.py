@@ -353,7 +353,7 @@ def get_query(
     max_Ehull=0.05,
     max_sites_per_structure=65,
     max_strucs_per_cmpd=4,
-    data_dir="../data",
+    data_dir=os.getcwd().replace("scripts", "data"),
     savename="query.json",
     remake=False,
 ):
@@ -437,7 +437,7 @@ def check_query(query):
 
 def get_strucs(
     query,
-    data_dir="../data",
+    data_dir=os.getcwd().replace("scripts", "data"),
     savename="strucs.json",
     remake=False,
 ):
@@ -484,7 +484,7 @@ def get_magmoms(
     strucs,
     max_afm_combos=50,
     treat_as_nm=[],
-    data_dir="../data",
+    data_dir=os.getcwd().replace("scripts", "data"),
     savename="magmoms.json",
     remake=False,
 ):
@@ -536,8 +536,8 @@ def get_launch_dirs(
     user_configs,
     make_launch_dirs=True,
     refresh_configs=True,
-    data_dir="../data",
-    calcs_dir="../calcs",
+    data_dir=os.getcwd().replace("scripts", "data"),
+    calcs_dir=os.getcwd().replace("scripts", "calcs"),
     savename="launch_dirs.json",
     remake=False,
 ):
@@ -729,7 +729,7 @@ def get_results(
     launch_dirs,
     user_configs,
     refresh_configs=True,
-    data_dir="../data",
+    data_dir=os.getcwd().replace("scripts", "data"),
     savename="results.json",
     remake=False,
 ):
@@ -784,7 +784,7 @@ def check_results(results):
 def get_gs(
     results,
     include_structure=False,
-    data_dir="../data",
+    data_dir=os.getcwd().replace("scripts", "data"),
     savename="gs_%s.json",
     remake=False,
 ):
@@ -907,7 +907,7 @@ def check_gs(gs):
 def get_Efs(
     gs,
     non_default_functional=None,
-    data_dir="../data",
+    data_dir=os.getcwd().replace("scripts", "data"),
     savename="Efs.json",
     remake=False,
 ):
@@ -967,7 +967,11 @@ def check_Efs(Efs):
 
 
 def get_thermo_results(
-    results, Efs, data_dir="../data", savename="thermo_results.json", remake=False
+    results,
+    Efs,
+    data_dir=os.getcwd().replace("scripts", "data"),
+    savename="thermo_results.json",
+    remake=False,
 ):
     """
 
