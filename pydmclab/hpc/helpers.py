@@ -784,8 +784,9 @@ def check_results(results):
 def get_gs(
     results,
     include_structure=False,
+    non_default_functional=None,
     data_dir=os.getcwd().replace("scripts", "data"),
-    savename="gs_%s.json",
+    savename="gs.json",
     remake=False,
 ):
     """
@@ -872,6 +873,20 @@ def get_gs(
                 if include_structure:
                     gs[standard][xc][formula]["structure"] = gs_structure
 
+    for standard in gs:
+        for xc in gs[standard]:
+            if not non_default_functional:
+                functional = "r2scan" if xc == "metagga" else "pbe"
+            else:
+                functional = non_default_functional
+            mus = ChemPots(functional=functional, standard=standard).chempots
+            for formula in gs[standard][xc]:
+                E = gs[standard][xc][formula]["E"]
+                if E:
+                    Ef = FormationEnthalpy(formula=formula, E_DFT=E, chempots=mus).Ef
+                else:
+                    Ef = None
+                gs[standard][xc][formula]["Ef"] = Ef
     write_json(gs, fjson)
     return read_json(fjson)
 
@@ -902,73 +917,16 @@ def check_gs(gs):
                 "%i/%i formulas with all calculations completed"
                 % (n_formulas_complete, n_formulas)
             )
-
-
-def get_Efs(
-    gs,
-    non_default_functional=None,
-    data_dir=os.getcwd().replace("scripts", "data"),
-    savename="Efs.json",
-    remake=False,
-):
-    """
-    Args:
-        gs (dict) - {formula (str) : {basic stuff for ground-states}}
-        non_default_functional (str or None) - if None, use default functionals
-        savename (str) - filename for fjson in DATA_DIR
-        remake (bool) - write (True) or just read (False) fjson
-
-    Returns:
-    {xc (str, the exchange-correlation method) :}
-        {formula (str) :
-            {'E' : energy of the ground-structure,
-             'key' : formula.ID.standard.mag.xc_calc for the ground-state structure,
-             'structure' : structure of the ground-state structure,
-             'n_started' : how many polymorphs you tried to calculate,
-             'n_converged' : how many polymorphs are converged,
-             'complete' : True if n_converged = n_started (i.e., all structures for this formula at this xc are done),
-             'Ef' : formation enthalpy at 0 K (float)}
-    """
-    fjson = os.path.join(data_dir, savename)
-    if os.path.exists(fjson) and not remake:
-        return read_json(fjson)
-    for standard in gs:
-        for xc in gs[standard]:
-            if not non_default_functional:
-                functional = "r2scan" if xc == "metagga" else "pbe"
-            else:
-                functional = non_default_functional
-            mus = ChemPots(functional=functional, standard=standard).chempots
             for formula in gs[standard][xc]:
-                E = gs[standard][xc][formula]["E"]
-                if E:
-                    Ef = FormationEnthalpy(formula=formula, E_DFT=E, chempots=mus).Ef
-                else:
-                    Ef = None
-                gs[standard][xc][formula]["Ef"] = Ef
-
-    write_json(gs, fjson)
-    return read_json(fjson)
-
-
-def check_Efs(Efs):
-    print("\nchecking formation enthalpies")
-
-    for standard in Efs:
-        print("\n\nworking on %s standard" % standard)
-        for xc in Efs[standard]:
-            print("\nxc = %s" % xc)
-            for formula in Efs[standard][xc]:
-                if Efs[standard][xc][formula]["Ef"]:
+                if gs[standard][xc][formula]["Ef"]:
                     print(
-                        "%s : %.2f eV/at" % (formula, Efs[standard][xc][formula]["Ef"])
+                        "%s : %.2f eV/at" % (formula, gs[standard][xc][formula]["Ef"])
                     )
-    return
 
 
 def get_thermo_results(
     results,
-    Efs,
+    gs,
     data_dir=os.getcwd().replace("scripts", "data"),
     savename="thermo_results.json",
     remake=False,
@@ -998,9 +956,9 @@ def get_thermo_results(
 
     thermo_results = {
         standard: {
-            xc: {formula: {} for formula in Efs[standard][xc]} for xc in Efs[standard]
+            xc: {formula: {} for formula in gs[standard][xc]} for xc in gs[standard]
         }
-        for standard in Efs
+        for standard in gs
     }
 
     for key in results:
@@ -1028,9 +986,9 @@ def get_thermo_results(
         tmp_thermo["calculated_formula"] = calcd_formula
 
         if E:
-            gs_key = Efs[standard][xc][formula]["key"]
-            gs_Ef = Efs[standard][xc][formula]["Ef"]
-            gs_E = Efs[standard][xc][formula]["E"]
+            gs_key = gs[standard][xc][formula]["key"]
+            gs_Ef = gs[standard][xc][formula]["Ef"]
+            gs_E = gs[standard][xc][formula]["E"]
             delta_E_gs = E - gs_E
 
             if key == gs_key:
@@ -1040,7 +998,7 @@ def get_thermo_results(
 
             tmp_thermo["dE_gs"] = delta_E_gs
             tmp_thermo["Ef"] = gs_Ef + delta_E_gs
-            tmp_thermo["all_polymorphs_converged"] = Efs[standard][xc][formula][
+            tmp_thermo["all_polymorphs_converged"] = gs[standard][xc][formula][
                 "complete"
             ]
 
