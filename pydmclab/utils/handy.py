@@ -78,7 +78,6 @@ def is_slurm_job_in_queue(job_name, user_name="cbartel", fqueue="q.o"):
 
 
 def make_project_tree():
-
     project_dir = os.getcwd()
     tree = {
         "dev": ["scripts", "data", "figures"],
@@ -96,22 +95,6 @@ def make_project_tree():
             if not os.path.exists(freadme):
                 with open(freadme, "w") as f:
                     f.write("This is a placeholder for the %s directory" % that_layer)
-
-
-def make_sub_for_launcher():
-    flauncher_sub = os.path.join(os.getcwd(), "sub_launcher.sh")
-    launch_job_name = "-".join([os.getcwd().split("/")[-2], "launcher"])
-    with open(flauncher_sub, "w") as f:
-        f.write("#!/bin/bash -l\n")
-        f.write("#SBATCH --nodes=1\n")
-        f.write("#SBATCH --ntasks=8\n")
-        f.write("#SBATCH --time=4:00:00\n")
-        f.write("#SBATCH --error=_log_launcher.e\n")
-        f.write("#SBATCH --output=_log_launcher.o\n")
-        f.write("#SBATCH --account=cbartel\n")
-        f.write("#SBATCH --job-name=%s\n" % launch_job_name)
-        f.write("#SBATCH --partition=msismall\n")
-        f.write("\npython launcher.py\n")
 
 
 def is_calc_valid(structure, standard, xc, calc, mag, magmom, mag_override):
