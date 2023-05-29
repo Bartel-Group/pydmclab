@@ -76,6 +76,7 @@ SLURM_CONFIGS = get_slurm_configs(
     total_nodes=1,
     cores_per_node=8,
     walltime_in_hours=95,
+    mem_per_core="all",
     partition="msismall,msidmc",
     error_file="log.e",
     output_file="log.o",

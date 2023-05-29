@@ -846,7 +846,8 @@ def get_slurm_configs(
     total_nodes=1,
     cores_per_node=8,
     walltime_in_hours=95,
-    partition="msismall,msidmc",
+    mem_per_core="all",
+    partition="agsmall,msidmc",
     error_file="log.e",
     output_file="log.o",
     account="cbartel",
@@ -891,6 +892,18 @@ def get_slurm_configs(
     if (total_nodes > 1) and (cores_per_node < 32):
         print("WARNING: this seems like a small job. are you sure you need > 1 node??")
 
+    if mem_per_core == "all":
+        if partition in [
+            "msismall",
+            "small",
+            "msilarge",
+            "large",
+            "amdsmall",
+            "amdlarge",
+        ]:
+            slurm_configs["mem_per_cpu"] = "1900M"
+        else:
+            slurm_configs["mem_per_cpu"] = "4000M"
     return slurm_configs
 
 
