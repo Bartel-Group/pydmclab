@@ -1,5 +1,4 @@
 import os
-from pydmclab.utils.handy import make_sub_for_launcher
 
 from pydmclab.hpc.helpers import (
     get_query,
@@ -24,6 +23,7 @@ from pydmclab.hpc.helpers import (
     get_slurm_configs,
     get_vasp_configs,
     get_analysis_configs,
+    make_sub_for_launcher,
 )
 
 """
