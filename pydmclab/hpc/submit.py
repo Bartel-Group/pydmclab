@@ -655,12 +655,14 @@ class SubmitTools(object):
                                 ] or not os.path.exists(
                                     os.path.join(calc_dir, "lobsterout")
                                 ):
+                                    f.write("cd %s\n" % calc_dir)
                                     f.write(self.lobster_command)
                                 if sub_configs[
                                     "force_postprocess"
                                 ] or not os.path.exists(
                                     os.path.join(calc_dir, "ACF.dat")
                                 ):
+                                    f.write("cd %s\n" % calc_dir)
                                     f.write(self.bader_command)
                         f.write("echo %s is done >> %s\n" % (xc_calc, fstatus))
                     else:
