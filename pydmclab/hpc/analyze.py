@@ -747,16 +747,19 @@ class AnalyzeVASP(object):
             if el_tag == "E":
                 continue
             out[el_tag] = {}
-            out[el_tag]["cohp"] = np.zeros(len(out["E"]))
-            out[el_tag]["icohp"] = np.zeros(len(out["E"]))
+            tmp_cohp = np.zeros(len(out["E"]))
+            tmp_icohp = np.zeros(len(out["E"]))
             for site_tag in pcohp[el_tag]:
                 for spin in pcohp[el_tag][site_tag]["cohp"]:
-                    out[el_tag]["cohp"] += np.array(
-                        pcohp[el_tag][site_tag]["cohp"][spin]
+                    tmp_cohp = np.add(
+                        np.array(pcohp[el_tag][site_tag]["cohp"][spin]), tmp_cohp
                     )
-                    out[el_tag]["icohp"] += np.array(
-                        pcohp[el_tag][site_tag]["cohp"][spin]
+                    tmp_icohp = np.add(
+                        np.array(pcohp[el_tag][site_tag]["icohp"][spin]), tmp_icohp
                     )
+
+                    out[el_tag]["cohp"] = tmp_cohp
+                    out[el_tag]["icohp"] = tmp_icohp
 
         for el_tag in out:
             if el_tag == "E":
