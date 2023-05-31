@@ -150,6 +150,12 @@ def mus_from_bartel2019_npj():
     return write_json(data, fjson)
 
 
+def gas_thermo_data():
+    fjson = os.path.join(DATA_PATH, "gas_thermo_data_nist.json")
+    if os.path.exists(fjson):
+        return read_json(fjson)
+
+
 def main():
     mus_from_bartel2019_npj()
     ssub()
