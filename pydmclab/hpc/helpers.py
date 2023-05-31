@@ -1194,7 +1194,7 @@ def check_thermo_results(thermo):
             )
 
 
-def get_dos_data(
+def get_dos_results(
     results,
     thermo_results,
     only_gs=True,
@@ -1212,10 +1212,15 @@ def get_dos_data(
 
     for key in results:
         calc_dir = results[key]["meta"]["calc_dir"]
-        standard, ID, xc = (
+        standard, xc = (
             results[key]["meta"]["setup"]["standard"],
-            results[key]["meta"]["setup"]["ID"],
             results[key]["meta"]["setup"]["xc"],
+        )
+        ID = "__".join(
+            [
+                results[key]["meta"]["setup"]["formula_tag"],
+                results[key]["meta"]["setup"]["ID"],
+            ]
         )
         formula = results[key]["results"]["formula"]
         thermo_result = thermo_results[standard][xc][formula][ID]
