@@ -1206,6 +1206,38 @@ def get_dos_results(
     savename="dos_results.json",
     remake=False,
 ):
+    """
+    Args:
+        results (dict)
+            from get_results
+
+        thermo_results (dict)
+            from get_thermo_results
+
+        only_gs (bool)
+            if True, only get DOS/COHP for the ground-state polymorphs
+
+        only_xc (str)
+            if not None, only get DOS/COHP for this XC
+
+        only_formulas (list)
+            if not None, only get DOS/COHP for these formulas
+
+        only_standard (str)
+            if not None, only get DOS/COHP for this standard
+
+        dos_to_store (list)
+            which DOS/COHP to store ['tcohp', 'pcohp', 'tdos', 'pdos', etc]
+
+        data_dir (str)
+            path to data directory
+
+        savename (str)
+            name of json file to save results to
+
+        remake (bool)
+            if True, remake the json file
+    """
     fjson = os.path.join(data_dir, savename)
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)

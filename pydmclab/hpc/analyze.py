@@ -758,8 +758,8 @@ class AnalyzeVASP(object):
                         np.array(pcohp[el_tag][site_tag]["icohp"][spin]), tmp_icohp
                     )
 
-                    out[el_tag]["cohp"] = tmp_cohp
-                    out[el_tag]["icohp"] = tmp_icohp
+            out[el_tag]["cohp"] = tmp_cohp
+            out[el_tag]["icohp"] = tmp_icohp
 
         for el_tag in out:
             if el_tag == "E":
