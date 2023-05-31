@@ -1194,6 +1194,73 @@ def check_thermo_results(thermo):
             )
 
 
+def get_dos_data(
+    results,
+    thermo_results,
+    only_gs=True,
+    only_xc="metagga",
+    only_formulas=[],
+    only_standard="dmc",
+    dos_to_store=["tdos", "tcohp"],
+    data_dir=os.getcwd().replace("scripts", "data"),
+    savename="dos_results.json",
+    remake=False,
+):
+    fjson = os.path.join(data_dir, savename)
+    if os.path.exists(fjson) and not remake:
+        return read_json(fjson)
+
+    for key in results:
+        calc_dir = results[key]["meta"]["calc_dir"]
+        standard, ID, xc = (
+            results[key]["meta"]["setup"]["standard"],
+            results[key]["meta"]["setup"]["ID"],
+            results[key]["meta"]["setup"]["xc"],
+        )
+        formula = results[key]["results"]["formula"]
+        thermo_result = thermo_results[standard][xc][formula][ID]
+        if only_gs:
+            if not thermo_result["is_gs"]:
+                continue
+        if only_formulas:
+            if thermo_result["formula"] not in only_formulas:
+                continue
+        if only_xc:
+            if xc != only_xc:
+                continue
+        if only_standard:
+            if standard != only_standard:
+                continue
+        av = AnalyzeVASP(calc_dir)
+        if "tdos" in dos_to_store:
+            pdos = av.pdos()
+            tdos = av.tdos(pdos=pdos)
+            thermo_results[standard][xc][formula][ID]["tdos"] = tdos
+        if "pdos" in dos_to_store:
+            thermo_results[standard][xc][formula][ID]["pdos"] = pdos
+        if "tcohp" in dos_to_store:
+            pcohp = av.pcohp()
+            tcohp = av.tcohp(pcohp=pcohp)
+            thermo_results[standard][xc][formula][ID]["tcohp"] = tcohp
+        if "pcohp" in dos_to_store:
+            thermo_results[standard][xc][formula][ID]["pcohp"] = pcohp
+        if "tcoop" in dos_to_store:
+            pcohp = av.pcohp(are_coops=True)
+            tcohp = av.tcohp(pcohp=pcohp)
+            thermo_results[standard][xc][formula][ID]["tcoop"] = tcohp
+        if "pcoop" in dos_to_store:
+            thermo_results[standard][xc][formula][ID]["pcoop"] = pcohp
+        if "tcobi" in dos_to_store:
+            pcohp = av.pcohp(are_cobis=True)
+            tcohp = av.tcohp(pcohp=pcohp)
+            thermo_results[standard][xc][formula][ID]["tcobi"] = tcohp
+        if "pcobi" in dos_to_store:
+            thermo_results[standard][xc][formula][ID]["pcobi"] = pcohp
+
+    write_json(thermo_results, fjson)
+    return read_json(fjson)
+
+
 def crawl_and_purge(
     head_dir,
     files_to_purge=[
