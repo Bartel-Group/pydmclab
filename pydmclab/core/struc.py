@@ -100,7 +100,7 @@ class StrucTools(object):
         structure.perturb(perturbation)
         return structure
 
-    def change_occ(self, site_idx, new_occ, structure=None):
+    def change_occ_for_site(self, site_idx, new_occ, structure=None):
         """
 
         return a structure with a new occupation for some site
@@ -128,6 +128,16 @@ class StrucTools(object):
         else:
             s[site_idx].species = new_occ
         return s
+
+    def change_occ_for_el(self, el, new_occ, structure=None):
+        if not structure:
+            structure = self.structure
+
+        for i, site in enumerate(structure):
+            if SiteTools(structure, i).el == el:
+                structure = self.change_occ_for_site(i, new_occ, structure=structure)
+
+        return structure
 
     @property
     def decorate_with_ox_states(self):
@@ -185,7 +195,12 @@ class StrucTools(object):
         else:
             return {0: out.as_dict()}
 
-    def replace_species(self, species_mapping, n_strucs=1):
+    def replace_species(
+        self,
+        species_mapping,
+        n_strucs=1,
+        use_ox_states_in_mapping=False,
+    ):
         """
         Args:
             species_mapping (dict) - {Element(el) :
@@ -200,6 +215,8 @@ class StrucTools(object):
         structure = self.structure
         print("replacing species with %s\n" % str(species_mapping))
 
+        if not use_ox_states_in_mapping:
+            structure.remove_oxidation_states()
         disappearing_els = []
         for el_to_replace in species_mapping:
             if (len(species_mapping[el_to_replace]) == 1) and (
@@ -214,6 +231,7 @@ class StrucTools(object):
 
         if species_mapping:
             structure.replace_species(species_mapping)
+
         if structure.is_ordered:
             return {0: structure.as_dict()}
         else:
@@ -376,60 +394,68 @@ class SiteTools(object):
         return self.site.is_ordered
 
     @property
-    def ion(self):
+    def site_string(self):
         """
+
         Returns:
-            whatever is occupying site (str)
-                - could be multiple ions, multiple elements, one element, one ion, etc
+            occupation_element_oxstate__occupation_element_oxstate__... for each ion occupying a site
         """
         d = self.site_dict
         species = d["species"]
         ions = []
         for entry in species:
             el = entry["element"]
-            ox = entry["oxidation_state"]
-            occ = entry["occu"]
+            if "oxidation_state" in entry:
+                ox = float(entry["oxidation_state"])
+            else:
+                ox = None
+            occ = float(entry["occu"])
             if ox:
                 if ox < 0:
                     ox = str(abs(ox)) + "-"
                 else:
                     ox = str(ox) + "+"
             else:
-                ox = ""
-            if occ == 1:
-                occ = ""
-            else:
-                occ = str(occ)
-            name = occ + el + ox
+                ox = "0.0+"
+            occ = str(occ)
+            name_to_join = []
+            for thing in [occ, el, ox]:
+                if thing:
+                    name_to_join.append(thing)
+            name = "_".join(name_to_join)
             ions.append(name)
         if len(ions) == 1:
             return ions[0]
         else:
-            return " ".join(ions)
+            return "__".join(ions)
+
+    @property
+    def ion(self):
+        """
+        Returns:
+            the ion occupying the site (str)
+            None if > 1 ion
+        """
+        site_string = self.site_string
+        if "__" in site_string:
+            print("Multiple ions in site, returning None")
+            return None
+
+        return "".join([site_string.split("_")[1], site_string.split("_")[2]])
 
     @property
     def el(self):
         """
         Returns:
             just the element occupying the site (even if it has an oxidation state)
+            None if more than one element occupies a site
         """
-        d = self.site_dict
-        species = d["species"]
-        ions = []
-        for entry in species:
-            el = entry["element"]
-            occ = entry["occu"]
-            ox = ""
-            if occ == 1:
-                occ = ""
-            else:
-                occ = str(occ)
-            name = occ + el + ox
-            ions.append(name)
-        if len(ions) == 1:
-            return ions[0]
-        else:
-            return " ".join(ions)
+        site_string = self.site_string
+        if "__" in site_string:
+            print("Multiple ions in site, returning None")
+            return None
+
+        return site_string.split("_")[1]
 
     @property
     def ox_state(self):
@@ -447,8 +473,14 @@ class SiteTools(object):
 
 
 def main():
-    return
+    path_to_cif = "/Users/cbartel/Downloads/BaNb0.98S3 ICSD_CollCode79447.cif"
+    st = StrucTools(path_to_cif, ox_states={"Ba": 2, "Nb": 5, "V": 5, "S": -2})
+    s = st.change_occ_for_el("Nb", {"Nb": 0.5})
+    print(s)
+    return st
+
+    return st
 
 
 if __name__ == "__main__":
-    main()
+    st = main()
