@@ -36,14 +36,17 @@ class UnitTestStruc(unittest.TestCase):
         self.assertEqual(len(supercell), 60)
 
         st = StrucTools(Cr2O3)
-        new_struc = st.change_occ(5, {"Li": 0.5})
+        new_struc = st.change_occ_for_site(5, {"Li": 0.5})
 
         self.assertEqual(new_struc[5].species_string, "Li:0.500")
 
-        new_struc = st.change_occ(55, {"Li": 0.5}, structure=supercell)
+        new_struc = st.change_occ_for_site(55, {"Li": 0.5}, structure=supercell)
         self.assertEqual(new_struc[55].species_string, "Li:0.500")
 
-        new_struc = st.change_occ(5, {"Cr": 0})
+        new_struc = st.change_occ_for_el("Cr", {"Li": 0.5}, structure=supercell)
+        self.assertEqual(new_struc[5].species_string, "Li:0.500")
+
+        new_struc = st.change_occ_for_site(5, {"Cr": 0})
         self.assertEqual(len(new_struc), 9)
 
         st = StrucTools(Cr2O3, ox_states={"Cr": 3, "O": -2})
@@ -53,7 +56,7 @@ class UnitTestStruc(unittest.TestCase):
 
         s = StrucTools(Cr2O3.copy()).structure
         for i in range(4):
-            s = st.change_occ(i, {"Cr": 0.5, "Mn": 0.5}, structure=s)
+            s = st.change_occ_for_site(i, {"Cr": 0.5, "Mn": 0.5}, structure=s)
 
         st = StrucTools(s)
         strucs = st.get_ordered_structures(n_strucs=2)
@@ -91,9 +94,11 @@ class UnitTestStruc(unittest.TestCase):
         index = 3
 
         sitet = SiteTools(s, index)
-        self.assertEqual(sitet.ion, "Cr3+")
+        self.assertEqual(sitet.ion, "Cr3.0+")
         self.assertEqual(sitet.el, "Cr")
         self.assertEqual(sitet.ox_state, 3.0)
+
+        self.assertEqual(sitet.site_string, "1.0_Cr_3.0+")
 
 
 if __name__ == "__main__":
