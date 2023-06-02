@@ -124,7 +124,7 @@ def plot_tdos(di,
         ):
     """
     Args:
-        calc_dir (str) - path to calculation with DOSCAR
+        di (dict) - dictionary of results for every single calculation
         formula - formula of compound
         what_to_plot (dict) - {element or 'total' (str)}
         colors_and_labels (dict) - {element-spin-orbital (str) : {'color' : color (str),
