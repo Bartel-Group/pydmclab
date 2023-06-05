@@ -1202,6 +1202,8 @@ def get_dos_results(
     only_formulas=[],
     only_standard="dmc",
     dos_to_store=["tdos", "tcohp"],
+    regenerate_dos=False,
+    regenerate_cohp=False,
     data_dir=os.getcwd().replace("scripts", "data"),
     savename="dos_results.json",
     remake=False,
@@ -1228,6 +1230,12 @@ def get_dos_results(
 
         dos_to_store (list)
             which DOS/COHP to store ['tcohp', 'pcohp', 'tdos', 'pdos', etc]
+
+        regenerate_dos (bool)
+            if True, make pdos/tdos jsons again even if it exists
+
+        regenerate_cohp (bool)
+            if True, make pcohp/tcohp jsons again even if it exists
 
         data_dir (str)
             path to data directory
@@ -1270,26 +1278,26 @@ def get_dos_results(
                 continue
         av = AnalyzeVASP(calc_dir)
         if "tdos" in dos_to_store:
-            pdos = av.pdos()
-            tdos = av.tdos(pdos=pdos)
+            pdos = av.pdos(remake=regenerate_dos)
+            tdos = av.tdos(pdos=pdos, remake=regenerate_dos)
             thermo_results[standard][xc][formula][ID]["tdos"] = tdos
         if "pdos" in dos_to_store:
             thermo_results[standard][xc][formula][ID]["pdos"] = pdos
         if "tcohp" in dos_to_store:
-            pcohp = av.pcohp()
-            tcohp = av.tcohp(pcohp=pcohp)
+            pcohp = av.pcohp(remake=regenerate_cohp)
+            tcohp = av.tcohp(pcohp=pcohp, remake=regenerate_cohp)
             thermo_results[standard][xc][formula][ID]["tcohp"] = tcohp
         if "pcohp" in dos_to_store:
             thermo_results[standard][xc][formula][ID]["pcohp"] = pcohp
         if "tcoop" in dos_to_store:
-            pcohp = av.pcohp(are_coops=True)
-            tcohp = av.tcohp(pcohp=pcohp)
+            pcohp = av.pcohp(are_coops=True, remake=regenerate_cohp)
+            tcohp = av.tcohp(pcohp=pcohp, remake=regenerate_cohp)
             thermo_results[standard][xc][formula][ID]["tcoop"] = tcohp
         if "pcoop" in dos_to_store:
             thermo_results[standard][xc][formula][ID]["pcoop"] = pcohp
         if "tcobi" in dos_to_store:
-            pcohp = av.pcohp(are_cobis=True)
-            tcohp = av.tcohp(pcohp=pcohp)
+            pcohp = av.pcohp(are_cobis=True, remake=regenerate_cohp)
+            tcohp = av.tcohp(pcohp=pcohp, remake=regenerate_cohp)
             thermo_results[standard][xc][formula][ID]["tcobi"] = tcohp
         if "pcobi" in dos_to_store:
             thermo_results[standard][xc][formula][ID]["pcobi"] = pcohp
