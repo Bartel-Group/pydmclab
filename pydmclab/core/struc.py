@@ -200,6 +200,7 @@ class StrucTools(object):
         species_mapping,
         n_strucs=1,
         use_ox_states_in_mapping=False,
+        use_occ_in_mapping=True,
     ):
         """
         Args:
@@ -208,6 +209,11 @@ class StrucTools(object):
                                                         fraction el2}}
             n_strucs (int) - number of ordered structures to return if disordered
 
+            use_ox_states_in_mapping (bool)
+                if False, will remove oxidation states before doing replacements
+
+            use_occ_in_mapping (bool)
+                if False, will set all occupancies to 1.0 before doing replacements
         Returns:
             dict of ordered structures {index : structure (Structure.as_dict())}
                 - index = 0 has lowest Ewald energy
@@ -217,6 +223,12 @@ class StrucTools(object):
 
         if not use_ox_states_in_mapping:
             structure.remove_oxidation_states()
+
+        if not use_occ_in_mapping:
+            els = self.els
+            for el in els:
+                structure = self.change_occ_for_el(el, {el: 1.0}, structure=structure)
+
         disappearing_els = []
         for el_to_replace in species_mapping:
             if (len(species_mapping[el_to_replace]) == 1) and (
@@ -475,8 +487,8 @@ class SiteTools(object):
 def main():
     path_to_cif = "/Users/cbartel/Downloads/BaNb0.98S3 ICSD_CollCode79447.cif"
     st = StrucTools(path_to_cif, ox_states={"Ba": 2, "Nb": 5, "V": 5, "S": -2})
-    s = st.change_occ_for_el("Nb", {"Nb": 0.5})
-    print(s)
+    s = st.replace_species({"Nb": {"Nb": 1}}, use_occ_in_mapping=False)
+    print(StrucTools(s[0]).structure)
     return st
 
     return st
