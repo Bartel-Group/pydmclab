@@ -6,7 +6,6 @@ from scipy.ndimage import gaussian_filter1d
 
 from pydmclab.core.comp import CompTools
 from pydmclab.core.struc import StrucTools
-from pydmclab.utils.plotting import get_colors, set_rc_params
 from pydmclab.utils.handy import read_json, write_json
 
 import matplotlib as mpl
