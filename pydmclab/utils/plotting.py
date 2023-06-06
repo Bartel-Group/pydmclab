@@ -79,38 +79,6 @@ def set_rc_params():
     return params
 
 
-# make slim tdos results
-def make_smaller_results(xc=None, remake=False):
-    # data directory
-    DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
-
-    fjson = os.path.join(DATA_DIR, "tdos.json")
-    if not remake and os.path.exists(fjson):
-        return read_json(fjson)
-
-    d = read_json(os.path.join(DATA_DIR, "results.json"))
-    out = {}
-
-    # only keep the converged results and the xc you specified
-    for k in d:
-        if not d[k]["results"]["convergence"]:
-            continue
-        if xc != None and not d[k]["meta"]["setup"]["xc"] == xc:
-            continue
-        out[k] = {}
-
-    # keep whatever keys you need to plot tdos
-    # Note: we need "structure" only if we want to normalize by formula unit
-    keep_keys = ["results", "meta", "structure", "tdos"]
-
-    for k in out:
-        for keep_key in keep_keys:
-            out[k][keep_key] = d[k][keep_key].copy()
-
-    write_json(out, fjson)
-    return read_json(fjson)
-
-
 # Please note that this function only deals with the case of total spin
 def ax_tdos(
     tdos,
@@ -156,9 +124,9 @@ def ax_tdos(
 
         population_sources (str or list)
             'all' : plot all elements and the total
-            ['total'] or 'total' : plots just the total
+            ['total'] : plots just the total
             ['Al', 'N'] : plots just Al and N
-            ['Al'] or 'Al' : plots just Al
+            ['Al'] : plots just Al
 
         colors (dict)
             {element or 'total' (str) : color (str)}
@@ -227,10 +195,11 @@ def ax_tdos(
     set_rc_params()
     random.seed(42)
 
+    if spins != "summed":
+        raise NotImplementedError("Sorry, only summed spins are implemented right now.")
+
     if savename:
         fig = plt.figure(figsize=(5, 8))
-
-    ax = plt.subplot(111)
 
     Efermi = 0.0
     occupied_up_to = Efermi
@@ -335,11 +304,35 @@ def ax_tdos(
     return ax
 
 
+def get_label(cmpd, els):
+    """
+    Args:
+        cmpd (str) - chemical formula
+        els (list) - ordered list of elements (str) as you want them to appear in label
+
+    Returns:
+        neatly formatted chemical formula label
+    """
+    label = r"$"
+    for el in els:
+        amt = CompTools(cmpd).stoich(el)
+        if amt == 0:
+            continue
+        label += el
+        if amt == 1:
+            continue
+        label += "_{%s}" % amt
+    label += "$"
+    return label
+
+
 def main():
     test_data_dir = "../data/test_data/vasp/AlN"
     tdos = read_json(os.path.join(test_data_dir, "tdos.json"))
-    # return tdos
-    ax = ax_tdos(
+
+    fig = plt.figure()
+    ax1 = plt.subplot(121)
+    ax1 = ax_tdos(
         tdos,
         population_sources=["total", "Al"],
         colors={"total": "black", "Al": "green"},
@@ -358,8 +351,32 @@ def main():
         ylabel=r"$E-E_F\/(eV)$",
         legend=True,
         title=None,
-        savename=os.path.join(test_data_dir, "tdos.png"),
-        show=True,
+        savename=None,
+        show=False,
+    )
+
+    ax2 = plt.subplot(122)
+    ax2 = ax_tdos(
+        tdos,
+        population_sources=["total", "Al"],
+        colors={"total": "black", "Al": "orange"},
+        color_palette=get_colors("set2"),
+        params={"line_alpha": 0.9, "fill_alpha": 0.2, "lw": 1},
+        special_labels=None,
+        spins="summed",
+        normalization=1,
+        smearing=2,
+        Efermi=0.0,
+        xlim=(0, 10),
+        ylim=(-2, 2),
+        xticks=(True, [0, 5, 10]),
+        yticks=(False, [-2, -1, 0, 1, 2]),
+        xlabel="DOS",
+        ylabel="",
+        legend=True,
+        title=None,
+        savename=None,
+        show=False,
     )
 
     return tdos
