@@ -17,7 +17,7 @@ def mus_at_0K():
     if os.path.exists(fjson):
         return read_json(fjson)
     mus = {}
-    d = read_json(os.path.join(DATA_PATH, "230122_dmc-mus.json"))
+    d = read_json(os.path.join(DATA_PATH, "230614_dmc-mus.json"))
     for xc in d:
         if xc == "gga":
             functional = "pbe"
@@ -157,11 +157,11 @@ def gas_thermo_data():
 
 
 def main():
-    mus_from_bartel2019_npj()
-    ssub()
-    mus_from_mp_no_corrections()
+    # mus_from_bartel2019_npj()
+    # ssub()
+    # mus_from_mp_no_corrections()
     mus_at_0K()
-    mus_at_T()
+    # mus_at_T()
 
 
 if __name__ == "__main__":

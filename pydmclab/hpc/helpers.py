@@ -1389,3 +1389,14 @@ def make_sub_for_launcher():
         f.write("#SBATCH --job-name=%s\n" % launch_job_name)
         f.write("#SBATCH --partition=msismall\n")
         f.write("\npython launcher.py\n")
+
+
+def main():
+    mus = ChemPots(functional="r2scan", standard="dmc").chempots
+    for el in mus:
+        if not mus[el]:
+            print(el)
+
+
+if __name__ == "__main__":
+    main()
