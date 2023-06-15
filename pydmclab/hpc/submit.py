@@ -285,7 +285,7 @@ class SubmitTools(object):
         if machine == "msi":
             return "/home/cbartel/shared/bin"
         elif machine == "bridges2":
-            return "/jet/home/%s/bin/" % os.getlogin()
+            return "/ocean/projects/mat230011p/shared/bin"
         elif machine == "expanse":
             return "/home/%s/bin/" % os.getlogin()
 
