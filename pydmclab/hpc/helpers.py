@@ -238,6 +238,8 @@ def get_sub_configs(
         for xc in special_packing:
             sub_configs["packing"]["xc"] = special_packing[xc]
 
+    sub_configs["machine"] = machine
+
     return sub_configs
 
 
