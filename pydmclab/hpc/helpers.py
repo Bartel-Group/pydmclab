@@ -137,7 +137,8 @@ def get_slurm_configs(
     slurm_configs["nodes"] = total_nodes
     slurm_configs["ntasks"] = int(total_nodes * cores_per_node)
 
-    slurm_configs["time"] = int(walltime_in_hours * 60)
+    if account == "cbartel":
+        slurm_configs["time"] = int(walltime_in_hours * 60)
 
     if total_nodes > 1:
         if "small" in partition:
