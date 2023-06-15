@@ -1,3 +1,24 @@
+RM:
+  cores_per_node: 128
+  sharing: False
+  max_wall: 48:00:00
+  mem_per_core: 2GB
+  max_nodes: 50
+  proc: cpu
+RM-shared:
+  cores_per_node: 128
+  sharing: True
+  max_wall: 48:00:00
+  mem_per_core: 2GB
+  max_nodes: 1
+  proc: cpu
+RM-512:
+  cores_per_node: 128
+  sharing: False
+  max_wall: 48:00:00
+  mem_per_core: 4GB
+  max_nodes: 2
+  proc: cpu
 msidmc:
   cores_per_node: 128
   sharing: True
