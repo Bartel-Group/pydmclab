@@ -276,6 +276,33 @@ class SubmitTools(object):
         return options
 
     @property
+    def bin_dir(self):
+        """
+        Returns bin directory where things (eg LOBSTER) are located
+        """
+        sub_configs = self.sub_configs.copy()
+        machine = sub_configs["machine"]
+        if machine == "msi":
+            return "/home/cbartel/shared/bin"
+        elif machine == "bridges2":
+            return "/jet/home/%s/bin/" % os.getlogin()
+        elif machine == "expanse":
+            return "/home/%s/bin/" % os.getlogin()
+
+    @property
+    def vasp_dir(self):
+        """
+        Returns directory containing vasp executable
+        """
+        machine = self.sub_configs["machine"]
+        if machine == "msi":
+            return "%s/vasp" % self.bin_dir
+        elif machine == "bridges2":
+            return "/opt/packages/VASP/VASP6/6.3+VTST"
+        else:
+            raise NotImplementedError('dont have VASP path for machine "%s"' % machine)
+
+    @property
     def vasp_command(self):
         """
         Returns command used to execute vasp
@@ -283,7 +310,7 @@ class SubmitTools(object):
         """
         sub_configs = self.sub_configs.copy()
         vasp_configs = self.vasp_configs.copy()
-        vasp_exec = os.path.join(sub_configs["vasp_dir"], sub_configs["vasp"])
+        vasp_exec = os.path.join(self.vasp_dir, sub_configs["vasp"])
         slurm_options = self.slurm_options.copy()
 
         if sub_configs["mpi_command"] == "srun":
@@ -306,16 +333,18 @@ class SubmitTools(object):
         """
         Returns command used to execute lobster
         """
-        lobster = "/home/cbartel/shared/bin/lobster/lobster-4.1.0/lobster-4.1.0"
-        return "\n%s\n" % lobster
+        lobster_path = os.path.join(
+            self.bin_dir, "lobster", "lobster-4.1.0", "lobster-4.1.0"
+        )
+        return "\n%s\n" % lobster_path
 
     @property
     def bader_command(self):
         """
         Returns command used to execute bader
         """
-        chgsum = "/home/cbartel/shared/bin/bader/chgsum.pl AECCAR0 AECCAR2"
-        bader = "/home/cbartel/shared/bin/bader/bader CHGCAR -ref CHGCAR_sum"
+        chgsum = "%s/bader/chgsum.pl AECCAR0 AECCAR2" % self.bin_dir
+        bader = "%s/bader/bader CHGCAR -ref CHGCAR_sum" % self.bin_dir
         return "\n%s\n%s\n" % (chgsum, bader)
 
     def is_job_in_queue(self, job_name):

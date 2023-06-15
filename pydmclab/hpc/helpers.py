@@ -176,6 +176,7 @@ def get_slurm_configs(
 
 
 def get_sub_configs(
+    machine="msi",
     submit_calculations_in_parallel=False,
     start_all_calculations_from_scratch=False,
     rerun_lobster=False,
