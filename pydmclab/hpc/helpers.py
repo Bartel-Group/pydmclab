@@ -183,7 +183,7 @@ def get_slurm_configs(
 def get_sub_configs(
     machine="msi",
     submit_calculations_in_parallel=False,
-    start_all_calculations_from_scratch=False,
+    delete_all_calculations_and_start_over=False,
     rerun_lobster=False,
     mpi_command="mpirun",
     special_packing=False,
@@ -199,7 +199,7 @@ def get_sub_configs(
             - True: use all available processors
             - int: use that many processors
 
-        start_all_calculations_from_scratch (bool):
+        delete_all_calculations_and_start_over (bool):
             if True, start all calculations over (ie delete all outputs)
 
         rerun_lobster (bool) :
@@ -230,7 +230,7 @@ def get_sub_configs(
 
     sub_configs["n_procs"] = n_procs
 
-    if start_all_calculations_from_scratch:
+    if delete_all_calculations_and_start_over:
         sub_configs["fresh_restart"] = True
 
     if rerun_lobster:
