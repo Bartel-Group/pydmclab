@@ -59,6 +59,7 @@ SUB_CONFIGS = get_sub_configs(
     mpi_command="mpirun",
     special_packing=False,
     delete_all_calculations_and_start_over=False,
+    machine="msi",
 )
 
 # any configurations related to Slurm
@@ -71,7 +72,6 @@ SLURM_CONFIGS = get_slurm_configs(
     error_file="log.e",
     output_file="log.o",
     account="cbartel",
-    machine="msi",
 )
 
 # any configurations related to VASPSetUp
