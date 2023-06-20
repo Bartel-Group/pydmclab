@@ -26,7 +26,7 @@ from pydmclab.hpc.helpers import (
 # where is this file
 SCRIPTS_DIR = os.getcwd()
 
-# where are my calculations going to live
+# where are my calculations going to live (maybe on scratch)
 CALCS_DIR = SCRIPTS_DIR.replace("scripts", "calcs")
 
 # where is my data going to live
@@ -58,7 +58,7 @@ SUB_CONFIGS = get_sub_configs(
     rerun_lobster=False,
     mpi_command="mpirun",
     special_packing=False,
-    start_all_calculations_from_scratch=False,
+    delete_all_calculations_and_start_over=False,
 )
 
 # any configurations related to Slurm
@@ -71,6 +71,7 @@ SLURM_CONFIGS = get_slurm_configs(
     error_file="log.e",
     output_file="log.o",
     account="cbartel",
+    machine="msi",
 )
 
 # any configurations related to VASPSetUp
@@ -172,6 +173,7 @@ def main():
     if remake_subs:
         submit_calcs(
             launch_dirs=launch_dirs,
+            calcs_dir=CALCS_DIR,
             user_configs=user_sub_configs,
             ready_to_launch=ready_to_launch,
             n_procs=sub_configs["n_procs"],
