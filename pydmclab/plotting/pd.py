@@ -1,6 +1,6 @@
 from pydmclab.core.comp import CompTools
 from pydmclab.core.hulls import GetHullInputData, AnalyzeHull, MixingHull
-from pydmclab.utils.plotting import set_rc_params, get_colors
+from pydmclab.plotting.utils import set_rc_params, get_colors
 from pydmclab.utils.handy import read_json, write_json
 
 import os
@@ -69,7 +69,13 @@ def get_mixing(hullout, remake=False):
 
 
 class BinaryPD(object):
-    def __init__(self, stability_data, end_members, stability_source="AnalyzeHull"):
+    def __init__(
+        self,
+        stability_data,
+        end_members,
+        polymorph_data={},
+        stability_source="AnalyzeHull",
+    ):
         """
 
         Args:
@@ -89,9 +95,15 @@ class BinaryPD(object):
                          'x' : mole fraction of right end member}}}
 
 
+
             end_members (list): [left end, right end]
                 e.g., ['Mg', 'S'] for a typical Mg-S phase diagram (AnalyzeHull)
                 e.g., ['MgCl2', 'NaCl'] for a mixing hull laong NaCl-MgCl2 (MixingHull)
+
+            polymorph_data (dict):
+                {formula (str) :
+                    {ID (str) :
+                        {'dE_gs' : energy above ground state (eV/atom)}}}
 
             stability_source (str): 'AnalyzeHull' or 'MixingHull'
 
@@ -100,7 +112,9 @@ class BinaryPD(object):
                 {formula (str) :
                     {'Ef' : formation energy (eV/atom),
                      'x' : mole fraction of right end member,
-                     'stability' : True if on the hull else False}}
+                     'stability' : True if on the hull else False,
+                     'polys' : [{'ID' : ID (str), 'Ef' : Ef_gs + dE_gs (eV/atom)}]}}
+
 
             left_end (str): left end member
             right_end (str): right end member
@@ -128,6 +142,15 @@ class BinaryPD(object):
         elif stability_source == "MixingHull":
             for formula in data:
                 data[formula]["Ef"] = data[formula]["E_mix"]
+
+        for formula in stability_data:
+            data[formula]["polys"] = []
+            if formula in polymorph_data:
+                for ID in polymorph_data[formula]:
+                    dE_gs = polymorph_data[formula][ID]["dE_gs"]
+                    data[formula]["polys"].append(
+                        {"ID": ID, "Ef": data[formula]["Ef"] + dE_gs}
+                    )
 
         self.data = data
         self.left_end, self.right_end = left_end, right_end
@@ -172,27 +195,23 @@ class BinaryPD(object):
     @property
     def unstable(self):
         """
-
-
         Returns:
             list of dicts
                 {'x' : mole fraction of right end member,
                  'Ef' : formation energy (eV/atom),
-                 'label' : formula}
+                 'label' : formula (for gs) or ID (for non-gs)}
             sorted by x (ascending)
             only for unstable compounds
         """
         data = self.data
-        data = {k: data[k] for k in data if not data[k]["stability"]}
-        xs = self.sorted_xs
         to_plot = []
-        for x in xs:
-            formula = [k for k in data if data[k]["x"] == x]
-            if formula:
-                formula = formula[0]
-            else:
-                continue
-            to_plot.append({"x": x, "Ef": data[formula]["Ef"], "label": formula})
+        for formula in data:
+            polys = data[formula]["polys"]
+            x = data[formula]["x"]
+            for p in polys:
+                to_plot.append({"x": x, "Ef": p["Ef"], "label": p["ID"]})
+            if not data[formula]["stability"]:
+                to_plot.append({"x": x, "Ef": data[formula]["Ef"], "label": formula})
 
         return to_plot
 
@@ -639,17 +658,23 @@ def main():
     bpd_mh = BinaryPD(
         mixing,
         ["NaCl", "MgCl2"],
+        polymorph_data={
+            "Cl4Mg1Na2": {"mp-1234": {"dE_gs": 0.05}},
+            "Cl8Mg1Na6": {
+                "mp-4321": {"dE_gs": 0.1},
+            },
+        },
         stability_source="MixingHull",
     )
 
     tpd = None
 
-    # bpd_mh.ax_pd(
-    #     yticks=(True, [-0.1, 0.1]), ylim=(-0.1, 0.1), el_order=("Na", "Mg", "Cl")
-    # )
+    bpd_mh.ax_pd(
+        yticks=(True, [-0.1, 0.1]), ylim=(-0.1, 0.1), el_order=("Na", "Mg", "Cl")
+    )
 
-    tpd = TernaryPD(hullout, ["S", "Cr", "Mg"])
-    tpd.ax_pd()
+    # tpd = TernaryPD(hullout, ["S", "Cr", "Mg"])
+    # tpd.ax_pd()
     return query, hullout, mixing, bpd, tpd
 
 

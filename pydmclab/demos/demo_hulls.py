@@ -2,7 +2,7 @@ from pydmclab.core.comp import CompTools
 from pydmclab.core.query import MPQuery
 from pydmclab.core.hulls import GetHullInputData, AnalyzeHull, ParallelHulls
 from pydmclab.utils.handy import read_json, write_json
-from pydmclab.utils.plotting import set_rc_params, get_colors
+from pydmclab.plotting.utils import set_rc_params, get_colors
 from pydmclab.data.thermochem import mus_at_0K, mus_at_T
 
 import matplotlib.pyplot as plt
