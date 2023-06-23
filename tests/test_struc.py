@@ -30,7 +30,7 @@ class UnitTestStruc(unittest.TestCase):
         self.assertEqual("Cr2O3", st.compact_formula)
         self.assertEqual("Cr4 O6", st.formula)
         self.assertEqual(["Cr", "O"], st.els)
-
+        self.assertEqual({"Cr": 4, "O": 6}, st.amts)
         supercell = st.make_supercell([1, 2, 3])
 
         self.assertEqual(len(supercell), 60)

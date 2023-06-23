@@ -7,8 +7,6 @@ from pymatgen.transformations.standard_transformations import (
     OxidationStateDecorationTransformation,
 )
 from pymatgen.analysis.structure_matcher import StructureMatcher
-from pymatgen.core.composition import Element, Composition
-from pymatgen.core.ion import Ion
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
 import os
@@ -30,8 +28,11 @@ class StrucTools(object):
                 - or None
 
         """
+        # convert Structure.as_dict() to Structure
         if isinstance(structure, dict):
             structure = Structure.from_dict(structure)
+
+        # convert file into Structure
         if isinstance(structure, str):
             if os.path.exists(structure):
                 structure = Structure.from_file(structure)
@@ -72,6 +73,21 @@ class StrucTools(object):
         """
         return CompTools(self.compact_formula).els
 
+    @property
+    def amts(self):
+        """
+        Returns:
+            {el (str): number of el in struc (int)}
+        """
+        els = self.els
+        amts = {el: 0 for el in els}
+        structure = self.structure
+        for i, site in enumerate(structure):
+            el = SiteTools(structure, i).el
+            if el:
+                amts[el] += 1
+        return amts
+
     def make_supercell(self, grid):
         """
         Args:
@@ -106,13 +122,17 @@ class StrucTools(object):
         return a structure with a new occupation for some site
 
         Args:
-            site_idx (int): index of site in structure to change
-            new_occ (dict): dictionary telling me the new occupation on that site
-                e.g., {'Li' : 0.5, 'Fe' : 0.5}
+            site_idx (int):
+                index of site in structure to change
+
+            new_occ (dict):
+                dictionary telling me the new occupation on that site
+                    e.g., {'Li' : 0.5, 'Fe' : 0.5}
 
             structure (None or pymatgen Structure object):
                 if None, start from self.structure
                 else, start from structure
+                    (in case you don't want to start from the structure that initialized StrucTools)
 
         Returns:
             pymatgen Structure object with new occupation
@@ -124,15 +144,29 @@ class StrucTools(object):
         s = structure.copy()
 
         if np.sum(list(new_occ.values())) == 0:
+            # if new occupation is 0, remove that site
             s.remove_sites([site_idx])
         else:
+            # otherwise, update the occupation
             s[site_idx].species = new_occ
         return s
 
     def change_occ_for_el(self, el, new_occ, structure=None):
+        """
+        Args:
+            el (str)
+                element to change occupation for
+
+            new_occ (dict)
+                {el : new occupation (float)}
+
+            structure (None or pymatgen Structure object)
+                if None, start from self.structure
+        """
         if not structure:
             structure = self.structure
 
+        # for all sites having that element, change the occupation
         for i, site in enumerate(structure):
             if SiteTools(structure, i).el == el:
                 structure = self.change_occ_for_site(i, new_occ, structure=structure)
@@ -162,37 +196,54 @@ class StrucTools(object):
     def get_ordered_structures(self, algo=0, decorate=True, n_strucs=1):
         """
         Args:
-            algo (int) - 0 = fast, 1 = complete, 2 = best first
-                - see pymatgen.transformations.standard_transformations.OrderDisorderedStructureTransformation
-                - 0 usually OK
-            decorate (bool) - whether to decorate with oxidation states
-                - if False, self.structure must already have them
-            n_strucs (int) - number of ordered structures to return
+            algo (int):
+                method for enumeration
+                    0 = fast, 1 = complete, 2 = best first
+                        see pymatgen.transformations.standard_transformations.OrderDisorderedStructureTransformation
+                        0 usually OK
+
+            decorate (bool)
+                whether to decorate with oxidation states
+                    if False, self.structure must already have them
+
+            n_strucs (int)
+                number of ordered structures to return
 
         Returns:
-            dict of ordered structures {index : structure (Structure.as_dict())}
+            dict of ordered structures
+            {index : structure (Structure.as_dict())}
                 - index = 0 has lowest Ewald energy
         """
+
+        # initialize ordering engine
         transformer = OrderDisorderedStructureTransformation(algo=algo)
+
+        # decorat with oxidation states or not
         if decorate:
             structure = self.decorate_with_ox_states
         else:
             structure = self.structure
+
+        # only return one structure if n_strucs = 1
         return_ranked_list = n_strucs if n_strucs > 1 else False
 
+        # generate ordered structure
         print("ordering disordered structures\n")
         out = transformer.apply_transformation(
             structure, return_ranked_list=return_ranked_list
         )
-        # print(out[0])
+
         if isinstance(out, list):
+            # more than 1 structure, so check for duplicates (symmetrically equivalent structures) and remove them
             print("getting unique structures\n")
             matcher = StructureMatcher()
             out = [i["structure"] for i in out]
+            # find unique groups of structures
             groups = matcher.group_structures(out)
             out = [groups[i][0] for i in range(len(groups))]
             return {i: out[i].as_dict() for i in range(len(out))}
         else:
+            # if only one structure is made, return in same formation (dict)
             return {0: out.as_dict()}
 
     def replace_species(
@@ -204,31 +255,41 @@ class StrucTools(object):
     ):
         """
         Args:
-            species_mapping (dict) - {Element(el) :
-                                        {Element(el1) : fraction el1,
-                                                        fraction el2}}
-            n_strucs (int) - number of ordered structures to return if disordered
+            species_mapping (dict)
+                {Element(el) :
+                    {Element(el1) : fraction el1,
+                     Element(el2) : fraction el2,
+                     ...},
+                 ...}
+
+            n_strucs (int)
+                number of ordered structures to return if disordered
 
             use_ox_states_in_mapping (bool)
                 if False, will remove oxidation states before doing replacements
 
             use_occ_in_mapping (bool)
                 if False, will set all occupancies to 1.0 before doing replacements
+
         Returns:
-            dict of ordered structures {index : structure (Structure.as_dict())}
-                - index = 0 has lowest Ewald energy
+            dict of ordered structures
+                {index : structure (Structure.as_dict())}
+                    index = 0 has lowest Ewald energy
         """
         structure = self.structure
         print("replacing species with %s\n" % str(species_mapping))
 
+        # purge oxidation states if you'd like
         if not use_ox_states_in_mapping:
             structure.remove_oxidation_states()
 
+        # ignore the original occupancies if you'd like (sometimes convenient)
         if not use_occ_in_mapping:
             els = self.els
             for el in els:
                 structure = self.change_occ_for_el(el, {el: 1.0}, structure=structure)
 
+        # figure out which elements have occupancy becoming 0
         disappearing_els = []
         for el_to_replace in species_mapping:
             if (len(species_mapping[el_to_replace]) == 1) and (
@@ -237,55 +298,30 @@ class StrucTools(object):
                 structure.remove_species(species=[el_to_replace])
                 disappearing_els.append(el_to_replace)
 
+        # remove these no longer existing elements
         if disappearing_els:
             for el in disappearing_els:
                 del species_mapping[el]
 
+        # replace species according to mapping
         if species_mapping:
             structure.replace_species(species_mapping)
 
         if structure.is_ordered:
+            # if the replacement leads to an ordered structure, return it (in a dict)
             return {0: structure.as_dict()}
         else:
+            # otherwise, need to order this partially occupied structure
             structools = StrucTools(structure, self.ox_states)
             return structools.get_ordered_structures(n_strucs=n_strucs)
-
-    def BROKEN_get_structures_with_dilute_vacancy(
-        self, el_to_replace, n_strucs=1, structure=None
-    ):
-        """
-        @TODO: revisit this
-
-
-        Args:
-            el_to_replace (str) - element to replace with vacancy
-            n_strucs (int) - number of ordered structures to return if disordered
-            structure (Structure) - structure to create vacancy in
-                - if None, use self.structure
-
-        Returns:
-            dict of ordered structures {index : structure (Structure.as_dict())}
-                - each structure will be missing 1 el_to_replace
-        """
-        if not structure:
-            s = self.structure
-        else:
-            s = structure
-        species_mapping = {
-            Element(el_to_replace): {Element(el_to_replace): 1 - 1 / len(s)}
-        }
-        if not structure:
-            return self.replace_species(species_mapping, n_strucs=n_strucs)
-        else:
-            return StrucTools(structure).replace_species(
-                species_mapping, n_strucs=n_strucs
-            )
 
     @property
     def spacegroup_info(self):
         """
         Returns:
             dict of spacegroup info with 'tight' or 'loose' symmetry tolerance
+                tight means symprec = 0.01
+                loose means symprec = 0.1
             e.g.,
                 data['tight']['number'] returns spacegroup number with tight tolerance
                 data['loose']['symbol'] returns spacegroup symbol with loose tolerance
@@ -316,17 +352,22 @@ class StrucTools(object):
         returns spacegroup number of symbol with loose or tight tolerance
 
         Args:
-            number_or_symbol (str, optional): _description_. Defaults to 'symbol'.
-            loose_or_tight (str, optional): _description_. Defaults to 'loose'.
+            number_or_symbol (str):
+                whether to return the number or the symbol
+
+            loose_or_tight (str):
+                whether to use the loose or tight tolerance
 
         Returns:
-            spacegroup number or symbol with loose or tight tolerance
+            spacegroup number (int) or symbol (str) with loose or tight tolerance
         """
         sg_info = self.spacegroup_info
         return sg_info[loose_or_tight][number_or_symbol]
 
     def scale_structure(self, scale_factor, structure=None):
-        """_summary_
+        """
+
+        Isotropically scale a structure
 
         Args:
             scale_factor (float): fractional scaling of the structure volume
@@ -346,6 +387,8 @@ class StrucTools(object):
             structure = structure.copy()
         orig_vol = structure.volume
         new_vol = orig_vol * scale_factor
+
+        # scaling occurs only on the lattice (i.e., the top of POSCAR)
         structure.scale_lattice(new_vol)
 
         return structure
@@ -353,15 +396,18 @@ class StrucTools(object):
 
 class SiteTools(object):
     """
-    make it a little easier to get site info from structures
+    Purpose: make it a little easier to get site info from structures
 
     """
 
     def __init__(self, structure, index):
         """
         Args:
-            structure (Structure) - pymatgen structure
-            index (int) - index of site in structure
+            structure (Structure)
+                pymatgen Structure
+
+            index (int)
+                index of site in structure
 
         Returns:
             pymatgen Site object
@@ -374,6 +420,10 @@ class SiteTools(object):
         """
         Returns:
             dict of site info (from Pymatgen)
+                {'species' : [{'element' : element, 'occu' : occupation, ...}, {...}}],
+                 'abc' : fractional coordinates ([a, b, c])
+                 'lattice' : Lattice object,
+                 'properties' : dict (e.g., {'magmom' : 3})}
         """
         return self.site.as_dict()
 
@@ -408,6 +458,7 @@ class SiteTools(object):
     @property
     def site_string(self):
         """
+        unique string to represent a complex site
 
         Returns:
             occupation_element_oxstate__occupation_element_oxstate__... for each ion occupying a site
@@ -445,8 +496,8 @@ class SiteTools(object):
     def ion(self):
         """
         Returns:
-            the ion occupying the site (str)
-            None if > 1 ion
+            the ion (element + oxidation state) occupying the site (str)
+                None if > 1 ion
         """
         site_string = self.site_string
         if "__" in site_string:
@@ -459,7 +510,9 @@ class SiteTools(object):
     def el(self):
         """
         Returns:
-            just the element occupying the site (even if it has an oxidation state)
+            just the element occupying the site (str)
+                even if it has an oxidation state)
+
             None if more than one element occupies a site
         """
         site_string = self.site_string
@@ -474,6 +527,7 @@ class SiteTools(object):
         """
         Returns:
             oxidation state (float) of site
+                averaged over all ions occupying the site
         """
         d = self.site_dict
         ox = 0
@@ -485,14 +539,8 @@ class SiteTools(object):
 
 
 def main():
-    path_to_cif = "/Users/cbartel/Downloads/BaNb0.98S3 ICSD_CollCode79447.cif"
-    st = StrucTools(path_to_cif, ox_states={"Ba": 2, "Nb": 5, "V": 5, "S": -2})
-    s = st.replace_species({"Nb": {"Nb": 1}}, use_occ_in_mapping=False)
-    print(StrucTools(s[0]).structure)
-    return st
-
-    return st
+    return
 
 
 if __name__ == "__main__":
-    st = main()
+    main()

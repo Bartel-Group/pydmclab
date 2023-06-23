@@ -1,11 +1,24 @@
 from pydmclab.core.comp import CompTools
 
-"""
-This file currently tests the following classes in CompTools
-    - CompTools
+""" 
+Purpose: 
+  CompTools is used to perform chemical formula manipulations
 
-TO-DO:
-    - convert into formal "tests"
+In pydmclab, formulas are expected to be "clean" (CompTools(formula).clean)
+  - this ensures that you can always find a chemical formula
+  - for instance, you wouldn't want CaTiO3 to sometimes appear as CaTiO3, Ca1Ti1O3, CaTi1O3, etc.
+    - CompTools(< any of these formula representations >).clean will always yield Ca1O3Ti1
+        - sorts els alphabetically
+        - reduces formula
+        - removes spaces
+        - removes parentheses
+        - includes stoichiometry (even if 1)
+  - Note: there are some currently strange exceptions (due to [pymatgen special formulas](https://github.com/materialsproject/pymatgen/blob/v2023.5.10/pymatgen/core/composition.py#L75))
+        - Li2O2, Na2O2, K2O2, H2O2, Cs2O2, Rb2O2
+        - these formulas won't reduce
+        
+Unit tests:
+  - see pydmclab/tests/test_comp.py
 """
 
 

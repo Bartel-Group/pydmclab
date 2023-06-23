@@ -1,5 +1,10 @@
 import unittest
-from pydmclab.core.energies import ChemPots, FormationEnthalpy, FormationEnergy
+from pydmclab.core.energies import (
+    ChemPots,
+    FormationEnthalpy,
+    FormationEnergy,
+    DefectFormationEnergy,
+)
 
 import numpy as np
 
@@ -161,8 +166,113 @@ class UnitTestFormationEnthalpy(unittest.TestCase):
 
     class UnitTestDefects(unittest.TestCase):
         def test_defects(self):
-            # TODO
-            pass
+            chempots = ChemPots(functional="r2scan", standard="dmc").chempots
+
+            chempots = {"Li": chempots["Li"]}
+            E_pristine = -1.744
+            E_defect = -1.461
+            formula_pristine = "LiCoO2"
+            formula_defect = "CoO2"
+            charge_defect = 0
+            Eg_pristine = 0.66
+            shared_el_for_basis = "O"
+            charge_correction = 0
+
+            E_defect1 = DefectFormationEnergy(
+                E_pristine,
+                formula_pristine,
+                Eg_pristine,
+                E_defect,
+                formula_defect,
+                charge_defect,
+                shared_el_for_basis,
+                chempots,
+                charge_correction,
+            ).Efs[0.0]
+
+            E_defect2 = DefectFormationEnergy(
+                E_pristine,
+                formula_pristine,
+                Eg_pristine,
+                E_defect,
+                formula_defect,
+                charge_defect,
+                shared_el_for_basis,
+                chempots,
+                charge_correction,
+            ).Efs[0.1]
+
+            self.assertEqual(E_defect1, E_defect2)
+
+            charge_defect = 2
+            E_defect3 = DefectFormationEnergy(
+                E_pristine,
+                formula_pristine,
+                Eg_pristine,
+                E_defect,
+                formula_defect,
+                charge_defect,
+                shared_el_for_basis,
+                chempots,
+                charge_correction,
+            ).Efs[0.1]
+
+            self.assertEqual(E_defect2, E_defect3 - 0.2)
+
+            charge_correction = 0.5
+            E_defect4 = DefectFormationEnergy(
+                E_pristine,
+                formula_pristine,
+                Eg_pristine,
+                E_defect,
+                formula_defect,
+                charge_defect,
+                shared_el_for_basis,
+                chempots,
+                charge_correction,
+            ).Efs[0.1]
+
+            self.assertEqual(E_defect3, E_defect4 - charge_correction)
+
+            formula_defect = "Li99Co100O200"
+            E_defect5 = DefectFormationEnergy(
+                E_pristine,
+                formula_pristine,
+                Eg_pristine,
+                E_defect,
+                formula_defect,
+                charge_defect,
+                shared_el_for_basis,
+                chempots,
+                charge_correction,
+            ).Efs[0.1]
+
+            self.assertEqual(E_defect4, E_defect5)
+
+            formula_pristine = "Al2O3"
+            formula_defect = "GaAlO3"
+            E_pristine = -1
+            E_defect = -1.1
+            Eg_pristine = 10
+            charge_defect = 0
+            shared_el_for_basis = "O"
+            chempots = {"Al": -3, "Ga": -2}
+            charge_correction = 0
+
+            E_defect6 = DefectFormationEnergy(
+                E_pristine,
+                formula_pristine,
+                Eg_pristine,
+                E_defect,
+                formula_defect,
+                charge_defect,
+                shared_el_for_basis,
+                chempots,
+                charge_correction,
+                gap_discretization=1,
+            ).Efs[5.0]
+
+            self.assertEqual(E_defect6, -2.6)
 
 
 if __name__ == "__main__":

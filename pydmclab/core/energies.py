@@ -409,6 +409,8 @@ class DefectFormationEnergy(object):
                  'q' : charge of defect-containing formula}
 
         """
+        pristine_formula = CompTools(formula_pristine).clean
+        defect_formula = CompTools(formula_defect).clean
         pristine = {"E": E_pristine, "formula": formula_pristine, "Eg": Eg_pristine}
         defect = {"E": E_defect, "formula": formula_defect, "q": charge_defect}
         self.shared_el_for_basis = shared_el_for_basis
