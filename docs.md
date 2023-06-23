@@ -697,15 +697,13 @@ launch_dirs = {<composition>/<unique ID for that composition>/<standard>/<unique
   
 # Maintenance
 
-- `core.comp` documented, tested, demoed (6/23/23)
-- `core.struc` documented, tested, demoed (6/23/23)
-- `core.mag` documented, tested, demoed (6/23/23)
-- `core.query` documented, tested, demoed (6/23/23)
-- `core.energies` tested (6/1/23)
-  - **@TODO** document, demo
+- `core.comp` documented, tested, demoed (6/23/23, CJB)
+- `core.struc` documented, tested, demoed (6/23/23, CJB)
+- `core.mag` documented, tested, demoed (6/23/23, CJB)
+- `core.query` documented, tested, demoed (6/23/23, CJB)
+- `core.energies` documented, tested, demoed (6/23/23, CJB)
 - `core.hulls` tested (6/1/23)
   - **@TODO** document, demo
-
 - `hpc.*`
   - **@TODO** document, test, demo
 - `plotting.*`
