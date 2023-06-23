@@ -343,11 +343,20 @@ class MPQuery(object):
     ):
         """
         Args:
-            material_id (str) - MP ID of entry
-            properties (list) - list of properties to query
-            incl_structure (bool) - whether to include structure in entry
-            conventional (bool) - whether to use conventional unit cell
-            compatible_only (bool) - whether to only include compatible entries (related to MP formation energies)
+            material_id (str)
+                MP ID of entry
+
+            properties (list)
+                list of properties to query
+
+            incl_structure (bool)
+                whether to include structure in entry
+
+            conventional (bool)
+                whether to use conventional unit cell
+
+            compatible_only (bool)
+                whether to only include compatible entries (related to MP formation energies)
 
         Returns:
             ComputedEntry object
@@ -360,7 +369,8 @@ class MPQuery(object):
     def get_structure_by_material_id(self, material_id):
         """
         Args:
-            material_id (str) - MP ID of entry
+            material_id (str)
+                MP ID of entry
 
         Returns:
             Structure object
@@ -371,7 +381,8 @@ class MPQuery(object):
     def get_incar(self, material_id):
         """
         Args:
-            material_id (str) - MP ID of entry
+            material_id (str)
+                MP ID of entry
 
         Returns:
             dict of incar settings
@@ -382,7 +393,8 @@ class MPQuery(object):
     def get_kpoints(self, material_id):
         """
         Args:
-            material_id (str) - MP ID of entry
+            material_id (str)
+                MP ID of entry
 
         Returns:
             dict of kpoint settings
@@ -393,7 +405,8 @@ class MPQuery(object):
     def get_vasp_inputs(self, material_id):
         """
         Args:
-            material_id (str) - MP ID of entry
+            material_id (str)
+                MP ID of entry
 
         Returns:
             dict of vasp inputs

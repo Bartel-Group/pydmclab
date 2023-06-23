@@ -700,8 +700,7 @@ launch_dirs = {<composition>/<unique ID for that composition>/<standard>/<unique
 - `core.comp` documented, tested, demoed (6/23/23)
 - `core.struc` documented, tested, demoed (6/23/23)
 - `core.mag` documented, tested, demoed (6/23/23)
-- `core.query` tested (6/1/23)
-  - **@TODO** document, demo
+- `core.query` documented, tested, demoed (6/23/23)
 - `core.energies` tested (6/1/23)
   - **@TODO** document, demo
 - `core.hulls` tested (6/1/23)
