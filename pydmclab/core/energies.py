@@ -32,22 +32,41 @@ class ChemPots(object):
     ):
         """
         Args:
-            temperature (int) - temperature in Kelvin
-            functional (str) - explicit functional for DFT claculations (don't include +U in name)
-            standard (str) - standard for DFT calculations
-            partial_pressures (dict) - {el (str) : partial pressure (atm)}
-                - adjusts chemical potential of gaseous species based on RTln(p/p0)
-            diatomics (list) - list of diatomic elements
-                - if el is in diatomics, will use 0.5 * partial pressure effecton mu
-            oxide_type (str) - type of oxide
-                - this only affects MP Formation energies
-                - they use different corrections for oxides, peroxides, and superoxides
-            user_chempots (dict) - {el (str) : chemical potential (eV/at)}
-                - specifies the chemical potential you want to use for el
-                - will override everything
-            user_dmus (dict) - {el (str) : delta_mu (eV/at)}
-                - specifies the change in chemical potential you want to use for el
-                - will override everything except user_chempots
+            temperature (int)
+                temperature in Kelvin
+                    if T > 0, will use experimental data from Barin's thermochemical data of pure substances
+
+            functional (str)
+                explicit functional for DFT claculations (don't include + in name)
+                    currently supports "pbe" (for GGA), "pbeu" (for GGA+U), "r2scan" (for meta-GGA)
+
+            standard (str)
+                standard for DFT calculations
+                    currently supports "dmc" (for DMC) and "mp" (for Materials Project)
+
+            partial_pressures (dict)
+                {el (str) : partial pressure (atm)}
+                    adjusts chemical potential of gaseous species based on RTln(p/p0)
+                        where p0 = 1 atm
+
+            diatomics (list)
+                list of diatomic elements
+                    if el is in diatomics, will use 0.5 * partial pressure effect on mu
+
+            oxide_type (str)
+                type of oxide
+                    this only affects MP formation energies
+                    they use different corrections for oxides, peroxides, and superoxides
+
+            user_chempots (dict)
+                {el (str) : chemical potential (eV/at)}
+                    specifies the chemical potential you want to use for el
+                    will override everything
+
+            user_dmus (dict)
+                {el (str) : delta_mu (eV/at)}
+                    specifies the change in chemical potential you want to use for el
+                    will be added on top of everything except user_chempots
         """
         self.temperature = temperature
         self.functional = functional
@@ -60,13 +79,25 @@ class ChemPots(object):
 
     @property
     def apply_mp_corrections(self):
+        """
+        Returns:
+            updates user_dmus to include MP corrections
+        """
         user_dmus = self.user_dmus.copy()
+
+        # load the data extracted in ~2022 (from 2020 compatibility scheme)
         mp_dmus = mp2020_compatibility_dmus()
+
+        # shift the anions MP wants to shift
         for el in mp_dmus["anions"]:
             user_dmus[el] = -mp_dmus["anions"][el]
+
+        # apply U corrections
         if self.functional == "pbeu":
             for el in mp_dmus["U"]:
                 user_dmus[el] = -mp_dmus["U"][el]
+
+        # apply different kinds of oxide corrections
         if self.oxide_type == "peroxide":
             user_dmus[el] = -mp_dmus["peroxide"]["O"]
         elif self.oxide_type == "superoxide":
@@ -78,24 +109,30 @@ class ChemPots(object):
     def chempots(self):
         """
         Returns:
-            dictionary of chemical potentials {el : chemical potential (eV/at)} based on user inputs
+            dictionary of chemical potentials
+                {el : chemical potential (eV/at)} based on user inputs
         """
         T = self.temperature
         standard, functional = self.standard, self.functional
         if T == 0:
+            # use DFT data at 0 K
             if (standard == "dmc") or (functional in ["scan", "r2scan"]):
+                # use DMC data
                 all_mus = mus_at_0K()
                 els = sorted(list(all_mus[functional].keys()))
                 mus = {el: all_mus[functional][el]["mu"] for el in els}
             else:
+                # use MP data
                 mus = mus_from_mp_no_corrections()
         else:
+            # use experimental data at T > 0 K
             allowed_Ts = list(range(300, 2100, 100))
             if T not in allowed_Ts:
                 raise ValueError("Temperature must be one of %s" % allowed_Ts)
             all_mus = mus_at_T()
             mus = all_mus[str(T)].copy()
 
+        # apply partial pressure correction for activity of gaseous elements
         partial_pressures = self.partial_pressures
         diatomics = self.diatomics
         R = 8.6173303e-5  # eV/K
@@ -103,21 +140,25 @@ class ChemPots(object):
         if partial_pressures:
             for el in partial_pressures:
                 if el in diatomics:
+                    # correct diatomics b/c they exist as O2 yet their mu is stored as O
                     factor = 1 / 2
                 else:
                     factor = 1
                 mus[el] += R * T * factor * np.log(partial_pressures[el])
 
         if (standard == "mp") and (T == 0):
+            # apply MP corrections if needed
             self.apply_mp_corrections
 
         user_dmus = self.user_dmus
         if user_dmus:
+            # apply any dmus if needed
             for el in user_dmus:
                 mus[el] += user_dmus[el]
 
         user_chempots = self.user_chempots
         if user_chempots:
+            # specify any mus directly
             for el in user_chempots:
                 mus[el] = user_chempots[el]
 
@@ -127,23 +168,26 @@ class ChemPots(object):
 class FormationEnthalpy(object):
     """
     For computing formation energies (~equivalently enthalpies) at 0 K
-
-    TO DO:
-        - write tests/demo
     """
 
     def __init__(
         self,
         formula,
-        E_DFT,  # eV/at
-        chempots,  # from ThermoTools.ChemPots.chempots
+        E_DFT,
+        chempots,
     ):
         """
         Args:
-            formula (str) - chemical formula
-            E_DFT (float) - DFT energy (eV/at)
-            chempots (dict) - {el (str) : chemical potential (eV/at)}
-                - probably generated using ChemPots.chempots
+            formula (str)
+                chemical formula
+
+            E_DFT (float)
+                DFT energy (eV/atom)
+                    per atom should mean per CompTools(formula).n_atoms
+
+            chempots (dict)
+                {el (str) : chemical potential (eV/at)}
+                    probably generated using ChemPots(...).chempots
 
         """
         self.formula = CompTools(formula).clean
@@ -155,16 +199,24 @@ class FormationEnthalpy(object):
         """
         Returns:
             weighted elemental energies (eV per formula unit)
+
+                for Al2O3, this would be 2 * mu_Al + 3 * mu_O
         """
         mus = self.chempots
         els_to_amts = CompTools(self.formula).amts
+        for el in els_to_amts:
+            if (el not in mus) or not mus[el]:
+                raise ValueError('No chemical potential for "%s"' % el)
         return np.sum([mus[el] * els_to_amts[el] for el in els_to_amts])
 
     @property
     def Ef(self):
         """
         Returns:
-            formation energy at 0 K (eV/at)
+            formation energy at 0 K (eV/atom)
+                the formation reaction for AxBy is xA + yB --> AxBy
+                this reaction energy is computed on a per formula unit (molar) basis
+                then divided by the number of atoms (x + y) to get eV/atom formation energies
         """
         formula = self.formula
         n_atoms = CompTools(formula).n_atoms
@@ -177,18 +229,15 @@ class FormationEnergy(object):
     """
     This class is for computing formation energies at T > 0 K
 
-    Automatically uses the Bartel2018 model: https://doi.org/10.1038/s41467-018-06682-4
+    By default, uses the Bartel2018 model for vibrational entropy: https://doi.org/10.1038/s41467-018-06682-4
 
-    TO DO:
-        - write tests/demo
-        - test ideal mixing entropy?
     """
 
     def __init__(
         self,
         formula,
-        Ef,  # eV/at
-        chempots,  # from ChemPots.chempots (probably)
+        Ef,
+        chempots,
         structure=False,
         atomic_volume=False,
         x_config=None,
@@ -198,24 +247,39 @@ class FormationEnergy(object):
     ):
         """
         Args:
-            formula (str) - chemical formula
-            Ef (float) - DFT formation enthalpy at 0 K (eV/at)
-                - or any formation enthalpy at T <= 298 K
-            chempots (dict) - {el (str) : chemical potential (eV/at)}
-                - probably generated using ChemPots.chempots
-            structure (Structure) - pymatgen structure object
-                - either structure or atomic_volume needed for vibrational entropy calculation
-            atomic_volume (float) - atomic volume (A^3/atom)
-                - either structure or atomic_volume needed for vibrational entropy calculation
-            override_Ef_0K (float) - formation energy at 0 K (eV/at)
-                - if False, compute Ef_0K using FormationEnergy.Ef_0K
-            x_config (float) - partial occupancy parameter to compute configurational entropy
-                - needed to compute configurational entropy
-            n_config (int) - number of systems exhibiting ideal solution behavior
-                - this would be one if I have one site that is partially occupied by two ions
-                - this would be two if I have two sites that are each partially occupied by two ions
-            include_Svib (bool) - whether to include vibrational entropy
-            include_Sconfig (bool) - whether to include configurational entropy
+            formula (str)
+                chemical formula
+
+            Ef (float)
+                DFT formation enthalpy at 0 K (eV/at)
+                    or any formation enthalpy at T <= 298 K
+
+            chempots (dict)
+                {el (str) : chemical potential (eV/at)}
+                    probably generated using ChemPots.chempots
+
+            structure (Structure)
+                pymatgen structure object (or Structure.as_dict() or path to structure file)
+                    either structure or atomic_volume needed for vibrational entropy calculation
+
+            atomic_volume (float)
+                atomic volume (A^3/atom)
+                    either structure or atomic_volume needed for vibrational entropy calculation
+
+            x_config (float)
+                partial occupancy parameter to compute configurational entropy
+                    needed to compute configurational entropy [x in xlnx + (1-x)ln(1-x))]
+
+            n_config (int)
+                number of inequivalent sites exhibiting ideal solution behavior
+                    this would be one if I have one site that is partially occupied by two ions
+                    this would be two if I have two sites that are each partially occupied by two ions
+
+            include_Svib (bool)
+                whether to include vibrational entropy (Bartel model)
+
+            include_Sconfig (bool)
+                whether to include configurational entropy (ideal mixing model)
         """
         self.formula = CompTools(formula).clean
         self.Ef = Ef
@@ -250,13 +314,16 @@ class FormationEnergy(object):
         """
         mus = self.chempots
         els_to_amts = CompTools(self.formula).amts
+        for el in els_to_amts:
+            if (el not in mus) or not mus[el]:
+                raise ValueError('No chemical potential for "%s"' % el)
         return np.sum([mus[el] * els_to_amts[el] for el in els_to_amts])
 
     @property
     def reduced_mass(self):
         """
         Returns weighted reduced mass of composition
-            - only needed for G(T) see Chris B Nature Comms 2019
+            needed if include_Svib = True (Chris B Nature Comms 2019)
         """
         names = CompTools(self.formula).els
         els_to_amts = CompTools(self.formula).amts
@@ -290,6 +357,15 @@ class FormationEnergy(object):
 
     @property
     def S_config(self):
+        """
+        configurational entropy from ideal mixing model (float, eV/atom/K)
+            no short range order
+            completely random occupation
+
+
+
+        -kB * n_config * (x_config * ln(x_config) + (1-x_config) * ln(1-x_config))
+        """
         x, n = self.x_config, self.n_config
         if x in [0, 1]:
             return 0
@@ -302,14 +378,17 @@ class FormationEnergy(object):
     def dGf(self, temperature):
         """
         Args:
-            temperature (int) - temperature (K)
+            temperature (int)
+                temperature (K)
+
         Returns:
             formation energy at temperature (eV/at)
-                - see Chris B Nature Comms 2019
+                see Chris B Nature Comms 2019
         """
         T = temperature
         Ef_0K = self.Ef
         if T == 0:
+            # use 0 K formation energy
             return Ef_0K
         if self.include_Svib:
             m = self.reduced_mass
@@ -331,6 +410,7 @@ class FormationEnergy(object):
 
         if self.include_Sconfig:
             if not self.include_Svib:
+                # start from 0 K formation energy
                 dGf = Ef_0K
             dGf += -T * self.S_config
 
@@ -409,14 +489,19 @@ class DefectFormationEnergy(object):
                  'q' : charge of defect-containing formula}
 
         """
-        pristine_formula = CompTools(formula_pristine).clean
-        defect_formula = CompTools(formula_defect).clean
+        # clean formulas
+        formula_pristine = CompTools(formula_pristine).clean
+        formula_defect = CompTools(formula_defect).clean
+
+        # make dicts for pristine and defect
         pristine = {"E": E_pristine, "formula": formula_pristine, "Eg": Eg_pristine}
         defect = {"E": E_defect, "formula": formula_defect, "q": charge_defect}
+
         self.shared_el_for_basis = shared_el_for_basis
         self.chempots = chempots
         self.charge_correction = charge_correction
 
+        # map pristine to defect basis
         pristine_multiplier = CompTools(formula_defect).stoich(
             shared_el_for_basis
         ) / CompTools(formula_pristine).stoich(shared_el_for_basis)
@@ -432,6 +517,7 @@ class DefectFormationEnergy(object):
         for i, el in enumerate(pristine_els):
             pristine_basis_formula += el + str(int(pristine_amounts[i]))
         pristine["basis_formula"] = pristine_basis_formula
+
         self.pristine = pristine
         self.defect = defect
         self.gap_discretization = gap_discretization
@@ -501,6 +587,8 @@ class DefectFormationEnergy(object):
                 - vacancy
                 - interstitial
                 - substitional
+
+            NOTE: what about antisite defects?
         """
         dn = self.els_exchanged
         removed_from_pristine = []
@@ -516,6 +604,8 @@ class DefectFormationEnergy(object):
             defect_type = "vacancy"
         elif len(added_to_pristine) > 0:
             defect_type = "interstitial"
+        else:
+            raise ValueError("defect_type not found")
 
         return defect_type
 
@@ -585,53 +675,9 @@ class DefectFormationEnergy(object):
         return dict(zip(E_Fermis, energies))
 
 
-def test_dGf():
-    mus = ChemPots(functional="r2scan", standard="dmc")
-
-    Ef = FormationEnthalpy(
-        formula="IrO2", E_DFT=-0.10729517e04 / 48, chempots=mus.chempots
-    ).Ef
-
-    temperature = 2000
-    mus = ChemPots(temperature=temperature)
-
-    # return mus, mus
-    dGf = FormationEnergy(
-        formula="IrO2", Ef=Ef, chempots=mus.chempots, atomic_volume=10.76
-    ).dGf(temperature)
-    print(Ef)
-    print(dGf)
-
-    return mus, fe
-
-
 def main():
-    chempots = ChemPots(functional="r2scan", standard="dmc").chempots
-
-    chempots = {"Li": chempots["Li"]}
-    E_pristine = -1.744
-    E_defect = -1.461
-    formula_pristine = "LiCoO2"
-    formula_defect = "Li99Co100O200"
-    charge_defect = 1
-    Eg_pristine = 0.66
-    shared_el_for_basis = "O"
-    charge_correction = 1
-    dfe = DefectFormationEnergy(
-        E_pristine,
-        formula_pristine,
-        Eg_pristine,
-        E_defect,
-        formula_defect,
-        charge_defect,
-        shared_el_for_basis,
-        chempots,
-        charge_correction,
-    )
-    print(dfe.Efs)
-
-    return dfe
+    return
 
 
 if __name__ == "__main__":
-    dfe = main()
+    out = main()

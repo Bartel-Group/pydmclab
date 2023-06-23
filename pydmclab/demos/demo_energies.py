@@ -150,6 +150,7 @@ def get_defect_formation_energy():
         - vacancies, interstitials, substitutions
         - antisites not implemented yet...
     """
+    print("\n now a defect")
     pristine_formula = "GaN"
     defect_formula = "AlGa3N4"
 
