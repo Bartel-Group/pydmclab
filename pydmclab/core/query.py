@@ -8,84 +8,13 @@ from pymatgen.ext.matproj import MPRester
 import itertools
 import numpy as np
 
-
-class NewMPQuery(object):
-    # Chris B key = ***REMOVED***
-
-    """
-    Trying to transition to new API but running into many issues
-    """
-
-    def __init__(self, api_key):
-        """
-        Args:
-            api_key (str) - Materials Project API key
-
-        Returns:
-            self.mpr (MPRester) - Materials Project REST interface
-        """
-
-        api_key = api_key if api_key else "YOUR_API_KEY"
-
-        self.api_key = api_key
-        self.mpr = new_MPRester(api_key)
-
-    @property
-    def available_fields(self):
-        return self.mpr.summary.available_fields
-
-    @property
-    def typical_fields(self):
-        return [
-            "formula_pretty",
-            "volume",
-            "nsites",
-            "material_id",
-            "energy_per_atom",
-            "uncorrected_energy_per_atom",
-            "formation_energy_per_atom",
-            "energy_above_hull",
-            "equilibrium_reaction_energy_per_atom",
-            "decomposes_to",
-            "band_gap",
-            "is_magnetic",
-            "symmetry",
-        ]
-
-    def get_data_for_comp(self, comp):
-        all_chemsyses = None
-        all_formulas = None
-        if isinstance(comp, str):
-            if "-" in comp:
-                chemsys = comp
-                all_chemsyses = []
-                elements = chemsys.split("-")
-                for i in range(len(elements)):
-                    for els in itertools.combinations(elements, i + 1):
-                        all_chemsyses.append("-".join(sorted(els)))
-            else:
-                all_formulas = [CompTools(comp).clean]
-        elif isinstance(comp, list):
-            if "-" in comp[0]:
-                all_chemsyses = []
-                for chemsys in comp:
-                    elements = chemsys.split("-")
-                    for i in range(len(elements)):
-                        for els in itertools.combinations(elements, i + 1):
-                            all_chemsyses.append("-".join(sorted(els)))
-                all_chemsyses = sorted(list(set(all_chemsyses)))
-            else:
-                all_formulas = [CompTools(c).pretty for c in comp]
-        if all_formulas:
-            from_mp = self.mpr.summary.search(
-                formula_pretty=all_formulas, fields=self.typical_fields
-            )
-        elif all_chemsyses:
-            from_mp = self.mpr.summary.search(
-                chemsys=all_chemsyses, fields=self.typical_fields
-            )
-
-        return from_mp
+""" 
+Purpose:
+    - query the Materials Project database for data
+    
+Typical use:
+    MPQuery.get_data_for_comp(...)
+"""
 
 
 class MPQuery(object):
@@ -98,10 +27,12 @@ class MPQuery(object):
     def __init__(self, api_key=None):
         """
         Args:
-            api_key (str) - Materials Project API key
+            api_key (str)
+                Materials Project API key
 
         Returns:
-            self.mpr (MPRester) - Materials Project REST interface
+            self.mpr (MPRester)
+                Materials Project REST interface
         """
 
         api_key = api_key if api_key else "YOUR_API_KEY"
@@ -261,35 +192,47 @@ class MPQuery(object):
         Returns:
             {mpid : {DATA}}
         """
+        # convert MP keys into shorter keys
         key_map = self.long_to_short_keys
         if properties == "all":
+            # use all supported properties
             properties = self.supported_properties
         if properties == None:
+            # use our typical properties
             properties = self.typical_properties
         else:
+            # make sure properties are supported
             for prop in properties:
                 if prop not in self.supported_properties:
                     raise ValueError("Property %s is not supported!" % prop)
 
         if criteria == None:
+            # make criteria an empty dictionary
             criteria = {}
 
         if isinstance(comp, str):
+            # just working with one compound or chemical system
             if "-" in comp:
+                # must be a chemical system
                 chemsys = comp
+                # need to get all chemical (sub)systems
                 all_chemsyses = []
                 elements = chemsys.split("-")
                 for i in range(len(elements)):
                     for els in itertools.combinations(elements, i + 1):
                         all_chemsyses.append("-".join(sorted(els)))
-
+                # add these chemical spaces to our criteria
                 criteria["chemsys"] = {"$in": all_chemsyses}
             else:
+                # just working with one formula
                 formula = comp
+                # query only for that formula
                 criteria["pretty_formula"] = {"$in": [CompTools(formula).pretty]}
 
         elif isinstance(comp, list):
+            # now we have a list of compounds or chemical systems (should be one or the other)
             if "-" in comp[0]:
+                # must be a list of chemical systems, let's get em all
                 all_chemsyses = []
                 for chemsys in comp:
                     elements = chemsys.split("-")
@@ -299,17 +242,26 @@ class MPQuery(object):
                 all_chemsyses = sorted(list(set(all_chemsyses)))
                 criteria["chemsys"] = {"$in": all_chemsyses}
             else:
+                # get the entire list of formulas
                 all_formulas = [CompTools(c).pretty for c in comp]
                 criteria["pretty_formula"] = {"$in": all_formulas}
 
+        # initalize the rester and query
         mpr = self.mpr
         list_from_mp = mpr.query(criteria, properties)
+        if not list_from_mp:
+            raise ValueError("No entries found for criteria %s" % criteria)
 
-        extra_keys = [k for k in list_from_mp[0] if k not in key_map]
+        # shorten the keys we can shorten
         cleaned_list_from_mp = [
             {key_map[old_key]: entry[old_key] for old_key in key_map}
             for entry in list_from_mp
         ]
+
+        # grab the keys that won't get mapped to short keys
+        extra_keys = [k for k in list_from_mp[0] if k not in key_map]
+
+        # assemble all the chunked queries into one query
         query = []
         for i in range(len(list_from_mp)):
             query.append(
@@ -321,6 +273,7 @@ class MPQuery(object):
             )
 
         if only_gs:
+            # grab only the lowest energy entry for each composition
             gs = {}
             for entry in query:
                 cmpd = CompTools(entry["pretty_formula"]).clean
@@ -333,23 +286,23 @@ class MPQuery(object):
                     if Ef_check < Ef_stored:
                         gs[cmpd] = entry
             query = [gs[k] for k in gs]
-            query = {entry["mpid"]: entry for entry in query}
 
-        else:
-            query = {entry["mpid"]: entry for entry in query}
+        # orient our query into a dictionary keyed by MP ID
+        query = {entry["mpid"]: entry for entry in query}
 
         if include_structure:
-            for entry in query:
-                mpid = query[entry]["mpid"]
+            for mpid in query:
+                # grab the structure for each MPID
                 structure = self.get_structure_by_material_id(mpid)
                 if supercell_structure:
                     if len(supercell_structure) == 3:
                         structure = StrucTools(structure).make_supercell(
                             supercell_structure
                         )
-                query[entry]["structure"] = structure.as_dict()
+                query[mpid]["structure"] = structure.as_dict()
 
         if max_sites_per_structure:
+            # remove entries that have too many sites
             query = {
                 e: query[e]
                 for e in query
@@ -357,19 +310,8 @@ class MPQuery(object):
             }
 
         if max_Ehull:
-            if only_gs:
-                query = {
-                    e: query[e] for e in query if query[e]["Ehull_mp"] <= max_Ehull
-                }
-            else:
-                cmpds = sorted(list(set([query[e]["cmpd"] for e in query])))
-                mpids = [
-                    e
-                    for e in query
-                    if query[e]["Ehull_mp"] <= max_Ehull
-                    if query[e]["cmpd"] in cmpds
-                ]
-                query = {e: query[e] for e in mpids}
+            # remove entries that are too far above the hull
+            query = {e: query[e] for e in query if query[e]["Ehull_mp"] <= max_Ehull}
 
         if max_strucs_per_cmpd:
             if not only_gs:
@@ -387,6 +329,7 @@ class MPQuery(object):
 
                 return trimmed_query
 
+        # close rester
         mpr.session.close()
         return query
 
@@ -477,13 +420,8 @@ class MPQuery(object):
 
 
 def main():
-    API_KEY = "***REMOVED***"
-
-    mpq = MPQuery(API_KEY)
-    q = mpq.get_data_for_comp(comp="Al-O", only_gs=True)
-
     return
 
 
 if __name__ == "__main__":
-    mpq = main()
+    out = main()

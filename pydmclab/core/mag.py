@@ -8,21 +8,11 @@ from pymatgen.transformations.site_transformations import (
 from pymatgen.analysis.structure_matcher import StructureMatcher
 
 
-"""
-Using enumlib:
-    - install enumlib from https://github.com/msg-byu/enumlib
-    - for MAC
-        - install xcode ($ xcode-select --install)
-        - install gfortran (https://github.com/fxcoudert/gfortran-for-macOS/releases)
-    - follow enumlib instructions
-    - mkdir */enumlib.bin
-    - move */enumlib/src/enum.x and */enumlib/aux_src/makeStr.py to */enumlib/bin
-    - add #! /usr/bin/env python to top of */enumlib/bin/makeStr.py
-    - add */enumlib/bin to PATH (PATH=$PATH:*/enumlib/bin)
-"""
-
-
 class MagTools(object):
+    """
+    For generating magnetic orderings for structures
+    """
+
     def __init__(
         self,
         structure,
@@ -34,23 +24,40 @@ class MagTools(object):
     ):
         """
         Args:
-            structure (Structure): pymatgen Structure object
-            max_afm_combos (int): maximum number of AFM spin configurations to generate
-            afm_spins (tuple): low and high spin for AFM initialization
-            fm_spins (tuple): zero and non-zero spin for FM initialization
-            randomize_afm (bool): randomize AFM spin configurations
-                - randomization occurs in two different steps
-                    - when AFM combinations are enumerated,
-                        if the number of combinations is greater than max_afm_combos,
-                        then we randomly select max_afm_combos combinations
-                    - when the unique AFM structures are generated,
-                        we randomly order them to avoid having the same "kinds" of AFM orderings always appearing first
-                    - random seeds are being used so both operations should be deterministic
-            treat_as_nm (list): list of elements to treat as non-magnetic
-                - e.g., if you want to only explore various initial configurations for other element(s)
+            structure (Structure):
+                pymatgen Structure object
+
+            max_afm_combos (int):
+                maximum number of AFM spin configurations to generate
+                    this is useful when there are a tremendous number of plausible AFM orderings (e.g., for structures w/ many magnetic elements)
+                    100 is usually reasonable
+
+            afm_spins (tuple):
+                low and high spin for AFM initialization
+                    -5 and 5 are usually safe initializations
+
+            fm_spins (tuple):
+                zero and non-zero spin for FM initialization
+                    0.6 and 5 are usually safe initializations
+
+            randomize_afm (bool):
+                randomize AFM spin configurations
+                    randomization occurs in two different steps
+                        1) when AFM combinations are enumerated,
+                            if the number of combinations is greater than max_afm_combos,
+                            then we randomly select max_afm_combos combinations
+                        2) when the unique AFM structures are generated,
+                            we randomly order them to avoid having the same "kinds" of AFM orderings always appearing first
+                    random seeds are being used so both operations should be deterministic
+
+            treat_as_nm (list):
+                list of elements to treat as non-magnetic
+                    e.g., if you want to only explore various initial configurations for other element(s)
         """
         if isinstance(structure, dict):
             structure = Structure.from_dict(structure)
+
+        # purge oxidation states (makes life easier later)
         structure.remove_oxidation_states()
         self.structure = structure
         self.max_afm_combos = max_afm_combos
@@ -66,6 +73,10 @@ class MagTools(object):
 
         from_MP = https://github.com/materialsproject/pymatgen/blob/master/pymatgen/analysis/magnetism/default_magmoms.yaml
         from_matminer = https://github.com/hackingmaterials/matminer/blob/main/matminer/featurizers/composition/element.py
+
+        Returns:
+            list of elements (str) that could be magnetic
+                note removes those you've said to "treat_as_nm"
         """
         from_matminer = [
             "Ti",
@@ -149,7 +160,7 @@ class MagTools(object):
     @property
     def could_be_afm(self):
         """
-        True if there are at least two magnetic sites in structure
+        True if there are at least two magnetic sites in structure and the number of magnetic sites is even
         """
         if not self.could_be_magnetic:
             return False
@@ -168,7 +179,7 @@ class MagTools(object):
     @property
     def get_nonmagnetic_structure(self):
         """
-        Returns nonmagnetic Structure with magmom of zeros
+        Returns nonmagnetic Structure with magmoms of zeros
         """
         s = self.structure
         magmom = [0 for i in range(len(s))]
@@ -188,7 +199,6 @@ class MagTools(object):
         if len(magnetic_ions_in_struc) == 0:
             return None
         s = self.structure
-        # magnetic_sites = [i for i in range(len(s)) if s[i].species_string in magnetic_ions_in_struc]
         magmom = [
             spins[0] if s[i].species_string not in magnetic_ions_in_struc else spins[1]
             for i in range(len(s))
@@ -204,7 +214,7 @@ class MagTools(object):
             - but it doesn't require enumlib interaction with pymatgen
             - it seems reasonably efficient, might break down for large/complex structures
             - note 1: it has no idea which configurations are "most likely" to be low energy
-            - note 2: it may require execution on MSI compute nodes
+            - note 2: it may require execution on compute nodes
 
         Basic workflow:
             - start from the NM structure
@@ -327,7 +337,6 @@ class MagTools(object):
 
 
 def main():
-
     return
 
 

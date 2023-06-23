@@ -699,14 +699,14 @@ launch_dirs = {<composition>/<unique ID for that composition>/<standard>/<unique
 
 - `core.comp` documented, tested, demoed (6/23/23)
 - `core.struc` documented, tested, demoed (6/23/23)
-- `core.mag` tested (6/1/23)
+- `core.mag` documented, tested, demoed (6/23/23)
+- `core.query` tested (6/1/23)
   - **@TODO** document, demo
 - `core.energies` tested (6/1/23)
   - **@TODO** document, demo
 - `core.hulls` tested (6/1/23)
   - **@TODO** document, demo
-- `core.query` tested (6/1/23)
-  - **@TODO** document, demo
+
 - `hpc.*`
   - **@TODO** document, test, demo
 - `plotting.*`
