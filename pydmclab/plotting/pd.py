@@ -667,14 +667,15 @@ def main():
         stability_source="MixingHull",
     )
 
+    # tpd = None
+
+    bpd_mh.ax_pd(
+        yticks=(True, [-0.1, 0.1]), ylim=(-0.1, 0.1), el_order=("Na", "Mg", "Cl")
+    )
+
+    # tpd = TernaryPD(hullout, ["S", "Cr", "Mg"])
+    # tpd.ax_pd()
     tpd = None
-
-    # bpd_mh.ax_pd(
-    #     yticks=(True, [-0.1, 0.1]), ylim=(-0.1, 0.1), el_order=("Na", "Mg", "Cl")
-    # )
-
-    tpd = TernaryPD(hullout, ["S", "Cr", "Mg"])
-    tpd.ax_pd()
     return query, hullout, mixing, bpd, tpd
 
 

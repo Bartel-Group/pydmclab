@@ -159,6 +159,11 @@ class UnitTestFormationEnthalpy(unittest.TestCase):
 
         self.assertAlmostEqual(dGf, dGf_hard, places=1)
 
+    class UnitTestDefects(unittest.TestCase):
+        def test_defects(self):
+            # TODO
+            pass
+
 
 if __name__ == "__main__":
     unittest.main()

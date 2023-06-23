@@ -337,6 +337,252 @@ class FormationEnergy(object):
         return dGf
 
 
+class DefectFormationEnergy(object):
+    def __init__(
+        self,
+        E_pristine,
+        formula_pristine,
+        Eg_pristine,
+        E_defect,
+        formula_defect,
+        charge_defect,
+        shared_el_for_basis,
+        chempots,
+        charge_correction,
+        gap_discretization=0.1,
+    ):
+        """
+        Args:
+            E_pristine (float)
+                DFT total energy (or formation energy) of pristine compound (eV/atom)
+
+            formula_pristine (str)
+                formula of pristine compound
+
+            Eg_pristine (float)
+                band gap of pristine compound (eV)
+
+            E_defect (float)
+                DFT total energy (or formation energy) of defect-containing compound (eV/atom)
+
+            formula_defect (str)
+                formula of defect-containing compound
+
+            charge_defect (int)
+                charge of defect-containing compound
+
+            shared_el_for_basis (str)
+                element shared between pristine and defect-containing compounds
+                    - for normalizing formula units
+                    - e.g., if pristine = Al2O3 and defect = Al4O5S1
+                        - shared_el_for_basis = "Al"
+                        - so that I know to use Al4O6 for pristine for calculations..
+
+            chempots (dict)
+                chemical potentials (eV/atom)
+                    {el (str) :
+                        chempot (float)
+                    for any el exchanged between defect and pristine}
+
+            charge_correction (float)
+                charge correction (eV/cell)
+                    this gets added before dividing by number of defects
+
+            gap_discretization (float)
+                how fine of a grid do you want to calculate the formation energy over
+                smaller numbers = more grid points
+
+        Returns:
+            shared_el_for_basis
+            chempots
+            charge_correction
+            gap_discretization
+            pristine (dict)
+                {'E' : total energy per atom in clean formula (eV/atom),
+                 'formula' : the clean formula,
+                 'Eg' : band gap (eV),
+                 'multiplier' : how many times the clean formula is multiplied to get the defect-containing formula.
+                 'basis_formula' : the formula of the basis (e.g., Al4O6 for Al2O3 if the defect if Al4O5S1)}
+            defect (dict)
+                {'E' : total energy per atom in defect-containing formula (eV/atom),
+                 'formula' : the clean defect-containing formula,
+                 'q' : charge of defect-containing formula}
+
+        """
+        pristine = {"E": E_pristine, "formula": formula_pristine, "Eg": Eg_pristine}
+        defect = {"E": E_defect, "formula": formula_defect, "q": charge_defect}
+        self.shared_el_for_basis = shared_el_for_basis
+        self.chempots = chempots
+        self.charge_correction = charge_correction
+
+        pristine_multiplier = CompTools(formula_defect).stoich(
+            shared_el_for_basis
+        ) / CompTools(formula_pristine).stoich(shared_el_for_basis)
+
+        pristine["multiplier"] = pristine_multiplier
+
+        pristine_els = CompTools(pristine["formula"]).els
+        pristine_amounts = [
+            CompTools(pristine["formula"]).stoich(el) * pristine_multiplier
+            for el in pristine_els
+        ]
+        pristine_basis_formula = ""
+        for i, el in enumerate(pristine_els):
+            pristine_basis_formula += el + str(int(pristine_amounts[i]))
+        pristine["basis_formula"] = pristine_basis_formula
+        self.pristine = pristine
+        self.defect = defect
+        self.gap_discretization = gap_discretization
+
+    @property
+    def dE(self):
+        """
+        Returns:
+            the energy difference between the pristine structure and the defective structure
+                E[X^q] - E[pristine]
+            the basis is the defect-containing formula unit
+
+            e.g.,
+                if pristine = Al2O3
+                    defect = Al4O5S1
+                   E[X^q] = E_Al4O5S1
+                   E[pristine] = 2*E_Al2O3 (to make Al4O6)
+                   dE = E_Al4O5S1*10 atoms - 2*E_Al2O3*5 atoms
+
+        """
+        pristine = self.pristine
+        defect = self.defect
+
+        return (
+            defect["E"] * CompTools(defect["formula"]).n_atoms
+            - pristine["E"]
+            * CompTools(pristine["formula"]).n_atoms
+            * pristine["multiplier"]
+        )
+
+    @property
+    def els_exchanged(self):
+        """
+        Returns:
+            dictionary of elements exchanged between pristine and defect-containing compounds
+            {el (str) :
+                dn (float)}
+                dn > 0 --> more of that el in defect than pristine
+                dn < 0 --> less of that el in defect than pristine
+        """
+        pristine = self.pristine
+        defect = self.defect
+        els = sorted(
+            list(
+                set(
+                    CompTools(pristine["formula"]).els
+                    + CompTools(defect["formula"]).els
+                )
+            )
+        )
+
+        dn = {}
+        for el in els:
+            n_pristine = (
+                CompTools(pristine["formula"]).stoich(el) * pristine["multiplier"]
+            )
+            n_defect = CompTools(defect["formula"]).stoich(el)
+            dn[el] = n_defect - n_pristine
+
+        return dn
+
+    @property
+    def defect_type(self):
+        """
+        Returns:
+            (str) what type of defect is it?
+                - vacancy
+                - interstitial
+                - substitional
+        """
+        dn = self.els_exchanged
+        removed_from_pristine = []
+        added_to_pristine = []
+        for el in dn:
+            if dn[el] < 0:
+                removed_from_pristine.append(el)
+            elif dn[el] > 0:
+                added_to_pristine.append(el)
+        if (len(removed_from_pristine) > 0) and (len(added_to_pristine) > 0):
+            defect_type = "substitional"
+        elif len(removed_from_pristine) > 0:
+            defect_type = "vacancy"
+        elif len(added_to_pristine) > 0:
+            defect_type = "interstitial"
+
+        return defect_type
+
+    @property
+    def n_defects(self):
+        """
+        Returns:
+            how many defects (int) (referenced to the defect-containing basis formula)
+        """
+        dn = self.els_exchanged
+        el = [el for el in dn if dn[el] != 0][0]
+        return abs(dn[el])
+
+    @property
+    def sum_mus(self):
+        """
+        Returns:
+            sum(dn_i * mu_i) for all elements that are exchanged
+
+            e.g., if pristine = Al2O3 and defect = Al4O5S1
+                - so basis = Al4O6
+                - dn_Al = 4 - 4 = 0
+                - dn_O = 5 - 6 = -1
+                - dn_S = 1 - 0 = 1
+                - so sum_mus = -1 * mu_O + 1 * mu_S
+
+        """
+        chempots = self.chempots
+        dn = self.els_exchanged
+        sum_mus = 0.0
+        for el in dn:
+            if dn[el] == 0:
+                continue
+            sum_mus += dn[el] * chempots[el]
+
+        return sum_mus
+
+    @property
+    def Efs(self):
+        """
+
+        Returns:
+            {E_Fermi (float, eV relative to VBM) : defect formation energy (float, eV/defect)}
+
+            Ef = Ef[X^q] - Ef[pristine] + sum(dn_i*mu_i) + q * E_Fermi + charge_correction
+
+            note:
+                - the charge correction gets divided by the number of defects
+        """
+        pristine = self.pristine
+        Eg = pristine["Eg"]
+        multiplier = pristine["multiplier"]
+        gap_discretization = self.gap_discretization
+        if Eg > 0:
+            E_Fermis = np.arange(0, Eg + gap_discretization, gap_discretization)
+        else:
+            E_Fermis = np.array([0.0])
+        dE = self.dE
+        sum_mus = self.sum_mus
+        q = self.defect["q"]
+        charge_correction = self.charge_correction
+        n_defects = self.n_defects
+        energies = [
+            ((dE - sum_mus) / multiplier + q * E_Fermi + charge_correction) / n_defects
+            for E_Fermi in E_Fermis
+        ]
+        return dict(zip(E_Fermis, energies))
+
+
 def test_dGf():
     mus = ChemPots(functional="r2scan", standard="dmc")
 
@@ -358,9 +604,32 @@ def test_dGf():
 
 
 def main():
-    chempots = ChemPots(temperature=300).chempots
-    print(chempots["O"])
+    chempots = ChemPots(functional="r2scan", standard="dmc").chempots
+
+    chempots = {"Li": chempots["Li"]}
+    E_pristine = -1.744
+    E_defect = -1.461
+    formula_pristine = "LiCoO2"
+    formula_defect = "Li99Co100O200"
+    charge_defect = 1
+    Eg_pristine = 0.66
+    shared_el_for_basis = "O"
+    charge_correction = 1
+    dfe = DefectFormationEnergy(
+        E_pristine,
+        formula_pristine,
+        Eg_pristine,
+        E_defect,
+        formula_defect,
+        charge_defect,
+        shared_el_for_basis,
+        chempots,
+        charge_correction,
+    )
+    print(dfe.Efs)
+
+    return dfe
 
 
 if __name__ == "__main__":
-    main()
+    dfe = main()
