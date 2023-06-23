@@ -1114,6 +1114,7 @@ def get_thermo_results(
             [
                 results[key]["meta"]["setup"]["formula_tag"],
                 results[key]["meta"]["setup"]["ID"],
+                results[key]["meta"]["setup"]["mag"],
             ]
         )
         E = results[key]["results"]["E_per_at"]
@@ -1268,6 +1269,7 @@ def get_dos_results(
             [
                 results[key]["meta"]["setup"]["formula_tag"],
                 results[key]["meta"]["setup"]["ID"],
+                results[key]["meta"]["setup"]["mag"],
             ]
         )
         formula = results[key]["results"]["formula"]
