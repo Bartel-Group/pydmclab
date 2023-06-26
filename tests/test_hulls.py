@@ -82,16 +82,12 @@ class UnitTestHulls(unittest.TestCase):
             "Al3GaO6": {"E": -11},
         }
 
-        varying_element = "Ga"
         end_members = ["Al2O3", "Ga2O3"]
-        shared_element_basis = "O"
         energy_key = "E"
 
         mh = MixingHull(
             input_energies,
-            varying_element,
             end_members,
-            shared_element_basis,
             energy_key,
         )
 

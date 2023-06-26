@@ -722,6 +722,7 @@ class ReactionEnergy(object):
         }
         self.reactants = [Composition(c) for c in reactants]
         self.products = [Composition(c) for c in products]
+        self.norm = norm
 
     @property
     def rxn(self):

@@ -969,7 +969,9 @@ class MixingHull(object):
         reactants = self.end_members
         input_energies = self.input_energies
         reactions = {
-            t: ReactionEnergy(input_energies, reactants, [t], energy_key="E")
+            t: ReactionEnergy(
+                input_energies, reactants, [t], energy_key="E", norm="rxn"
+            )
             for t in targets
         }
         return reactions
