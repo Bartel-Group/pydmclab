@@ -1,10 +1,8 @@
 from pydmclab.core.comp import CompTools
 from pydmclab.core.query import MPQuery
-from pydmclab.core.hulls import GetHullInputData, AnalyzeHull, ParallelHulls
+from pydmclab.core.hulls import GetHullInputData, AnalyzeHull, ParallelHulls, MixingHull
 from pydmclab.utils.handy import read_json, write_json
 from pydmclab.plotting.utils import set_rc_params, get_colors
-from pydmclab.data.thermochem import mus_at_0K, mus_at_T
-
 import matplotlib.pyplot as plt
 
 import os
@@ -12,20 +10,34 @@ import numpy as np
 
 set_rc_params()
 
-"""
-This file currently tests the following classes in ThermoTools
-    - GetHullInputData
-    - AnalyzeHull
-    - ParallelHulls
+""" 
+Purpose: 
+    The convex hull analysis is central to understanding the stability of materials
+        Convex hulls are made from formation energy vs composition analyses for a given chemical space
+          Standard hulls using formation energies, which are referenced to elemental phases
+            These formation energies can be DFT dEf(0 K), dGf(T, p), dphi_f(T, p, mu) etc
+          Hulls can also be made from an arbitrary reference (e.g., energies relative to chosen end-member compounds)
+            In pydmclab, these are called "Mixing Hulls"
+    
+    Typical hulls (elemental end-members, n-dimensional for n elements in a chemical space)
+        Serial mode:
+          - GetHullInputData prepares the input
+          - AnalyzeHull processes it
+        Parallel mode:
+          - ParallelHulls does it all
+    
+    Mixing hulls (compound end-members, 2D supported, n-d coming later)
+        MixingHulls
+  
+Unit tests:
+  - see pydmclab/tests/test_hulls.py
 
-TO-DO:
-    - convert into formal "tests"
 """
 # Chris B's API key for MP query
 API_KEY = "***REMOVED***"
 
 # chemical system to test on
-CHEMSYS = "Ca-Mg-Ti-F"
+CHEMSYS = "Li-Nb-O-F"
 
 # where to save data
 DATA_DIR = os.path.join("output", "hulls", "data")
@@ -40,28 +52,31 @@ if not os.path.exists(FIG_DIR):
 
 def get_mp_data_for_chemsys(
     comp=CHEMSYS,
-    properties=None,
-    criteria={},
     only_gs=True,
-    include_structure=True,
-    supercell_structure=False,
-    max_Ehull=0.1,
-    max_sites_per_structure=100,
-    max_strucs_per_cmpd=5,
     data_dir=DATA_DIR,
     remake=False,
 ):
     """
+    Query MP to get some data for a chemical system to paly around with
+
     Args:
-        chemsys (str): chemical system to query ('-'.join([elements]))
-        only_gs (bool): if True, remove non-ground state polymorphs from MP query
-            - good practice to do this before doing hull analysis b/c non-gs polymorphs trivially have Ehull=Ehull_gs + dE_polymorph-gs
-        dict_key (str): key to use to orient dictionary of MPQuery results
-            - 'cmpd' is the default behavior in MPQuery, meaning we get a dictionary that looks like {CHEMICAL_FORMULA : {DATA}}
-        remake (bool): if True, re-query MP
+        chemsys (str)
+            chemical system to query ('-'.join([elements]))
+
+        only_gs (bool):
+            if True, remove non-ground state polymorphs from MP query
+                good practice to do this before doing hull analysis b/c non-gs polymorphs trivially have Ehull=Ehull_gs + dE_polymorph-gs
+
+        data_dir (str):
+            directory to save data
+
+        remake (bool):
+            if True, re-query MP
 
     Returns:
-        gs (dict): dictionary of ground state data from MPQuery for chemsys
+        gs (dict)
+            dictionary of ground state data from MPQuery for chemsys
+                {formula (str) : {'Ef_mp' : formation energy (eV/atom)}
     """
     fjson = os.path.join(data_dir, "query_" + comp + ".json")
     if not remake and os.path.exists(fjson):
@@ -70,6 +85,7 @@ def get_mp_data_for_chemsys(
     mpq = MPQuery(API_KEY)
     d = mpq.get_data_for_comp(comp=comp, only_gs=only_gs)
 
+    # data is MPID-keyed, let's make it formula-keyed
     out = {}
     formulas = list(set([d[k]["cmpd"] for k in d]))
     for formula in formulas:
@@ -83,23 +99,42 @@ def serial_get_hull_input_data(
     gs, formation_energy_key="Ef_mp", remake=False, data_dir=DATA_DIR, chemsys=CHEMSYS
 ):
     """
+    Let's prepare the hull input file for a "typical" (element-bounded) nD hull
+
     Args:
-        gs (dict): dictionary of ground state data from MPQuery for chemsys
-            - generated with get_mp_data_for_chemsys()
-        formation_energy_key (str): key to use for formation energy in gs
-            - 'Ef_mp' is default behavior in MPQuery
-        remake (bool): if True, re-calculate hull input data
-        data_dir (str): directory to save data
-        chemsys (str): chemical system to query ('-'.join([elements]))
+        gs (dict)
+            dictionary of ground state data from MPQuery for chemsys
+                {formula (str) : {'Ef_mp' : formation energy (eV/atom)}
+
+        formation_energy_key (str):
+            key to use for formation energy in gs
+                'Ef_mp' is default behavior in MPQuery
+
+        remake (bool)
+            if True, re-calculate hull input data
+
+        data_dir (str)
+            directory to save data
+
+        chemsys (str)
+            chemical system to query ('-'.join([elements]))
+                just used to generate the savename for the .json
 
     Returns:
-        hullin (dict): dictionary of hull input data for gs
-            dict of {chemical space (str) : {formula (str) : {'E' : formation energy (float),
-                                                              'amts' : {el (str) : fractional amt of el in formula (float) for el in space}}
-                                            for all relevant formulas including elements}
-                - elements are automatically given formation energy = 0
-                - chemical space is now in 'el1_el2_...' format to be jsonable
-                - each "chemical space" is a convex hull that must be computed
+        hullin (dict):
+            dictionary of hull input data for gs
+                {chemical space (str) :
+                    {formula (str) :
+                        {'E' : formation energy (float),
+                         'amts' :
+                            {el (str) :
+                                fractional amt of el in formula (float) for el in space
+                                }
+                            }
+                                for all relevant formulas including elements}
+                    - elements are automatically given formation energy = 0
+                    - chemical space is now in 'el1_el2_...' format to be jsonable
+                    - each "chemical space" is a convex hull that must be computed
     """
     fjson = os.path.join(data_dir, "hullin_serial_" + chemsys + ".json")
     if not remake and os.path.exists(fjson):
@@ -113,28 +148,45 @@ def serial_get_hull_output_data(
     hullin, remake=False, chemsys=CHEMSYS, data_dir=DATA_DIR
 ):
     """
+    Now, let's solve the hull we initialized
+
     Args:
-        hullin (dict): dictionary of hull input data for gs
-        remake (bool): if True, re-calculate hull output data
-        chemsys (str): chemical system to query ('-'.join([elements]))
-        data_dir (str): directory to save data
+        hullin (dict)
+            dictionary of hull input data for chemical system
+
+        remake (bool)
+            if True, re-calculate hull output data
+
+        chemsys (str)
+            chemical system to query ('-'.join([elements]))
+                only used for savename
+
+        data_dir (str)
+            directory to save data
 
     Returns:
         stability data (dict) for all compounds in the specified chemical space
-            {compound (str) : {'Ef' : formation energy (float),
-                                'Ed' : decomposition energy (float),
-                                'rxn' : decomposition reaction (str),
-                                'stability' : stable (True) or unstable (False)}}
+            {compound (str) :
+                {'Ef' : formation energy (float),
+                 'Ed' : decomposition energy (float),
+                 'rxn' : decomposition reaction (str),
+                 'stability' : stable (True) or unstable (False)
+                 }
+                 for all compounds in the chemical space
+            }
     """
     fjson = os.path.join(data_dir, "hullout_serial_" + chemsys + ".json")
     if not remake and os.path.exists(fjson):
         return read_json(fjson)
 
     hullout = {}
+    # loop through each chemical (sub)space in the hullin dictionary
     for space in hullin:
         ah = AnalyzeHull(hullin, space)
+        # loop through every compound in that space
         for cmpd in hullin[space]:
             print("\n%s" % cmpd)
+            # get the stability data for that compound
             hullout[cmpd] = ah.cmpd_hull_output_data(cmpd)
     return write_json(hullout, fjson)
 
@@ -143,31 +195,57 @@ def parallel_get_hull_input_and_output_data(
     gs, remake=False, chemsys=CHEMSYS, data_dir=DATA_DIR, n_procs=2, fresh_restart=True
 ):
     """
+    Repeat what we did with GetHullInputData + AnalyzeHull, but now in parallel
+
     Args:
-        gs (dict): dictionary of ground state data from MPQuery for chemsys
-        remake (bool): if True, re-calculate hull input and output data
-        chemsys (str): chemical system to query ('-'.join([elements]))
-        data_dir (str): directory to save data
-        n_procs (int): number of processors to use (could also be 'all' to use multip.cpu_count()-1 procs)
-        fresh_restart (bool): if True, restart ParallelHull process from scratch
+        gs (dict)
+            dictionary of ground state data from MPQuery for chemsys
+                {formula (str) : {'Ef_mp' : formation energy (eV/atom)}}
+                }
+        remake (bool)
+            if True, re-calculate hull input and output data
+
+        chemsys (str)
+            chemical system to query ('-'.join([elements]))
+                only for savename
+
+        data_dir (str)
+            directory to save data
+
+        n_procs (int)
+            number of processors to use
+                could also be 'all' to use multip.cpu_count()-1 procs
+
+        fresh_restart (bool)
+            if True, restart ParallelHull process from scratch
+            if False, use the files we've already written from a previous execution
 
     Returns:
         stability data (dict) for all compounds in the specified chemical space
-            {compound (str) : {'Ef' : formation energy (float),
-                                'Ed' : decomposition energy (float),
-                                'rxn' : decomposition reaction (str),
-                                'stability' : stable (True) or unstable (False)}}
-            written to fjson
-            also writes small_spaces and hullin data resulting from ParallelHull to json
+            {compound (str) :
+                {'Ef' : formation energy (float),
+                 'Ed' : decomposition energy (float),
+                 'rxn' : decomposition reaction (str),
+                 'stability' : stable (True) or unstable (False)
+                 }
+                 for all compounds in the chemical space
+            }
     """
     fjson = os.path.join(data_dir, "hullout_parallel_" + chemsys + ".json")
     if not remake and os.path.exists(fjson):
         return read_json(fjson)
+
     ph = ParallelHulls(gs, n_procs=n_procs, fresh_restart=fresh_restart)
+
+    # prepare hull input data
     hullin = ph.parallel_hullin(fjson=fjson.replace("hullout", "hullin"))
+
+    # identify the simplest hull that can be solved for each compound
     smallest_spaces = ph.smallest_spaces(
         hullin=hullin, fjson=fjson.replace("hullout", "small_spaces")
     )
+
+    # solve these minimally complex hulls for every compound
     return ph.parallel_hullout(
         hullin=hullin, smallest_spaces=smallest_spaces, fjson=fjson, remake=True
     )
@@ -175,16 +253,23 @@ def parallel_get_hull_input_and_output_data(
 
 def plot_to_check_success(gs, serial_hullout, parallel_hullout):
     """
+    Let's make sure things worked
+        1) Parallel and serial should give the same results
+        2) For unstable compounds (above the hull), our Ed results and MP E above hull should be the same
+        3) For stable compounds, our Ed results will be negative; MP's should be E above hull = 0
+
     Args:
-        gs (dict): dictionary of ground state data from MPQuery for chemsys
-        serial_hullout (dict): dictionary of hull output data for gs (run serially)
-        parallel_hullout (dict): dictionary of hull output data for gs (run in parallel)
+        gs (dict)
+            dictionary of ground state data from MPQuery for chemsys
+
+        serial_hullout (dict)
+            dictionary of hull output data for gs (run serially)
+
+        parallel_hullout (dict)
+            dictionary of hull output data for gs (run in parallel)
 
     Returns:
-        compares serial and parallel hull output data (should be identica)
-        compares serial and MP hull output data
-            - should be identical (or very close) for unstable compounds
-            - for stable compounds, MP will have Ehull = 0, whereas our code will compure Ed < 0
+        a couple scatter plots
 
     """
     set_rc_params()
@@ -260,17 +345,59 @@ def plot_to_check_success(gs, serial_hullout, parallel_hullout):
     fig.savefig(os.path.join(FIG_DIR, "pd_demo_check.png"))
 
 
+def demo_mixing_hull(gs, end_members, remake=False):
+    """
+    Now, we'll do a "mixing hull"
+        A convex hull with compounds as end members
+
+    e.g., a 2D hull bounded by LiNbO3-Li2NbO3
+
+    Args:
+        gs (dict)
+            dictionary of ground state data from MPQuery for chemsys
+
+        end_members (list)
+            list of end members to use for mixing hull
+
+        remake (bool)
+
+    """
+    fjson = os.path.join(
+        DATA_DIR, "pd_demo_mixing_hull_%s-%s.json" % (end_members[0], end_members[1])
+    )
+    if not remake and os.path.exists(fjson):
+        return read_json(fjson)
+
+    mh = MixingHull(
+        input_energies=gs,
+        varying_element="Li",
+        end_members=end_members,
+        shared_element_basis="O",
+        energy_key="Ef_mp",
+    )
+    out = mh.results
+    for k in out:
+        if out[k]["stability"]:
+            print(k)
+            print(out[k]["x"])
+            print(out[k]["E_mix"])
+
+    return out
+
+
 def main():
     # if True, re-grab data from MP
-    remake_query = True
+    remake_query = False
     # if True, re-calculate hull input data
-    remake_serial_hullin = True
+    remake_serial_hullin = False
     # if True, re-calculate hull output data
-    remake_serial_hullout = True
+    remake_serial_hullout = False
     # if True, re-calculate hull output data in parallel
-    remake_parallel_hullout = True
+    remake_parallel_hullout = False
     # if True, generate figure to check results
-    remake_hull_figure_check = True
+    remake_hull_figure_check = False
+    # if True, remake mixing hull
+    remake_mixing_hull = False
 
     # MP query for CHEMSYS
     gs = get_mp_data_for_chemsys(CHEMSYS, remake=remake_query)
@@ -288,11 +415,11 @@ def main():
 
     # generate a graph that compares serial vs parallel hull output and also compares ThermoTools hull output to MP hull data
     if remake_hull_figure_check:
-        # %%
         plot_to_check_success(gs, hullout, p_hullout)
-        # %%
 
-    return gs, hullin, hullout, p_hullout
+    # generate a mixing hull
+    mixing = demo_mixing_hull(gs, ["Li2O", "NbO2"], remake=remake_mixing_hull)
+    return gs, hullin, hullout, p_hullout, mixing
 
 
 if __name__ == "__main__":
