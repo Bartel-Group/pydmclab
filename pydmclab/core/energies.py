@@ -13,6 +13,9 @@ from pydmclab.data.features import atomic_masses
 from pydmclab.core.comp import CompTools
 from pydmclab.core.struc import StrucTools
 
+from pymatgen.analysis.reaction_calculator import Reaction
+from pymatgen.core.composition import Composition
+
 
 class ChemPots(object):
     """
@@ -673,6 +676,128 @@ class DefectFormationEnergy(object):
             for E_Fermi in E_Fermis
         ]
         return dict(zip(E_Fermis, energies))
+
+
+class ReactionEnergy(object):
+
+    """
+    *** This is a work in progress ***
+
+    @TODO:
+        - write tests/demo
+        - incorporate filler
+        - incorporate normalization
+        - incorporate open systems
+
+    """
+
+    def __init__(
+        self, input_energies, reactants, products, energy_key="Ef", norm="rxn"
+    ):
+        """
+
+        Args:
+            input_energies (dict)
+                {formula (str): {< energy key> : formation energy (eV/at)}
+                    formation energies should account for chemical potentials (e.g., due to partial pressures)
+
+            reactants (list):
+                list of reactant compositions (str)
+
+            products (list):
+                list of product compositions (str)
+
+            energy_key (str):
+                how to find the formation energies in formation_energies
+
+            norm (str):
+                how to normalize the reaction energy
+                    'rxn' : the molar reaction energy for the reaction in ReactionEnergy.rxn_string
+                    'atom' : the molar reaction energy per atom in the products side of the reaction in ReactionEnergy.rxn_string
+        """
+
+        self.input_energies = {
+            CompTools(c).clean: {"E": input_energies[c][energy_key]}
+            for c in input_energies
+        }
+        self.reactants = [Composition(c) for c in reactants]
+        self.products = [Composition(c) for c in products]
+
+    @property
+    def rxn(self):
+        """
+        Returns:
+            Pymatgen Reaction object
+        """
+        rxn = Reaction(self.reactants, self.products)
+        return rxn
+
+    @property
+    def rxn_string(self):
+        """
+        Returns:
+            string representation of the reaction
+        """
+        return self.rxn.__str__()
+
+    @property
+    def coefs(self):
+        """
+        Returns:
+            {formula (str) : stoichiometry (float) in reaction}
+        """
+        rxn = self.rxn
+        coefs = rxn._coeffs
+        all_comp = rxn._all_comp
+        all_comp = [CompTools(c.formula).clean for c in all_comp]
+        unique_comp = list(set(all_comp))
+        out = {c: 0 for c in unique_comp}
+        for i, coef in enumerate(coefs):
+            comp = all_comp[i]
+            out[comp] += np.round(coef, 8)
+        return out
+
+    @property
+    def species(self):
+        """
+
+        Returns:
+            {formula (str) : {'coef' : stoichiometry (float) in reaction},
+                              'E' : energy (float, eV/atom) of that formula}}
+        """
+        species = {}
+        coefs = self.coefs
+        energies = self.input_energies
+        for c in coefs:
+            if c != 0:
+                species[c] = {
+                    "coef": coefs[c],
+                    "E": energies[c]["E"] if CompTools(c).n_els > 1 else 0,
+                }
+
+        return species
+
+    @property
+    def dE_rxn(self):
+        """
+        Returns:
+            reaction energy (float)
+                eV/atom if self.norm == 'atom'
+                eV/rxn if self.norm == 'rxn'
+
+        """
+        species = self.species
+        norm = self.norm
+        dE_rxn = 0
+        norm = 1
+        for formula in species:
+            coef = species[formula]["coef"]
+            if (norm == "atom") and (coef > 0):
+                norm += coef * CompTools(formula).n_atoms
+            Ef = species[formula]["E"]
+            dE_rxn += coef * Ef * CompTools(formula).n_atoms
+
+        return dE_rxn / norm
 
 
 def main():
