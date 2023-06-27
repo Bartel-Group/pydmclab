@@ -117,3 +117,10 @@ msigpu:
   mem_per_core: 1GB
   max_nodes: 1
   proc: gpu
+preempt:
+  cores_per_node: 128
+  sharing: True
+  max_wall: 24:00:00
+  mem_per_core: 4GB
+  max_nodes: 1
+  proc: cpu
