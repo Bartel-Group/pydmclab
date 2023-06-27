@@ -169,7 +169,14 @@ def get_slurm_configs(
             "RM",
         ]:
             mem_per_cpu = 1900
-        elif partition in ["agsmall", "msidmc", "aglarge", "agsmall,msidmd", "RM-512"]:
+        elif partition in [
+            "agsmall",
+            "msidmc",
+            "aglarge",
+            "agsmall,msidmc",
+            "RM-512",
+            "preempt",
+        ]:
             mem_per_cpu = 4000
         else:
             mem_per_cpu = 1900
