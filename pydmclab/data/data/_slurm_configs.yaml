@@ -6,7 +6,7 @@ output: log.o # where to write slurm output to in launch_dir
 account: cbartel # account to charge
 partition: msismall # partition to use
 job-name: # unique job name; if none provided, will default to formula.id.standard.mag.xc
-mem_per_cpu: # specify mem per core
-mem_per_gpu: # specify mem per gpu core
+mem-per-cpu: # specify mem per core
+mem-per-gpu: # specify mem per gpu core
 constraint: # may not need this ever on MSI
 qos: # may not need this ever on MSI

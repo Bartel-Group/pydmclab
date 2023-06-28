@@ -161,6 +161,7 @@ def main():
         magmoms=magmoms,
         user_configs=launch_configs,
         data_dir=DATA_DIR,
+        calcs_dir=CALCS_DIR,
         remake=remake_launch_dirs,
     )
     if print_launch_dirs_check:
@@ -173,7 +174,6 @@ def main():
     if remake_subs:
         submit_calcs(
             launch_dirs=launch_dirs,
-            calcs_dir=CALCS_DIR,
             user_configs=user_sub_configs,
             ready_to_launch=ready_to_launch,
             n_procs=sub_configs["n_procs"],

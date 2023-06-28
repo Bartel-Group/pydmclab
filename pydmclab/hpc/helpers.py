@@ -183,7 +183,7 @@ def get_slurm_configs(
     else:
         mem_per_cpu = mem_per_core
 
-    slurm_configs["mem_per_cpu"] = str(int(mem_per_cpu)) + "M"
+    slurm_configs["mem-per-cpu"] = str(int(mem_per_cpu)) + "M"
     return slurm_configs
 
 
