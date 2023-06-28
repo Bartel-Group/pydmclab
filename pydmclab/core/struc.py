@@ -8,6 +8,7 @@ from pymatgen.transformations.standard_transformations import (
 )
 from pymatgen.analysis.structure_matcher import StructureMatcher
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
+from pymatgen.core.surface import SlabGenerator
 
 import os
 import numpy as np
@@ -392,6 +393,56 @@ class StrucTools(object):
         structure.scale_lattice(new_vol)
 
         return structure
+
+    def get_slabs(
+        self,
+        miller=(1, 0, 0),
+        min_slab_size=10,
+        min_vacuum_size=10,
+        center_slab=True,
+        in_unit_planes=True,
+        reorient_lattice=True,
+    ):
+        """
+        Args:
+            TODO
+
+        Returns:
+            TODO
+
+        Use case:
+
+            data = {}
+            bulks = get_strucs()
+            millers = [(1, 0, 0), (0, 1, 0), (0, 0, 1)]
+            for b in bulks:
+                st = StrucTools(b)
+                formula = st.formula
+                data[formula] = {}
+                for m in millers:
+                    slabs = st.get_slabs(miller=m)
+                    data[formula].update(slabs)
+        """
+        bulk = self.decorate_with_ox_states
+
+        slabgen = SlabGenerator(
+            bulk,
+            miller_index=miller,
+            min_slab_size=min_slab_size,
+            min_vacuum_size=min_vacuum_size,
+            center_slab=center_slab,
+            in_unit_planes=in_unit_planes,
+            reorient_lattice=reorient_lattice,
+        )
+
+        slabs = slabgen.get_slabs()
+
+        out = {}
+        for i, slab in enumerate(slabs):
+            key = "".join([str(v) for v in miller]) + "_" + str(i)
+            out[key] = slab.as_dict()
+
+        return out
 
 
 class SiteTools(object):
