@@ -4,6 +4,7 @@ from pydmclab.core.energies import (
     FormationEnthalpy,
     FormationEnergy,
     DefectFormationEnergy,
+    ReactionEnergy,
 )
 
 import numpy as np
@@ -164,115 +165,150 @@ class UnitTestFormationEnthalpy(unittest.TestCase):
 
         self.assertAlmostEqual(dGf, dGf_hard, places=1)
 
-    class UnitTestDefects(unittest.TestCase):
-        def test_defects(self):
-            chempots = ChemPots(functional="r2scan", standard="dmc").chempots
 
-            chempots = {"Li": chempots["Li"]}
-            E_pristine = -1.744
-            E_defect = -1.461
-            formula_pristine = "LiCoO2"
-            formula_defect = "CoO2"
-            charge_defect = 0
-            Eg_pristine = 0.66
-            shared_el_for_basis = "O"
-            charge_correction = 0
+class UnitTestDefects(unittest.TestCase):
+    def test_defects(self):
+        chempots = ChemPots(functional="r2scan", standard="dmc").chempots
 
-            E_defect1 = DefectFormationEnergy(
-                E_pristine,
-                formula_pristine,
-                Eg_pristine,
-                E_defect,
-                formula_defect,
-                charge_defect,
-                shared_el_for_basis,
-                chempots,
-                charge_correction,
-            ).Efs[0.0]
+        E_pristine = -1.744
+        E_defect = -1.461
+        formula_pristine = "LiCoO2"
+        formula_defect = "CoO2"
+        charge_defect = 0
+        Eg_pristine = 0.66
+        charge_correction = 0
+        fixed_els = ["Co", "O"]
 
-            E_defect2 = DefectFormationEnergy(
-                E_pristine,
-                formula_pristine,
-                Eg_pristine,
-                E_defect,
-                formula_defect,
-                charge_defect,
-                shared_el_for_basis,
-                chempots,
-                charge_correction,
-            ).Efs[0.1]
+        dfe = DefectFormationEnergy(
+            E_pristine=E_pristine,
+            formula_pristine=formula_pristine,
+            Eg_pristine=Eg_pristine,
+            E_defect=E_defect,
+            formula_defect=formula_defect,
+            charge_defect=charge_defect,
+            chempots=chempots,
+            charge_correction=charge_correction,
+            fixed_els=fixed_els,
+        )
 
-            self.assertEqual(E_defect1, E_defect2)
+        self.assertEqual(dfe.rxn_string, "CoO2 + Li -> LiCoO2")
+        self.assertEqual(dfe.n_defects, 1)
+        self.assertEqual(dfe.defect_concentration, 1)
+        self.assertEqual(dfe.charge_contribution[0.0], 0)
+        self.assertEqual(dfe.Efs[0.0], dfe.dE_rxn / 1)
 
-            charge_defect = 2
-            E_defect3 = DefectFormationEnergy(
-                E_pristine,
-                formula_pristine,
-                Eg_pristine,
-                E_defect,
-                formula_defect,
-                charge_defect,
-                shared_el_for_basis,
-                chempots,
-                charge_correction,
-            ).Efs[0.1]
+        Ef1 = dfe.Efs[0.0]
 
-            self.assertEqual(E_defect2, E_defect3 - 0.2)
+        dfe = DefectFormationEnergy(
+            E_pristine=E_pristine,
+            formula_pristine=formula_pristine,
+            Eg_pristine=Eg_pristine,
+            E_defect=E_defect,
+            formula_defect="Li97Co100O200",
+            charge_defect=charge_defect,
+            chempots=chempots,
+            charge_correction=charge_correction,
+            fixed_els=fixed_els,
+        )
 
-            charge_correction = 0.5
-            E_defect4 = DefectFormationEnergy(
-                E_pristine,
-                formula_pristine,
-                Eg_pristine,
-                E_defect,
-                formula_defect,
-                charge_defect,
-                shared_el_for_basis,
-                chempots,
-                charge_correction,
-            ).Efs[0.1]
+        Ef2 = dfe.Efs[0.0]
 
-            self.assertEqual(E_defect3, E_defect4 - charge_correction)
+        self.assertEqual(dfe.rxn_string, "0.01 Li97(CoO2)100 + 0.03 Li -> LiCoO2")
+        self.assertEqual(dfe.n_defects, 3)
+        self.assertEqual(dfe.defect_concentration, 0.03)
+        self.assertEqual(dfe.charge_contribution[0.0], 0)
+        self.assertEqual(dfe.Efs[0.0], dfe.dE_rxn / 3)
 
-            formula_defect = "Li99Co100O200"
-            E_defect5 = DefectFormationEnergy(
-                E_pristine,
-                formula_pristine,
-                Eg_pristine,
-                E_defect,
-                formula_defect,
-                charge_defect,
-                shared_el_for_basis,
-                chempots,
-                charge_correction,
-            ).Efs[0.1]
+        dfe = DefectFormationEnergy(
+            E_pristine=E_pristine,
+            formula_pristine=formula_pristine,
+            Eg_pristine=Eg_pristine,
+            E_defect=E_defect,
+            formula_defect="Li97Na3Co100O200",
+            charge_defect=charge_defect,
+            chempots=chempots,
+            charge_correction=charge_correction,
+            fixed_els=fixed_els,
+        )
 
-            self.assertEqual(E_defect4, E_defect5)
+        Ef3 = dfe.Efs[0.0]
 
-            formula_pristine = "Al2O3"
-            formula_defect = "GaAlO3"
-            E_pristine = -1
-            E_defect = -1.1
-            Eg_pristine = 10
-            charge_defect = 0
-            shared_el_for_basis = "O"
-            chempots = {"Al": -3, "Ga": -2}
-            charge_correction = 0
+        self.assertEqual(
+            dfe.rxn_string, "0.01 Na3Li97(CoO2)100 + 0.03 Li -> 0.03 Na + LiCoO2"
+        )
+        self.assertEqual(dfe.n_defects, 3)
+        self.assertEqual(dfe.defect_type, "substitutional")
+        self.assertEqual(dfe.defect_concentration, 0.03)
+        self.assertEqual(dfe.charge_contribution[0.0], 0)
+        self.assertEqual(dfe.Efs[0.0], dfe.dE_rxn / 3)
 
-            E_defect6 = DefectFormationEnergy(
-                E_pristine,
-                formula_pristine,
-                Eg_pristine,
-                E_defect,
-                formula_defect,
-                charge_defect,
-                shared_el_for_basis,
-                chempots,
-                charge_correction,
-                gap_discretization=1,
-            ).Efs[5.0]
+        dfe = DefectFormationEnergy(
+            E_pristine=E_pristine,
+            formula_pristine=formula_pristine,
+            Eg_pristine=Eg_pristine,
+            E_defect=E_defect,
+            formula_defect="CoO2",
+            charge_defect=1,
+            chempots=chempots,
+            charge_correction=0,
+            fixed_els=fixed_els,
+        )
 
-            self.assertEqual(E_defect6, -2.6)
+        Ef5 = dfe.Efs[0.1]
+
+        self.assertEqual(Ef1, Ef5 - 0.1 * 1)
+
+
+class UnitTestReactions(unittest.TestCase):
+    def test_rxn_string(self):
+        reactants = ["RuO2", "FeO"]
+        products = ["RuFeO3"]
+        rxn = ReactionEnergy({}, reactants, products).rxn_string
+        self.assertEqual(rxn, "RuO2 + FeO -> FeRuO3")
+
+        products = ["RuFeO3", "O2"]
+        rxn = ReactionEnergy({}, reactants, products).rxn_string
+        self.assertEqual(rxn, "RuO2 + FeO -> FeRuO3")
+
+        products = ["RuFeO4", "O2"]
+        rxn = ReactionEnergy({}, reactants, products).rxn_string
+        self.assertEqual(rxn, "RuO2 + FeO + 0.5 O2 -> FeRuO4")
+
+        products = ["RuFeO2", "O2"]
+        rxn = ReactionEnergy({}, reactants, products).rxn_string
+        self.assertEqual(rxn, "RuO2 + FeO -> FeRuO2 + 0.5 O2")
+
+        products = ["RuFeO2", "O2", "H2O", "N2", "CO2"]
+        rxn = ReactionEnergy({}, reactants, products).rxn_string
+        self.assertEqual(rxn, "RuO2 + FeO -> FeRuO2 + 0.5 O2")
+
+        input_energies = {
+            "CaO": {"E": -6.618 / 2},
+            "TiO2": {"E": -10.505 / 3},
+            "CaTiO3": {"E": -17.787 / 5},
+        }
+
+        reactants = ["CaO", "TiO2"]
+        products = ["CaTiO3"]
+        rxn = ReactionEnergy(input_energies, reactants, products, energy_key="E")
+        self.assertEqual(rxn.rxn_string, "CaO + TiO2 -> CaTiO3")
+        self.assertEqual(rxn.coefs["O2Ti1"], -1)
+        self.assertEqual(rxn.coefs["Ca1O3Ti1"], 1)
+        self.assertAlmostEqual(rxn.dE_rxn, -0.664 / 1, places=3)
+
+        rxn = ReactionEnergy(
+            input_energies, reactants, products, energy_key="E", norm="atom"
+        )
+
+        self.assertAlmostEqual(rxn.dE_rxn, -0.664 / 5, places=3)
+
+        reactants = ["CaO", "TiO2"]
+        products = ["CaTi2O4", "O2"]
+        input_energies["CaTi2O4"] = {"E": -17.787 / 5}
+        input_energies["O2"] = {"E": -1}
+        rxn = ReactionEnergy(input_energies, reactants, products, energy_key="E")
+        self.assertEqual(rxn.rxn_string, "CaO + 2 TiO2 -> CaTi2O4 + 0.5 O2")
+        self.assertEqual(rxn.coefs["O1"], 1)
 
 
 if __name__ == "__main__":

@@ -421,6 +421,15 @@ class FormationEnergy(object):
 
 
 class DefectFormationEnergy(object):
+    """
+    *** This is a work in progress ***
+
+    @TODO:
+        - write demo
+        - incorporate open systems
+
+    """
+
     def __init__(
         self,
         E_pristine,
@@ -429,7 +438,7 @@ class DefectFormationEnergy(object):
         E_defect,
         formula_defect,
         charge_defect,
-        shared_el_for_basis,
+        fixed_els,
         chempots,
         charge_correction,
         gap_discretization=0.1,
@@ -447,45 +456,43 @@ class DefectFormationEnergy(object):
 
             E_defect (float)
                 DFT total energy (or formation energy) of defect-containing compound (eV/atom)
+                    energy must be consistent/comparable with E_pristine
 
             formula_defect (str)
                 formula of defect-containing compound
 
             charge_defect (int)
                 charge of defect-containing compound
+                    e.g., if you removed an electron to do the defect calculation, charge_defect = +1
 
-            shared_el_for_basis (str)
-                element shared between pristine and defect-containing compounds
-                    - for normalizing formula units
-                    - e.g., if pristine = Al2O3 and defect = Al4O5S1
-                        - shared_el_for_basis = "Al"
-                        - so that I know to use Al4O6 for pristine for calculations..
+            fixed_els (list)
+                list of elements that are not exchanged b/t defect and pristine
+                    e.g., if pristine = 'Li2MnNbO2F' and defect = 'Li1MnNbO2F', I've just removed a Li so fixed_els = ['Mn', 'Nb', 'O', 'F']
 
             chempots (dict)
                 chemical potentials (eV/atom)
                     {el (str) :
                         chempot (float)
-                    for any el exchanged between defect and pristine}
+                    for (at least) any el exchanged between defect and pristine}
 
             charge_correction (float)
                 charge correction (eV/cell)
                     this gets added before dividing by number of defects
 
+                needs to be calculated using some method that looks at the defect calculation
+                    e.g., see pymatgen.analysis.defects.corrections
+
             gap_discretization (float)
                 how fine of a grid do you want to calculate the formation energy over
-                smaller numbers = more grid points
+                    smaller numbers = more grid points
 
         Returns:
-            shared_el_for_basis
-            chempots
-            charge_correction
-            gap_discretization
+
             pristine (dict)
                 {'E' : total energy per atom in clean formula (eV/atom),
                  'formula' : the clean formula,
-                 'Eg' : band gap (eV),
-                 'multiplier' : how many times the clean formula is multiplied to get the defect-containing formula.
-                 'basis_formula' : the formula of the basis (e.g., Al4O6 for Al2O3 if the defect if Al4O5S1)}
+                 'Eg' : band gap (eV)}
+
             defect (dict)
                 {'E' : total energy per atom in defect-containing formula (eV/atom),
                  'formula' : the clean defect-containing formula,
@@ -500,182 +507,214 @@ class DefectFormationEnergy(object):
         pristine = {"E": E_pristine, "formula": formula_pristine, "Eg": Eg_pristine}
         defect = {"E": E_defect, "formula": formula_defect, "q": charge_defect}
 
-        self.shared_el_for_basis = shared_el_for_basis
         self.chempots = chempots
         self.charge_correction = charge_correction
-
-        # map pristine to defect basis
-        pristine_multiplier = CompTools(formula_defect).stoich(
-            shared_el_for_basis
-        ) / CompTools(formula_pristine).stoich(shared_el_for_basis)
-
-        pristine["multiplier"] = pristine_multiplier
-
-        pristine_els = CompTools(pristine["formula"]).els
-        pristine_amounts = [
-            CompTools(pristine["formula"]).stoich(el) * pristine_multiplier
-            for el in pristine_els
-        ]
-        pristine_basis_formula = ""
-        for i, el in enumerate(pristine_els):
-            pristine_basis_formula += el + str(int(pristine_amounts[i]))
-        pristine["basis_formula"] = pristine_basis_formula
-
         self.pristine = pristine
         self.defect = defect
         self.gap_discretization = gap_discretization
+        self.fixed_els = fixed_els
+
+        if not defect["q"] and charge_correction:
+            print(
+                "WARNING: you have a neutral defect and a charge correction. you sure about that?"
+            )
 
     @property
-    def dE(self):
+    def rxn(self):
         """
         Returns:
-            the energy difference between the pristine structure and the defective structure
-                E[X^q] - E[pristine]
-            the basis is the defect-containing formula unit
-
-            e.g.,
-                if pristine = Al2O3
-                    defect = Al4O5S1
-                   E[X^q] = E_Al4O5S1
-                   E[pristine] = 2*E_Al2O3 (to make Al4O6)
-                   dE = E_Al4O5S1*10 atoms - 2*E_Al2O3*5 atoms
+            ReactionEnergy object for the defect-forming reaction
+                Note: the pristine formula is the (a) product (not reactant) so it has a unary basis
 
         """
         pristine = self.pristine
         defect = self.defect
 
-        return (
-            defect["E"] * CompTools(defect["formula"]).n_atoms
-            - pristine["E"]
-            * CompTools(pristine["formula"]).n_atoms
-            * pristine["multiplier"]
+        # get all the elements that could be in the reaction
+        els = list(
+            set(CompTools(pristine["formula"]).els + CompTools(defect["formula"]).els)
         )
+
+        # don't include the els that are fixed
+        fixed_els = self.fixed_els
+        els = [el for el in els if el not in fixed_els]
+
+        # the pristine is the product
+        products = [pristine["formula"]]
+
+        # the defect + any els that may be exchanged are the reactants (note reactants can move to products as needed to balance)
+        reactants = [defect["formula"]] + els
+
+        # reduce my chempots to just the ones I need
+        mus = self.chempots
+        mus = {el: mus[CompTools(el).els[0]] for el in els}
+
+        # make input_energies for ReactionEnergy object in proper format
+        input_energies = {
+            pristine["formula"]: {"E": pristine["E"]},
+            defect["formula"]: {"E": defect["E"]},
+        }
+        for el in mus:
+            input_energies[el] = {"E": mus[el]}
+
+        # initialize ReactionEnergy object w/ molar basis
+        re = ReactionEnergy(
+            input_energies=input_energies,
+            reactants=reactants,
+            products=products,
+            energy_key="E",
+            norm="rxn",
+        )
+        return re
+
+    @property
+    def rxn_string(self):
+        """
+        Returns:
+            string representation of the defect-forming reaction
+                e.g., If I remove 1 Li from LiMnO2, the rxn_string is:
+                    0.5 LiMn2O4 + 0.5 Li --> LiMnO2
+        """
+        return self.rxn.rxn_string
 
     @property
     def els_exchanged(self):
         """
         Returns:
-            dictionary of elements exchanged between pristine and defect-containing compounds
-            {el (str) :
-                dn (float)}
-                dn > 0 --> more of that el in defect than pristine
-                dn < 0 --> less of that el in defect than pristine
+            dict of elements exchanged between pristine and defect
+                {'added' : {el (str) : coef (float)},
+                 'removed' : {el (str) : coef (float)}}
+
+            for 0.5 LiMn2O4 + 0.5 Li --> LiMnO2
+                els_exchanged = {'removed' : {'Li' : 0.5},
         """
-        pristine = self.pristine
-        defect = self.defect
-        els = sorted(
-            list(
-                set(
-                    CompTools(pristine["formula"]).els
-                    + CompTools(defect["formula"]).els
-                )
-            )
-        )
+        coefs = self.rxn.coefs
+        pristine, defect = self.pristine["formula"], self.defect["formula"]
 
-        dn = {}
-        for el in els:
-            n_pristine = (
-                CompTools(pristine["formula"]).stoich(el) * pristine["multiplier"]
-            )
-            n_defect = CompTools(defect["formula"]).stoich(el)
-            dn[el] = n_defect - n_pristine
-
-        return dn
+        added_to_pristine = {}
+        removed_from_pristine = {}
+        for formula in coefs:
+            if formula not in [pristine, defect]:
+                if coefs[formula] > 0:
+                    added_to_pristine[formula] = coefs[formula]
+                elif coefs[formula] < 0:
+                    removed_from_pristine[formula] = coefs[formula]
+        return {"added": added_to_pristine, "removed": removed_from_pristine}
 
     @property
     def defect_type(self):
         """
         Returns:
-            (str) what type of defect is it?
-                - vacancy
-                - interstitial
-                - substitional
-
-            NOTE: what about antisite defects?
+            string representing the defect type
         """
-        dn = self.els_exchanged
-        removed_from_pristine = []
-        added_to_pristine = []
-        for el in dn:
-            if dn[el] < 0:
-                removed_from_pristine.append(el)
-            elif dn[el] > 0:
-                added_to_pristine.append(el)
-        if (len(removed_from_pristine) > 0) and (len(added_to_pristine) > 0):
-            defect_type = "substitional"
-        elif len(removed_from_pristine) > 0:
-            defect_type = "vacancy"
-        elif len(added_to_pristine) > 0:
-            defect_type = "interstitial"
+        els_exchanged = self.els_exchanged
+        if els_exchanged["added"] and not els_exchanged["removed"]:
+            return "interstitial"
+        elif els_exchanged["removed"] and not els_exchanged["added"]:
+            return "vacancy"
+        elif els_exchanged["added"] and els_exchanged["removed"]:
+            return "substitutional"
         else:
-            raise ValueError("defect_type not found")
+            return "antisite"
 
-        return defect_type
+    @property
+    def dE_rxn(self):
+        """
+        Returns:
+            reaction energy for defect-forming reaction
+                note: the sign is flipped compared to rxn_string
+
+                this is E[X^q] - E[pristine] - sum(n_i * mu_i)
+        """
+        pristine, defect = self.pristine, self.defect
+        defect_type = self.defect_type
+        if defect_type == "antisite":
+            # for antisite defects, we don't really have a reaction (since pristine and defect have same composition)
+            factor = (
+                CompTools(pristine["formula"]).n_atoms
+                / CompTools(defect["formula"]).n_atoms
+            )
+
+            return (
+                defect["E"] * CompTools(defect["formula"]).n_atoms
+                - pristine["E"] * CompTools(pristine["formula"]).n_atoms / factor
+            )
+
+        # flip sign so defect is product-side w/ 1 mole pristine basis
+        return -self.rxn.dE_rxn
+
+    @property
+    def defect_concentration(self):
+        """
+        ** this may have unexpected behavior **
+
+        Returns:
+            defect concentration in molar units
+                0.5 LiMn2O4 + 0.5 Li --> LiMnO2 would return 0.5 b/c I removed 50% of Li from LiMnO2
+        """
+        els_exchanged = self.els_exchanged
+        data = (
+            els_exchanged["added"]
+            if els_exchanged["added"]
+            else els_exchanged["removed"]
+        )
+        count = 0
+        for el in data:
+            count += abs(data[el])
+        return count
 
     @property
     def n_defects(self):
         """
+        ** this may have unexpected behavior **
+
         Returns:
-            how many defects (int) (referenced to the defect-containing basis formula)
+            number of defects relative to the pristine
+                0.5 LiMn2O4 + 0.5 Li --> LiMnO2 would return 1 since adding 1 Li to LiMn2O4 would give me the pristine composition
         """
-        dn = self.els_exchanged
-        el = [el for el in dn if dn[el] != 0][0]
-        return abs(dn[el])
+        re = self.rxn
+        ceofs = re.coefs
+        defect = self.defect["formula"]
+        return self.defect_concentration / abs(ceofs[defect])
 
     @property
-    def sum_mus(self):
+    def charge_contribution(self):
         """
         Returns:
-            sum(dn_i * mu_i) for all elements that are exchanged
+            {E_Fermi (float) : charge contribution to defect formation energy (float)}
+                this is q * E_Fermi
 
-            e.g., if pristine = Al2O3 and defect = Al4O5S1
-                - so basis = Al4O6
-                - dn_Al = 4 - 4 = 0
-                - dn_O = 5 - 6 = -1
-                - dn_S = 1 - 0 = 1
-                - so sum_mus = -1 * mu_O + 1 * mu_S
-
+            Fermi levels evalulated from 0 to band gap in gap_discretization increments
         """
-        chempots = self.chempots
-        dn = self.els_exchanged
-        sum_mus = 0.0
-        for el in dn:
-            if dn[el] == 0:
-                continue
-            sum_mus += dn[el] * chempots[el]
-
-        return sum_mus
-
-    @property
-    def Efs(self):
-        """
-
-        Returns:
-            {E_Fermi (float, eV relative to VBM) : defect formation energy (float, eV/defect)}
-
-            Ef = Ef[X^q] - Ef[pristine] + sum(dn_i*mu_i) + q * E_Fermi + charge_correction
-
-            note:
-                - the charge correction gets divided by the number of defects
-        """
-        pristine = self.pristine
-        Eg = pristine["Eg"]
-        multiplier = pristine["multiplier"]
+        q = self.defect["q"]
+        Eg = self.pristine["Eg"]
         gap_discretization = self.gap_discretization
         if Eg > 0:
             E_Fermis = np.arange(0, Eg + gap_discretization, gap_discretization)
         else:
             E_Fermis = np.array([0.0])
-        dE = self.dE
-        sum_mus = self.sum_mus
-        q = self.defect["q"]
+        return {E_Fermi: E_Fermi * q for E_Fermi in E_Fermis}
+
+    @property
+    def Efs(self):
+        """
+        Returns:
+            {E_Fermi (float, eV) : defect formation energy (eV/defect)}
+        """
+        dE_rxn = self.dE_rxn
+        charge_contribution = self.charge_contribution
         charge_correction = self.charge_correction
         n_defects = self.n_defects
-        energies = [
-            ((dE - sum_mus) / multiplier + q * E_Fermi + charge_correction) / n_defects
-            for E_Fermi in E_Fermis
-        ]
-        return dict(zip(E_Fermis, energies))
+        out = {}
+        for E_Fermi in charge_contribution:
+            # dE_rxn is per defect-forming reaction
+            # charge_contribution is per defect-forming reaction
+            # charge_correction is per defect-forming reaction
+            # so divide all by # defects to get per defect
+            out[E_Fermi] = (
+                dE_rxn + charge_contribution[E_Fermi] + charge_correction
+            ) / n_defects
+        return out
 
 
 class ReactionEnergy(object):
@@ -684,22 +723,19 @@ class ReactionEnergy(object):
     *** This is a work in progress ***
 
     @TODO:
-        - write tests/demo
-        - incorporate filler
-        - incorporate normalization
+        - write demo
         - incorporate open systems
 
     """
 
-    def __init__(
-        self, input_energies, reactants, products, energy_key="Ef", norm="rxn"
-    ):
+    def __init__(self, input_energies, reactants, products, energy_key="E", norm="rxn"):
         """
 
         Args:
             input_energies (dict)
-                {formula (str): {< energy key> : formation energy (eV/at)}
-                    formation energies should account for chemical potentials (e.g., due to partial pressures)
+                {formula (str): {< energy key> : energy (eV/at)}
+                  energies can be total energies, formation enthalpies, formation energies, etc.
+                    they just need to be consistent with one another
 
             reactants (list):
                 list of reactant compositions (str)
@@ -708,7 +744,10 @@ class ReactionEnergy(object):
                 list of product compositions (str)
 
             energy_key (str):
-                how to find the formation energies in formation_energies
+                how to find the energies in input_energies
+                    e.g., {'CaO' : {'E' : -1.2},
+                           'Ca'  : {'E' : -0.6}}
+                           would have energy_key = 'E'
 
             norm (str):
                 how to normalize the reaction energy
@@ -716,12 +755,27 @@ class ReactionEnergy(object):
                     'atom' : the molar reaction energy per atom in the products side of the reaction in ReactionEnergy.rxn_string
         """
 
-        self.input_energies = {
+        # clean the formulas in the energies dict
+        input_energies = {
             CompTools(c).clean: {"E": input_energies[c][energy_key]}
             for c in input_energies
         }
+
+        # if elements are in the reactants/products but not in input_energies, give them 0 energy
+        for c in reactants + products:
+            if CompTools(c).clean not in input_energies:
+                if CompTools(c).n_els == 1:
+                    print(
+                        "WARNING: assuming the provided energies are formation energies"
+                    )
+                    input_energies[CompTools(c).clean] = {"E": 0}
+
+        self.input_energies = input_energies
+
+        # turn the reactants and products into pymatgen Composition objects
         self.reactants = [Composition(c) for c in reactants]
         self.products = [Composition(c) for c in products]
+
         self.norm = norm
 
     @property
@@ -737,15 +791,22 @@ class ReactionEnergy(object):
     def rxn_string(self):
         """
         Returns:
-            string representation of the reaction
+            string representation of the balanced reaction
+                e.g., 'CaO + 2 TiO2 -> CaTi2O5'
         """
         return self.rxn.__str__()
 
     @property
     def coefs(self):
         """
+        includes reaction balancing
+
         Returns:
-            {formula (str) : stoichiometry (float) in reaction}
+            {formula (str) :
+                stoichiometry (float) in reaction}
+
+            stoichiometry < 0 --> reactant
+            stoichiometry > 0 --> product
         """
         rxn = self.rxn
         coefs = rxn._coeffs
@@ -755,26 +816,33 @@ class ReactionEnergy(object):
         out = {c: 0 for c in unique_comp}
         for i, coef in enumerate(coefs):
             comp = all_comp[i]
-            out[comp] += np.round(coef, 8)
+            if comp in ["O1", "N1", "H1", "F1", "Cl1"]:
+                # pymatgen stores these as O2, N2, etc but we use O1, N1, etc
+                coef *= 2
+
+            # rounding b/c balancing sometimes leads to imprecision (e.g., 0.00000000001)
+            out[comp] += np.round(coef, 5)
         return out
 
     @property
     def species(self):
         """
 
+        Combines coefficients and energies
+            removes species with 0 coefficient
+
         Returns:
-            {formula (str) : {'coef' : stoichiometry (float) in reaction},
-                              'E' : energy (float, eV/atom) of that formula}}
+            {formula (str) :
+                {'coef' : stoichiometry (float) in reaction},
+                 'E' : energy (float, eV/atom) of that formula}}
         """
         species = {}
         coefs = self.coefs
         energies = self.input_energies
-        for c in coefs:
-            if c != 0:
-                species[c] = {
-                    "coef": coefs[c],
-                    "E": energies[c]["E"] if CompTools(c).n_els > 1 else 0,
-                }
+        for formula in coefs:
+            if coefs[formula] != 0:
+                # ignore formulas w/ 0 coefficient
+                species[formula] = {"coef": coefs[formula], "E": energies[formula]["E"]}
 
         return species
 
@@ -788,22 +856,54 @@ class ReactionEnergy(object):
 
         """
         species = self.species
-        norm = self.norm
+        norm_approach = self.norm
         dE_rxn = 0
-        norm = 1
+        norm_counter = 0
         for formula in species:
             coef = species[formula]["coef"]
-            if (norm == "atom") and (coef > 0):
-                norm += coef * CompTools(formula).n_atoms
+            if (norm_approach == "atom") and (coef > 0):
+                # keep track of atoms in the product side
+                norm_counter += coef * CompTools(formula).n_atoms
+
             Ef = species[formula]["E"]
+
+            # convert per atom energies to molar basis for dE_rxn
             dE_rxn += coef * Ef * CompTools(formula).n_atoms
 
-        return dE_rxn / norm
+        if norm_approach == "atom":
+            # divide by # atoms if norm is per atom
+            return dE_rxn / norm_counter
+        else:
+            # keep molar reaction energy if norm is per mole
+            return dE_rxn
 
 
 def main():
-    return
+    chempots = ChemPots(functional="r2scan", standard="dmc").chempots
+
+    # chempots = {"Li": chempots["Li"], "Co": chempots["Co"], "O": chempots["O"]}
+    E_pristine = -1.744
+    E_defect = -1.461
+    formula_pristine = "LiCoO2"
+    formula_defect = "Li97Na3Co100O199"
+    charge_defect = 0
+    fixed_els = ["Co"]
+    Eg_pristine = 0.66
+    charge_correction = 0
+
+    dfe = DefectFormationEnergy(
+        E_pristine=E_pristine,
+        formula_pristine=formula_pristine,
+        Eg_pristine=Eg_pristine,
+        E_defect=E_defect,
+        formula_defect=formula_defect,
+        charge_defect=charge_defect,
+        chempots=chempots,
+        charge_correction=charge_correction,
+        fixed_els=fixed_els,
+    )
+    return dfe
 
 
 if __name__ == "__main__":
-    out = main()
+    dfe = main()

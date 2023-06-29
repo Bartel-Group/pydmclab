@@ -3,6 +3,7 @@ from pydmclab.core.energies import (
     FormationEnthalpy,
     FormationEnergy,
     DefectFormationEnergy,
+    ReactionEnergy,
 )
 
 from pydmclab.core.struc import StrucTools
@@ -19,6 +20,7 @@ Basic idea:
     FormationEnthalpy: get formation enthalpy at 0 K
     FormationEnergy: get formation energy at T 
     DefectFormationEnergy: get defect formation energy
+    ReactionEnergy: balance reactions and compute their energies
 """
 
 
@@ -147,8 +149,7 @@ def get_T_dependent_formation_energy_with_configurational_entropy():
 def get_defect_formation_energy():
     """
     defect formation energies tell me the energy gain or penalty of creating defects
-        - vacancies, interstitials, substitutions
-        - antisites not implemented yet...
+        - vacancies, interstitials, substitutions, antisites
     """
     print("\n now a defect")
     pristine_formula = "GaN"
@@ -163,25 +164,79 @@ def get_defect_formation_energy():
 
     charge_correction = 0  # not charged
 
-    shared_el = "N"  # for normalizing formula
+    fixed_els = ["N"]  # helps balance the reaction
 
     mus = ChemPots(functional="pbe", standard="mp").chempots  # need mus (for Ga and Al)
 
     E_Fermi = 0  # neutral defect, so let's evaluate at VBM
 
     dfe = DefectFormationEnergy(
-        formula_defect=defect_formula,
-        formula_pristine=pristine_formula,
-        E_defect=Ef_defect,
         E_pristine=Ef_pristine,
+        formula_pristine=pristine_formula,
         Eg_pristine=Eg_pristine,
+        E_defect=Ef_defect,
+        formula_defect=defect_formula,
         charge_defect=q,
-        charge_correction=charge_correction,
-        shared_el_for_basis=shared_el,
         chempots=mus,
-    ).Efs[E_Fermi]
+        charge_correction=0,
+        fixed_els=fixed_els,
+    )
 
-    print("defect formation energy for Al_Ga in GaN = %.2f eV/atom" % dfe)
+    print(
+        "defect formation energy for %i Al_Ga defects (%.2f concentration) in GaN = %.2f eV"
+        % (dfe.n_defects, dfe.defect_concentration, dfe.Efs[E_Fermi])
+    )
+
+
+def get_reaction_energies():
+    """
+    ReactionEnergy will balance reactions and compute energies
+        Needs input energies to start with
+    """
+
+    print("\n reaction energies")
+
+    # normally, you would get these w/ MPQuery or your calculations (or a mix)
+    # these are hand-grabbed formation energies from MP
+    energies = {
+        "MgS": {"E": -3.355 / 2},
+        "Cr2S3": {"E": -5.056 / 5},
+        "MgCr2S4": {"E": -8.557 / 7},
+        "NaCrS2": {"E": -5.009 / 4},
+        "NaCl": {"E": -4.219 / 2},
+        "MgCr2O4": {"E": -18.451 / 7},
+        "MgCl2": {"E": -6.797 / 3},
+    }
+
+    # just making a few reactions
+    reactants1 = ["MgS", "Cr2S3"]
+    products1 = ["MgCr2S4"]
+
+    reactants2 = ["NaCrS2", "MgCl2"]
+    products2 = ["MgCr2S4", "NaCl"]
+
+    reactants3 = ["MgCr2S4", "O2"]
+    products3 = ["MgCr2O4", "S"]
+
+    data = {
+        1: {"r": reactants1, "p": products1},
+        2: {"r": reactants2, "p": products2},
+        3: {"r": reactants3, "p": products3},
+    }
+
+    norm = "rxn"
+    for k in data:
+        reactants = data[k]["r"]
+        products = data[k]["p"]
+        re = ReactionEnergy(
+            input_energies=energies,
+            reactants=reactants,
+            products=products,
+            norm=norm,
+            energy_key="E",
+        )
+        print("Reaction %i: %s" % (k, re.rxn_string))
+        print("dE_rxn = %.2f eV" % re.dE_rxn)
 
 
 def main():
@@ -193,6 +248,7 @@ def main():
     get_T_dependent_formation_energy_with_vibrational_entropy()
     get_T_dependent_formation_energy_with_configurational_entropy()
     get_defect_formation_energy()
+    get_reaction_energies()
     return
 
 

@@ -362,6 +362,7 @@ def demo_mixing_hull(gs, end_members, remake=False):
         remake (bool)
 
     """
+    print("\n now a mixing hull")
     fjson = os.path.join(
         DATA_DIR, "pd_demo_mixing_hull_%s-%s.json" % (end_members[0], end_members[1])
     )
@@ -370,9 +371,7 @@ def demo_mixing_hull(gs, end_members, remake=False):
 
     mh = MixingHull(
         input_energies=gs,
-        varying_element="Li",
         end_members=end_members,
-        shared_element_basis="O",
         energy_key="Ef_mp",
     )
     out = mh.results
@@ -387,17 +386,17 @@ def demo_mixing_hull(gs, end_members, remake=False):
 
 def main():
     # if True, re-grab data from MP
-    remake_query = False
+    remake_query = True
     # if True, re-calculate hull input data
-    remake_serial_hullin = False
+    remake_serial_hullin = True
     # if True, re-calculate hull output data
-    remake_serial_hullout = False
+    remake_serial_hullout = True
     # if True, re-calculate hull output data in parallel
-    remake_parallel_hullout = False
+    remake_parallel_hullout = True
     # if True, generate figure to check results
-    remake_hull_figure_check = False
+    remake_hull_figure_check = True
     # if True, remake mixing hull
-    remake_mixing_hull = False
+    remake_mixing_hull = True
 
     # MP query for CHEMSYS
     gs = get_mp_data_for_chemsys(CHEMSYS, remake=remake_query)
