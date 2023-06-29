@@ -256,7 +256,7 @@ class UnitTestDefects(unittest.TestCase):
 
         Ef5 = dfe.Efs[0.1]
 
-        self.assertEqual(Ef1, Ef5 - 0.1 * 1)
+        self.assertAlmostEqual(Ef1, Ef5 - 0.1 * 1, places=5)
 
 
 class UnitTestReactions(unittest.TestCase):

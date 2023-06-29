@@ -59,66 +59,33 @@ class VASPSetUp(object):
     ):
         """
         Args:
-            calc_dir (os.PathLike) - directory where I want to execute VASP
-                - there must be a POSCAR in calc_dir
-                - the other input files will be added automatically within this code
-            user_configs (dict) - user-defined configs
-                - options in vasp_configs_yaml
-            vasp_configs_yaml (os.PathLike) - path to yaml file with possible user_configs and default values
-            refresh_configs (bool) - if True, will copy pydmc baseline configs to your local directory
-                - this is useful if you've made changes to the configs files in the directory you're working in and want to start over
+            calc_dir (os.PathLike)
+                directory where I want to execute VASP
+                    there must be a POSCAR in calc_dir
+                        should get placed there with pydmclab.hpc.launch.LaunchTools
+
+                    other input files (INCAR, KPOINTS, POTCAR) will be added using pydmclab.hpc.submit.SubmitTools
+
+            user_configs (dict)
+                user-defined configs related to VASP
+                    options (and defaults) in pydmclab.data.data._vasp_configs_yaml
+
+            vasp_configs_yaml (os.PathLike)
+                where to write yaml file for current vasp configs
+
+            refresh_configs (bool)
+                if True, will copy pydmclab baseline configs to your local directory
+                    this is useful if you've made changes to the configs files in the directory you're working in and want to start over
 
         Returns:
-            calc_dir (os.PathLike) - directory where I want to execute VASP
-            structure (pymatgen.Structure) - structure to be used for VASP calculation
-                - note: raises error if no POSCAR in calc_dir
+            calc_dir (os.PathLike)
+                directory where I want to execute VASP
+
+            structure (pymatgen.Structure)
+                structure to be used for VASP calculation (read from calc_dir/POSCAR)
+
             configs (dict)
-                # VASPSetUp (general)
-                # these should get passed through LaunchTools
-                standard: # make mp if comparing to MP data
-                mag:  # **change** as desired
-                magmom: # you will need to pass this for AFM calcs {'magmom' : [list of magmoms (float)]}
-
-                # these should get passed through SubmitTools
-                xc_to_run:  # gga, ggau, or metagga
-                calc_to_run: # usually this is what we want unless you want an independent "static" or "loose" calc
-
-                fun: # usually this is fine
-                lobster_static: True # can make False if you don't want to run LOBSTER
-
-                # some output files
-                fvaspout: vasp.o # where vasp output goes in calc_dir for each vasp run
-                fvasperrors: errors.o # where vasp errors go in calc_dir for each vasp run
-
-                # may be desirable to pass various configs for each type of calculation
-                # INCARs should be {INCAR_FLAG : value}
-                # KPOINTs should be Kpoints object
-                # POTCARs should be {el (str) : potcar flag (str)}
-
-                # loose calculations
-                loose_incar: {} # e.g., {'ENCUT' : 555}
-                loose_kpoints: {} # e.g., {'length' : 25}
-                loose_potcar: {} # e.g., {'W' : 'W_pv'}
-
-                # relax calculations
-                relax_incar: {}
-                relax_kpoints: {}
-                relax_potcar: {}
-
-                # static calculations
-                static_incar: {}
-                static_kpoints: {}
-                static_potcar: {}
-
-                # lobster calculations
-                lobster_incar: {}
-                lobster_kpoints: {}
-                lobster_potcar: {}
-
-                # rarely need to change these:
-                mag_override: False # if True, allows user to run nm calcs for mag systems and vice versa
-                potcar_functional: PBE_54 # probably don't change
-                validate_magmom: False # probably don't change
+                see pydmclab.data.data._vasp_configs_yaml for options
         """
 
         # this is where we will execute VASP
@@ -146,6 +113,7 @@ class VASPSetUp(object):
         # NOTE: user_configs will overwrite any keys shared with vasp_configs
         configs = {**_vasp_configs, **user_configs}
 
+        # these are essential configs that must be specified
         essential_configs = ["xc_to_run", "calc_to_run", "standard", "mag"]
         for essential in essential_configs:
             if essential not in configs.keys():
@@ -154,6 +122,7 @@ class VASPSetUp(object):
         # copy configs to prevent further changes
         self.configs = configs.copy()
 
+        # perturb structure right away if that was requested
         perturbation = self.configs["perturb_struc"]
         if perturbation:
             initial_structure = self.structure.copy()
@@ -164,8 +133,9 @@ class VASPSetUp(object):
     def get_vasp_input(self):
         """
         Returns:
-            vasp_input (pymatgen.io.vasp.sets.VaspInputSet
+            vasp_input (pymatgen.io.vasp.sets.VaspInputSet)
 
+        Starting from a pymatgen
         Uses configs to modify pymatgen's VaspInputSets as required
         """
 
@@ -227,12 +197,6 @@ class VASPSetUp(object):
                     "provided magmom that is not AFM, but you are trying to run an AFM calculation\n"
                 )
             structure.add_site_property("magmom", magmom)
-
-        # MP wants to set W_pv but we don't have that one in PBE54 (no biggie)
-        """
-        if configs["standard"] != "mp":
-            modify_potcar["W"] = "W"
-        """
 
         # don't mess with much if trying to match Materials Project
         if configs["standard"] == "mp":
@@ -370,10 +334,9 @@ class VASPSetUp(object):
         # note: some of this gets handled later for us
         if configs["lobster_static"] and (configs["calc_to_run"] == "static"):
             if configs["standard"] != "mp":
-                # want more DOS points
                 # want to write charge densities
                 # new NBANDS so don't want to start from WAVECAR
-                lobster_incar_settings = {"NEDOS": 4000, "ISTART": 0, "LAECHG": True}
+                lobster_incar_settings = {"NEDOS": 800, "ISTART": 0, "LAECHG": True}
                 for key in lobster_incar_settings:
                     if key not in configs["lobster_incar"]:
                         modify_incar[key] = lobster_incar_settings[key]
@@ -382,7 +345,7 @@ class VASPSetUp(object):
                     modify_incar[key] = configs["lobster_incar"][key]
 
                 if not configs["lobster_kpoints"]:
-                    # need KPOINTS file for LOBSTER
+                    # need KPOINTS file for LOBSTER (as opposed to KSPACING)
                     modify_kpoints = {"length": 25}
                 else:
                     modify_kpoints = configs["lobster_kpoints"]
@@ -393,6 +356,7 @@ class VASPSetUp(object):
                 modify_incar["ISYM"] = -1
 
         print("modify_incar = %s" % modify_incar)
+
         # initialize new VASPSet with all our settings
         vasp_input = vaspset(
             structure,
