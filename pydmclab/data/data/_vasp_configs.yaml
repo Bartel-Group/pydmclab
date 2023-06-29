@@ -45,3 +45,6 @@ lobster_potcar: {}
 mag_override: False # if True, allows user to run nm calcs for mag systems and vice versa
 potcar_functional: PBE_54 # probably don't change
 validate_magmom: False # probably don't change
+
+# how fine of a LOBSTER DOS do you want (more = more detailed)
+COHPSteps: 400

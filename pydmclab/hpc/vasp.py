@@ -437,7 +437,7 @@ class VASPSetUp(object):
 
             lobsterin_dict = lobsterin.as_dict()
 
-            lobsterin_dict["COHPSteps"] = 4000
+            lobsterin_dict["COHPSteps"] = configs["COHPSteps"]
             lobsterin = Lobsterin.from_dict(lobsterin_dict)
 
             flobsterin = os.path.join(calc_dir, "lobsterin")
@@ -503,6 +503,7 @@ class VASPSetUp(object):
             "bad_sym": [
                 "ERROR: while reading WAVECAR, plane wave coefficients changed"
             ],
+            "num_prob": ["num prob"],
         }
 
     @property
@@ -664,6 +665,8 @@ class VASPSetUp(object):
         if "pricel" in errors:
             incar_changes["SYMPREC"] = 1e-8
             incar_changes["ISYM"] = 0
+        if "num_prob" in errors:
+            incar_changes["ISMEAR"] = -1
         return incar_changes
 
 

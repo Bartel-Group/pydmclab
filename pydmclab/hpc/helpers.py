@@ -12,6 +12,7 @@ from pydmclab.utils.handy import read_json, write_json
 
 def get_vasp_configs(
     run_lobster=False,
+    detailed_dos=True,
     modify_loose_incar=False,
     modify_relax_incar=False,
     modify_static_incar=False,
@@ -28,6 +29,11 @@ def get_vasp_configs(
 
     Args:
         run_lobster (bool, optional): True to run LOBSTER
+
+        detailed_dos (bool or int):
+            - if False, COHPSteps = 400
+            - if True, COHPSteps = 4000
+            - if int, COHPSteps = detailed_dos
 
         modify_loose_incar (bool, optional):
             - dictionary of {incar flag (str) : setting for that flag}
@@ -65,6 +71,11 @@ def get_vasp_configs(
         dictionary of VASP_CONFIGS
     """
     vasp_configs = {"lobster_static": run_lobster}
+    if detailed_dos:
+        if type(detailed_dos) == bool:
+            vasp_configs["COHPSteps"] = 4000
+        else:
+            vasp_configs["COHPSteps"] = detailed_dos
 
     if modify_loose_incar:
         vasp_configs["loose_incar"] = modify_loose_incar

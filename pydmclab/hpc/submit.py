@@ -494,17 +494,29 @@ class SubmitTools(object):
                         parent_convergence = True
 
                 # if parents + current calc are converged, give it status = done
-                if (
-                    convergence
-                    and parent_convergence
-                    and not fresh_restart
-                    and not large_E_diff_between_relax_and_static
-                    and not sub_configs["force_postprocess"]
-                ):
-                    print("     %s is already converged; skipping" % xc_calc)
-                    status = "done"
-                    statuses[final_xc][xc_calc] = status
-                    continue
+                if calc_to_run != "static":
+                    if (
+                        convergence
+                        and parent_convergence
+                        and not fresh_restart
+                        and not large_E_diff_between_relax_and_static
+                    ):
+                        print("     %s is already converged; skipping" % xc_calc)
+                        status = "done"
+                        statuses[final_xc][xc_calc] = status
+                        continue
+                else:
+                    if (
+                        convergence
+                        and parent_convergence
+                        and not fresh_restart
+                        and not large_E_diff_between_relax_and_static
+                        and not sub_configs["force_postprocess"]
+                    ):
+                        print("     %s is already converged; skipping" % xc_calc)
+                        status = "done"
+                        statuses[final_xc][xc_calc] = status
+                        continue
 
                 # for jobs that are not DONE:
 
