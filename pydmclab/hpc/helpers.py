@@ -8,6 +8,7 @@ from pydmclab.core.struc import StrucTools
 from pydmclab.core.mag import MagTools
 from pydmclab.core.energies import ChemPots, FormationEnthalpy
 from pydmclab.utils.handy import read_json, write_json
+from pydmclab.data.configs import load_partition_configs
 
 
 def get_vasp_configs(
@@ -25,51 +26,62 @@ def get_vasp_configs(
 ):
     """
 
-    how to modify VASP calculations from the defaults (see pydmclab.hpc.vasp for defaults)
+    how to modify VASP calculations from the defaults
+
+    see pydmclab.hpc.vasp for defaults
 
     Args:
-        run_lobster (bool, optional): True to run LOBSTER
+        run_lobster (bool):
+            True to run LOBSTER for static calculations
+                sets vasp_configs['lobster_static'] = True
 
         detailed_dos (bool or int):
-            - if False, COHPSteps = 400
-            - if True, COHPSteps = 4000
-            - if int, COHPSteps = detailed_dos
+            if you're running LOBSTER, this will determine how many (E, DOS/COHP) points you get
+                if False, COHPSteps = 400
+                if True, COHPSteps = 4000
+                if int, COHPSteps = detailed_dos
+            if run_lobster is False, this is ignored
 
-        modify_loose_incar (bool, optional):
-            - dictionary of {incar flag (str) : setting for that flag}
-            - modifies only the "loose" calculations
-        modify_relax_incar (bool, optional):
-            - dictionary of {incar flag (str) : setting for that flag}
-            - modifies only the "relax" calculations
-        modify_static_incar (bool, optional):
-            - dictionary of {incar flag (str) : setting for that flag}
-            - modifies only the "static" calculations
+        modify_< calc >_incar (False or dict):
 
+            < calc > could be loose, relax, or static
 
-        modify_loose_kpoints (bool, optional):
-            - dictionary of non-default K-point setting. see pydmclab.hpc.vasp for format
-            - modifies only the "loose" calculations
-        modify_relax_kpoints (bool, optional):
-            - dictionary of non-default K-point setting. see pydmclab.hpc.vasp for format
-            - modifies only the "relax" calculations
-        modify_static_kpoints (bool, optional):
-            - dictionary of non-default K-point setting. see pydmclab.hpc.vasp for format
-            - modifies only the "static" calculations
+            dictionary of {incar flag (str) : setting for that flag}
+                modifies only that < calc >
+                gets passed to vasp_configs["< calc >_incar"]
 
+            e.g., modify_relax_incar = {'ISIF' : 2, 'ISYM' : -1}
+                would update those INCAR settings in your relax calculations
 
-        modify_loose_potcar (bool, optional):
-            - dictionary of non-default POTCAR in format {element (str) : POTCAR to use (str)}
-            - modifies only the "loose" calculations
-        modify_relax_potcar (bool, optional):
-            - dictionary of non-default POTCAR in format {element (str) : POTCAR to use (str)}
-            - modifies only the "loose" calculations
-        modify_static_potcar (bool, optional):
-            - dictionary of non-default POTCAR in format {element (str) : POTCAR to use (str)}
-            - modifies only the "static" calculations
+        modify_< calc >_kpoints (False or dict):
+
+            < calc > could be loose, relax, or static
+
+            dictionary representation of the KPOINTS you want to use if non-default
+                modifies only that < calc >
+                gets passed to vasp_configs["< calc >_kpoints"]
+
+            e.g., modify_static_kpoints = {'reciprocal_density' : 1000}
+                would update the KPOINT generation for your static calculations
+
+        modify_< calc >_potcar (False or dict):
+
+            < calc > could be loose, relax, or static
+
+            dictionary representation of the POTCAR you want to use if non-default
+                modifies only that < calc >
+                gets passed to vasp_configs["< calc >_potcar"]
+
+            e.g., modify_static_potcar = {'W' : 'W_pv', 'O' : 'O_s}
+                would update the POTCARs as requested for your static calculations
 
     Returns:
         dictionary of VASP_CONFIGS
+            {config_key : config_value}
+
+            to get passed as user_configs to VASPSetUp (through SubmitTools)
     """
+    # DOS-related
     vasp_configs = {"lobster_static": run_lobster}
     if detailed_dos:
         if type(detailed_dos) == bool:
@@ -77,6 +89,7 @@ def get_vasp_configs(
         else:
             vasp_configs["COHPSteps"] = detailed_dos
 
+    # INCARs
     if modify_loose_incar:
         vasp_configs["loose_incar"] = modify_loose_incar
     if modify_relax_incar:
@@ -84,6 +97,7 @@ def get_vasp_configs(
     if modify_static_incar:
         vasp_configs["static_incar"] = modify_static_incar
 
+    # KPOINTSs
     if modify_loose_kpoints:
         vasp_configs["loose_kpoints"] = modify_loose_kpoints
     if modify_relax_kpoints:
@@ -91,6 +105,7 @@ def get_vasp_configs(
     if modify_static_kpoints:
         vasp_configs["static_kpoints"] = modify_static_kpoints
 
+    # POTCARs
     if modify_loose_potcar:
         vasp_configs["loose_potcar"] = modify_loose_potcar
     if modify_relax_potcar:
@@ -113,31 +128,33 @@ def get_slurm_configs(
 ):
     """
 
-    how to modify slurm configurations for each VASP job (see pydmclab.data.data._slurm_configs.yaml for defaults)
+    how to modify slurm configurations for each VASP job
+
+    (see pydmclab.data.data._slurm_configs.yaml for defaults)
 
     Args:
-        total_nodes (int, optional):
+        total_nodes (int):
             how many nodes to run each VASP job on
 
-        cores_per_node (int, optional):
+        cores_per_node (int):
             how many cores per node to use for each VASP job
 
-        walltime_in_hours (int, optional):
+        walltime_in_hours (int):
             how long to run each VASP job
 
-        mem_per_core (str, optional):
-            if 'all', try to use all avaiable mem; otherwise use specified memory per core (cpu)
+        mem_per_core (str):
+            if 'all', try to use all avaiable mem; otherwise use specified memory (int, MB) per core
 
-        partition (str, optional):
+        partition (str):
             what part of the cluster to run each VASP job on
 
-        error_file (str, optional):
-            where to send each VASP job error
+        error_file (str):
+            where to send each VASP job errors
 
-        output_file (str, optional):
-            where to send each VASP job output
+        output_file (str):
+            where to send each VASP job outputs
 
-        account (str, optional):
+        account (str):
             what account to charge for your VASP jobs
 
     Returns:
@@ -149,6 +166,7 @@ def get_slurm_configs(
     slurm_configs["ntasks"] = int(total_nodes * cores_per_node)
 
     if account == "cbartel":
+        # convert MSI to minutes
         slurm_configs["time"] = int(walltime_in_hours * 60)
 
     if total_nodes > 1:
@@ -168,26 +186,15 @@ def get_slurm_configs(
     if (total_nodes > 1) and (cores_per_node < 32):
         print("WARNING: this seems like a small job. are you sure you need > 1 node??")
 
+    # figure out how much memory to use per core
     if mem_per_core == "all":
-        if partition in [
-            "msismall",
-            "small",
-            "msilarge",
-            "large",
-            "amdsmall",
-            "amdlarge",
-            "RM-small",
-            "RM",
-        ]:
-            mem_per_cpu = 1900
-        elif partition in [
-            "agsmall",
-            "msidmc",
-            "aglarge",
-            "agsmall,msidmc",
-            "RM-512",
-            "preempt",
-        ]:
+        partitions = load_partition_configs()
+        if partition in partitions:
+            mem_per_cpu = partitions[partition]["mem_per_core"]
+            if isinstance(mem_per_cpu, str):
+                if "GB" in mem_per_cpu:
+                    mem_per_cpu = int(mem_per_cpu.replace("GB", "")) * 1000
+        elif partition == "agsmall,msidmc":
             mem_per_cpu = 4000
         else:
             mem_per_cpu = 1900

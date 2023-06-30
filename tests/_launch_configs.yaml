@@ -1,0 +1,7 @@
+compare_to_mp: false
+n_afm_configs: 0
+override_mag: false
+perturb_launch_poscar: false
+to_launch:
+  dmc:
+  - metagga

@@ -845,8 +845,8 @@ class SubmitTools(object):
     def launch_sub(self):
         """
         launch the submission script written in write_sub
-            - if job is not in queue already
-            - if there's something to launch
+            if job is not in queue already
+            if there's something to launch
                 (ie if all calcs are done, dont launch)
         """
         final_xcs = self.final_xcs
@@ -865,9 +865,11 @@ class SubmitTools(object):
                 for line in f:
                     if "job-name" in line:
                         job_name = line[:-1].split("=")[-1]
+
             # see if jobs in queue
             if self.is_job_in_queue(job_name):
                 continue
+
             needs_to_launch = False
             # see if there's anything to launch
             with open(fsub) as f:
@@ -875,6 +877,7 @@ class SubmitTools(object):
                 for flag in flags_that_need_to_be_executed:
                     if flag in contents:
                         needs_to_launch = True
+
             if not needs_to_launch:
                 print(" !!! nothing to launch here, not launching\n\n")
                 return
