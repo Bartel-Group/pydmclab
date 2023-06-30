@@ -712,7 +712,7 @@ launch_dirs = {<composition>/<unique ID for that composition>/<standard>/<unique
   - **@TODO** demo
 - `hpc.helpers`
   - **@TODO** document, test, demo
-    - vasp, sub, slurm doc'd and tested
+    - vasp, sub, slurm, launch doc'd and tested
 - `hpc.analyze`
   - **@TODO** document, test, demo
 - `plotting.*`

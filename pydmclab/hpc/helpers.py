@@ -327,19 +327,21 @@ def get_launch_configs(
     to_launch = {}
 
     for standard in standards:
-        to_launch[standard] = xcs
+        to_launch[standard] = []
+        for xc in xcs:
+            if (standard in skip_xcs_for_standards) and (
+                xc in skip_xcs_for_standards[standard]
+            ):
+                continue
+            to_launch[standard].append(xc)
+
+    for standard in to_launch:
+        if not to_launch[standard]:
+            del to_launch[standard]
 
     if use_mp_thermo_data:
         # make sure we run GGA+U for MP consistency
         to_launch["mp"] = ["ggau"]
-
-    for standard in skip_xcs_for_standards:
-        # skip the standard : xc combos we don't want to run
-        if standard not in to_launch:
-            continue
-        for xc in skip_xcs_for_standards[standard]:
-            if xc in to_launch[standard]:
-                to_launch[standard].remove(xc)
 
     launch_configs["to_launch"] = to_launch
 

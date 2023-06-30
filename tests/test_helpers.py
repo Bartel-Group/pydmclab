@@ -175,12 +175,50 @@ class UnitTestHelpers(unittest.TestCase):
         self.assertEqual(sub_configs["fresh_restart"], start_over)
 
     def test_get_launch_configs(self):
+        standards = ["dmc"]
+        xcs = ["metagga"]
+        use_mp_thermo_data = False
+        n_afm_configs = 0
+        skip_xcs_for_standards = {"mp": ["gga", "metagga"]}
+
         launch_configs = get_launch_configs(
-            standards=["dmc"],
-            xcs=["metagga"],
-            use_mp_thermo_data=False,
-            n_afm_configs=0,
-            skip_xcs_for_standards={"mp": ["gga", "metagga"]},
+            standards=standards,
+            xcs=xcs,
+            use_mp_thermo_data=use_mp_thermo_data,
+            n_afm_configs=n_afm_configs,
+            skip_xcs_for_standards=skip_xcs_for_standards,
+        )
+
+        self.assertEqual(launch_configs["to_launch"], {"dmc": ["metagga"]})
+        self.assertEqual(launch_configs["n_afm_configs"], n_afm_configs)
+
+        use_mp_thermo_data = True
+        launch_configs = get_launch_configs(
+            standards=standards,
+            xcs=xcs,
+            use_mp_thermo_data=use_mp_thermo_data,
+            n_afm_configs=n_afm_configs,
+            skip_xcs_for_standards=skip_xcs_for_standards,
+        )
+
+        self.assertEqual(
+            launch_configs["to_launch"], {"dmc": ["metagga"], "mp": ["ggau"]}
+        )
+
+        standards = ["dmc", "abc"]
+        xcs = ["metagga", "hse"]
+        use_mp_thermo_data = False
+        skip_xcs_for_standards = {"abc": ["metagga"]}
+        launch_configs = get_launch_configs(
+            standards=standards,
+            xcs=xcs,
+            use_mp_thermo_data=use_mp_thermo_data,
+            n_afm_configs=n_afm_configs,
+            skip_xcs_for_standards=skip_xcs_for_standards,
+        )
+
+        self.assertEqual(
+            launch_configs["to_launch"], {"dmc": ["metagga", "hse"], "abc": ["hse"]}
         )
 
 
