@@ -132,6 +132,9 @@ def get_slurm_configs(
 
     (see pydmclab.data.data._slurm_configs.yaml for defaults)
 
+    see pydmclab.hpc.submit.SubmitTools for more info
+
+
     Args:
         total_nodes (int):
             how many nodes to run each VASP job on
@@ -216,19 +219,25 @@ def get_sub_configs(
     """
 
     configs related to preparing submission scripts and submitting VASP calculations
-        - see defaults in pydmclab.data.data._sub_configs.yaml
+
+        see defaults in pydmclab.data.data._sub_configs.yaml
+        see pydmclab.hpc.submit.SubmitTools for more info
 
     Args:
-        submit_calculations_in_parallel (bool or int): whether to prepare submission scripts in parallel or not
-            - False: use 1 processor
-            - True: use all available processors
-            - int: use that many processors
+        submit_calculations_in_parallel (bool or int):
+            whether to prepare submission scripts in parallel or not
+                False: use 1 processor
+                True: use all available processors - 1
+                int: use that many processors
+            if this is not False, you should not run this on a login node
 
         delete_all_calculations_and_start_over (bool):
             if True, start all calculations over (ie delete all outputs)
+                ** you should rarely use this! **
 
         rerun_lobster (bool) :
             if True, rerun lobster even if it has already been run
+                ** you should rarely use this! **
 
         mpi_command (str):
             the command to use for mpi (eg mpirun, srun, etc)
@@ -248,10 +257,8 @@ def get_sub_configs(
     else:
         if submit_calculations_in_parallel == True:
             n_procs = multip.cpu_count() - 1
-        elif submit_calculations_in_parallel == False:
-            n_procs = 1
         else:
-            n_procs = submit_calculations_in_parallel
+            n_procs = int(submit_calculations_in_parallel)
 
     sub_configs["n_procs"] = n_procs
 
@@ -266,7 +273,7 @@ def get_sub_configs(
     if special_packing:
         sub_configs["packing"] = {}
         for xc in special_packing:
-            sub_configs["packing"]["xc"] = special_packing[xc]
+            sub_configs["packing"][xc] = special_packing[xc]
 
     sub_configs["machine"] = machine
 
@@ -282,28 +289,37 @@ def get_launch_configs(
 ):
     """
 
-    configs related to launching  chains of calculations
+    configs related to launching chains of calculations
+
+    see defaults in pydmclab.data.data._launch_configs.yaml
+
+    see pydmclab.hpc.launch.LaunchTools for more info
 
     Args:
-        standards (list, optional):
-            list of standards you'd like to calculate
+        standards (list):
+            list of standards (str) you'd like to calculate
+                e.g., ['dmc']
 
-        xcs (list, optional):
-            list of xcs you'd like to calculate for each standard
+        xcs (list):
+            list of xcs (str) you'd like to calculate for each standard
+                e.g., ['metagga', 'ggau']
 
-        use_mp_thermo_data (bool, optional):
+        use_mp_thermo_data (bool):
             True if you are going to use formation energies provided in Materials Project for phase stability analysis
+                will automatically update the xcs/standards you want to launch to run these calcs
 
-        n_afm_configs (int, optional):
+        n_afm_configs (int):
             number of antiferromagnetic configurations to run for each structure (0 if you don't want to run AFM)
 
-        skip_xcs_for_standards (dict, optional):
-            dictionary of xcs to skip for a given standard.
+        skip_xcs_for_standards (dict):
+            dictionary of xcs to skip for a given standard
+                in principle, you may not want to run every xc for every standard. this gives you a mechanism to encode skipping combinations
                 Defaults to {"mp": ["gga", "metagga"]}.
                     - e.g., we don't want to run GGA or MetaGGA MP calculations because MP uses GGA+U (for now)
 
     Returns:
         dictionary of launch configurations
+            {config param : config value}
     """
 
     launch_configs = {}
@@ -314,9 +330,11 @@ def get_launch_configs(
         to_launch[standard] = xcs
 
     if use_mp_thermo_data:
+        # make sure we run GGA+U for MP consistency
         to_launch["mp"] = ["ggau"]
 
     for standard in skip_xcs_for_standards:
+        # skip the standard : xc combos we don't want to run
         if standard not in to_launch:
             continue
         for xc in skip_xcs_for_standards[standard]:
@@ -324,8 +342,6 @@ def get_launch_configs(
                 to_launch[standard].remove(xc)
 
     launch_configs["to_launch"] = to_launch
-
-    launch_configs["compare_to_mp"] = use_mp_thermo_data
 
     launch_configs["n_afm_configs"] = n_afm_configs
 

@@ -703,10 +703,21 @@ launch_dirs = {<composition>/<unique ID for that composition>/<standard>/<unique
 - `core.mag` documented, tested, demoed (6/23/23, CJB)
 - `core.query` documented, tested, demoed (6/23/23, CJB)
 - `core.energies` documented, tested, demoed (6/29/23, CJB)
-- `core.hulls` documented, tested, demoed (6/29/23)
-- `hpc.*`
+- `core.hulls` documented, tested, demoed (6/29/23, CJB)
+- `hpc.vasp` documented, tested (6/30/23, CJB)
+  - **@TODO** demo
+- `hpc.submit` documented, tested (6/30/23, CJB)
+  - **@TODO** demo
+- `hpc.launch` documented, tested (6/30/23, CJB)
+  - **@TODO** demo
+- `hpc.helpers`
+  - **@TODO** document, test, demo
+    - vasp, sub, slurm doc'd and tested
+- `hpc.analyze`
   - **@TODO** document, test, demo
 - `plotting.*`
+  - **@TODO** document, test, demo
+- `utils.handy`
   - **@TODO** document, test, demo
 
 # FAQ
