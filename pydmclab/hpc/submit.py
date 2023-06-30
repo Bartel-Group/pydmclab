@@ -553,7 +553,8 @@ class SubmitTools(object):
                 fpos_dst = os.path.join(calc_dir, "POSCAR")
                 if os.path.exists(fpos_dst):
                     # if there is a POSCAR, make sure its not empty
-                    contents = open(fpos_dst, "r").readlines()
+                    with open(fpos_dst, "r") as f:
+                        contents = f.readlines()
                     # if its empty, copy the initial structure to calc_dir
                     if len(contents) == 0:
                         copyfile(fpos_src, fpos_dst)
@@ -566,7 +567,8 @@ class SubmitTools(object):
                 # (ie later, we'll copy CONTCAR to POSCAR); otherwise, mark as NEWRUN
                 fcont_dst = os.path.join(calc_dir, "CONTCAR")
                 if os.path.exists(fcont_dst):
-                    contents = open(fcont_dst, "r").readlines()
+                    with open(fcont_dst, "r") as f:
+                        contents = f.readlines()
                     if (
                         (len(contents) > 0)
                         and not fresh_restart
@@ -806,7 +808,8 @@ class SubmitTools(object):
                                 if file_to_inherit == "CONTCAR":
                                     # make sure CONTCAR is not empty
                                     if os.path.exists(fsrc):
-                                        contents = open(fsrc).readlines()
+                                        with open(fsrc, "r") as f:
+                                            contents = f.readlines()
                                         if len(contents) < 0:
                                             continue
                                 f.write("cp %s %s\n" % (fsrc, fdst))
