@@ -1,0 +1,22 @@
+import unittest
+
+from pydmclab.hpc.vasp import VASPSetUp
+from pydmclab.core.struc import StrucTools
+
+import os
+
+class UnitTestVASPSetUp(unittest.TestCase):
+    def test_convergence_checker(self):
+        
+        calc_dir = '/home/cbartel/cbartel/projects/for_pydmclab_unit_tests/test_hit_nsw_unconverged/calcs/Cl1Li1/mp-1185319/dmc/nm/gga-relax'
+        vsu = VASPSetUp(calc_dir, user_configs={'calc_to_run' : 'relax'})
+        
+        unconverged_log = vsu.unconverged_log
+        
+        self.assertEqual(unconverged_log, ['nsw_too_low'])
+
+
+
+if __name__ == "__main__":
+    unittest.main()
+

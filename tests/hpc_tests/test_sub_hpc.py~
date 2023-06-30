@@ -1,0 +1,143 @@
+import unittest
+
+from pydmclab.hpc.vasp import VASPSetUp
+from pydmclab.hpc.submit import SubmitTools
+from pydmclab.core.struc import StrucTools
+
+import os
+
+class UnitTestSubmitTools(unittest.TestCase):
+    def test_fresh_prep_directories_and_write_sub(self):
+
+        launch_dir = '/home/cbartel/cbartel/projects/for_pydmclab_unit_tests/test_fresh_prep_directories/Al1N1/mp-661/dmc/nm'
+        user_configs = {
+            "loose_incar": {"ENCUT": 1234},
+            "files_to_inherit": ["WAVECAR", "CONTCAR", "CHGCAR"],
+            "time": 97 * 60,
+            "nodes": 4,
+            "partition": "msidmc",
+            'lobster_static' : True}
+        
+        launch_dirs = {launch_dir : {'xcs' : ['metagga'],
+                                     'magmom' : None}}
+        sub = SubmitTools(
+            launch_dir=launch_dir,
+            final_xcs=launch_dirs[launch_dir]["xcs"],
+            magmom=launch_dirs[launch_dir]["magmom"],
+            user_configs=user_configs,
+        )
+
+        statuses = sub.prepare_directories
+
+        count = 0
+        for final_xc in statuses:
+            for calc in statuses[final_xc]:
+                count += 1
+                self.assertEqual(statuses[final_xc][calc], "new")
+                self.assertTrue(os.path.exists(os.path.join(launch_dir, calc)))
+                for f in ['INCAR', 'KPOINTS', 'POTCAR', 'POSCAR']:
+                    self.assertTrue(os.path.exists(os.path.join(launch_dir, calc, f)))
+
+        self.assertEqual(
+            count,
+            len(
+                [
+                    "gga-loose",
+                    "gga-relax",
+                    "gga-static",
+                    "metagga-relax",
+                    "metagga-static",
+                ]
+            ),
+        )
+
+        sub.write_sub
+
+        fsub = os.path.join(launch_dir, 'sub_metagga.sh')
+        self.assertTrue(os.path.exists(fsub))
+        with open(fsub, 'r') as f:
+            mpi_counter = 0
+            lobster_counter = 0
+            bader_counter = 0
+            for line in f:
+                if 'mpirun' in line:
+                    mpi_counter += 1
+                if 'lobster' in line:
+                    lobster_counter += 1
+                if 'chgsum.pl' in line:
+                    bader_counter += 1
+
+        self.assertEqual(count, mpi_counter)
+        self.assertEqual(lobster_counter, 2)
+        self.assertEqual(bader_counter, 2)
+
+    def test_finished_calcs_write_sub(self):
+        launch_dir = '/home/cbartel/cbartel/projects/for_pydmclab_unit_tests/test_make_sub_for_finished_calcs/Al1N1/mp-661/dmc/nm'
+        launch_dirs = {launch_dir : {'xcs' : ['metagga'], 'magmom' : None}}
+
+        sub = SubmitTools(
+            launch_dir=launch_dir,
+            final_xcs=launch_dirs[launch_dir]["xcs"],
+            magmom=launch_dirs[launch_dir]["magmom"],
+            user_configs={},
+        )
+            
+        sub.write_sub
+
+        fsub = os.path.join(launch_dir, 'sub_metagga.sh')
+        self.assertTrue(os.path.exists(fsub))
+        with open(fsub) as f:
+            vasp_counter = 0
+            for line in f:
+                if 'vasp' in line:
+                    vasp_counter += 1
+                
+            self.assertEqual(vasp_counter, 0)
+            
+    def test_force_postprocess(self):
+        
+        launch_dir = '/home/cbartel/cbartel/projects/for_pydmclab_unit_tests/test_force_postprocess_sub/Ca2O7Ru2/mp-554638/dmc/fm'
+        
+        launch_dirs = {launch_dir : {'xcs' : ['metagga'],
+                                     'magmom' : None}}
+        sub = SubmitTools(launch_dir=launch_dir,
+                          final_xcs=launch_dirs[launch_dir]['xcs'],
+                          magmom=launch_dirs[launch_dir]['magmom'],
+                          user_configs={'lobster_static' : True})
+        
+        sub.write_sub
+
+        fsub = os.path.join(launch_dir, 'sub_metagga.sh')
+        with open(fsub) as f:
+            lobster_counter = 0
+            vasp_counter = 0
+            for line in f:
+                if 'lobster' in line:
+                    lobster_counter += 1
+                if 'vasp' in line:
+                    vasp_counter += 1
+        
+        self.assertEqual(lobster_counter, vasp_counter)
+        self.assertEqual(lobster_counter, 0)
+        
+        sub = SubmitTools(launch_dir=launch_dir,
+                          final_xcs=launch_dirs[launch_dir]['xcs'],
+                          magmom=launch_dirs[launch_dir]['magmom'],
+                          user_configs={'lobster_static' : True,
+                                        'force_postprocess' : True})
+        with open(fsub) as f:
+            lobster_counter = 0
+            vasp_counter = 0
+            for line in f:
+                if 'lobster' in line:
+                    lobster_counter += 1
+                if 'vasp' in line:
+                    vasp_counter += 1
+
+        self.assertEqual(lobster_counter, vasp_counter)
+        self.assertEqual(lobster_counter, 2)
+
+
+if __name__ == "__main__":
+    unittest.main()
+
