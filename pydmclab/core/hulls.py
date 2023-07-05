@@ -1063,12 +1063,12 @@ class MixingHull(object):
                 it's OK if entries in this dictionary are not relevant to the mixing hull you are trying to calculate
                     this code will just ignore them
 
-            end_members (list):
-                this should be a two-element list with each item of the list being a formula (str)
-                    this specifies the two "end members" of your mixing hull
-                    e.g., ['FeP2S6', 'Li2FeP2S6']
-                        if you were looking at the lithiation of FeP2S6 (e.g., to compute the insertion voltage)
-                    e.g., ['BaZrS3', 'BaNbS3']
+            left_end_member (str):
+            right_end_member (str):
+                this specifies the two "end members" of your mixing hull
+                e.g., left = 'FeP2S6' and right='Li2FeP2S6'
+                    if you were looking at the lithiation of FeP2S6 (e.g., to compute the insertion voltage)
+                e.g., left = 'BaZrS3', right = 'BaNbS3'
                         if you were looking at the formation of Ba(Zr_{1-x}Nb_x)S_3 phases
 
             energy_key (str): Defaults to "E".
@@ -1408,7 +1408,8 @@ def main():
         left_end_member="MnO",
         right_end_member="Li6MnO4",
         energy_key="Ef_mp",
-        divide_reactions_by_to_align_end_members=1,
+        divide_left_by=1,
+        divide_right_by=1,
     )
 
     return mix, mix.results
