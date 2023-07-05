@@ -371,15 +371,18 @@ def demo_mixing_hull(gs, end_members, remake=False):
 
     mh = MixingHull(
         input_energies=gs,
-        end_members=end_members,
+        left_end_member=end_members[0],
+        right_end_member=end_members[1],
         energy_key="Ef_mp",
+        divide_left_by=1,
+        divide_right_by=1,
     )
     out = mh.results
     for k in out:
         if out[k]["stability"]:
             print(k)
             print(out[k]["x"])
-            print(out[k]["E_mix"])
+            print(out[k]["E_mix_per_fu"])
 
     return out
 
