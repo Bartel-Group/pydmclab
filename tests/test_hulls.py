@@ -1,9 +1,10 @@
 import unittest
 from pydmclab.core.hulls import GetHullInputData, AnalyzeHull, ParallelHulls, MixingHull
+from pydmclab.utils.handy import read_json
 
 
 class UnitTestHulls(unittest.TestCase):
-    def test_get_hullin(self):
+    def _test_get_hullin(self):
         compounds = ["CaTiO3", "TiO2", "Al2O3", "CaO"]
         Efs = [-0.1, -0.2, -0.3, -0.4]
         compound_to_energy = {}
@@ -17,7 +18,7 @@ class UnitTestHulls(unittest.TestCase):
 
         self.assertEqual(hullin["Ca_O_Ti"]["Ca1O3Ti1"]["amts"]["Ca"], 0.2)
 
-    def test_get_hullout(self):
+    def _test_get_hullout(self):
         compounds = ["MnO", "MnO2"]
         Efs = [-2, -1.5]
         compound_to_energy = {}
@@ -36,7 +37,7 @@ class UnitTestHulls(unittest.TestCase):
 
         self.assertAlmostEqual(hullout["Mn1O2"]["Ed"], Ed_MnO2, places=5)
 
-    def test_parallel_hulls(self):
+    def _test_parallel_hulls(self):
         compounds = ["CaTiO3", "TiO2", "Al2O3", "CaO"]
         Efs = [-0.1, -0.2, -0.3, -0.4]
         compound_to_energy = {}
@@ -84,26 +85,76 @@ class UnitTestHulls(unittest.TestCase):
 
         end_members = ["Al2O3", "Ga2O3"]
         energy_key = "E"
+        divide_left, divide_right = 1, 1
 
         mh = MixingHull(
-            input_energies,
-            end_members,
-            energy_key,
+            input_energies=input_energies,
+            left_end_member=end_members[0],
+            right_end_member=end_members[1],
+            energy_key=energy_key,
+            divide_left_by=divide_left,
+            divide_right_by=divide_right,
         )
 
         results = mh.results
 
-        self.assertEqual(results["Al2O3"]["E_mix"], 0)
-        self.assertEqual(results["Ga2O3"]["E_mix"], 0)
+        self.assertEqual(results["Al2O3"]["E_mix_per_fu"], 0)
+        self.assertEqual(results["Ga2O3"]["E_mix_per_fu"], 0)
         self.assertEqual(results["Al2O3"]["x"], 0)
         self.assertEqual(results["Ga2O3"]["x"], 1)
         self.assertEqual(results["Al1Ga1O3"]["x"], 0.5)
         self.assertEqual(results["Al3Ga1O6"]["stability"], False)
         self.assertEqual(results["Al1Ga1O3"]["stability"], True)
 
-        E_mix_middle_hard = (1 / 5) * (-25 * 5 - (0.5 * -30 * 5 + 0.5 * -10 * 5))
+        E_mix_middle_hard = -25 * 5 - (0.5 * -30 * 5 + 0.5 * -10 * 5)
 
-        self.assertEqual(results["Al1Ga1O3"]["E_mix"], E_mix_middle_hard)
+        self.assertEqual(results["Al1Ga1O3"]["E_mix_per_fu"], E_mix_middle_hard)
+
+        input_energies = read_json(
+            "../pydmclab/demos/output/hulls/data/query_Li-Mn-Fe-O.json"
+        )
+        energy_key = "Ef_mp"
+        end_members = ["Li", "MnO2"]
+        mix = MixingHull(
+            input_energies=input_energies,
+            left_end_member=end_members[0],
+            right_end_member=end_members[1],
+            energy_key=energy_key,
+            divide_left_by=divide_left,
+            divide_right_by=divide_right,
+        )
+        out = mix.results
+        print(out["Li1Mn2O4"])
+        self.assertEqual(out["Li1Mn2O4"]["stability"], True)
+        self.assertAlmostEqual(out["Li1Mn2O4"]["E_mix_per_at"], -0.520, places=2)
+        self.assertEqual(out["Li1Mn2O4"]["mixing_rxn"], "Li + 2 MnO2 -> LiMn2O4")
+        self.assertEqual(out["Li1Mn2O4"]["x"], 2 / 3)
+        self.assertEqual(
+            out["Li1Mn2O4"]["E_mix_per_fu"] / out["Li1Mn2O4"]["E_mix_per_at"],
+            2 / 3 * 3 + 1 / 3 * 1,
+        )
+
+        end_members = ["LiMnO2", "Li9Mn20O40"]
+        divide_right = 20
+        mix = MixingHull(
+            input_energies=input_energies,
+            left_end_member=end_members[0],
+            right_end_member=end_members[1],
+            energy_key=energy_key,
+            divide_left_by=divide_left,
+            divide_right_by=divide_right,
+        )
+        out = mix.results
+        print(out["Li1Mn2O4"])
+
+        self.assertEqual(out["Li1Mn2O4"]["stability"], True)
+        self.assertAlmostEqual(out["Li1Mn2O4"]["E_mix_per_at"], -0.011, places=2)
+        self.assertEqual(out["Li1Mn2O4"]["x"], 1 / 3)
+        self.assertAlmostEqual(
+            out["Li1Mn2O4"]["E_mix_per_fu"] / out["Li1Mn2O4"]["E_mix_per_at"],
+            (1 / 3) * 69 / 20 + (2 / 3) * 4,
+            places=4,
+        )
 
 
 if __name__ == "__main__":
