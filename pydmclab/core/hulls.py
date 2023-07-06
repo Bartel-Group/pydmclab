@@ -1032,12 +1032,21 @@ class MixingHull(object):
             2b) examples not adhering to the same basis
                 - e.g., A = LiMnO2, B = Mn3O4 does not adhere to the same basis
                     - B must be re-cast as Mn_{1.5}O2, then basis = Li_{z}MnO2
+                    - divide_right_by = 2
                 - e.g., A = Li2MnO3, B = MnO2 does not adhere to the same basis
                     - A must be re-cast as Li_{4/3}Mn_{2/3}O2, then basis = Li_{z}MnO2
+                    - divide_left_by = 3/2
                 - e.g., A = Li3Fe2P4S12, B = FeP2S6 does not adhere to the same basis
                     - A must be re-cast as Li_{1.5}FeP2S6, then basis = Li_{z}FeP2S6
+                    - divide_left_by = 2
                 - e.g., A = Li9Mn20O40, B = LiMnO2 does not adhere to the same basis
                     - A must be re-cast as Li_{0.45}MnO2, then basis = Li_{z}MnO2
+                    - divide_left_by = 20
+            2c) the end members have the same basis, but you want to change both of them
+                - e.g., A = Li8Fe3Mn1P8S24, B = Fe3Mn1P8S24
+                    - you want a ...P2S6 basis
+                    - so A must be-recast as Li_{2}Fe_{0.75}Mn_{0.25}P2S6 and B = Fe_{0.75}Mn_{0.25}P2S6
+                    - divide_left_by = 4, divide_right_by = 4
 
         Mixing hulls are computed for mixing energies with a basis formula having A_{1-x}B_{x} atoms where A and B are compounds having the same basis
             align the basis using divide_left_by and divide_right_by

@@ -184,6 +184,10 @@ class StrucTools(object):
         print("decorating with oxidation states\n")
         structure = self.structure
         ox_states = self.ox_states
+        els = self.els
+        if not ox_states:
+            ox_states = {els[0]: 0}
+
         if not ox_states:
             print("     automatically\n")
             transformer = AutoOxiStateDecorationTransformation()
