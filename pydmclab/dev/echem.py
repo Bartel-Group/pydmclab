@@ -46,12 +46,17 @@ class VoltageCurve(object):
 
     @property
     def mixing_results(self):
+        charged, discharged = self.charged_composition, self.discharged_composition
+        basis_ion, basis_amt = self.basis_ion
+        divide_charged_by = CompTools(charged).stoich(basis_ion) / basis_amt
+        divide_discharged_by = CompTools(discharged).stoich(basis_ion) / basis_amt
         hull = MixingHull(
             input_energies=self.input_energies,
             energy_key=self.energy_key,
-            varying_element=self.intercalating_ion,
-            end_members=[self.charged_composition, self.discharged_composition],
-            shared_element_basis=self.basis_ion[0],
+            left_end_member=discharged,
+            right_end_member=charged,
+            divide_left_by=divide_discharged_by,
+            divide_right_by=divide_charged_by,
         )
 
         d = hull.results
@@ -67,16 +72,18 @@ class VoltageCurve(object):
             n_basis_el = CompTools(original_formula).stoich(self.basis_ion[0])
             if n_basis_el == 0:
                 continue
-            factor = self.basis_ion[1] / n_basis_el
-            E_per_basis_fu = E_per_at * CompTools(original_formula).n_atoms * factor
+            divide_formula_by = n_basis_el / self.basis_ion[1]
+            E_per_basis_fu = (
+                E_per_at * CompTools(original_formula).n_atoms / divide_formula_by
+            )
 
             n_ion = CompTools(original_formula).stoich(self.intercalating_ion)
-            n_basis_ion = n_ion * factor
+            n_basis_ion = n_ion / divide_formula_by
 
             out[original_formula] = {
                 "on_mixing_hull": stability,
                 "E_per_at": E_per_at,
-                "factor": factor,
+                "divide_formula_by": divide_formula_by,
                 "n_intercalating": n_basis_ion,
                 "E": E_per_basis_fu,
             }
@@ -178,7 +185,8 @@ def make_voltages():
 def chrisc_main():
     fjson = os.path.join("/users/cbartel", "Downloads", "Li2MP2S6_gga_gs_E_per_at.json")
     energies = read_json(fjson)
-    mixing = make_mixing_json()
+    # mixing = make_mixing_json()
+    mixing = None
     voltages = make_voltages()
     return energies, mixing, voltages
 
@@ -206,7 +214,7 @@ def mm_stuff():
     return energies, out
 
 
-def main():
+def mm_main():
     fjson = os.path.join("/Users/cbartel/Downloads/gs_ABX3-subs_b.json")
     gs = read_json(fjson)
     input_energies = gs["dmc"]["gga"]
@@ -236,6 +244,10 @@ def main():
     E_mix = results[compound_at_x]["E_mix"]
     print(E_mix)
     return out
+
+
+def main():
+    chrisc_main()
 
 
 if __name__ == "__main__":
