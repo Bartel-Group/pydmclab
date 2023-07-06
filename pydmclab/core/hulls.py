@@ -1040,7 +1040,9 @@ class MixingHull(object):
                     - A must be re-cast as Li_{0.45}MnO2, then basis = Li_{z}MnO2
 
         Mixing hulls are computed for mixing energies with a basis formula having A_{1-x}B_{x} atoms where A and B are compounds having the same basis
-            align the basis using divide_reactions_by_to_align_end_members
+            align the basis using divide_left_by and divide_right_by
+
+        We generally care about mixing energies per formula unit basis ('E_mix_per_fu')
     """
 
     def __init__(
