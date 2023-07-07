@@ -839,6 +839,7 @@ class SubmitTools(object):
                             "\necho launched %s-%s >> %s\n"
                             % (xc_to_run, calc_to_run, fstatus)
                         )
+                f.write("\n\nscancel $SLURM_JOB_ID\n")
         return True
 
     @property
