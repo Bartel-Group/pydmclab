@@ -601,6 +601,8 @@ class VASPSetUp(object):
             incar_changes["SYMPREC"] = 1e-8
         if "zheev" in errors:
             incar_changes["ALGO"] = "Exact"
+        if "pssyevx" in errors:
+            incar_changes["ALGO"] = "Normal"
         if "zpotrf" in errors:
             incar_changes["ISYM"] = -1
         if "zbrent" in errors:
