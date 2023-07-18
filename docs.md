@@ -545,8 +545,10 @@ launch_dirs = {<composition>/<unique ID for that composition>/<standard>/<unique
   
 ## demos
 
-- decomposition energies: `pydmclab/pydmclab/demos/demo_hulls.py`
-- formation energies: **@TODO**
+- most methods in `pydmclab` are demonstrated in `pydmclab/demos`
+- these demos are meant to supplement the documentation present within the source code for each function/class
+- functions from these demos are illustrative and should not be imported for your own work
+- they are just here to help give a better idea what you can do with the various tools in `pydmclab`
 
 # Supporting modules
 
