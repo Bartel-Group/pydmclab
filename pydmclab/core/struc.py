@@ -440,7 +440,7 @@ class StrucTools(object):
             reorient_lattice=reorient_lattice,
         )
 
-        slabs = slabgen.get_slabs()
+        slabs = slabgen.get_slabs(symmetrize=True)
 
         out = {}
         for i, slab in enumerate(slabs):
