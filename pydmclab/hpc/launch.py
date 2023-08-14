@@ -31,6 +31,7 @@ class LaunchTools(object):
         top_level,
         unique_ID,
         magmoms=None,
+        ID_specific_vasp_configs={},
         user_configs={},
         refresh_configs=True,
         launch_configs_yaml=os.path.join(os.getcwd(), "_launch_configs.yaml"),
@@ -75,6 +76,18 @@ class LaunchTools(object):
 
                 if you are not running AFM calculations (you don't need a specific MAGMOM)
                     can be None or {}
+
+            ID_specific_vasp_configs (dict):
+                if you want certain VASP configs (eg INCAR, KPOINTS, POTCAR) to apply to particular IDs,
+                    you would pass that here
+                the format should be the same as _vasp_configs.yaml
+                    i.e., specify for loose, relax, static as needed
+
+                    {formula_ID (str) :
+                        {'loose_incar' : {'NELECT' : 123},
+                         'relax_incar' : {'NELECT' : 123},
+                         'static_incar' : {'NELECT' : 123}}
+
 
             user_configs (dict):
                 any setting you want to pass that's not default in pydmclab.data.data._launch_configs.yaml
@@ -134,6 +147,8 @@ class LaunchTools(object):
 
         # make a copy of our configs to prevent unwanted changes
         self.configs = configs.copy()
+
+        self.ID_specific_vasp_configs = ID_specific_vasp_configs.copy()
 
     @property
     def valid_mags(self):
@@ -211,6 +226,7 @@ class LaunchTools(object):
         """
         structure = self.structure
         magmoms = self.magmoms
+        ID_specific_vasp_configs = self.ID_specific_vasp_configs.copy()
 
         # make a copy of our configs to prevent unwanted changes
         configs = self.configs.copy()
@@ -259,6 +275,13 @@ class LaunchTools(object):
                 # SubmitTools will make 1 submission script for each final_xc
                 # save the magmom as well. VASPSetUp will need that to set the INCARs for all calcs in this launch_dir
                 launch_dirs[launch_dir] = {"xcs": xcs, "magmom": magmom}
+
+                if "_".join([level1, level2]) in ID_specific_vasp_configs:
+                    launch_dirs[launch_dir][
+                        "ID_specific_vasp_configs"
+                    ] = ID_specific_vasp_configs["_".join([level1, level2])]
+                else:
+                    launch_dirs[launch_dir]["ID_specific_vasp_configs"] = None
 
                 # if make_dirs, make the launch_dir and put a POSCAR in there
                 if make_dirs:

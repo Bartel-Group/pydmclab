@@ -654,6 +654,7 @@ def get_launch_dirs(
     strucs,
     magmoms,
     user_configs,
+    ID_specific_vasp_configs=None,
     make_launch_dirs=True,
     refresh_configs=True,
     data_dir=os.getcwd().replace("scripts", "data"),
@@ -671,6 +672,9 @@ def get_launch_dirs(
 
         user_configs (dict)
             optional launch configurations
+
+        ID_specific_vasp_configs (dict)
+            optional VASP configurations for specific IDs
 
         make_launch_dirs (bool)
             make launch directories (True) or just return launch dict (False)
@@ -719,6 +723,7 @@ def get_launch_dirs(
                 calcs_dir=calcs_dir,
                 user_configs=user_configs,
                 magmoms=curr_magmoms,
+                ID_specific_vasp_configs=ID_specific_vasp_configs,
                 structure=structure,
                 top_level=top_level,
                 unique_ID=unique_ID,
@@ -773,6 +778,9 @@ def submit_one_calc(submit_args):
     user_configs = submit_args["user_configs"]
     refresh_configs = submit_args["refresh_configs"]
     ready_to_launch = submit_args["ready_to_launch"]
+
+    if launch_dirs[launch_dir]["ID_specific_vasp_configs"]:
+        user_configs.update(launch_dirs[launch_dir]["ID_specific_vasp_configs"])
 
     # what are our terminal xcs for that launch_dir
     final_xcs = launch_dirs[launch_dir]["xcs"]

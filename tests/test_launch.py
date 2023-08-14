@@ -30,6 +30,7 @@ class UnitTestLaunchTools(unittest.TestCase):
             top_level=top_level,
             unique_ID=unique_ID,
             magmoms=magmoms,
+            ID_specific_vasp_configs={"Mn1O1_0": {"loose_incar": {"NELECT": 123}}},
             user_configs=user_configs,
         )
 
@@ -49,6 +50,12 @@ class UnitTestLaunchTools(unittest.TestCase):
             for mag in mags:
                 dir_to_launch = os.path.join(structure_path, standard, mag)
                 self.assertTrue(dir_to_launch in launch_dirs)
+                self.assertEqual(
+                    launch_dirs[dir_to_launch]["ID_specific_vasp_configs"][
+                        "loose_incar"
+                    ]["NELECT"],
+                    123,
+                )
                 if "afm" in mag:
                     self.assertTrue(
                         launch_dirs[dir_to_launch]["magmom"],
