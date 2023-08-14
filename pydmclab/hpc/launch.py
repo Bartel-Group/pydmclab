@@ -281,7 +281,7 @@ class LaunchTools(object):
                         "ID_specific_vasp_configs"
                     ] = ID_specific_vasp_configs["_".join([level1, level2])]
                 else:
-                    launch_dirs[launch_dir]["ID_specific_vasp_configs"] = None
+                    launch_dirs[launch_dir]["ID_specific_vasp_configs"] = {}
 
                 # if make_dirs, make the launch_dir and put a POSCAR in there
                 if make_dirs:

@@ -654,7 +654,7 @@ def get_launch_dirs(
     strucs,
     magmoms,
     user_configs,
-    ID_specific_vasp_configs=None,
+    ID_specific_vasp_configs={},
     make_launch_dirs=True,
     refresh_configs=True,
     data_dir=os.getcwd().replace("scripts", "data"),
