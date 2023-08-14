@@ -1,8 +1,8 @@
 import os
 from pydmclab.hpc.helpers import (
-    get_query,
+    # get_query,
     check_query,
-    get_strucs,
+    # get_strucs,
     check_strucs,
     get_magmoms,
     check_magmoms,
@@ -42,11 +42,11 @@ for d in [CALCS_DIR, DATA_DIR]:
         os.makedirs(d)
 
 # if you need data from MP as a starting point (often the case), you need your API key
-API_KEY = "***REMOVED***"
+API_KEY = "__API KEY__"
 
 # what to query MP for (if you need MP data)
 ## e.g., 'MnO2', ['MnO2', 'TiO2'], 'Ca-Ti-O, etc
-COMPOSITIONS = ['GaN']
+COMPOSITIONS = ["GaN"]
 
 # any configurations related to LaunchTools
 LAUNCH_CONFIGS = get_launch_configs(
@@ -112,19 +112,32 @@ GEN_MAGMOMS = True if LAUNCH_CONFIGS["n_afm_configs"] else False
 # You will often want to write your own "get_query" and/or "get_strucs" functions instead
 # See below (or within pydmclab.hpc.helpers) for some more detailed docs
 
-def get_query(data_dir=os.getcwd().replace("scripts", "data"),
+""" 
+In this launcher, we're going to run charged defect calculations
+We are going to start from our neutral defect calculations
+    - these must have started running for this launcher to work
+        - because it's going to collect NELECT from those calculations
+We're going to use the same initial structures as those used for the neutral calculations
+    - the only difference is we're going to pass custom INCAR settings (NELECT, ISIF) to different "ID"s to run our charged calculations
+"""
+
+
+def get_query(
+    data_dir=os.getcwd().replace("scripts", "data"),
     savename="query.json",
     remake=False,
 ):
+    """Use our neutral calculations strucs dict as our "query" here"""
     fjson = os.path.join(data_dir, savename)
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
 
-    path_to_neutral = os.getcwd().replace('charged', 'neutral')
-    neutral_data = os.path.join(path_to_neutral.replace('scripts', 'data'))
-    query = read_json(os.path.join(neutral_data, 'strucs.json'))
+    path_to_neutral = os.getcwd().replace("charged", "neutral")
+    neutral_data = os.path.join(path_to_neutral.replace("scripts", "data"))
+    query = read_json(os.path.join(neutral_data, "strucs.json"))
     write_json(query, fjson)
     return read_json(fjson)
+
 
 def get_strucs(
     query,
@@ -133,6 +146,7 @@ def get_strucs(
     savename="strucs.json",
     remake=False,
 ):
+    """Create unique IDs for each charge state we want to run for each structure"""
     fjson = os.path.join(data_dir, savename)
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
@@ -141,21 +155,34 @@ def get_strucs(
     for formula in query:
         strucs[formula] = {}
         for ID in query[formula]:
-            if 'pristine' in ID:
+            if "pristine" in ID:
+                # we don't want to run charged calculations for the pristine structure
                 continue
+
             for charge_state in charge_states:
-                indicator = 'm' if charge_state < 0 else 'p'
-                charge_tag = '_'.join([indicator, str(abs(charge_state))])
-                charge_ID = '-'.join([ID, charge_tag])
+                # m for minus; p for plus
+                indicator = "m" if charge_state < 0 else "p"
+
+                # our "charge_tag" will be like m_2 for -2 defect or p_1 for +1 defect
+                charge_tag = "_".join([indicator, str(abs(charge_state))])
+
+                # our "ID" for this charged calculation will be like <structure ID> - <charge tag>
+                # e.g., our structure ID might be V_N-2 for the 3rd structure of the N vacancy calculations we ran in neutral
+                # so our charged calculation ID will be V_N-2-m_2 for the -2 charge state of the 3rd structure of the N vacancy calculations
+                charge_ID = "-".join([ID, charge_tag])
                 strucs[formula][charge_ID] = query[formula][ID]
-    
+
     write_json(strucs, fjson)
     return read_json(fjson)
 
-def get_ID_specific_vasp_configs(strucs,
-                                 data_dir=os.getcwd().replace("scripts", "data"),
-                                 savename="ID_specific_vasp_configs.json",
-                                 remake=False):
+
+def get_ID_specific_vasp_configs(
+    strucs,
+    data_dir=os.getcwd().replace("scripts", "data"),
+    savename="ID_specific_vasp_configs.json",
+    remake=False,
+):
+    """Here is we're we'll prepare our "ID-specific" VASP configs"""
     fjson = os.path.join(data_dir, savename)
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
@@ -163,25 +190,41 @@ def get_ID_specific_vasp_configs(strucs,
     out = {}
     for formula in strucs:
         for ID in strucs[formula]:
-            key = '_'.join([formula, ID])
+            key = "_".join([formula, ID])
             out[key] = {}
-            
-            neutral_calc = os.path.join(os.getcwd().replace('charged', 'neutral').replace('scripts', 'calcs'), formula, '-'.join(ID.split('-')[:-1]), 'dmc', 'nm', 'gga-loose')
+
+            # first, we need the NELECT from our neutral calculation
+            neutral_calc = os.path.join(
+                os.getcwd().replace("charged", "neutral").replace("scripts", "calcs"),
+                formula,
+                "-".join(ID.split("-")[:-1]),
+                "dmc",
+                "nm",
+                "gga-loose",
+            )
             print(os.listdir(neutral_calc))
             av = AnalyzeVASP(neutral_calc)
             neutral_nelect = av.outputs.outcar.nelect
-            charge_tag = ID.split('-')[-1]
-            indicator, charge_state = charge_tag.split('_')
-            if indicator == 'p':
+
+            # now we need to use our "charge_tag" to figure out how to change NELECT
+            charge_tag = ID.split("-")[-1]
+            indicator, charge_state = charge_tag.split("_")
+
+            # remove e- for positive charge states
+            if indicator == "p":
                 new_nelect = neutral_nelect - float(charge_state)
-            elif indicator == 'm':
+            # add e- for negative charge states
+            elif indicator == "m":
                 new_nelect = neutral_nelect + float(charge_state)
-            for calc in ['loose', 'relax', 'static']:
-                out[key][calc+'_incar'] = {'NELECT' : int(new_nelect)
-                                           'ISIF' : 2}
-    
+
+            # modify the loose, relax, and static INCAR
+            # new NELECT and optimize only ion positions, not cell shape
+            for calc in ["loose", "relax", "static"]:
+                out[key][calc + "_incar"] = {"NELECT": int(new_nelect), "ISIF": 2}
+
     write_json(out, fjson)
     return read_json(fjson)
+
 
 def main():
     remake_sub_for_launcher = False
@@ -194,6 +237,9 @@ def main():
 
     remake_magmoms = False
     print_magmoms_check = True
+
+    remake_ID_specific_vasp_configs = False
+    print_ID_specific_vasp_configs_check = True
 
     remake_launch_dirs = False
     print_launch_dirs_check = True
@@ -215,8 +261,9 @@ def main():
 
     comp = COMPOSITIONS
     query = get_query(
-        data_dir=DATA_DIR, remake=remake_query,
-            )
+        data_dir=DATA_DIR,
+        remake=remake_query,
+    )
     if print_query_check:
         check_query(query)
 
@@ -231,10 +278,15 @@ def main():
     else:
         magmoms = None
 
-    ID_specific_vasp_configs = get_ID_specific_vasp_configs(strucs, remake=True)
+    ID_specific_vasp_configs = get_ID_specific_vasp_configs(
+        strucs, data_dir=DATA_DIR, remake=remake_ID_specific_vasp_configs
+    )
 
-    print(ID_specific_vasp_configs)
-
+    if print_ID_specific_vasp_configs_check:
+        for ID in ID_specific_vasp_configs:
+            print("\n")
+            print(ID)
+            print(ID_specific_vasp_configs[ID])
 
     launch_configs = LAUNCH_CONFIGS
     launch_dirs = get_launch_dirs(
@@ -248,8 +300,7 @@ def main():
     )
     if print_launch_dirs_check:
         check_launch_dirs(launch_dirs)
-    
-#    return
+
     sub_configs = SUB_CONFIGS
     slurm_configs = SLURM_CONFIGS
     vasp_configs = VASP_CONFIGS

@@ -2,7 +2,7 @@ import os
 from pydmclab.hpc.helpers import (
     get_query,
     check_query,
-    get_strucs,
+    # get_strucs,
     check_strucs,
     get_magmoms,
     check_magmoms,
@@ -41,11 +41,11 @@ for d in [CALCS_DIR, DATA_DIR]:
         os.makedirs(d)
 
 # if you need data from MP as a starting point (often the case), you need your API key
-API_KEY = "***REMOVED***"
+API_KEY = "__API KEY__"
 
 # what to query MP for (if you need MP data)
 ## e.g., 'MnO2', ['MnO2', 'TiO2'], 'Ca-Ti-O, etc
-COMPOSITIONS = ['GaN']
+COMPOSITIONS = ["GaN"]
 
 # any configurations related to LaunchTools
 LAUNCH_CONFIGS = get_launch_configs(
@@ -111,6 +111,13 @@ GEN_MAGMOMS = True if LAUNCH_CONFIGS["n_afm_configs"] else False
 # You will often want to write your own "get_query" and/or "get_strucs" functions instead
 # See below (or within pydmclab.hpc.helpers) for some more detailed docs
 
+""" 
+In this launcher, we're going to run neutral defect calculations
+The only thing that really must be modified from the launcher_template is our get_strucs function
+We need to use that function to create our defective structures
+"""
+
+
 def get_strucs(
     query,
     data_dir=os.getcwd().replace("scripts", "data"),
@@ -121,39 +128,67 @@ def get_strucs(
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
 
-    formula = 'Ga1N1'
-    mpid = [mpid for mpid in query if query[mpid]['cmpd'] == formula]
+    # demo'ing for a single "pristine" formula, but it doesn't have to be
+    formula = "Ga1N1"
+
+    # get my single pristine structure for that formula
+    mpid = [mpid for mpid in query if query[mpid]["cmpd"] == formula]
     if len(mpid) > 1:
         raise ValueError
     mpid = mpid[0]
-    
-    pristine_structure = query[mpid]['structure']
-    ox_states = {'N' : -3, 'Ga' : 3, 'Mg' : 2}
+
+    # specify the oxidation states for all ions in the pristine structure
+    # and any extrinsic dopants (in this demo, Mg)
+    pristine_structure = query[mpid]["structure"]
+    ox_states = {"N": -3, "Ga": 3, "Mg": 2}
     st = StrucTools(pristine_structure, ox_states=ox_states)
-    
+
+    # determine the number of each element in the pristine structure
     amts = st.amts
-    
-    N_occ_for_vacancy = (amts['N'] - 1) / amts['N']
-    
-    Ga_occ_for_Mg_Ga = (amts['Ga'] - 1) / amts['Ga']
-    Mg_occ_for_Mg_Ga = 1 / amts['Ga']
-    
-    V_N_structure = st.change_occ_for_el('N', {'N' : N_occ_for_vacancy})
-    Mg_Ga_structure = st.change_occ_for_el('Ga', {'Ga' : Ga_occ_for_Mg_Ga,
-                                                  'Mg' : Mg_occ_for_Mg_Ga})
 
+    # get the nitrogen occupancy for a structure w/ a dilute nitrogen vacancy, V_N
+    N_occ_for_vacancy = (amts["N"] - 1) / amts["N"]
+
+    # get the Ga and Mg occupancies for a structure w/ a dilute Mg dopant on a Ga site
+    Ga_occ_for_Mg_Ga = (amts["Ga"] - 1) / amts["Ga"]
+    Mg_occ_for_Mg_Ga = 1 / amts["Ga"]
+
+    # create a V_N starting structure w/ partial occupancies
+    V_N_structure = st.change_occ_for_el("N", {"N": N_occ_for_vacancy})
+
+    # create a Mg_Ga starting structure w/ partial occupancies
+    Mg_Ga_structure = st.change_occ_for_el(
+        "Ga", {"Ga": Ga_occ_for_Mg_Ga, "Mg": Mg_occ_for_Mg_Ga}
+    )
+
+    # set the number of symmetry-inequivalent defective structures I'd like to generate
     n_strucs = 2
-    V_N_structures = StrucTools(V_N_structure, ox_states=ox_states).get_ordered_structures(n_strucs=n_strucs)
-    Mg_Ga_structures = StrucTools(Mg_Ga_structure, ox_states=ox_states).get_ordered_structures(n_strucs=n_strucs)
 
-    strucs = {'pristine-0' : pristine_structure}
-    
+    # generate ordered structures w/ V_N
+    V_N_structures = StrucTools(
+        V_N_structure, ox_states=ox_states
+    ).get_ordered_structures(n_strucs=n_strucs)
+
+    # generate ordered structures w/ Mg_Ga
+    Mg_Ga_structures = StrucTools(
+        Mg_Ga_structure, ox_states=ox_states
+    ).get_ordered_structures(n_strucs=n_strucs)
+
+    # start my strucs dict with the pristine structure
+    # ID naming convention will be <defect>-<structure index>
+    strucs = {"pristine-0": pristine_structure}
+
+    # populate strucs dict with V_N structures
     for i in V_N_structures:
-        strucs['V_N-%s' % str(i)] = V_N_structures[i]
-        
+        strucs["V_N-%s" % str(i)] = V_N_structures[i]
+
+    # populate strucs dict with Mg_Ga structures
     for i in Mg_Ga_structures:
-        strucs['Mg_Ga-%s' % str(i)] = Mg_Ga_structures[i]
-    
+        strucs["Mg_Ga-%s" % str(i)] = Mg_Ga_structures[i]
+
+    # align strucs dict with expected structure
+    # {"<formula>": {"<ID>": structure}}
+    # note: if you have more than one "formula", you would need to loop through those as well
     out = {}
     for ID in strucs:
         st = StrucTools(strucs[ID])
@@ -164,7 +199,6 @@ def get_strucs(
 
     write_json(out, fjson)
     return read_json(fjson)
-
 
 
 def main():
@@ -199,8 +233,11 @@ def main():
 
     comp = COMPOSITIONS
     query = get_query(
-        comp=comp, api_key=API_KEY, data_dir=DATA_DIR, remake=remake_query,
-        supercell_structure=[2,2,2]
+        comp=comp,
+        api_key=API_KEY,
+        data_dir=DATA_DIR,
+        remake=remake_query,
+        supercell_structure=[2, 2, 2],  # make a supercell of the pristine if necessary
     )
     if print_query_check:
         check_query(query)
