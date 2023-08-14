@@ -779,6 +779,9 @@ def submit_one_calc(submit_args):
     refresh_configs = submit_args["refresh_configs"]
     ready_to_launch = submit_args["ready_to_launch"]
 
+    if launch_dirs[launch_dir]["ID_specific_vasp_configs"]:
+        user_configs.update(launch_dirs[launch_dir]["ID_specific_vasp_configs"])
+
     # what are our terminal xcs for that launch_dir
     final_xcs = launch_dirs[launch_dir]["xcs"]
 
