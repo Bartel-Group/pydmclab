@@ -1476,8 +1476,7 @@ def make_sub_for_launcher():
 
 
 def setup_bandstructure(
-    converged_static_dir, rerun=False, symprec=0.1, ready_to_launch=False, **kwargs
-):
+        converged_static_dir, rerun=False, symprec=0.1, kpoints_line_density=20):
     """
     Args:
         converged_static_dir (str)
@@ -1527,13 +1526,14 @@ def setup_bandstructure(
         KPOINTS_output=fkpoints_dst,
         line_mode=True,
         symprec=symprec,
+        kpoints_line_density=kpoints_line_density
     )
 
     copyfile(fpotcar_src, fpotcar_dst)
 
     lobsterin = Lobsterin.standard_calculations_from_vasp_files(
         POSCAR_input=fposcar_dst,
-        INCAR_input=fincar_dst,
+        INCAR_input=fincar_src,
         POTCAR_input=fpotcar_dst,
         option="standard_with_fatband",
     )
@@ -1546,27 +1546,6 @@ def setup_bandstructure(
         poscar_input=fposcar_dst,
         further_settings={"ISMEAR": 0},
     )
-
-    submit_args = {
-        "launch_dir": bs_dir,
-        "launch_dirs": {
-            bs_dir: {
-                "xcs": [bs_dir.split("/")[-1].split("-")[0]],
-                "magmom": None,
-                "ID_specific_vasp_configs": None,
-            }
-        },
-        "user_configs": {
-            **get_sub_configs(**kwargs),
-            **get_slurm_configs(**kwargs),
-            **get_vasp_configs(**kwargs),
-        },
-        "refresh_configs": [],
-        "ready_to_launch": ready_to_launch,
-    }
-
-    submit_one_calc(submit_args)
-
 
 def main():
     return
