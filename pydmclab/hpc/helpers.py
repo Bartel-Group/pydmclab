@@ -783,7 +783,7 @@ def submit_one_calc(submit_args):
     refresh_configs = submit_args["refresh_configs"]
     ready_to_launch = submit_args["ready_to_launch"]
 
-    if 'ID_specific_vasp_configs' in launch_dirs[launch_dir]:
+    if "ID_specific_vasp_configs" in launch_dirs[launch_dir]:
         if launch_dirs[launch_dir]["ID_specific_vasp_configs"]:
             user_configs.update(launch_dirs[launch_dir]["ID_specific_vasp_configs"])
 
@@ -1475,7 +1475,9 @@ def make_sub_for_launcher():
         f.write("\npython launcher.py\n")
 
 
-def setup_bandstructure(converged_static_dir, rerun=False, symprec=0.1, user_configs={}, ready_to_launch=False):
+def setup_bandstructure(
+    converged_static_dir, rerun=False, symprec=0.1, ready_to_launch=False, **kwargs
+):
     """
     Args:
         converged_static_dir (str)
@@ -1544,20 +1546,31 @@ def setup_bandstructure(converged_static_dir, rerun=False, symprec=0.1, user_con
         poscar_input=fposcar_dst,
         further_settings={"ISMEAR": 0},
     )
-    
-    submit_args = {'launch_dir' : bs_dir,
-                   'launch_dirs' : {bs_dir : {'xcs' : [bs_dir.split('/')[-1].split('-')[0]], 'magmom' : None, 'ID_specific_vasp_configs' : None}},
-                   'user_configs' : user_configs,
-                   'refresh_configs' : [],
-                   'ready_to_launch' : ready_to_launch}
-                   
-    
+
+    submit_args = {
+        "launch_dir": bs_dir,
+        "launch_dirs": {
+            bs_dir: {
+                "xcs": [bs_dir.split("/")[-1].split("-")[0]],
+                "magmom": None,
+                "ID_specific_vasp_configs": None,
+            }
+        },
+        "user_configs": {
+            **get_sub_configs(**kwargs),
+            **get_slurm_configs(**kwargs),
+            **get_vasp_configs(**kwargs),
+        },
+        "refresh_configs": [],
+        "ready_to_launch": ready_to_launch,
+    }
+
     submit_one_calc(submit_args)
-    
-    
 
 
 def main():
+    return
+
 
 if __name__ == "__main__":
     main()
