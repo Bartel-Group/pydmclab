@@ -32,3 +32,15 @@ packing:
   - gga-static
   - metagga-relax
   - metagga-static
+ gga_hse06:
+  - gga-loose
+  - gga-relax
+  - gga-static
+  - hse06-static
+ metagga_hse06:
+  - gga-loose
+  - gga-relax
+  - gga-static
+  - metagga-relax
+  - metagga-static
+  - hse06-static

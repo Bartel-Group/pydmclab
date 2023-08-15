@@ -11,6 +11,7 @@ calc_to_run: # usually this is what we want unless you want an independent "stat
 fun: # usually this is fine
 lobster_static: False # can make False if you don't want to run LOBSTER
 perturb_struc: False # if float, perturb internal ionic coordinates by perturb_struc
+generate_bandstructure: False # if True, run a bandstructure calculation at the end
 
 # some output files
 fvaspout: vasp.o # where vasp output goes in calc_dir for each vasp run

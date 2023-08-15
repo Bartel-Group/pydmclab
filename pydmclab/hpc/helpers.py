@@ -10,6 +10,10 @@ from pydmclab.core.energies import ChemPots, FormationEnthalpy
 from pydmclab.utils.handy import read_json, write_json
 from pydmclab.data.configs import load_partition_configs
 
+from pymatgen.io.lobster import Lobsterin
+
+from shutil import copyfile
+
 
 def get_vasp_configs(
     run_lobster=False,
@@ -757,7 +761,7 @@ def submit_one_calc(submit_args):
                     (formula/ID/standard/mag) to write and launch submission script in,
             'launch_dirs' :
                 launch_dirs (dict)
-                    {launch_dir (formula/ID/standard/mag) : {'xcs' : [list of final_xcs], 'magmoms' : [list of magmoms for each site in structure in launch_dir]}},
+                    {launch_dir (formula/ID/standard/mag) : {'xcs' : [list of final_xcs], 'magmoms' : [list of magmoms for each site in structure in launch_dir], 'ID_specific_vasp_configs' : {options}}},
             'user_configs' :
                 user_configs (dict)
                     optional sub, slurm, or VASP configurations,
@@ -779,8 +783,9 @@ def submit_one_calc(submit_args):
     refresh_configs = submit_args["refresh_configs"]
     ready_to_launch = submit_args["ready_to_launch"]
 
-    if launch_dirs[launch_dir]["ID_specific_vasp_configs"]:
-        user_configs.update(launch_dirs[launch_dir]["ID_specific_vasp_configs"])
+    if 'ID_specific_vasp_configs' in launch_dirs[launch_dir]:
+        if launch_dirs[launch_dir]["ID_specific_vasp_configs"]:
+            user_configs.update(launch_dirs[launch_dir]["ID_specific_vasp_configs"])
 
     # what are our terminal xcs for that launch_dir
     final_xcs = launch_dirs[launch_dir]["xcs"]
@@ -1470,12 +1475,89 @@ def make_sub_for_launcher():
         f.write("\npython launcher.py\n")
 
 
-def main():
-    mus = ChemPots(functional="r2scan", standard="dmc").chempots
-    for el in mus:
-        if not mus[el]:
-            print(el)
+def setup_bandstructure(converged_static_dir, rerun=False, symprec=0.1, user_configs={}, ready_to_launch=False):
+    """
+    Args:
+        converged_static_dir (str)
+            path to converged static calculation
 
+        rerun (bool)
+            if True, rerun bandstructure calculation even if it's already converged
+
+        symprec (float)
+            symmetry precision for finding primitive cell and generating KPOINTS
+    """
+    av = AnalyzeVASP(converged_static_dir)
+    if not av.is_converged:
+        print("static calculation not converged; not setting up bandstructure yet")
+        return None
+
+    files_from_static = ["POSCAR", "KPOINTS", "POTCAR", "INCAR"]
+    fposcar_src, fkpoints_src, fpotcar_src, fincar_src = [
+        os.path.join(converged_static_dir, f) for f in files_from_static
+    ]
+
+    bs_dir = converged_static_dir.replace("-static", "-bs")
+    if not os.path.exists(bs_dir):
+        os.mkdir(bs_dir)
+
+    fposcar_dst, fkpoints_dst, fpotcar_dst, fincar_dst = [
+        os.path.join(bs_dir, f) for f in files_from_static
+    ]
+
+    av = AnalyzeVASP(bs_dir)
+    if av.is_converged and not rerun:
+        print("bandstructure already converged")
+        return None
+
+    fposcar_dst, fkpoints_dst, fpotcar_dst, fincar_dst = [
+        os.path.join(bs_dir, f) for f in files_from_static
+    ]
+
+    lobsterin = Lobsterin
+
+    lobsterin.write_POSCAR_with_standard_primitive(
+        POSCAR_input=fposcar_src, POSCAR_output=fposcar_dst, symprec=symprec
+    )
+
+    lobsterin.write_KPOINTS(
+        POSCAR_input=fposcar_dst,
+        KPOINTS_output=fkpoints_dst,
+        line_mode=True,
+        symprec=symprec,
+    )
+
+    copyfile(fpotcar_src, fpotcar_dst)
+
+    lobsterin = Lobsterin.standard_calculations_from_vasp_files(
+        POSCAR_input=fposcar_dst,
+        INCAR_input=fincar_dst,
+        POTCAR_input=fpotcar_dst,
+        option="standard_with_fatband",
+    )
+    flobsterin = os.path.join(bs_dir, "lobsterin")
+    lobsterin.write_lobsterin(flobsterin)
+
+    lobsterin.write_INCAR(
+        incar_input=fincar_src,
+        incar_output=fincar_dst,
+        poscar_input=fposcar_dst,
+        further_settings={"ISMEAR": 0},
+    )
+    
+    submit_args = {'launch_dir' : bs_dir,
+                   'launch_dirs' : {bs_dir : {'xcs' : [bs_dir.split('/')[-1].split('-')[0]], 'magmom' : None, 'ID_specific_vasp_configs' : None}},
+                   'user_configs' : user_configs,
+                   'refresh_configs' : [],
+                   'ready_to_launch' : ready_to_launch}
+                   
+    
+    submit_one_calc(submit_args)
+    
+    
+
+
+def main():
 
 if __name__ == "__main__":
     main()

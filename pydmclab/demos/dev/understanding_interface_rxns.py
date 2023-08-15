@@ -1,38 +1,62 @@
 from pydmclab.utils.plotting import set_rc_params
+from pydmclab.core.comp import CompTools
 
 set_rc_params()
 
 import matplotlib.pyplot as plt
 
-BaO = (1, -2.831 * 2)
-TiO2 = (0, -3.512 * 3)
-BaTiO3 = (1 / 2, (3 - 1 / 2) * -3.502)
-Ba2TiO4 = (2 / 3, (3 - 2 / 3) * -3.408)
-cmpds = [TiO2, BaTiO3, Ba2TiO4, BaO]
-data = dict(zip(["TiO2", "BaTiO3", "Ba2TiO4", "BaO"], cmpds))
-print(data)
-x = [c[0] for c in cmpds]
+d_BaTiO3 = 0.06
+data = {
+    "Ba1O1": {"x": 1, "E_per_at": -2.831},
+    "O2Ti1": {"x": 0, "E_per_at": -3.512},
+    "Ba1O3Ti1": {"x": 1 / 2, "E_per_at": -3.502 + d_BaTiO3},
+    "Ba2O4Ti1": {"x": 2 / 3, "E_per_at": -3.408},
+}
+
+for cmpd in data:
+    n_atoms = CompTools(cmpd).n_atoms
+    n_basis = 3 - data[cmpd]["x"]
+    data[cmpd]["n_atoms"] = n_atoms
+    data[cmpd]["n_basis"] = n_basis
+
+    data[cmpd]["E_per_fu"] = data[cmpd]["E_per_at"] * n_atoms
+    data[cmpd]["E_per_basis"] = data[cmpd]["E_per_at"] * n_basis
 
 
-def rxn_energy(target):
-    return target[1] - target[0] * BaO[1] - (1 - target[0]) * TiO2[1]
+def rxn_energy_basis(target, data):
+    x = data[target]["x"]
+    E_target = data[target]["E_per_basis"]
+    E_BaO = data["Ba1O1"]["E_per_basis"]
+    E_TiO2 = data["O2Ti1"]["E_per_basis"]
+    return E_target - x * E_BaO - (1 - x) * E_TiO2
 
 
-y = [rxn_energy(c) for c in cmpds]
-print(y)
+def rxn_energy_per_at(target, data):
+    E_per_basis = rxn_energy_basis(target, data)
+    return E_per_basis / (3 - data[target]["x"])
 
-# y = [c[1] for c in cmpds]
+
+cmpds = ["O2Ti1", "Ba1O3Ti1", "Ba2O4Ti1", "Ba1O1"]
+x = [data[c]["x"] for c in cmpds]
+y_basis = [rxn_energy_basis(c, data) for c in cmpds]
+y_per_at = [rxn_energy_per_at(c, data) for c in cmpds]
 
 fig = plt.figure()
 ax = plt.subplot(111)
-ax = plt.plot(x, y, marker="o", markerfacecolor="white")
+ax = plt.plot(x, y_per_at, marker="o", markerfacecolor="white", label="eV/at")
+ax = plt.plot(x, y_basis, marker="o", markerfacecolor="white", label="eV/3-x")
+
 for c in data:
-    ax = plt.text(data[c][0], 0.08, c, horizontalalignment="center", fontsize=12)
+    ax = plt.text(data[c]["x"], 0.08, c, horizontalalignment="center", fontsize=12)
 
 ax = plt.xlabel(r"$x\/in(BaO)_{x}(TiO_2)_{1-x}$")
-ax = plt.ylabel(r"$E_{rxn}\/(\frac{eV}{basis})$")
+ax = plt.ylabel(r"$E_{rxn}\/(eV)$")
+ax = plt.legend()
 ax = plt.ylim()
 plt.show()
+
+print(y_basis)
+print(y_per_at)
 
 """
 from pydmclab.core.hulls import MixingHull
