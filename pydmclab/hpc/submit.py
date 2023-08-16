@@ -8,8 +8,6 @@ from pydmclab.data.configs import (
     load_partition_configs,
 )
 
-from pydmclab.hpc.helpers import setup_bandstructure
-
 from pymatgen.core.structure import Structure
 from pymatgen.io.lobster import Lobsterin
 
