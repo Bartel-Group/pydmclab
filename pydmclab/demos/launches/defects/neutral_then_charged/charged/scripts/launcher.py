@@ -132,7 +132,7 @@ def get_query(
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
 
-    path_to_neutral = os.getcwd().replace("charged", "neutral")
+    path_to_neutral = os.getcwd().replace("/charged", "/neutral")
     neutral_data = os.path.join(path_to_neutral.replace("scripts", "data"))
     query = read_json(os.path.join(neutral_data, "strucs.json"))
     write_json(query, fjson)
@@ -194,8 +194,9 @@ def get_ID_specific_vasp_configs(
             out[key] = {}
 
             # first, we need the NELECT from our neutral calculation
+            path_to_neutral = os.getcwd().replace("/charged", "/neutral")
             neutral_calc = os.path.join(
-                os.getcwd().replace("charged", "neutral").replace("scripts", "calcs"),
+                path_to_neutral.replace("scripts", "calcs"),
                 formula,
                 "-".join(ID.split("-")[:-1]),
                 "dmc",

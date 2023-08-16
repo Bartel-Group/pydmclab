@@ -11,10 +11,10 @@ URL = "https://github.umn.edu/bartel-group/pydmclab"
 EMAIL = "cbartel@umn.edu"
 AUTHOR = "Chris Bartel"
 REQUIRES_PYTHON = ">=3.6.0"
-VERSION = "1.0.1"
+VERSION = "1.0.2"
 
 REQUIRED = ["numpy", "pymatgen"]
-EXTRAS = {}
+EXTRAS = {"mlp": ["chgnet"]}
 here = os.path.abspath(os.path.dirname(__file__))
 try:
     with io.open(os.path.join(here, "README.md"), encoding="utf-8") as f:

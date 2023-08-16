@@ -89,6 +89,13 @@ pip install . --prefix=<path to your python version>
 pip install . --prefix=/home/cbartel/cbartel/bin/anaconda3
 ```
 
+- note:
+  - to use the `mlp` capabilities, you will need to install an "extra" version
+
+```bash
+pip install -e ".[mlp]"
+```
+
 ### Configuring your pseudopotentials with pymatgen
 
 - if you are getting lots of POTCAR errors after installing, do this
