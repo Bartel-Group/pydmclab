@@ -1,5 +1,6 @@
 from pydmclab.utils.plotting import set_rc_params
 from pydmclab.core.comp import CompTools
+from pydmclab.core.hulls import MixingHull, GetHullInputData, AnalyzeHull
 
 set_rc_params()
 
@@ -57,6 +58,13 @@ plt.show()
 
 print(y_basis)
 print(y_per_at)
+
+ghid = GetHullInputData(data, "E_per_at")
+hullin = ghid.hullin_data()
+ah = AnalyzeHull(hullin, "Ba_O_Ti")
+hullout = ah.hull_output_data
+
+print(hullout)
 
 """
 from pydmclab.core.hulls import MixingHull

@@ -8,6 +8,8 @@ from pydmclab.data.configs import (
     load_partition_configs,
 )
 
+from pydmclab.hpc.helpers import setup_bandstructure
+
 from pymatgen.core.structure import Structure
 
 import multiprocessing as multip
@@ -197,6 +199,10 @@ class SubmitTools(object):
 
         # include magmom in vasp_configs
         vasp_configs["magmom"] = magmom
+
+        # need to run lobster for bandstructure calcs
+        if vasp_configs["generate_bandstructure"]:
+            vasp_configs["lobster_static"] = True
 
         # create copy of vasp_configs to prevent unwanted updates
         self.vasp_configs = vasp_configs.copy()
@@ -755,6 +761,18 @@ class SubmitTools(object):
                                 ):
                                     f.write("cd %s\n" % calc_dir)
                                     f.write(self.bader_command)
+                                bs_dir = setup_bandstructure(
+                                    converged_static_dir=calc_dir,
+                                    rerun=sub_configs["force_postprocess"],
+                                    symprec=vasp_configs["bs_symprec"],
+                                    kpoints_line_density=vasp_configs[
+                                        "bs_line_density"
+                                    ],
+                                )
+                                if bs_dir:
+                                    f.write("cd %s\n" % bs_dir)
+                                    f.write("%s\n" % vasp_command)
+                                    f.write(self.lobster_command)
                         f.write("echo %s is done >> %s\n" % (xc_calc, fstatus))
                     else:
                         if status == "continue":

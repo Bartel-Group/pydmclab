@@ -12,6 +12,8 @@ fun: # usually this is fine
 lobster_static: False # can make False if you don't want to run LOBSTER
 perturb_struc: False # if float, perturb internal ionic coordinates by perturb_struc
 generate_bandstructure: False # if True, run a bandstructure calculation at the end
+bs_symprec: 0.1 # symprec for generating primitive cell for bs calculation
+bs_line_density: 20 # kpoint line density for bs calculation
 
 # some output files
 fvaspout: vasp.o # where vasp output goes in calc_dir for each vasp run
