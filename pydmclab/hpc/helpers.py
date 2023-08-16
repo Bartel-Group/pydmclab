@@ -39,6 +39,10 @@ def get_vasp_configs(
             True to run LOBSTER for static calculations
                 sets vasp_configs['lobster_static'] = True
 
+        run_bandstructure (bool):
+            True to run a bandstructure calculation after your static calculations
+                sets vasp_configs['generate_bandstructure'] = True
+
         detailed_dos (bool or int):
             if you're running LOBSTER, this will determine how many (E, DOS/COHP) points you get
                 if False, COHPSteps = 400
@@ -90,6 +94,10 @@ def get_vasp_configs(
         "lobster_static": run_lobster,
         "generate_bandstructure": run_bandstructure,
     }
+
+    if vasp_configs["generate_bandstructure"]:
+        vasp_configs["lobster_static"] = True
+
     if detailed_dos:
         if type(detailed_dos) == bool:
             vasp_configs["COHPSteps"] = 4000

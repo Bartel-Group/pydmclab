@@ -200,10 +200,6 @@ class SubmitTools(object):
         # include magmom in vasp_configs
         vasp_configs["magmom"] = magmom
 
-        # need to run lobster for bandstructure calcs
-        if vasp_configs["generate_bandstructure"]:
-            vasp_configs["lobster_static"] = True
-
         # create copy of vasp_configs to prevent unwanted updates
         self.vasp_configs = vasp_configs.copy()
 
@@ -761,6 +757,8 @@ class SubmitTools(object):
                                 ):
                                     f.write("cd %s\n" % calc_dir)
                                     f.write(self.bader_command)
+
+                                # see if our bandstructure can be set up
                                 bs_dir = setup_bandstructure(
                                     converged_static_dir=calc_dir,
                                     rerun=sub_configs["force_postprocess"],
@@ -770,6 +768,7 @@ class SubmitTools(object):
                                     ],
                                 )
                                 if bs_dir:
+                                    # if it can, go to that directory, run VASP, run LOBSTER
                                     f.write("cd %s\n" % bs_dir)
                                     f.write("%s\n" % vasp_command)
                                     f.write(self.lobster_command)

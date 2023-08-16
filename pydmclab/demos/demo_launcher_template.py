@@ -77,6 +77,7 @@ SLURM_CONFIGS = get_slurm_configs(
 # any configurations related to VASPSetUp
 VASP_CONFIGS = get_vasp_configs(
     run_lobster=False,
+    run_bandstructure=False,
     detailed_dos=False,
     modify_loose_incar=False,
     modify_relax_incar=False,
