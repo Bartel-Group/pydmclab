@@ -10,13 +10,13 @@ from pydmclab.core.energies import ChemPots, FormationEnthalpy
 from pydmclab.utils.handy import read_json, write_json
 from pydmclab.data.configs import load_partition_configs
 
-from pymatgen.io.lobster import Lobsterin
 
 from shutil import copyfile
 
 
 def get_vasp_configs(
     run_lobster=False,
+    run_bandstructure=False,
     detailed_dos=True,
     modify_loose_incar=False,
     modify_relax_incar=False,
@@ -86,7 +86,10 @@ def get_vasp_configs(
             to get passed as user_configs to VASPSetUp (through SubmitTools)
     """
     # DOS-related
-    vasp_configs = {"lobster_static": run_lobster}
+    vasp_configs = {
+        "lobster_static": run_lobster,
+        "generate_bandstructure": run_bandstructure,
+    }
     if detailed_dos:
         if type(detailed_dos) == bool:
             vasp_configs["COHPSteps"] = 4000
@@ -1473,102 +1476,6 @@ def make_sub_for_launcher():
         f.write("#SBATCH --job-name=%s\n" % launch_job_name)
         f.write("#SBATCH --partition=msismall\n")
         f.write("\npython launcher.py\n")
-
-
-def setup_bandstructure(
-    converged_static_dir, rerun=False, symprec=0.1, kpoints_line_density=20
-):
-    """
-
-    function to create input files (INCAR, KPOINTS, POTCAR, POSCAR, lobsterin) for band structure calculations
-        after static calculations
-
-    ideally, this would be implemented as the end of a "packing" but slightly complicated because we need teh static calculation to be converged (or do we?)
-
-    Args:
-        converged_static_dir (str)
-            path to converged static calculation
-
-        rerun (bool)
-            if True, rerun bandstructure calculation even if it's already converged
-
-        symprec (float)
-            symmetry precision for finding primitive cell and generating KPOINTS
-
-        kpoints_line_density (int)
-            how many kpoints between each high symmetry point
-
-    Returns:
-        directory to band structure calculation (str)
-
-    """
-    # make sure static is converged
-    av = AnalyzeVASP(converged_static_dir)
-    if not av.is_converged:
-        print("static calculation not converged; not setting up bandstructure yet")
-        return None
-
-    # get the paths to relevant input files from the static calculation
-    files_from_static = ["POSCAR", "KPOINTS", "POTCAR", "INCAR"]
-    fposcar_src, fkpoints_src, fpotcar_src, fincar_src = [
-        os.path.join(converged_static_dir, f) for f in files_from_static
-    ]
-
-    # make a directory for the bandstructure calculation
-    bs_dir = converged_static_dir.replace("-static", "-bs")
-    if not os.path.exists(bs_dir):
-        os.mkdir(bs_dir)
-
-    # get the paths to relevant input files for the bandstructure calculation
-    fposcar_dst, fkpoints_dst, fpotcar_dst, fincar_dst = [
-        os.path.join(bs_dir, f) for f in files_from_static
-    ]
-
-    # make sure bandstructure calc didn't already run
-    av = AnalyzeVASP(bs_dir)
-    if av.is_converged and not rerun:
-        print("bandstructure already converged")
-        return None
-
-    # initialize a Lobsterin object
-    lobsterin = Lobsterin
-
-    # create a primitive cell and write to bs POSCAR (needed so we don't have a bunch of overlapping bands)
-    lobsterin.write_POSCAR_with_standard_primitive(
-        POSCAR_input=fposcar_src, POSCAR_output=fposcar_dst, symprec=symprec
-    )
-
-    # create a line-mode KPOINTS file and write to bs KPOINTS
-    lobsterin.write_KPOINTS(
-        POSCAR_input=fposcar_dst,
-        KPOINTS_output=fkpoints_dst,
-        line_mode=True,
-        symprec=symprec,
-        kpoints_line_density=kpoints_line_density,
-    )
-
-    # copy our POTCAR from the static calc
-    copyfile(fpotcar_src, fpotcar_dst)
-
-    # write a lobsterin file, including fatband analysis
-    lobsterin = Lobsterin.standard_calculations_from_vasp_files(
-        POSCAR_input=fposcar_dst,
-        INCAR_input=fincar_src,
-        POTCAR_input=fpotcar_dst,
-        option="standard_with_fatband",
-    )
-    flobsterin = os.path.join(bs_dir, "lobsterin")
-    lobsterin.write_lobsterin(flobsterin)
-
-    # write our bs INCAR
-    lobsterin.write_INCAR(
-        incar_input=fincar_src,
-        incar_output=fincar_dst,
-        poscar_input=fposcar_dst,
-        further_settings={"ISMEAR": 0},
-    )
-
-    return bs_dir
 
 
 def main():
