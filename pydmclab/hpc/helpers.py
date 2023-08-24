@@ -288,7 +288,7 @@ def get_sub_configs(
     if special_packing:
         sub_configs["packing"] = {}
         for xc in special_packing:
-            sub_configs["packing"][xc] = special_packing[xc]
+            sub_configs["packing"][xc] = "-".join([xc, special_packing[xc]])
 
     sub_configs["machine"] = machine
 

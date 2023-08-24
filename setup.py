@@ -14,7 +14,7 @@ REQUIRES_PYTHON = ">=3.6.0"
 VERSION = "1.0.2"
 
 REQUIRED = ["numpy", "pymatgen"]
-EXTRAS = {"mlp": ["chgnet"]}
+EXTRAS = {"mlp": ["chgnet"], "defects": ["dscribe"]}
 here = os.path.abspath(os.path.dirname(__file__))
 try:
     with io.open(os.path.join(here, "README.md"), encoding="utf-8") as f:

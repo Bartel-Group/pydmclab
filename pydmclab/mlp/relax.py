@@ -86,8 +86,12 @@ class Relaxer(object):
 
 def main():
     fposcar = "../data/test_data/vasp/AlN/POSCAR"
-
     relaxer = Relaxer(fposcar, model="chgnet")
+    optimized_structure = relaxer.relaxed_structure
+    optimized_energy = relaxer.E_per_at
+
+    print(optimized_structure)
+    print(optimized_energy)
     return relaxer
 
 
