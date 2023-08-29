@@ -759,19 +759,38 @@ class SubmitTools(object):
                                     f.write(self.bader_command)
 
                                 # see if our bandstructure can be set up
-                                bs_dir = setup_bandstructure(
-                                    converged_static_dir=calc_dir,
-                                    rerun=sub_configs["force_postprocess"],
-                                    symprec=vasp_configs["bs_symprec"],
-                                    kpoints_line_density=vasp_configs[
-                                        "bs_line_density"
-                                    ],
-                                )
+                                if vasp_configs["generate_bandstructure"]:
+                                    bs_dir = setup_bandstructure(
+                                        converged_static_dir=calc_dir,
+                                        rerun=sub_configs["force_postprocess"],
+                                        symprec=vasp_configs["bs_symprec"],
+                                        kpoints_line_density=vasp_configs[
+                                            "bs_line_density"
+                                        ],
+                                    )
+                                else:
+                                    bs_dir = None
+
                                 if bs_dir:
                                     # if it can, go to that directory, run VASP, run LOBSTER
                                     f.write("cd %s\n" % bs_dir)
                                     f.write("%s\n" % vasp_command)
                                     f.write(self.lobster_command)
+
+                                # see if you PARCHG can be set up
+                                if vasp_configs["generate_parchg"]:
+                                    parchg_dir = setup_parchg(
+                                        converged_static_dir=calc_dir,
+                                        rerun=sub_configs["force_postprocess"],
+                                        eint=vasp_configs["eint_for_parchg"],
+                                    )
+                                else:
+                                    parchg_dir = None
+
+                                if parchg_dir:
+                                    f.write("cd %s\n" % parchg_dir)
+                                    f.write("%s\n" % vasp_command)
+
                         f.write("echo %s is done >> %s\n" % (xc_calc, fstatus))
                     else:
                         if status == "continue":
@@ -930,7 +949,7 @@ def setup_bandstructure(
             how many kpoints between each high symmetry point
 
     Returns:
-        directory to band structure calculation (str)
+        directory to band structure calculation (str) or None if not ready to run this
 
     """
     # make sure static is converged
@@ -1000,6 +1019,73 @@ def setup_bandstructure(
     )
 
     return bs_dir
+
+
+def setup_parchg(converged_static_dir, rerun=False, eint=-1):
+    """
+
+    function to create input files (INCAR, KPOINTS, POTCAR, POSCAR, WAVECAR, CHGCAR) for partial charge calculation
+        after static calculations
+
+    Args:
+        converged_static_dir (str)
+            path to converged static calculation
+
+        rerun (bool)
+            if True, rerun bandstructure calculation even if it's already converged
+
+        eint (flaot)
+            the lower energy bound (relative to E_Fermi) to analyze partial charge density
+
+    Returns:
+        directory to band structure calculation (str) or None if not ready to run this
+
+    """
+    # make sure static is converged
+    av = AnalyzeVASP(converged_static_dir)
+    if not av.is_converged:
+        print("static calculation not converged; not setting up parchg calc yet")
+        return None
+
+    # get the paths to relevant input files from the static calculation
+    files_from_static = ["POSCAR", "KPOINTS", "POTCAR", "INCAR", "WAVECAR", "CHGCAR"]
+
+    # make a directory for the bandstructure calculation
+    parchg_dir = converged_static_dir.replace("-static", "-parchg")
+    if not os.path.exists(parchg_dir):
+        os.mkdir(parchg_dir)
+
+    # make sure bandstructure calc didn't already run
+    av = AnalyzeVASP(parchg_dir)
+    if av.is_converged and not rerun:
+        print("parchg already converged")
+        return None
+
+    new_incar_params = {
+        "EINT": str(eint),
+        "ISTART": "1",
+        "LPARD": "True",
+        "LSEPB": "False",
+        "LSEPK": "False",
+        "LWAVE": "False",
+        "NBMOD": "-3",
+    }
+
+    for file_to_copy in files_from_static:
+        f_src = os.path.join(converged_static_dir, file_to_copy)
+        f_dst = os.path.join(parchg_dir, file_to_copy)
+        copyfile(f_src, f_dst)
+
+    with open(os.path.join(converged_static_dir, "INCAR")) as f_src:
+        with open(os.path.join(parchg_dir, "INCAR"), "w") as f_dst:
+            for key in new_incar_params:
+                f_dst.write("%s = %s\n" % (key, new_incar_params[key]))
+            for line in f_src:
+                if line.split("=")[0].strip() in new_incar_params:
+                    continue
+                f_dst.write(line)
+
+    return parchg_dir
 
 
 def main():

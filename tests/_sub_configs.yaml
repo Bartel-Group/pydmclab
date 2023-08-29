@@ -18,15 +18,38 @@ packing:
   - gga-loose
   - gga-relax
   - gga-static
+  gga_hse06:
+  - gga-loose
+  - gga-relax
+  - gga-static
+  - hse06-static
   ggau:
   - ggau-loose
   - ggau-relax
   - ggau-static
+  ggau_hse06:
+  - ggau-loose
+  - ggau-relax
+  - ggau-static
+  - hse06-static
+  hse06:
+  - gga-loose
+  - gga-relax
+  - gga-static
+  - hse06-relax
+  - hse06-static
   metagga:
   - gga-loose
   - gga-relax
   - gga-static
   - metagga-relax
   - metagga-static
+  metagga_hse06:
+  - gga-loose
+  - gga-relax
+  - gga-static
+  - metagga-relax
+  - metagga-static
+  - hse06-static
 perturb_first_struc: 0.1
 vasp: vasp_std

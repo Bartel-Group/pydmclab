@@ -148,7 +148,9 @@ class UnitTestHelpers(unittest.TestCase):
 
         self.assertEqual(sub_configs["n_procs"], 1)
 
-        special_packing = {"metagga": ["loose", "banana", "apple"]}
+        special_packing = {
+            "metagga": ["metagga-loose", "metagga-banana", "metagga-apple"]
+        }
         sub_configs = get_sub_configs(
             machine=machine,
             submit_calculations_in_parallel=parallel,

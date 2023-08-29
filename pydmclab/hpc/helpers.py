@@ -11,9 +11,6 @@ from pydmclab.utils.handy import read_json, write_json
 from pydmclab.data.configs import load_partition_configs
 
 
-from shutil import copyfile
-
-
 def get_vasp_configs(
     run_lobster=False,
     run_bandstructure=False,

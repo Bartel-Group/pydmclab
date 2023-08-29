@@ -14,6 +14,8 @@ perturb_struc: False # if float, perturb internal ionic coordinates by perturb_s
 generate_bandstructure: False # if True, run a bandstructure calculation at the end
 bs_symprec: 0.1 # symprec for generating primitive cell for bs calculation
 bs_line_density: 20 # kpoint line density for bs calculation
+generate_parchg: False # if True, generate a partial charge
+eint_for_parchg: -1 # the lower energy (relative to E_Fermi) that you want to analyze
 
 # some output files
 fvaspout: vasp.o # where vasp output goes in calc_dir for each vasp run
