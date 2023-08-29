@@ -774,7 +774,8 @@ class SubmitTools(object):
                                 if bs_dir:
                                     # if it can, go to that directory, run VASP, run LOBSTER
                                     f.write(
-                                        "working on %s-bs >> %s\n" % (xc_calc, fstatus)
+                                        "echo working on %s-bs >> %s\n"
+                                        % (xc_calc, fstatus)
                                     )
                                     f.write("cd %s\n" % bs_dir)
                                     f.write("%s\n" % vasp_command)
@@ -792,7 +793,8 @@ class SubmitTools(object):
 
                             if parchg_dir:
                                 f.write(
-                                    "working on %s-parchg >> %s\n" % (xc_calc, fstatus)
+                                    "echo working on %s-parchg >> %s\n"
+                                    % (xc_calc, fstatus)
                                 )
                                 f.write("cd %s\n" % parchg_dir)
                                 f.write("%s\n" % vasp_command)
