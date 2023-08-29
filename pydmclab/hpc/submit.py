@@ -741,8 +741,8 @@ class SubmitTools(object):
                     )
                     if status == "done":
                         # write postprocessing commands for static calculations if needed
-                        if vasp_configs["lobster_static"]:
-                            if calc_to_run == "static":
+                        if calc_to_run == "static":
+                            if vasp_configs["lobster_static"]:
                                 if sub_configs[
                                     "force_postprocess"
                                 ] or not os.path.exists(
@@ -777,19 +777,19 @@ class SubmitTools(object):
                                     f.write("%s\n" % vasp_command)
                                     f.write(self.lobster_command)
 
-                                # see if you PARCHG can be set up
-                                if vasp_configs["generate_parchg"]:
-                                    parchg_dir = setup_parchg(
-                                        converged_static_dir=calc_dir,
-                                        rerun=sub_configs["force_postprocess"],
-                                        eint=vasp_configs["eint_for_parchg"],
-                                    )
-                                else:
-                                    parchg_dir = None
+                            # see if you PARCHG can be set up
+                            if vasp_configs["generate_parchg"]:
+                                parchg_dir = setup_parchg(
+                                    converged_static_dir=calc_dir,
+                                    rerun=sub_configs["force_postprocess"],
+                                    eint=vasp_configs["eint_for_parchg"],
+                                )
+                            else:
+                                parchg_dir = None
 
-                                if parchg_dir:
-                                    f.write("cd %s\n" % parchg_dir)
-                                    f.write("%s\n" % vasp_command)
+                            if parchg_dir:
+                                f.write("cd %s\n" % parchg_dir)
+                                f.write("%s\n" % vasp_command)
 
                         f.write("echo %s is done >> %s\n" % (xc_calc, fstatus))
                     else:
