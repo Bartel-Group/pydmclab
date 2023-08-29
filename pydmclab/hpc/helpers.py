@@ -14,6 +14,7 @@ from pydmclab.data.configs import load_partition_configs
 def get_vasp_configs(
     run_lobster=False,
     run_bandstructure=False,
+    run_parchg=False,
     detailed_dos=True,
     modify_loose_incar=False,
     modify_relax_incar=False,
@@ -39,6 +40,10 @@ def get_vasp_configs(
         run_bandstructure (bool):
             True to run a bandstructure calculation after your static calculations
                 sets vasp_configs['generate_bandstructure'] = True
+
+        run_parchg (bool):
+            True to run a parchg calculation after your static calculations
+                sets vasp_configs['generate_parchg'] = True
 
         detailed_dos (bool or int):
             if you're running LOBSTER, this will determine how many (E, DOS/COHP) points you get
@@ -90,6 +95,7 @@ def get_vasp_configs(
     vasp_configs = {
         "lobster_static": run_lobster,
         "generate_bandstructure": run_bandstructure,
+        "generate_parchg": run_parchg,
     }
 
     if vasp_configs["generate_bandstructure"]:
