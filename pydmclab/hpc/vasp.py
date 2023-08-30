@@ -305,7 +305,7 @@ class VASPSetUp(object):
                 "LAECHG": True,
             }
             for key in static_settings:
-                if key not in static_settings:
+                if key not in modify_incar:
                     modify_incar[key] = static_settings[key]
 
         # make sure WAVECAR is written unless told user specified not to
