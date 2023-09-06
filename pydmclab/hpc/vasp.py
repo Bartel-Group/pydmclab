@@ -8,7 +8,7 @@ import os
 import warnings
 from shutil import copyfile
 
-from pymatgen.io.vasp.sets import MPRelaxSet, MPScanRelaxSet
+from pymatgen.io.vasp.sets import MPRelaxSet, MPScanRelaxSet, MPHSERelaxSet
 from pymatgen.core.structure import Structure
 from pymatgen.io.vasp.inputs import Kpoints
 from pymatgen.io.lobster.inputs import Lobsterin
@@ -274,6 +274,9 @@ class VASPSetUp(object):
                     modify_incar["METAGGA"] = fun.upper()
                 else:
                     modify_incar["METAGGA"] = "R2SCAN"
+
+        elif configs["xc_to_run"] == "hse06":
+            vaspset = MPHSERelaxSet
 
         # default "loose" relax
         if configs["calc_to_run"] == "loose":
