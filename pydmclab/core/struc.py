@@ -405,7 +405,7 @@ class StrucTools(object):
         min_slab_size=10,
         min_vacuum_size=10,
         center_slab=True,
-        in_unit_planes=True,
+        in_unit_planes=False,
         reorient_lattice=True,
     ):
         """
@@ -444,7 +444,13 @@ class StrucTools(object):
 
         out = {}
         for i, slab in enumerate(slabs):
-            key = "".join([str(v) for v in miller]) + "_" + str(i)
+            key = (
+                "".join([str(v) for v in miller])
+                + "_"
+                + str(min_vacuum_size)
+                + "_"
+                + str(i)
+            )
             out[key] = slab.as_dict()
 
         return out
