@@ -15,6 +15,7 @@ def get_vasp_configs(
     run_lobster=False,
     run_bandstructure=False,
     run_parchg=False,
+    run_dielectric=False,
     detailed_dos=True,
     modify_loose_incar=False,
     modify_relax_incar=False,
@@ -44,6 +45,9 @@ def get_vasp_configs(
         run_parchg (bool):
             True to run a parchg calculation after your static calculations
                 sets vasp_configs['generate_parchg'] = True
+
+        run_dielectric (bool):
+            True to get the dielectric tensor on your static calculation
 
         detailed_dos (bool or int):
             if you're running LOBSTER, this will determine how many (E, DOS/COHP) points you get
@@ -96,6 +100,7 @@ def get_vasp_configs(
         "lobster_static": run_lobster,
         "generate_bandstructure": run_bandstructure,
         "generate_parchg": run_parchg,
+        "generate_dielectric": run_dielectric,
     }
 
     if vasp_configs["generate_bandstructure"]:

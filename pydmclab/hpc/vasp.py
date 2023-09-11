@@ -358,6 +358,18 @@ class VASPSetUp(object):
                 # gga-static will get ISYM = -1, so need to pass that to metagga relax otherwise WAVECAR from GGA doesnt help metagga
                 modify_incar["ISYM"] = -1
 
+        if configs["generate_dielectric"]:
+            if configs["calc_to_run"] == "static":
+                if configs["xc_to_run"] != "metagga":
+                    modify_incar["LVTOT"] = True
+                    modify_incar["LEPSILON"] = True
+                    modify_incar["LOPTICS"] = True
+                    modify_incar["IBRION"] = 8
+                else:
+                    warnings.warn(
+                        "\nyou cannot run METAGGA and generate a dielectric. the METAGGA calculation will run but without a dielectric\n"
+                    )
+
         print("modify_incar = %s" % modify_incar)
 
         # initialize new VASPSet with all our settings
