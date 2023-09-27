@@ -372,6 +372,10 @@ class VASPSetUp(object):
 
         print("modify_incar = %s" % modify_incar)
 
+        if configs['standard'] == 'dmc':
+            if 'W' not in modify_potcar:
+                modify_potcar['W'] = 'W'
+
         # initialize new VASPSet with all our settings
         vasp_input = vaspset(
             structure,
