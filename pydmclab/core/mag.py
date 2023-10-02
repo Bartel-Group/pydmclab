@@ -259,10 +259,29 @@ class MagTools(object):
         ]
 
         print("%i magnetic sites" % len(magnetic_sites))
-        # enumerate all possible ways to yield afm ordering
-        combos = itertools.product(range(len(spins)), repeat=len(magnetic_sites))
 
-        combos = [c for c in combos if sum(c) == 0.5 * len(magnetic_sites)]
+        if len(magnetic_sites) % 2:
+            return []
+
+        spin_sum = 0.5 * len(magnetic_sites)
+
+        def filter_by_sum(c):
+            return sum(c) == spin_sum
+
+        combos = filter(filter_by_sum, itertools.product(range(len(spins)), repeat=len(magnetic_sites)))
+        
+        print('filtered')
+
+        combos = list(itertools.islice(combos, int(1e6)))
+        
+        print('isliced')
+        combos = list(combos)
+        # enumerate all possible ways to yield afm ordering
+#        combos = itertools.product(range(len(spins)), repeat=len(magnetic_sites))
+        
+#        print('enumerated %i combos' % len(list(combos)))
+
+#        combos = [c for c in combos if np.sum(c) == 0.5 * len(magnetic_sites)]
         print("%i afm combos" % len(combos))
 
         # randomly reduce list if too big for practical usage
