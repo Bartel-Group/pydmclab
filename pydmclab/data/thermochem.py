@@ -17,13 +17,13 @@ def mus_at_0K():
     if os.path.exists(fjson):
         return read_json(fjson)
     mus = {}
-    d = read_json(os.path.join(DATA_PATH, "230614_dmc-mus.json"))
-    for xc in d:
-        if xc == "gga":
-            functional = "pbe"
-        elif xc == "metagga":
-            functional = "r2scan"
-        mus[functional] = d[xc]
+    mus = read_json(os.path.join(DATA_PATH, "231002_dmc-mus.json"))
+#    for xc in d:
+#        if xc == "gga":
+#            functional = "pbe"
+#        elif xc == "metagga":
+#            functional = "r2scan"
+#        mus[functional] = d[xc]
     return write_json(mus, fjson)
 
 
