@@ -614,6 +614,13 @@ class SubmitTools(object):
                     for setting in incar_changes:
                         user_vasp_configs[incar_key][setting] = incar_changes[setting]
 
+                print("\n\n\n\n\n\n")
+                print(calc_dir)
+                print("THESE ARE MY USER_VASP_CONFIGS")
+                print(user_vasp_configs)
+                print("\n\n\n\n\n\n")
+                print(calc_dir)
+
                 # update our vasp_configs with any modifications to the INCAR that we made to fix errors
                 # user_vasp_configs = {**vasp_configs, **calc_configs}
                 print("--------- may be some warnings (POTCAR ones OK) ----------")
