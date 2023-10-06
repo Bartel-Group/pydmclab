@@ -612,7 +612,7 @@ class SubmitTools(object):
                 if incar_changes:
                     incar_key = "%s_incar" % calc_to_run
                     for setting in incar_changes:
-                        user_vasp_configs[setting] = incar_changes[setting]
+                        user_vasp_configs[incar_key][setting] = incar_changes[setting]
 
                 # update our vasp_configs with any modifications to the INCAR that we made to fix errors
                 # user_vasp_configs = {**vasp_configs, **calc_configs}
