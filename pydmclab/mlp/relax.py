@@ -1,4 +1,6 @@
 from pydmclab.core.struc import StrucTools
+from pymatgen.core.structure import Structure
+from chgnet.model.dynamics import TrajectoryObserver
 from chgnet.model import StructOptimizer, CHGNet, CHGNetCalculator
 from pymatgen.io.ase import AseAtomsAdaptor
 
@@ -49,7 +51,7 @@ class Relaxer(object):
     def trajectory(self):
         """
         Returns:
-            Not sure how to use this ...
+            chgnet TrajectoryObserver object
         """
         return self.relaxer(False)["trajectory"]
 
@@ -70,10 +72,15 @@ class Relaxer(object):
         s_initial = self.initial_structure
         s_final = self.relaxed_structure
 
-        return {
-            "initial": CHGNet().predict_structure(structure=s_initial),
-            "final": CHGNet().predict_structure(structure=s_final),
-        }
+        if self.model == "chgnet":
+            predictions = {
+                "initial": CHGNet().predict_structure(structure=s_initial),
+                "final": CHGNet().predict_structure(structure=s_final),
+            }
+        else:
+            raise NotImplementedError
+
+        return predictions
 
     @property
     def E_per_at(self):
@@ -83,17 +90,88 @@ class Relaxer(object):
         """
         return self.predictions["final"]["e"]
 
+    @property
+    def trajectory_attributes(self):
+        """
+        Returns:
+            list of tuples summarizing the trajectory : (step, energy, structure (pymatgen.Structure))
+        """
+        trajectory_energies = self.get_trajectory_energies()
+        trajectory_structures = self.get_trajectory_strucs()
+
+        trajectory_attributes = [
+            (i, energy, structure)
+            for i, (energy, structure) in enumerate(
+                zip(trajectory_energies, trajectory_structures)
+            )
+        ]
+
+        return trajectory_attributes
+
+    def get_trajectory_strucs(self):
+        """
+        Returns:
+            List of pymatgen.Structure objects corresponding to the structure at each step of the trajectory
+            Starting with the initial structure
+        """
+
+        trajectory = self.trajectory
+        initial_structure = self.initial_structure
+
+        strucs = [initial_structure]
+        species = [atom for atom in initial_structure.species]
+
+        if self.model == "chgnet":
+            # Trajectory calls may be different for different models?
+
+            atom_positions = trajectory.atom_positions
+            cells = trajectory.cells
+            magmoms = trajectory.magmoms
+
+        for i, (coords, lattice, magmom) in enumerate(
+            zip(atom_positions, cells, magmoms)
+        ):
+            site_properties = {"magmom": magmom}
+            struc = Structure(
+                lattice=lattice,
+                species=species,
+                coords=coords,
+                site_properties=site_properties,
+            )
+            strucs.append(struc)
+        return strucs
+
+    def get_trajectory_energies(self):
+        """
+        Returns:
+            List of energies that follows the trajectory
+            Starting with the initial energy
+        """
+        trajectory = self.trajectory
+        initial_energy = self.predictions["initial"]["e"]
+
+        if self.model == "chgnet":
+            energies = [initial_energy, *trajectory.energies]
+
+        return energies
+
 
 def main():
     fposcar = "../data/test_data/vasp/AlN/POSCAR"
     relaxer = Relaxer(fposcar, model="chgnet")
-    optimized_structure = relaxer.relaxed_structure
-    optimized_energy = relaxer.E_per_at
 
-    print(optimized_structure)
-    print(optimized_energy)
-    return relaxer
+    relaxation_results = {
+        "relaxer": relaxer,
+        "initial_structure": relaxer.initial_structure,
+        "optimized_structure": relaxer.relaxed_structure,
+        "optimized_energy": relaxer.E_per_at,
+        "trajectory_observer": relaxer.trajectory,
+        "trajectory_attributes": relaxer.trajectory_attributes,
+    }
+
+    print(relaxation_results)
+    return relaxer, relaxation_results
 
 
 if __name__ == "__main__":
-    relaxer = main()
+    relaxer, relaxation_results = main()

@@ -1,3 +1,6 @@
+import os
+import numpy as np
+
 from pydmclab.core.comp import CompTools
 
 from pymatgen.core.structure import Structure
@@ -9,9 +12,6 @@ from pymatgen.transformations.standard_transformations import (
 from pymatgen.analysis.structure_matcher import StructureMatcher
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from pymatgen.core.surface import SlabGenerator
-
-import os
-import numpy as np
 
 
 class StrucTools(object):
@@ -454,6 +454,27 @@ class StrucTools(object):
             out[key] = slab.as_dict()
 
         return out
+
+    def structure_to_cif(self, filename, data_dir=None):
+        """
+        Coverts a structure to a cif file and saves it to a directory, useful for VESTA viewing
+
+        Args:
+            filename (str): name of cif file
+            data_dir (str): path to directory to save cif file
+
+        Returns:
+            None
+        """
+        if not data_dir:
+            data_dir = os.getcwd()
+
+        if not os.path.exists(data_dir):
+            os.makedirs(data_dir)
+
+        self.structure.to(filename=os.path.join(data_dir, f"{filename}.cif"))
+
+        return None
 
 
 class SiteTools(object):
