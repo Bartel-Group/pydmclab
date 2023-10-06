@@ -598,6 +598,8 @@ class SubmitTools(object):
                     user_configs=user_vasp_configs_before_error_handling,
                 )
 
+                user_vasp_configs = user_vasp_configs_before_error_handling.copy()
+
                 # (7) check for errors in continuing jobs
                 incar_changes = {}
                 if status in ["continue", "new"]:
@@ -609,13 +611,11 @@ class SubmitTools(object):
                 # if there are INCAR updates, add them to calc_configs
                 if incar_changes:
                     incar_key = "%s_incar" % calc_to_run
-                    if incar_key not in calc_configs:
-                        calc_configs[incar_key] = {}
                     for setting in incar_changes:
-                        calc_configs[incar_key][setting] = incar_changes[setting]
+                        user_vasp_configs[setting] = incar_changes[setting]
 
                 # update our vasp_configs with any modifications to the INCAR that we made to fix errors
-                user_vasp_configs = {**vasp_configs, **calc_configs}
+                # user_vasp_configs = {**vasp_configs, **calc_configs}
                 print("--------- may be some warnings (POTCAR ones OK) ----------")
 
                 # (8) prepare calc_dir to launch
