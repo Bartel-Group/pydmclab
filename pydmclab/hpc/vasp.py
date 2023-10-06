@@ -327,7 +327,7 @@ class VASPSetUp(object):
                 modify_incar["NSW"] = 199
 
         # make sure spin is off for nm calculations
-        if configs["mag"] == "nm":
+        if (configs["mag"] == "nm") and ("ISPIN" not in modify_incar):
             modify_incar["ISPIN"] = 1
         else:
             # make sure magnetization is written to OUTCAR for magnetic calcs
@@ -342,16 +342,19 @@ class VASPSetUp(object):
                 lobster_incar_settings = {"NEDOS": 800, "ISTART": 0, "LAECHG": True}
                 for key in lobster_incar_settings:
                     if key not in configs["lobster_incar"]:
-                        modify_incar[key] = lobster_incar_settings[key]
+                        if key not in modify_incar:
+                            modify_incar[key] = lobster_incar_settings[key]
 
                 for key in configs["lobster_incar"]:
-                    modify_incar[key] = configs["lobster_incar"][key]
+                    if key not in modify_incar:
+                        modify_incar[key] = configs["lobster_incar"][key]
 
-                if not configs["lobster_kpoints"]:
-                    # need KPOINTS file for LOBSTER (as opposed to KSPACING)
-                    modify_kpoints = {"length": 25}
-                else:
-                    modify_kpoints = configs["lobster_kpoints"]
+                if not modify_kpoints:
+                    if not configs["lobster_kpoints"]:
+                        # need KPOINTS file for LOBSTER (as opposed to KSPACING)
+                        modify_kpoints = {"length": 25}
+                    else:
+                        modify_kpoints = configs["lobster_kpoints"]
 
         if configs["lobster_static"]:
             if configs["xc_to_run"] == "metagga":
@@ -372,9 +375,9 @@ class VASPSetUp(object):
 
         print("modify_incar = %s" % modify_incar)
 
-        if configs['standard'] == 'dmc':
-            if 'W' not in modify_potcar:
-                modify_potcar['W'] = 'W'
+        if configs["standard"] == "dmc":
+            if "W" not in modify_potcar:
+                modify_potcar["W"] = "W"
 
         # initialize new VASPSet with all our settings
         vasp_input = vaspset(
