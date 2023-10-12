@@ -3,7 +3,7 @@ import numpy as np
 import multiprocessing as multip
 import json
 
-from pymatgen.io.vasp.outputs import Vasprun, Outcar, Eigenval
+from pymatgen.io.vasp.outputs import Vasprun, Outcar, Eigenval, Oszicar
 from pymatgen.core.structure import Structure
 from pymatgen.io.vasp.inputs import Kpoints, Incar
 from pymatgen.io.lobster.outputs import Doscar, Cohpcar, Charge, MadelungEnergies
@@ -150,6 +150,21 @@ class VASPOutputs(object):
         try:
             oc = Outcar(os.path.join(self.calc_dir, "OUTCAR"))
             return oc
+        except:
+            return None
+
+    @property
+    def oszicar(self):
+        """
+        Returns Oszicar object from OSZICAR in calc_dir
+        """
+        foszicar = os.path.join(self.calc_dir, "OSZICAR")
+        if not os.path.exists(foszicar):
+            return None
+
+        try:
+            oz = Oszicar(os.path.join(self.calc_dir, "OSZICAR"))
+            return oz
         except:
             return None
 
@@ -651,8 +666,14 @@ class AnalyzeVASP(object):
             if el_tag not in out:
                 out[el_tag] = {}
             out[el_tag][site_tag] = {
-                "cohp": {"1": list(np.zeros(len(energies))), "-1": list(np.zeros(len(energies)))},
-                "icohp": {"-1": list(np.zeros(len(energies))), "1": list(np.zeros(len(energies)))},
+                "cohp": {
+                    "1": list(np.zeros(len(energies))),
+                    "-1": list(np.zeros(len(energies))),
+                },
+                "icohp": {
+                    "-1": list(np.zeros(len(energies))),
+                    "1": list(np.zeros(len(energies))),
+                },
                 "length": bond_length,
             }
             out[el_tag][site_tag]["cohp"]["total"] = np.zeros(len(energies))
@@ -751,19 +772,14 @@ class AnalyzeVASP(object):
             tmp_icohp = np.zeros(len(out["E"]))
             for site_tag in pcohp[el_tag]:
                 for spin in pcohp[el_tag][site_tag]["cohp"]:
-
                     cohp_to_add = np.array(pcohp[el_tag][site_tag]["cohp"][spin])
-#                    print(cohp_to_add)
+                    #                    print(cohp_to_add)
                     if len(cohp_to_add) == len(tmp_cohp):
-                        tmp_cohp = np.add(cohp_to_add
-                                          , tmp_cohp
-                        )
-                    
+                        tmp_cohp = np.add(cohp_to_add, tmp_cohp)
+
                     icohp_to_add = np.array(pcohp[el_tag][site_tag]["icohp"][spin])
                     if len(icohp_to_add) == len(tmp_icohp):
-                        tmp_icohp = np.add(
-                            icohp_to_add, tmp_icohp
-                        )
+                        tmp_icohp = np.add(icohp_to_add, tmp_icohp)
 
             out[el_tag]["cohp"] = tmp_cohp
             out[el_tag]["icohp"] = tmp_icohp
