@@ -8,7 +8,7 @@ from pymatgen.io.ase import AseAtomsAdaptor
 class Relaxer(object):
     """for relaxing structures using ML potentials"""
 
-    def __init__(self, initial_structure, model="chgnet"):
+    def __init__(self, initial_structure, model="chgnet") -> None:
         """
         Args:
             initial_structure (pymatgen.Structure):
@@ -17,27 +17,15 @@ class Relaxer(object):
             model (str):
                 which MLP to use
         """
+
         self.initial_structure = StrucTools(initial_structure).structure
-        # self.st = StrucTools(self.initial_structure)
+        self.st = StrucTools(self.initial_structure)
         self.model = model
 
-    def relaxer(self, verbose=True):
-        """
-        Args:
-            verbose (bool):
-                if True, print the output steps
-
-        Returns:
-            a converged "relaxer" object
-            for model = 'chgnet'
-                {'final_structure' : optimized structure (pymatgen.Structure),
-                 'trajectory' : chgnet.model.dynamics.TrajectoryObserver object}
-        """
         if self.model == "chgnet":
-            relaxer = StructOptimizer()
-            return relaxer.relax(self.initial_structure, verbose=verbose)
-        else:
-            raise NotImplementedError
+            self.chgnet = CHGNet.load()
+            self.relaxer = StructOptimizer(model=self.chgnet)
+            self.result = self.relaxer.relax(self.initial_structure, verbose=True)
 
     @property
     def relaxed_structure(self):
@@ -45,7 +33,7 @@ class Relaxer(object):
         Returns:
             optimized structure (pymatgen.Structure)
         """
-        return self.relaxer(False)["final_structure"]
+        return self.result["final_structure"]
 
     @property
     def trajectory(self):
@@ -53,7 +41,7 @@ class Relaxer(object):
         Returns:
             chgnet TrajectoryObserver object
         """
-        return self.relaxer(False)["trajectory"]
+        return self.result["trajectory"]
 
     @property
     def predictions(self):
@@ -62,7 +50,7 @@ class Relaxer(object):
         Returns:
             dict
             {'initial' : CHGNet predictions for initial structure,
-             'final' : CHGNet predictions for optimized structure}
+            'final' : CHGNet predictions for optimized structure}
                 predictions =
                     {'e' : energy per atom (eV/atom),
                      'm' : magnetic moment (mu_B),
@@ -71,11 +59,12 @@ class Relaxer(object):
         """
         s_initial = self.initial_structure
         s_final = self.relaxed_structure
+        initialized_model = self.chgnet
 
         if self.model == "chgnet":
             predictions = {
-                "initial": CHGNet().predict_structure(structure=s_initial),
-                "final": CHGNet().predict_structure(structure=s_final),
+                "initial": initialized_model.predict_structure(structure=s_initial),
+                "final": initialized_model.predict_structure(structure=s_final),
             }
         else:
             raise NotImplementedError
@@ -86,7 +75,7 @@ class Relaxer(object):
     def E_per_at(self):
         """
         Returns:
-            final energy per atom predicted by CHGNet for CHGNet-optimized structure
+            energy per atom (eV/atom) predicted by specified model
         """
         return self.predictions["final"]["e"]
 
@@ -158,19 +147,19 @@ class Relaxer(object):
 
 def main():
     fposcar = "../data/test_data/vasp/AlN/POSCAR"
-    relaxer = Relaxer(fposcar, model="chgnet")
+    test_relaxer = Relaxer(fposcar, model="chgnet")
 
     relaxation_results = {
-        "relaxer": relaxer,
-        "initial_structure": relaxer.initial_structure,
-        "optimized_structure": relaxer.relaxed_structure,
-        "optimized_energy": relaxer.E_per_at,
-        "trajectory_observer": relaxer.trajectory,
-        "trajectory_attributes": relaxer.trajectory_attributes,
+        "relaxer": test_relaxer,
+        "initial_structure": test_relaxer.initial_structure,
+        "optimized_structure": test_relaxer.relaxed_structure,
+        "optimized_energy": test_relaxer.E_per_at,
+        "trajectory_observer": test_relaxer.trajectory,
+        "trajectory_attributes": test_relaxer.trajectory_attributes,
     }
 
     print(relaxation_results)
-    return relaxer, relaxation_results
+    return test_relaxer, relaxation_results
 
 
 if __name__ == "__main__":
