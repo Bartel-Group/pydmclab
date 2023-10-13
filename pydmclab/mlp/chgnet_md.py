@@ -1,6 +1,6 @@
+from chgnet.model import StructOptimizer, CHGNet
 from pydmclab.mlp.md import Relaxer, Observer
 from pymatgen.core.structure import Structure
-from chgnet.model import StructOptimizer, CHGNet
 
 
 class CHGNetRelaxer(Relaxer):
