@@ -1004,13 +1004,23 @@ def setup_bandstructure(
     )
 
     # create a line-mode KPOINTS file and write to bs KPOINTS
-    lobsterin.write_KPOINTS(
-        POSCAR_input=fposcar_dst,
-        KPOINTS_output=fkpoints_dst,
-        line_mode=True,
-        symprec=symprec,
-        kpoints_line_density=kpoints_line_density,
-    )
+    try:
+        lobsterin.write_KPOINTS(
+            POSCAR_input=fposcar_dst,
+            KPOINTS_output=fkpoints_dst,
+            line_mode=True,
+            symprec=symprec,
+            kpoints_line_density=kpoints_line_density,
+        )
+    except ValueError:
+        print("trying higher symprec")
+        lobsterin.write_KPOINTS(
+            POSCAR_input=fposcar_dst,
+            KPOINTS_output=fkpoints_dst,
+            line_mode=True,
+            symprec=symprec * 2,
+            kpoints_line_density=kpoints_line_density,
+        )
 
     # copy our POTCAR from the static calc
     copyfile(fpotcar_src, fpotcar_dst)
