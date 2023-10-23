@@ -146,6 +146,14 @@ class Observer(object):
         ), "Energies must be a list of floats."
         self._energies = values
 
+    @property
+    def compact_trajectory(self):
+        """
+        Returns:
+            list of tuples summarizing the trajectory : (step, energy, structure (pymatgen.Structure))
+        """
+        return list(zip(range(len(self.energies)), self.energies, self.structures))
+
 
 def main():
     fposcar = "../data/test_data/vasp/AlN/POSCAR"
