@@ -376,6 +376,7 @@ def get_launch_configs(
 def get_analysis_configs(
     analyze_calculations_in_parallel=False,
     analyze_structure=True,
+    analyze_trajectory=False,
     analyze_mag=False,
     analyze_charge=False,
     analyze_dos=False,
@@ -394,6 +395,9 @@ def get_analysis_configs(
 
         analyze_structure (bool, optional):
             True to include structure in your results
+
+        analyze_trajectory (bool, optional):
+            True to include trajectory in your results
 
         analyze_mag (bool, optional):
             True to include magnetization in your results
@@ -432,6 +436,9 @@ def get_analysis_configs(
     includes = []
     if analyze_structure:
         includes.append("structure")
+
+    if analyze_trajectory:
+        includes.append("trajectory")
 
     if analyze_mag:
         includes.append("mag")
