@@ -4,6 +4,7 @@ check_relax: True # make sure the relax calculation and the static have similar 
 include_meta: True # include metadata like INCAR, KPOINTS, POTCAR settings
 include_calc_setup: True # include things related to the calculation setup -- standard, mag, final_xc, etc
 include_structure: False # include the relaxed crystal structure as a dict
+include_trajectory: False # include the compact trajectory from the vasprun.xml
 include_mag: False # include the relaxed magnetization info as as dict
 include_tdos: False # include the light version of the density of states
 include_pdos: False # include heavy dos

@@ -431,6 +431,17 @@ class AnalyzeVASP(object):
             out[site] = orbs
         return out
 
+    @property
+    def compact_trajectory(self):
+        """
+        Returns:
+            list of tuples summarizing the trajectory : (step, energy, structure (pymatgen.Structure))
+        """
+        energies = [step["e_wo_entrp"] for step in self.outputs.vasprun.ionic_steps]
+        structures = [step["structure"] for step in self.outputs.vasprun.ionic_steps]
+
+        return list(zip(range(len(energies)), energies, structures))
+
     def pdos(self, fjson=None, remake=False):
         """
         @TODO: add demo/test
@@ -1071,6 +1082,7 @@ class AnalyzeVASP(object):
         include_meta=False,
         include_calc_setup=False,
         include_structure=False,
+        include_trajectory=False,
         include_mag=False,
         include_tdos=False,
         include_pdos=False,
@@ -1114,6 +1126,8 @@ class AnalyzeVASP(object):
             #    charge_source="bader", structure=None
             # )
             data["structure"] = self.relaxed_structure
+        if include_trajectory:
+            data["trajectory"] = self.compact_trajectory
         if include_mag:
             data["magnetization"] = self.magnetization
         if include_tdos:
@@ -1251,6 +1265,7 @@ class AnalyzeBatch(object):
         include_meta = configs["include_meta"]
         include_calc_setup = configs["include_calc_setup"]
         include_structure = configs["include_structure"]
+        include_trajectory = configs["include_trajectory"]
         include_mag = configs["include_mag"]
         include_tdos = configs["include_tdos"]
         include_pdos = configs["include_pdos"]
@@ -1272,6 +1287,7 @@ class AnalyzeBatch(object):
             include_meta=include_meta,
             include_calc_setup=include_calc_setup,
             include_structure=include_structure,
+            include_trajectory=include_trajectory,
             include_mag=include_mag,
             include_tdos=include_tdos,
             include_pdos=include_pdos,
