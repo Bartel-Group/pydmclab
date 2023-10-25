@@ -443,7 +443,7 @@ class AnalyzeVASP(object):
 
             if vr and nsites:
                 energies = [step["e_wo_entrp"] / nsites for step in vr.ionic_steps]
-                structures = [step["structure"] for step in vr.ionic_steps]
+                structures = [step["structure"].as_dict() for step in vr.ionic_steps]
                 return list(zip(range(len(energies)), energies, structures))
             return None
         else:
