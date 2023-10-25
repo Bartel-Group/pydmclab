@@ -437,10 +437,17 @@ class AnalyzeVASP(object):
         Returns:
             list of tuples summarizing the trajectory : (step, energy, structure (pymatgen.Structure))
         """
-        energies = [step["e_wo_entrp"] for step in self.outputs.vasprun.ionic_steps]
-        structures = [step["structure"] for step in self.outputs.vasprun.ionic_steps]
+        if self.is_converged:
+            vr = self.outputs.vasprun
+            nsites = self.nsites
 
-        return list(zip(range(len(energies)), energies, structures))
+            if vr and nsites:
+                energies = [step["e_wo_entrp"] / nsites for step in vr.ionic_steps]
+                structures = [step["structure"] for step in vr.ionic_steps]
+                return list(zip(range(len(energies)), energies, structures))
+            return None
+        else:
+            return None
 
     def pdos(self, fjson=None, remake=False):
         """
