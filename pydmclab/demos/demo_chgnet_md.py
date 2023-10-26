@@ -36,10 +36,16 @@ def main():
 
     for cmpd in strucs:
         for mpid in strucs[cmpd]:
-            st = StrucTools(strucs[cmpd][mpid])
-            initial_structure = st.perturb(0.1)
-            chgnet_relaxer = CHGNetRelaxer(initial_structure=initial_structure)
-            chgnet_observer = CHGNetObserver(relaxer=chgnet_relaxer)
+            st = StrucTools(strucs[cmpd][mpid])  # Load IrO2
+            initial_structure = st.perturb(
+                0.1
+            )  # Perturb to get non-equilibrium structure
+            chgnet_relaxer = CHGNetRelaxer(
+                initial_structure=initial_structure
+            )  # Initialize Relaxer
+            chgnet_observer = CHGNetObserver(
+                relaxer=chgnet_relaxer
+            )  # Pass converged relaxer to observer
 
             print(f"\n{cmpd} {mpid}")
             print(
