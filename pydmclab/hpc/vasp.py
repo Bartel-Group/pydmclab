@@ -339,7 +339,7 @@ class VASPSetUp(object):
             if configs["standard"] != "mp":
                 # want to write charge densities
                 # new NBANDS so don't want to start from WAVECAR
-                lobster_incar_settings = {"NEDOS": 800, "ISTART": 0, "LAECHG": True}
+                lobster_incar_settings = {"ISTART": 0, "LAECHG": True}
                 for key in lobster_incar_settings:
                     if key not in configs["lobster_incar"]:
                         if key not in modify_incar:
