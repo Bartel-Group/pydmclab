@@ -16,7 +16,7 @@ def get_vasp_configs(
     run_bandstructure=False,
     run_parchg=False,
     run_dielectric=False,
-    detailed_dos=True,
+    detailed_dos=False,
     modify_loose_incar=False,
     modify_relax_incar=False,
     modify_static_incar=False,
@@ -136,8 +136,11 @@ def get_vasp_configs(
         else:
             vasp_configs["COHPSteps"] = detailed_dos
 
-        if type(vasp_configs["static_incar"]) == dict:
-            vasp_configs["static_incar"]["NEDOS"] = vasp_configs["COHPSteps"]
+        if "static_incar" in vasp_configs:
+            if type(vasp_configs["static_incar"]) == dict:
+                vasp_configs["static_incar"]["NEDOS"] = vasp_configs["COHPSteps"]
+            else:
+                vasp_configs["static_incar"] = {"NEDOS": vasp_configs["COHPSteps"]}
         else:
             vasp_configs["static_incar"] = {"NEDOS": vasp_configs["COHPSteps"]}
 
