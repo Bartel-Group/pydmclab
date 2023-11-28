@@ -106,12 +106,6 @@ def get_vasp_configs(
     if vasp_configs["generate_bandstructure"]:
         vasp_configs["lobster_static"] = True
 
-    if detailed_dos:
-        if type(detailed_dos) == bool:
-            vasp_configs["COHPSteps"] = 4000
-        else:
-            vasp_configs["COHPSteps"] = detailed_dos
-
     # INCARs
     if modify_loose_incar:
         vasp_configs["loose_incar"] = modify_loose_incar
@@ -135,6 +129,17 @@ def get_vasp_configs(
         vasp_configs["relax_potcar"] = modify_relax_potcar
     if modify_static_potcar:
         vasp_configs["static_potcar"] = modify_static_potcar
+
+    if detailed_dos:
+        if type(detailed_dos) == bool:
+            vasp_configs["COHPSteps"] = 4000
+        else:
+            vasp_configs["COHPSteps"] = detailed_dos
+
+        if type(vasp_configs["static_incar"]) == dict:
+            vasp_configs["static_incar"]["NEDOS"] = vasp_configs["COHPSteps"]
+        else:
+            vasp_configs["static_incar"] = {"NEDOS": vasp_configs["COHPSteps"]}
 
     return vasp_configs
 

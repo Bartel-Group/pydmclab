@@ -2,10 +2,13 @@ COHPSteps: 400
 bs_line_density: 20
 bs_symprec: 0.1
 calc_to_run: null
+eint_for_parchg: -1
 fun: null
 fvasperrors: errors.o
 fvaspout: vasp.o
 generate_bandstructure: false
+generate_dielectric: false
+generate_parchg: false
 lobster_incar: {}
 lobster_kpoints: {}
 lobster_potcar: {}
