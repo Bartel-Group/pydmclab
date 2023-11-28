@@ -131,13 +131,13 @@ def get_vasp_configs(
         vasp_configs["static_potcar"] = modify_static_potcar
 
     if detailed_dos:
-        if type(detailed_dos) == bool:
+        if isinstance(detailed_dos, bool):
             vasp_configs["COHPSteps"] = 4000
         else:
             vasp_configs["COHPSteps"] = detailed_dos
 
         if "static_incar" in vasp_configs:
-            if type(vasp_configs["static_incar"]) == dict:
+            if isinstance(vasp_configs["static_incar"], dict):
                 vasp_configs["static_incar"]["NEDOS"] = vasp_configs["COHPSteps"]
             else:
                 vasp_configs["static_incar"] = {"NEDOS": vasp_configs["COHPSteps"]}
