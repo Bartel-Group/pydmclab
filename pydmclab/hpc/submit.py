@@ -535,7 +535,8 @@ class SubmitTools(object):
                             and parent_convergence
                             and not fresh_restart
                             and not large_E_diff_between_relax_and_static
-                            and not sub_configs["force_postprocess"]
+                            # note: muting force_postprocess here b/c we want the calc to still be "done", right?
+                            # and not sub_configs["force_postprocess"]
                         ):
                             print("     %s is already converged; skipping" % xc_calc)
                             status = "done"
