@@ -703,6 +703,20 @@ launch_dirs = {<composition>/<unique ID for that composition>/<standard>/<unique
   - modules for running MD with ASE
 - `pydmclab.tests`
   - thorough unit tests
+
+## Miscellaneous (including non-python)
+- alloys
+  - SQS (ATAT)
+  - alloy phase diagrams
+- diffusion
+  - NEB
+  - AIMD
+  - ASE-MD
+  - LAMMPS-MD
+- defects
+  - formation energy diagrams
+  - concentrations
+  - Fermi level
   
 # Maintenance
 
