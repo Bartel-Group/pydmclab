@@ -511,7 +511,7 @@ class SubmitTools(object):
                                 )
                             else:
                                 # if there is a large difference b/t the relax and static energy, something fishy happened, so let's start the static calc over
-                                if abs(parent_energy - static_energy) > 0.2:
+                                if abs(parent_energy - static_energy) > 0.05:
                                     print(
                                         "     %s (parent) and %s (child) energies differ by more than 0.2 eV/atom"
                                         % (parent_xc_calc, xc_calc)
