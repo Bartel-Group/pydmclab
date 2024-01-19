@@ -13,101 +13,114 @@ Note:
 
 API_KEY = "***REMOVED***"
 DATA_DIR = os.path.join("output", "query")
-CHEMSYS = "Li-Mn-F-S"
+CHEMSYS = "Sr-Zr-S"
 
 
-def demo_get_groundstate_hull_data_for_chemsys(
-    chemsys=CHEMSYS,
-    remake=False,
-    data_dir=DATA_DIR,
-    api_key=API_KEY,
-):
+def demo_get_a_structure(mpid):
     """
     Args:
-        chemsys (str)
-            chemical system to query ('-'.join([elements]))
-
-        only_gs (bool)
-            if True, remove non-ground state polymorphs from MP query
-                good practice to do this before doing hull analysis b/c non-gs polymorphs trivially have Ehull=Ehull_gs + dE_polymorph-gs
-
-        dict_key (str)
-            key to use to orient dictionary of MPQuery results
-                'cmpd' is the default behavior in MPQuery, meaning we get a dictionary that looks like {CHEMICAL_FORMULA : {DATA}}
-
-        remake (bool)
-            if True, re-query MP
+        mpid (str): Materials Project ID
 
     Returns:
-        gs (dict): dictionary of ground state data from MPQuery for chemsys
+        structure (Structure)
     """
-    fjson = os.path.join(data_dir, "query_gs_all_" + chemsys + ".json")
-    if not remake and os.path.exists(fjson):
-        return read_json(fjson)
-
-    mpq = MPQuery(api_key)
-    out = mpq.get_data_for_comp(comp=chemsys)
-
-    return write_json(out, fjson)
-
-
-def reorient_gs_data_from_ID_keys_to_cmpd_keys(d_gs):
-    """
-    Args:
-        d_gs (dict): dictionary of ground state data from MPQuery for chemsys
-            {MP_ID : {DATA}}
-
-    Returns:
-        d_gs_cmpd (dict):
-            reoriented so that keys are chemical formula instead of MP ID
-    """
-    d_gs_cmpd = {}
-    for k in d_gs:
-        d_gs_cmpd[d_gs[k]["cmpd"]] = d_gs[k]
-    return d_gs_cmpd
-
-
-def demo_entry_retrieval(mpid="mp-530748"):
-    """
-    Grab a calculated entry from MP
-    """
-    mpq = MPQuery(API_KEY)
-    properties = list(mpq.typical_properties) + ["band_gap"]
-    entry = mpq.get_entry_by_material_id(
-        material_id=mpid,
-        properties=properties,
-        incl_structure=True,
-        conventional=False,
-        compatible_only=True,
-    )
-    print(entry)
-    return entry
-
-
-def demo_structure_retrieval(mpid="mp-1094961"):
-    mpq = MPQuery(API_KEY)
-    s = mpq.get_structure_by_material_id(material_id=mpid)
-
-    print("\nThe formula for this structure is %s" % StrucTools(s).formula)
-    print("The first site in the structure is %s" % s[0])
-
+    mpq = MPQuery(api_key=API_KEY)
+    data = mpq.get_structures_by_material_id([mpid])
+    s = data[mpid]
+    print("got structure for %s. it has %i sites" % (mpid, len(s)))
     return s
 
 
-def demo_vaspinput_retrieval(mpid="mp-1938"):
-    inputs = MPQuery(API_KEY).get_vasp_inputs(material_id=mpid)
-    print("\n The %s for this calculation was %s" % ("ALGO", inputs["incar"]["ALGO"]))
-    return inputs
+def demo_get_structures(mpids):
+    """
+    Args:
+        mpids (list): list of Materials Project IDs (str)
+
+    Returns:
+        {mpid (str) : structure (Structure))}
+    """
+    mpq = MPQuery(api_key=API_KEY)
+    data = mpq.get_structures_by_material_id(mpids)
+    print("got %i structures. one each for: %s" % (len(data), ", ".join(data.keys())))
+    return data
+
+
+def demo_get_data_for_formula(formula):
+    """
+    Args:
+        formula (str): chemical formula
+
+    Returns:
+        data (dict): dictionary of data from MPQuery for formula
+    """
+    mpq = MPQuery(api_key=API_KEY)
+    data = mpq.get_data(search_for=formula)
+    print("found %i mpids for %s" % (len(data), formula))
+    return data
+
+
+def demo_get_ground_state_data_for_formulas(formulas):
+    """
+    Args:
+        formulas (list): list of chemical formulas
+
+    Returns:
+        data (dict): dictionary of data from MPQuery for formulas
+    """
+    mpq = MPQuery(api_key=API_KEY)
+    data = mpq.get_data(search_for=formulas, only_gs=True)
+    print(
+        "queried gs data for %i formulas so got %i mpids" % (len(formulas), len(data))
+    )
+    return data
+
+
+def demo_get_small_structures_in_chemsys(chemsys):
+    """
+    Args:
+        chemsys (str): chemical system to query ('-'.join([elements]))
+
+    Returns:
+        data (dict): dictionary of data from MPQuery for chemsys
+    """
+    mpq = MPQuery(api_key=API_KEY)
+    data = mpq.get_data(chemsys, max_sites_per_structure=30, only_gs=False)
+    print(
+        "queried small structures for %s. got %i mpids. most sites in a structure = %i"
+        % (chemsys, len(data), max([data[k]["nsites"] for k in data]))
+    )
+    return data
+
+
+def demo_get_hull_data(chemsys):
+    """
+    Args:
+        chemsys (str): chemical system to query ('-'.join([elements]))
+
+    Returns:
+        data (dict): dictionary of data from MPQuery for chemsys (including subspaces)
+
+    """
+    mpq = MPQuery(api_key=API_KEY)
+    data = mpq.get_data(chemsys, only_gs=True, include_sub_phase_diagrams=True)
+    print("%i compounds in %s hull" % (len(data), chemsys))
 
 
 def main():
-    d_gs = demo_get_groundstate_hull_data_for_chemsys(remake=True)
-    d_gs_cmpd = reorient_gs_data_from_ID_keys_to_cmpd_keys(d_gs)
-    entry = demo_entry_retrieval()
-    structure = demo_structure_retrieval()
-    vasp_inputs = demo_vaspinput_retrieval()
-    d_gs, d_gs_cmpd = None, None
-    return d_gs, d_gs_cmpd, entry, structure, vasp_inputs
+    mpid = "mp-390"
+    mpids = ["mp-390", "mp-1938", "mp-1094961"]
+    formula = ["SrZrS3"]
+    formulas = ["BaZrS3", "SrZrS3"]
+    chemsys = "Ca-Al-O"
+    hull_chemsys = "Ba-Zr-S"
+
+    s = demo_get_a_structure(mpid)
+    strucs = demo_get_structures(mpids)
+    data_for_SrZrS3 = demo_get_data_for_formula(formula)
+    gs_data_for_formulas = demo_get_ground_state_data_for_formulas(formulas)
+    data_for_LiMgCl = demo_get_small_structures_in_chemsys(chemsys)
+    data_for_BaZrS_hull = demo_get_hull_data(hull_chemsys)
+    return s, strucs
 
 
 if __name__ == "__main__":

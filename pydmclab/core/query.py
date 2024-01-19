@@ -1,9 +1,8 @@
 from pydmclab.core.comp import CompTools
 from pydmclab.core.struc import StrucTools
 
-from pymatgen.ext.matproj import MPRester
-
-# from mp_api.client import MPRester as new_MPRester
+from pymatgen.ext.matproj import MPRester as old_MPRester
+from mp_api.client import MPRester
 
 import itertools
 import numpy as np
@@ -18,6 +17,296 @@ Typical use:
 
 
 class MPQuery(object):
+    """
+    New MP API
+    """
+
+    def __init__(self, api_key=None):
+        """
+        Args:
+            api_key (str)
+                Materials Project API key
+
+        Returns:
+            self.mpr (MPRester)
+                Materials Project REST interface
+        """
+
+        api_key = api_key if api_key else "YOUR_API_KEY"
+
+        self.api_key = api_key
+        self.mpr = MPRester(api_key)
+
+    @property
+    def fields(self):
+        return self.mpr.summary.available_fields
+
+    @property
+    def typical_properties(self):
+        props = [
+            "formula_pretty",
+            "material_id",
+            "energy_per_atom",
+            "formation_energy_per_atom",
+            "uncorrected_energy_per_atom",
+            "volume",
+            "energy_above_hull",
+            "symmetry.number",
+            "nsites",
+        ]
+        return props
+
+    @property
+    def long_to_short_keys(self):
+        return {
+            "energy_per_atom": "E_mp",
+            "formation_energy_per_atom": "Ef_mp",
+            "energy_above_hull": "Ehull_mp",
+            "material_id": "mpid",
+            "symmetry.number": "sg",
+        }
+
+    def get_data(
+        self,
+        search_for,
+        properties=None,
+        max_Ehull=0.1,
+        max_sites_per_structure=100,
+        max_polymorph_energy=0.1,
+        only_gs=False,
+        include_structure=True,
+        max_strucs_per_cmpd=5,
+        include_sub_phase_diagrams=False,
+    ):
+        """
+        Args:
+            search_for (str or list)
+                can either be:
+                    - a chemical system (str) of elements joined by "-"
+                    - a chemical formula (str)
+                    - an MP ID (str)
+                can either be a list of:
+                    - chemical systems (str) of elements joined by "-"
+                    - chemical formulas (str)
+                    - MP IDs (str)
+
+            properties (list or None)
+                list of properties to query
+                    - if None, then use typical_properties
+                    - if 'all', then use all properties
+                    - if a string, then add that property to typical_properties
+                    - if a list, then add those properties to typical_properties
+
+            band_gap (tuple)
+                band gap range to query
+
+            max_Ehull (float)
+                upper bound on energy above hull to query
+
+            max_sites_per_structure (int)
+                upper bound on number of sites to query
+
+            max_polymorph_energy (float)
+                upper bound on polymorph energy to query
+
+            only_gs (bool)
+                if True, remove non-ground state polymorphs for each unique composition
+
+            include_structure (bool)
+                if True, include the structure (as a dictionary) for each entry
+
+            max_strucs_per_cmpd (int)
+                if not None, only retain the lowest energy structures for each composition until you reach max_strucs_per_cmpd
+
+            include_sub_phase_diagrams (bool)
+                if True, include all sub-phase diagrams for a given composition
+                    e.g., if comp = "Sr-Zr-S", then also include "Sr-S" and "Zr-S" in the query
+        Returns:
+            {mpid : {DATA}}
+
+
+        """
+        # start w/ typical properties
+        baseline_properties = self.typical_properties
+
+        # just use these if you don't say to add any
+        if not properties:
+            properties = baseline_properties
+
+        elif isinstance(properties, str):
+            if properties == "all":
+                # add all possible properties
+                properties = self.fields
+            else:
+                # if you add one property as a string, add it
+                properties += [properties]
+        elif isinstance(properties, list):
+            # if you pass a list, add those properties
+            properties += baseline_properties
+
+        # include the structure in the query if asked for
+        if include_structure and ("structure" not in properties):
+            properties.append("structure")
+
+        # map long MP keys to easier to read ones
+        long_to_short_keys = self.long_to_short_keys
+
+        # initialize MPRester
+        mpr = self.mpr
+
+        # convert a single-item list to str for convenience
+        if isinstance(search_for, list) and (len(search_for) == 1):
+            search_for = search_for[0]
+
+        # figure out if you're searching based on formula, chemsys, or MP ID (or a list of any one of these)
+        if isinstance(search_for, list):
+            first_search = search_for[0]
+            if "-" in first_search:
+                if "mp" in first_search:
+                    search_key = "material_id"
+                else:
+                    search_key = "chemsys"
+            elif CompTools(first_search).n_els == 1:
+                search_key = "elements"
+            else:
+                search_key = "formula"
+        elif isinstance(search_for, str):
+            if "-" in search_for:
+                if "mp" in search_for:
+                    search_key = "material_id"
+                else:
+                    search_key = "chemsys"
+            else:
+                search_key = "formula"
+
+        # include sub-phase diagrams if asked for (eg for hull analysis)
+        if (search_key == "chemsys") and include_sub_phase_diagrams:
+            chemsyses = [search_for]
+            els = search_for.split("-")
+            for i in range(len(els)):
+                for sub_els in itertools.combinations(els, i + 1):
+                    chemsyses.append("-".join(sorted(sub_els)))
+            chemsyses += els
+            search_for = chemsyses
+
+        # query MP based on a search for compounds containing at least these elements
+        if search_key == "elements":
+            docs = mpr.summary.search(
+                elements=search_for, energy_above_hull=(0, max_Ehull)
+            )
+        # query MP based on a search for compounds in these chemical systems
+        elif search_key == "chemsys":
+            docs = mpr.summary.search(
+                chemsys=search_for, energy_above_hull=(0, max_Ehull)
+            )
+        # query MP based on a search for compounds having these formulas
+        elif search_key == "formula":
+            docs = mpr.summary.search(
+                formula=search_for, energy_above_hull=(0, max_Ehull)
+            )
+        # query MP based on a search for entries w/ these IDs
+        elif search_key == "material_id":
+            docs = mpr.summary.search(
+                material_ids=search_for, energy_above_hull=(0, max_Ehull)
+            )
+
+        # convert returned documents into dictionaries
+        d = {}
+        for doc in docs:
+            d_doc = doc.dict()
+            mpid = d_doc["material_id"]
+            # mpid will be the front key in this dict since it's unique
+            tmp = {}
+            for k in d_doc:
+                if k == "material_id":
+                    continue
+                # map notable keys to shorter names
+                if k in long_to_short_keys:
+                    tmp[long_to_short_keys[k]] = d_doc[k]
+                elif k in properties:
+                    tmp[k] = d_doc[k]
+            # include a clean formula
+            tmp["cmpd"] = CompTools(tmp["formula_pretty"]).clean
+            d[mpid] = tmp
+
+            # get a list of all compounds in our query for parsing
+            compounds = sorted(list(set([d[mpid]["cmpd"] for mpid in d])))
+
+            # figure out which mpid belongs to the ground-state for each formula
+            gs = {}
+            for c in compounds:
+                mpids = [mpid for mpid in d if d[mpid]["cmpd"] == c]
+                energy_key = "E_mp" if len(CompTools(c).els) == 1 else "Ef_mp"
+                energies = [d[mpid][energy_key] for mpid in mpids]
+                gs_mpid = mpids[np.argmin(energies)]
+                gs[c] = gs_mpid
+
+            # add a flag for whether each entry is the ground state
+            for mpid in d:
+                d[mpid]["is_gs"] = True if mpid == gs[d[mpid]["cmpd"]] else False
+                energy_key = (
+                    "E_mp" if len(CompTools(d[mpid]["cmpd"]).els) == 1 else "Ef_mp"
+                )
+                d[mpid]["dE_gs"] = (
+                    d[mpid][energy_key] - d[gs[d[mpid]["cmpd"]]][energy_key]
+                )
+
+            # if you ask only for ground-states, remove other polymorphs
+            if only_gs:
+                d = {mpid: d[mpid] for mpid in d if d[mpid]["is_gs"]}
+
+            # remove certain higher energy polymorphs based on a max polymorphs per formula criterion
+            if max_strucs_per_cmpd:
+                mpids_to_keep = []
+                for c in compounds:
+                    mpids = [mpid for mpid in d if d[mpid]["cmpd"] == c]
+                    dEs = [d[mpid]["dE_gs"] for mpid in mpids]
+
+                    sorted_indices = np.argsort(dEs)
+                    sorted_ids = [mpids[i] for i in sorted_indices]
+                    mpids_to_keep += sorted_ids[:max_strucs_per_cmpd]
+
+                d = {mpid: d[mpid] for mpid in d if mpid in mpids_to_keep}
+
+            # remove entries that have too many sites in their structures
+            if max_sites_per_structure:
+                d = {
+                    mpid: d[mpid]
+                    for mpid in d
+                    if d[mpid]["nsites"] <= max_sites_per_structure
+                }
+
+            # remove entries that have too high an energy above the ground-state polymorph
+            if max_polymorph_energy:
+                d = {
+                    mpid: d[mpid]
+                    for mpid in d
+                    if d[mpid]["dE_gs"] <= max_polymorph_energy
+                }
+        return d
+
+    def get_structures_by_material_id(self, material_ids):
+        """
+        Args:
+            material_ids (list)
+                list of MP IDs (str)
+
+        Returns:
+            {mpid (str) : Structure (dict)}
+        """
+
+        docs = self.mpr.summary.search(
+            material_ids=material_ids, fields=["structure", "material_id"]
+        )
+        d = {}
+        for doc in docs:
+            d_doc = doc.dict()
+            mpid = d_doc["material_id"]
+            d[mpid] = d_doc["structure"]
+        return d
+
+
+class MPLegacyQuery(object):
     # Chris B API KEY =
     """
     class to assist with downloading data from Materials Project
@@ -38,7 +327,7 @@ class MPQuery(object):
         api_key = api_key if api_key else "YOUR_API_KEY"
 
         self.api_key = api_key
-        self.mpr = MPRester(api_key)
+        self.mpr = old_MPRester(api_key)
 
     @property
     def supported_properties(self):
@@ -433,8 +722,16 @@ class MPQuery(object):
 
 
 def main():
-    return
+    my_new_api_key = "***REMOVED***"
+    mpq = MPQuery(api_key=my_new_api_key)
+    """
+    out = mpq.get_data(
+        search_for=["Sr-Zr-S"], include_sub_phase_diagrams=False, only_gs=True
+    )
+    """
+    s = mpq.get_structures_by_material_id(material_ids=["mp-390"])
+    return mpq, out, s
 
 
 if __name__ == "__main__":
-    out = main()
+    mpq, out, s = main()

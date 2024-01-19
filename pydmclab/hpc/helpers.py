@@ -3,7 +3,7 @@ import os
 from pydmclab.hpc.launch import LaunchTools
 from pydmclab.hpc.submit import SubmitTools
 from pydmclab.hpc.analyze import AnalyzeVASP, AnalyzeBatch
-from pydmclab.core.query import MPQuery
+from pydmclab.core.query import MPQuery, MPLegacyQuery
 from pydmclab.core.struc import StrucTools
 from pydmclab.core.mag import MagTools
 from pydmclab.core.energies import ChemPots, FormationEnthalpy
@@ -471,6 +471,104 @@ def get_analysis_configs(
 
 
 def get_query(
+    api_key,
+    search_for,
+    properties=None,
+    max_Ehull=0.1,
+    max_sites_per_structure=100,
+    max_polymorph_energy=0.1,
+    only_gs=False,
+    include_structure=True,
+    max_strucs_per_cmpd=5,
+    include_sub_phase_diagrams=False,
+    data_dir=os.getcwd().replace("scripts", "data"),
+    savename="query.json",
+    remake=False,
+):
+    """
+    Args:
+        api_key (str)
+            your API key (should be 32 characters)
+        search_for (str or list)
+            can either be:
+                - a chemical system (str) of elements joined by "-"
+                - a chemical formula (str)
+                - an MP ID (str)
+            can either be a list of:
+                - chemical systems (str) of elements joined by "-"
+                - chemical formulas (str)
+                - MP IDs (str)
+
+        properties (list or None)
+            list of properties to query
+                - if None, then use typical_properties
+                - if 'all', then use all properties
+                - if a string, then add that property to typical_properties
+                - if a list, then add those properties to typical_properties
+
+        band_gap (tuple)
+            band gap range to query
+
+        max_Ehull (float)
+            upper bound on energy above hull to query
+
+        max_sites_per_structure (int)
+            upper bound on number of sites to query
+
+        max_polymorph_energy (float)
+            upper bound on polymorph energy to query
+
+        only_gs (bool)
+            if True, remove non-ground state polymorphs for each unique composition
+
+        include_structure (bool)
+            if True, include the structure (as a dictionary) for each entry
+
+        max_strucs_per_cmpd (int)
+            if not None, only retain the lowest energy structures for each composition until you reach max_strucs_per_cmpd
+
+        include_sub_phase_diagrams (bool)
+            if True, include all sub-phase diagrams for a given composition
+                e.g., if comp = "Sr-Zr-S", then also include "Sr-S" and "Zr-S" in the query
+        data_dir (str)
+            directory to save fjson
+        savename (str)
+            filename for fjson in data_dir
+        remake (bool)
+            write (True) or just read (False) fjson
+    Returns:
+        {ID (str) : {'structure' : Pymatgen Structure as dict,
+                    < any other data you want to keep track of >}}
+    """
+
+    if len(api_key) < 32:
+        raise ValueError("API key should be 32 characters")
+
+    fjson = os.path.join(data_dir, savename)
+    if os.path.exists(fjson) and not remake:
+        return read_json(fjson)
+
+    # initialize MPQuery with your API key
+    mpq = MPQuery(api_key=api_key)
+
+    # get the data from MP
+    data = mpq.get_data(
+        search_for=search_for,
+        properties=properties,
+        max_Ehull=max_Ehull,
+        max_sites_per_structure=max_sites_per_structure,
+        max_polymorph_energy=max_polymorph_energy,
+        only_gs=only_gs,
+        include_structure=include_structure,
+        max_strucs_per_cmpd=max_strucs_per_cmpd,
+        include_sub_phase_diagrams=include_sub_phase_diagrams,
+    )
+
+    write_json(data, fjson)
+    return read_json(fjson)
+
+
+def get_legacy_query(
     comp,
     api_key,
     properties=None,
@@ -546,7 +644,7 @@ def get_query(
         return read_json(fjson)
 
     # initialize MPQuery with your API key
-    mpq = MPQuery(api_key=api_key)
+    mpq = MPLegacyQuery(api_key=api_key)
 
     # get the data from MP
     data = mpq.get_data_for_comp(

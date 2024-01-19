@@ -10,11 +10,11 @@ DESCRIPTION = "Package to facilitate DFT calculations and analysis"
 URL = "https://github.umn.edu/bartel-group/pydmclab"
 EMAIL = "cbartel@umn.edu"
 AUTHOR = "Chris Bartel"
-REQUIRES_PYTHON = ">=3.6.0"
-VERSION = "1.0.3"
+REQUIRES_PYTHON = ">=3.9.0"
+VERSION = "1.1.0"
 
-REQUIRED = ["numpy", "pymatgen"]
-EXTRAS = {"mlp": ["chgnet"], "defects": ["dscribe"]}
+REQUIRED = ["numpy", "pymatgen", "mp-api"]
+EXTRAS = {"mlp": ["chgnet"], "defects": ["dscribe"], "new_mp" : ['mp-api']}
 here = os.path.abspath(os.path.dirname(__file__))
 try:
     with io.open(os.path.join(here, "README.md"), encoding="utf-8") as f:
