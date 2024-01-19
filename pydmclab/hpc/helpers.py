@@ -246,6 +246,7 @@ def get_sub_configs(
     rerun_lobster=False,
     mpi_command="mpirun",
     special_packing=False,
+    vasp_version=6,
 ):
     """
 
@@ -307,6 +308,8 @@ def get_sub_configs(
             sub_configs["packing"][xc] = special_packing[xc]
 
     sub_configs["machine"] = machine
+
+    sub_configs["vasp_version"] = vasp_version
 
     return sub_configs
 

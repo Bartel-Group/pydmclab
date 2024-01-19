@@ -60,6 +60,7 @@ SUB_CONFIGS = get_sub_configs(
     special_packing=False,
     delete_all_calculations_and_start_over=False,
     machine="msi",
+    vasp_version=6,
 )
 
 # any configurations related to Slurm

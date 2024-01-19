@@ -1,5 +1,5 @@
 vasp: vasp_std # use vasp_gam for "loose" calcs (havent implemented yet)
-#vasp_dir: /home/cbartel/shared/bin/vasp/ # where vasp executable lives
+vasp_version: 6 # version of VASP
 mpi_command: mpirun # how to launch on multicore/multinode (may be mpirun depending on compilation)
 manager: '#SBATCH' # how to manage interactions with the queue (some machines dont use slurm)
 machine: msi # which supercomputer

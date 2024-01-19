@@ -302,10 +302,18 @@ class SubmitTools(object):
         Returns directory containing vasp executable
         """
         machine = self.sub_configs["machine"]
+        version = self.sub_configs["vasp_version"]
         if machine == "msi":
-            return "%s/vasp" % self.bin_dir
+            preamble = "%s/vasp" % self.bin_dir
+            if version == 5:
+                return "%s/vasp.5.4.4.pl2" % preamble
+            elif version == 6:
+                return "%s/vasp.6.4.1" % preamble
         elif machine == "bridges2":
-            return "/opt/packages/VASP/VASP6/6.3+VTST"
+            if version == 6:
+                return "/opt/packages/VASP/VASP6/6.3+VTST"
+            else:
+                raise NotImplementedError("VASP < 6 not on Bridges?")
         else:
             raise NotImplementedError('dont have VASP path for machine "%s"' % machine)
 
@@ -725,7 +733,22 @@ class SubmitTools(object):
                 # load certain modules if needed for MPI command
                 if sub_configs["mpi_command"] == "mpirun":
                     if sub_configs["machine"] == "msi":
-                        f.write("module load impi/2018/release_multithread\n")
+                        if sub_configs["vasp_version"] == 5:
+                            f.write("module load impi/2018/release_multithread\n")
+                        elif sub_configs["vasp_version"] == 6:
+                            unload = [
+                                "mkl",
+                                "intel/2018.release",
+                                "intel/2018/release",
+                                "impi/2018/release_singlethread",
+                                "mkl/2018.release",
+                                "impi/intel",
+                            ]
+                            load = ["mkl/2021/release", "intel/cluster/2021"]
+                            for module in unload:
+                                f.write("module unload %s\n" % module)
+                            for module in load:
+                                f.write("module load %s\n" % module)
                     elif sub_configs["machine"] == "bridges2":
                         f.write("module load intelmpi\nexport OMP_NUM_THREADS=1\n")
 
