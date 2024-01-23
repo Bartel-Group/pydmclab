@@ -619,11 +619,3 @@ class SiteTools(object):
             if entry["oxidation_state"]:
                 ox += entry["oxidation_state"] * entry["occu"]
         return ox
-
-
-def main():
-    return
-
-
-if __name__ == "__main__":
-    main()
