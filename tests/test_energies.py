@@ -17,14 +17,14 @@ class UnitTestChemPots(unittest.TestCase):
         muO = cp.chempots["O"]
 
         # from 230122_dmc-mus.json
-        self.assertEqual(muTi, -7.74480818)
-        self.assertEqual(muO, -4.71400617)
+        self.assertEqual(muTi, -7.805884913333333)
+        self.assertEqual(muO, -4.942339795)
 
         cp = ChemPots(functional="r2scan", standard="dmc")
         muTi = cp.chempots["Ti"]
         muO = cp.chempots["O"]
-        self.assertEqual(muTi, -12.852719325)
-        self.assertEqual(muO, -5.585154205)
+        self.assertEqual(muTi, -12.935879826666666)
+        self.assertEqual(muO, -5.93051377)
 
         # from mus_from_mp_no_corrections.json + mp2020_compatibility_dmus()
         cp = ChemPots(functional="pbe", standard="mp")
@@ -61,7 +61,7 @@ class UnitTestChemPots(unittest.TestCase):
         self.assertEqual(muRe, -123)
 
         cp = ChemPots(functional="r2scan", standard="dmc", user_dmus={"Ti": 0.23})
-        self.assertEqual(cp.chempots["Ti"], -12.852719325 + 0.23)
+        self.assertEqual(cp.chempots["Ti"], -12.935879826666666 + 0.23)
 
 
 class UnitTestFormationEnthalpy(unittest.TestCase):

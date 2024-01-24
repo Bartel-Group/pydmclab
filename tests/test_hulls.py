@@ -110,9 +110,7 @@ class UnitTestHulls(unittest.TestCase):
 
         self.assertEqual(results["Al1Ga1O3"]["E_mix_per_fu"], E_mix_middle_hard)
 
-        input_energies = read_json(
-            "../pydmclab/demos/output/hulls/data/query_Li-Mn-Fe-O.json"
-        )
+        input_energies = read_json("../demos/output/hulls/data/query_Li-Mn-Fe-O.json")
         energy_key = "Ef_mp"
         end_members = ["Li", "MnO2"]
         mix = MixingHull(

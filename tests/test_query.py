@@ -1,11 +1,11 @@
 import unittest
-from pydmclab.core.query import MPQuery
+from pydmclab.core.query import MPLegacyQuery
 
 
 class UnitTestQuery(unittest.TestCase):
     def test_data_for_comp3(self):
         API_KEY = "***REMOVED***"
-        mpq = MPQuery(API_KEY)
+        mpq = MPLegacyQuery(API_KEY)
         q = mpq.get_data_for_comp(comp="Yb-F", only_gs=True)
         unique_formulas = ["Yb", "F", "F2Yb1", "F3Yb1"]
         formulas_from_q = [q[k]["cmpd"] for k in q]

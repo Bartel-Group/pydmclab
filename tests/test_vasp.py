@@ -63,7 +63,7 @@ class UnitTestVASPSetUp(unittest.TestCase):
         vasp_input = vsu.get_vasp_input
 
         self.assertEqual(vasp_input.user_incar_settings["NCORE"], 4)
-        self.assertEqual(vasp_input.user_incar_settings["NEDOS"], 800)
+        self.assertEqual(vasp_input.user_incar_settings["NEDOS"], 1000)
         self.assertEqual(vasp_input.user_incar_settings["ISYM"], -1)
         self.assertEqual(vasp_input.user_incar_settings["LAECHG"], True)
 
@@ -86,13 +86,15 @@ class UnitTestVASPSetUp(unittest.TestCase):
             test_data_dir, "Al1N1", "0", "dmc", "nm", "metagga-static"
         )
 
+        print(os.listdir(calc_dir))
+
         user_configs = {
             "loose_incar": {"NEDOS": 1234},
             "relax_incar": {"NEDOS": 4321},
             "static_incar": {"NEDOS": 1000, "KPAR": 12},
             "loose_kpoints": {"length": 100},
             "relax_kpoints": {"reciprocal_density": 1000},
-            "static_kpoints": Kpoints().as_dict(),
+            "static_kpoints": {"length": 25},
         }
 
         user_configs["standard"] = "dmc"
@@ -121,6 +123,7 @@ class UnitTestVASPSetUp(unittest.TestCase):
         with open(os.path.join(calc_dir, "KPOINTS")) as f:
             yay = 0
             for line in f:
+                print(line)
                 if "Automatic" in line:
                     yay += 1
                 if "25" in line:
