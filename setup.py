@@ -2,8 +2,9 @@ import io
 import os
 import sys
 from shutil import rmtree
+import numpy as np
 
-from setuptools import find_packages, setup, Command
+from setuptools import find_packages, setup, Command, find_namespace_packages
 
 NAME = "pydmclab"
 DESCRIPTION = "Package to facilitate DFT calculations and analysis"
@@ -11,10 +12,14 @@ URL = "https://github.umn.edu/bartel-group/pydmclab"
 EMAIL = "cbartel@umn.edu"
 AUTHOR = "Chris Bartel"
 REQUIRES_PYTHON = ">=3.9.0"
-VERSION = "1.1.0"
+VERSION = "1.1.2"
 
-REQUIRED = ["numpy", "pymatgen", "mp-api"]
-EXTRAS = {"mlp": ["chgnet"], "defects": ["dscribe"], "new_mp" : ['mp-api']}
+REQUIRED = [
+    "numpy>=1.25.0",
+    "mp-api>=0.39",
+    "pymatgen>=2023.0.0",
+]
+EXTRAS = {"mlp": ["chgnet"], "defects": ["dscribe"]}
 here = os.path.abspath(os.path.dirname(__file__))
 try:
     with io.open(os.path.join(here, "README.md"), encoding="utf-8") as f:
@@ -76,8 +81,8 @@ setup(
     author_email=EMAIL,
     python_requires=REQUIRES_PYTHON,
     url=URL,
-    packages=find_packages(exclude=["tests", "*.tests", "*.tests.*", "tests.*"]),
-    package_data={"pydmclab": ["pydmclab/data/data/*"]},
+    packages=find_namespace_packages(include=["pydmclab.*", "pydmclab.**.*"]),
+    package_data={"pydmclab.data.data": ["*.json", "*.yaml", "*.csv", "*.dat"]},
     install_requires=REQUIRED,
     extras_require=EXTRAS,
     include_package_data=True,
@@ -90,4 +95,5 @@ setup(
     cmdclass={
         "upload": UploadCommand,
     },
+    include_dirs=[np.get_include()],
 )

@@ -1,11 +1,12 @@
-from pydmclab.core.comp import CompTools
-from pydmclab.core.struc import StrucTools
+from itertools import combinations
+import numpy as np
 
 from pymatgen.ext.matproj import MPRester as old_MPRester
 from mp_api.client import MPRester
 
-import itertools
-import numpy as np
+from pydmclab.core.comp import CompTools
+from pydmclab.core.struc import StrucTools
+
 
 """ 
 Purpose:
@@ -184,7 +185,7 @@ class MPQuery(object):
             chemsyses = [search_for]
             els = search_for.split("-")
             for i in range(len(els)):
-                for sub_els in itertools.combinations(els, i + 1):
+                for sub_els in combinations(els, i + 1):
                     chemsyses.append("-".join(sorted(sub_els)))
             chemsyses += els
             search_for = chemsyses
@@ -508,7 +509,7 @@ class MPLegacyQuery(object):
                 all_chemsyses = []
                 elements = chemsys.split("-")
                 for i in range(len(elements)):
-                    for els in itertools.combinations(elements, i + 1):
+                    for els in combinations(elements, i + 1):
                         all_chemsyses.append("-".join(sorted(els)))
                 # add these chemical spaces to our criteria
                 criteria["chemsys"] = {"$in": all_chemsyses}
@@ -526,7 +527,7 @@ class MPLegacyQuery(object):
                 for chemsys in comp:
                     elements = chemsys.split("-")
                     for i in range(len(elements)):
-                        for els in itertools.combinations(elements, i + 1):
+                        for els in combinations(elements, i + 1):
                             all_chemsyses.append("-".join(sorted(els)))
                 all_chemsyses = sorted(list(set(all_chemsyses)))
                 criteria["chemsys"] = {"$in": all_chemsyses}

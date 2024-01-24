@@ -1,20 +1,19 @@
 import numpy as np
 import math
 from itertools import combinations
+from pymatgen.analysis.reaction_calculator import Reaction
+from pymatgen.core.composition import Composition
 
 from pydmclab.data.thermochem import (
     mp2020_compatibility_dmus,
     mus_at_0K,
     mus_at_T,
     mus_from_mp_no_corrections,
-    mus_from_bartel2019_npj,
+    #    mus_from_bartel2019_npj,
 )
 from pydmclab.data.features import atomic_masses
 from pydmclab.core.comp import CompTools
 from pydmclab.core.struc import StrucTools
-
-from pymatgen.analysis.reaction_calculator import Reaction
-from pymatgen.core.composition import Composition
 
 
 class ChemPots(object):

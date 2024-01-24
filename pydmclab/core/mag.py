@@ -1,11 +1,13 @@
-from pydmclab.core.struc import StrucTools, SiteTools
-import itertools
+from itertools import product, islice
 import random
+
 from pymatgen.core.structure import Structure
 from pymatgen.transformations.site_transformations import (
     ReplaceSiteSpeciesTransformation,
 )
 from pymatgen.analysis.structure_matcher import StructureMatcher
+
+from pydmclab.core.struc import StrucTools, SiteTools
 
 
 class MagTools(object):
@@ -268,20 +270,23 @@ class MagTools(object):
         def filter_by_sum(c):
             return sum(c) == spin_sum
 
-        combos = filter(filter_by_sum, itertools.product(range(len(spins)), repeat=len(magnetic_sites)))
-        
-        print('filtered')
+        combos = filter(
+            filter_by_sum,
+            product(range(len(spins)), repeat=len(magnetic_sites)),
+        )
 
-        combos = list(itertools.islice(combos, int(1e6)))
-        
-        print('isliced')
+        print("filtered")
+
+        combos = list(islice(combos, int(1e6)))
+
+        print("isliced")
         combos = list(combos)
         # enumerate all possible ways to yield afm ordering
-#        combos = itertools.product(range(len(spins)), repeat=len(magnetic_sites))
-        
-#        print('enumerated %i combos' % len(list(combos)))
+        #        combos = itertools.product(range(len(spins)), repeat=len(magnetic_sites))
 
-#        combos = [c for c in combos if np.sum(c) == 0.5 * len(magnetic_sites)]
+        #        print('enumerated %i combos' % len(list(combos)))
+
+        #        combos = [c for c in combos if np.sum(c) == 0.5 * len(magnetic_sites)]
         print("%i afm combos" % len(combos))
 
         # randomly reduce list if too big for practical usage

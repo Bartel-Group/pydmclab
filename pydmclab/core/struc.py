@@ -1,8 +1,6 @@
 import os
 import numpy as np
 
-from pydmclab.core.comp import CompTools
-
 from pymatgen.core.structure import Structure
 from pymatgen.transformations.standard_transformations import (
     OrderDisorderedStructureTransformation,
@@ -12,6 +10,8 @@ from pymatgen.transformations.standard_transformations import (
 from pymatgen.analysis.structure_matcher import StructureMatcher
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from pymatgen.core.surface import SlabGenerator
+
+from pydmclab.core.comp import CompTools
 
 
 class StrucTools(object):

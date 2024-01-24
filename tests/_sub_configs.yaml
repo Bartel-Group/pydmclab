@@ -53,3 +53,4 @@ packing:
   - hse06-static
 perturb_first_struc: 0.1
 vasp: vasp_std
+vasp_version: 6

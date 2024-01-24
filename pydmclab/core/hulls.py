@@ -1,28 +1,20 @@
-from pydmclab.core.comp import CompTools
-from pydmclab.core.struc import StrucTools
-from pydmclab.utils.handy import read_json, write_json
-from pydmclab.data.thermochem import (
-    mus_at_0K,
-    mus_at_T,
-    mp2020_compatibility_dmus,
-    mus_from_mp_no_corrections,
-)
-from pydmclab.data.features import atomic_masses
-
-from pymatgen.analysis.phase_diagram import PDEntry, PhaseDiagram, CompoundPhaseDiagram
-from pymatgen.core.composition import Composition
-
-from pydmclab.core.energies import ReactionEnergy
-
 import os
 import numpy as np
+
 from scipy.spatial import ConvexHull
 from scipy.optimize import minimize
-from scipy.stats import mode
+
 import multiprocessing as multip
 
+from pymatgen.analysis.phase_diagram import PDEntry, CompoundPhaseDiagram
+from pymatgen.core.composition import Composition
 
-HERE = os.path.dirname(os.path.abspath(__file__))
+from pydmclab.core.comp import CompTools
+from pydmclab.utils.handy import read_json, write_json
+from pydmclab.core.energies import ReactionEnergy
+
+
+# HERE = os.path.dirname(os.path.abspath(__file__))
 
 """
 Contents:
