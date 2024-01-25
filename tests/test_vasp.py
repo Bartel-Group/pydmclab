@@ -86,7 +86,7 @@ class UnitTestVASPSetUp(unittest.TestCase):
             test_data_dir, "Al1N1", "0", "dmc", "nm", "metagga-static"
         )
 
-        print(os.listdir(calc_dir))
+        # print(os.listdir(calc_dir))
 
         user_configs = {
             "loose_incar": {"NEDOS": 1234},

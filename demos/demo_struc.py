@@ -29,7 +29,7 @@ def demo_basic_structure_manipulations(mpid=MPID):
 
     print("\n ~~ demoing basic manipulations ~~ \n")
 
-    data = MPQuery(API_KEY).get_structures_by_material_id(mpid)
+    data = MPQuery(API_KEY).get_structures_by_material_id([mpid])
     s = data[mpid]
     st = StrucTools(s)
 
@@ -48,7 +48,7 @@ def demo_ox_state_decoration(mpid=MPID):
     - inspect the oxidation state using SiteTools.ion
     """
     print("\n ~~ demoing oxidation state decoration ~~ \n")
-    data = MPQuery(API_KEY).get_structures_by_material_id(mpid)
+    data = MPQuery(API_KEY).get_structures_by_material_id([mpid])
     s = data[mpid]
     st = StrucTools(s)
 
@@ -76,12 +76,12 @@ def demo_replace_species_and_order(mpid=MPID):
     - inspect some sites in one of the ordered structures
     """
     print("\n ~~ demoing replace species ~~ \n")
-    data = MPQuery(API_KEY).get_structures_by_material_id(mpid)
+    data = MPQuery(API_KEY).get_structures_by_material_id([mpid])
     s = data[mpid]
     st = StrucTools(s)
     st.make_supercell([1, 2, 3])
 
-    species_map = {"Fe": {"Fe": 0.875, "Cr": 0.125}}
+    species_map = {"Fe": {"Fe": 0.75, "Cr": 0.25}}
 
     ordered_strucs = st.replace_species(species_map, n_strucs=10)
 
@@ -104,7 +104,7 @@ def demo_dilute_vacancy(mpid=MPID):
 
     """
     print("\n ~~ demoing dilute vacancy ~~ \n")
-    data = MPQuery(API_KEY).get_structures_by_material_id(mpid)
+    data = MPQuery(API_KEY).get_structures_by_material_id([mpid])
     s = data[mpid]
     st = StrucTools(s)
 
