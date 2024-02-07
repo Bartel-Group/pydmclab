@@ -1171,6 +1171,7 @@ def get_gs(
                 for k in results
                 if results[k]["meta"]["setup"]["standard"] == standard
                 if results[k]["meta"]["setup"]["xc"] == xc
+                if results[k]['results']['formula']
             ]
 
             unique_formulas = sorted(
