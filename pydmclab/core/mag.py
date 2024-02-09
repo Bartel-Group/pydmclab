@@ -6,8 +6,25 @@ from pymatgen.transformations.site_transformations import (
     ReplaceSiteSpeciesTransformation,
 )
 from pymatgen.analysis.structure_matcher import StructureMatcher
+from pymatgen.analysis.magnetism.analyzer import MagneticStructureEnumerator
 
 from pydmclab.core.struc import StrucTools, SiteTools
+
+
+class PymatgenMagTools(object):
+    """
+    Need to get enumlib figured out to use this...
+
+    """
+
+    def __init__(self, structure):
+        st = StrucTools(structure)
+        self.st = st
+
+        self.structure = st.structure
+
+        mse = MagneticStructureEnumerator(self.structure)
+        self.mse = mse
 
 
 class MagTools(object):
@@ -316,9 +333,11 @@ class MagTools(object):
             spin_up = [i for i in magnetic_sites if magmom[i] == spins[1]]
             spin_down = [i for i in magnetic_sites if magmom[i] == spins[0]]
             indices_species_map = {
-                idx: struc[idx].species_string + "8+"
-                if idx in spin_up
-                else struc[idx].species_string + "8-"
+                idx: (
+                    struc[idx].species_string + "8+"
+                    if idx in spin_up
+                    else struc[idx].species_string + "8-"
+                )
                 for idx in spin_up + spin_down
             }
             rsst = ReplaceSiteSpeciesTransformation(indices_species_map)
@@ -361,8 +380,11 @@ class MagTools(object):
 
 
 def main():
+    # fcif = "/Users/cbartel/Downloads/Cr2O3.cif"
+    # mt = PymatgenMagTools(fcif)
+    # return mt
     return
 
 
 if __name__ == "__main__":
-    main()
+    mt = main()
