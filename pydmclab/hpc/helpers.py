@@ -918,9 +918,13 @@ def submit_one_calc(submit_args):
     refresh_configs = submit_args["refresh_configs"]
     ready_to_launch = submit_args["ready_to_launch"]
 
+    curr_user_configs = user_configs.copy()
+
     if "ID_specific_vasp_configs" in launch_dirs[launch_dir]:
         if launch_dirs[launch_dir]["ID_specific_vasp_configs"]:
-            user_configs.update(launch_dirs[launch_dir]["ID_specific_vasp_configs"])
+            curr_user_configs.update(
+                launch_dirs[launch_dir]["ID_specific_vasp_configs"]
+            )
 
     # what are our terminal xcs for that launch_dir
     final_xcs = launch_dirs[launch_dir]["xcs"]
@@ -933,7 +937,7 @@ def submit_one_calc(submit_args):
             launch_dir=launch_dir,
             final_xcs=final_xcs,
             magmom=magmom,
-            user_configs=user_configs,
+            user_configs=curr_user_configs,
             refresh_configs=refresh_configs,
         )
 
@@ -1171,7 +1175,7 @@ def get_gs(
                 for k in results
                 if results[k]["meta"]["setup"]["standard"] == standard
                 if results[k]["meta"]["setup"]["xc"] == xc
-                if results[k]['results']['formula']
+                if results[k]["results"]["formula"]
             ]
 
             unique_formulas = sorted(
