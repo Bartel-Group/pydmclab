@@ -43,8 +43,6 @@ class DefectStructures(object):
     def __init__(
         self,
         supercell,
-        min_atoms=60,
-        max_atoms=199,
         ox_states=None,
         how_many=1,
         n_strucs=1,
@@ -61,8 +59,6 @@ class DefectStructures(object):
             transforms bulk to pymatgen Structure object
         """
         self.supercell = StrucTools(supercell).structure
-        self.min_atoms = min_atoms
-        self.max_atoms = max_atoms
         self.ox_states = ox_states
         self.how_many = how_many
         self.n_strucs = n_strucs

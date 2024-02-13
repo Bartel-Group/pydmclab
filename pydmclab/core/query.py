@@ -207,6 +207,8 @@ class MPQuery(object):
             )
         # query MP based on a search for entries w/ these IDs
         elif search_key == "material_id":
+            if isinstance(search_for, str):
+                search_for = [search_for]
             docs = mpr.summary.search(
                 material_ids=search_for, energy_above_hull=(0, max_Ehull)
             )
