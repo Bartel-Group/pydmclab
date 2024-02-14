@@ -490,7 +490,7 @@ class VASPSetUp(object):
                 "ERROR: while reading WAVECAR, plane wave coefficients changed"
             ],
             "num_prob": ["num prob"],
-            "sym_too_tight": ["Refine the lattice parameters of your structure"],
+            "sym_too_tight": ["try changing SYMPREC"],
         }
 
     @property
