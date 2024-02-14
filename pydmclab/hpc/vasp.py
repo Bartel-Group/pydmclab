@@ -490,6 +490,7 @@ class VASPSetUp(object):
                 "ERROR: while reading WAVECAR, plane wave coefficients changed"
             ],
             "num_prob": ["num prob"],
+            "sym_too_tight": ["Refine the lattice parameters of your structure"],
         }
 
     @property
@@ -655,6 +656,8 @@ class VASPSetUp(object):
             incar_changes["ISYM"] = 0
         if "num_prob" in errors:
             incar_changes["ISMEAR"] = -1
+        if "sym_too_tight" in errors:
+            incar_changes["SYMPREC"] = 1e-3
         return incar_changes
 
 
