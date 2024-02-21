@@ -657,7 +657,7 @@ class VASPSetUp(object):
         if "num_prob" in errors:
             incar_changes["ISMEAR"] = -1
         if "sym_too_tight" in errors:
-            incar_changes["SYMPREC"] = 1e-3
+            incar_changes["ISYM"] = -1
         return incar_changes
 
 
