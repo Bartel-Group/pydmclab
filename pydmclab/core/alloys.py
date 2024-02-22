@@ -349,6 +349,7 @@ class AlloyThermo(object):
 def main():
     alpha_energies = {0: 0, 0.4: 0.1, 0.6: 0.15, 0.8: 0.2, 1: 0.22}
     beta_energies = {1: 0, 0.8: 0.05, 0.6: 0.09, 0.4: 0.1, 0.2: 0.12, 0: 0.125}
+    # beta_energies = alpha_energies.copy()
     A = "Al"
     B = "Fe"
     alloy = AlloyThermo(alpha_energies, beta_energies, A, B)
