@@ -808,7 +808,7 @@ class AlloyPlotter(object):
         ax = plt.legend()
 
         ax = plt.xlabel(r"$%s_{1-x}%s_{x}$" % (A, B))
-        ax = plt.ylabel(r"$\Delta G_{mix}\/(\frac{eV}{f.u.})$")
+        ax = plt.ylabel(r"$\Delta G_{mix}(%i\/K)\/(\frac{eV}{f.u.})$" % T)
 
         """ 
         x1, x2 = d["binodal"]["alpha"][T], d["binodal"]["beta"][T]
