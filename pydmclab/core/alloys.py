@@ -12,7 +12,221 @@ COLORS = get_colors("tab10")
 set_rc_params()
 
 
-class AlloyThermo(object):
+class IsoAlloy(object):
+    """ """
+
+    def __init__(
+        self,
+        energies,
+        kB=8.617e-5,
+        xs=np.linspace(0, 1, 101),
+        Ts=np.linspace(0, 3000, 31),
+    ):
+
+        self.energies = energies
+        self.kB = kB
+        self.xs = xs
+        self.Ts = Ts
+        self.discrete_x = sorted(list(energies.keys()))
+
+    @property
+    def E_mix_discrete(self):
+        """
+        Calculates mixing energies from the total or formation energies provided in energies
+            {x (float) : energy per formula unit (float)}
+        """
+        energies = self.energies
+        out = {}
+        for x in energies:
+            out[x] = energies[x] - (1 - x) * energies[0] - x * energies[1]
+        return out
+
+    @property
+    def omega(self):
+        """
+        Fits the discrete E_mix to a continous function of x
+            H_mix(x) = x * dE_B + omega * x * (1 - x)
+            - omega is a fit parameter, sometimes called the alloy interaction parameter
+
+        Returns:
+            omega (float): the fit parameter (eV/f.u.)
+        """
+        E_mix_dict = self.E_mix_discrete
+        compositions = sorted(list(E_mix_dict.keys()))
+        E_mix_to_fit = [E_mix_dict[x] for x in compositions]
+
+        def func(x, omega):
+            """
+            Function to optimize during fitting
+
+            Args:
+                x (float): composition in A_{1-x}B_{x}
+                omega (float): parameter to fit
+            """
+            return omega * x * (1 - x)
+
+        popt, pcov = curve_fit(func, compositions, E_mix_to_fit)
+        return popt[0]
+
+    def H_mix_curve(self, x):
+        """
+        Estimate of mixing enthalpy using the fit parameter omega
+
+        Args:
+            x (float): composition in A_{1-x}B_{x}
+        Returns:
+            mixing enthalpy (float, eV/fu) at composition x
+        """
+        omega = self.omega
+        return omega * x * (1 - x)
+
+    @property
+    def H_mix(self):
+        """
+        Mixing enthalpies for all x values specified in __init__
+
+        Returns:
+            list of mixing enthalpies (eV/fu)
+
+        """
+        xs = self.xs
+        return [self.H_mix_curve(x) for x in xs]
+
+    def S_mix(self, x):
+        """
+        Ideal mixing entropy (eV/fu)
+
+        Args:
+            x (float): composition in A_{1-x}B_{x}
+
+        Returns:
+            mixing entropy (float, eV/fu)
+
+        """
+        return -self.kB * (x * np.log(x) + (1 - x) * np.log(1 - x))
+
+    def G_mix(self, x, T):
+        """
+        Gibbs energy of mixing at composition x and temperature T
+
+        Args:
+            x (float): composition in A_{1-x}B_{x}
+            T (float): temperature in K
+
+        Returns:
+            float (eV/fu)
+        """
+        return self.H_mix_curve(x) - T * self.S_mix(x)
+
+    def G_mix_curve(self, T):
+        """
+        Gibbs energies of mixing at all xs
+
+        Args:
+            T (float): temperature in K
+
+        Returns:
+            list of Gibbs energies of mixing (eV/fu)
+        """
+        xs = self.xs
+        return [self.G_mix(x, T) for x in xs]
+
+    def dGdx(self, x, T):
+        """
+        First derivative of the G(x) curve
+
+        Args:
+            x (float): composition in A_{1-x}B_{x}
+            T (float): temperature in K
+
+        Returns:
+            float
+
+        """
+        return self.omega * (1 - 2 * x) + self.kB * T * np.log(x / (1 - x))
+
+    def dG2dx2(self, x, T):
+        """
+        Second derivative of the G(x) curve
+
+        Args:
+            x (float): composition in A_{1-x}B_{x}
+            T (float): temperature in K
+
+        Returns:
+            float
+        """
+        return -2 * self.omega + self.kB * T / (x * (1 - x))
+
+    def common_tangent(self, T, initial_guess=(0.1, 0.9)):
+        """
+        Performs the common tangent construction to determine the binodal compositions
+
+        Args:
+            T (float): temperature in K
+            initial_guess (tuple): initial guess for the common tangent construction
+                (x1, x2)
+                    x1 is the initial guess for the max x where a solid solution in alpha is stable
+                    x2 is the initial guess for the min x where a solid solution in beta is stable
+
+        Returns:
+            tuple: (x1, x2)
+                x1 is the max composition where the alpha solid solution is stable
+                x2 is the min composition where the beta solid solution is stable
+
+        Note:
+            - a solution should require that G(x) <= 0 at the common tangent points.
+            - if it's not, then we don't have a solid solution in that phase
+            - this is accounted for with if statements after optimization
+        """
+
+        def equations_to_solve(compositions, T):
+            """
+            Equations to optimize
+                - we return the squared sum to penalize non-zero values
+                - eqn1 and eqn2 should go to zero at the common tangent
+            Args:
+                compositions (tuple): (x1, x2)
+                    x1 is the max x where a solid solution in alpha is stable
+                    x2 is the min x where a solid solution in beta is stable
+
+                T (float): temperature in K
+
+            """
+            x1, x2 = compositions
+            eqn1 = self.dGdx(x1, T) - self.dGdx(x2, T)
+            eqn2 = (self.G_mix(x1, T) - self.G_mix(x2, T)) / (x1 - x2) - self.dGdx(
+                x1, T
+            )
+            return eqn1**2 + eqn2**2
+
+        G_mix_curve = self.G_mix_curve(T)
+        d2dGdx2 = [self.dG2dx2(x, T) for x in self.xs]
+        if max(G_mix_curve) <= 0:
+            return "solid solution everywhere"
+
+        elif min(G_mix_curve) >= 0:
+            return "solid solution nowhere"
+        elif:
+            # trying to deal with a few cases:
+                # G_mix_curve is a single parabola --> don't need common tangent
+                # G_mix_curve is a double parabola --> need common tangent
+            return
+        result = minimize(
+            fun=equations_to_solve,
+            x0=initial_guess,
+            args=(T,),
+            bounds=((0.00001, 0.99999), (0.00001, 0.99999)),
+        )
+        x1, x2 = result.x
+        if self.G_mix(x1) >= 0:
+            x1 = 0
+        if self.G_mix(x2) >= 0:
+            x2 = 1
+        return x1, x2
+
+
+class HeteroAlloy(object):
     """
     For computing heterostructural alloy phase diagrams
 
@@ -20,7 +234,7 @@ class AlloyThermo(object):
 
     Typical use case would be to:
         - generate the dictionary with all the results
-            AlloyThermo(args).to_dict(fjson=<savename>)
+            HeteroAlloy(args).to_dict(fjson=<savename>)
 
         - read that dictionary and analyze the results
             d = read_json(<savename>)
@@ -51,8 +265,6 @@ class AlloyThermo(object):
             In alpha_energies and beta_energies, x should be of the form A_{1-x}B_{x}
                 so alpha_energies[0] <= beta_energies[0] (i.e., A's ground-state is alpha)
                 and beta_energies[1] <= alpha_energies[1] (i.e., B's ground-state is beta)
-
-
 
         """
         self.alpha_energies = alpha_energies
@@ -525,7 +737,7 @@ class AlloyThermo(object):
             fjson (str): path to save the dictionary as a json file
                 if None, don't save
         Returns:
-            dict: dictionary representation of the AlloyThermo object
+            dict: dictionary representation of the HeteroAlloy object
 
             {'x' : x values in A_{1-x}B_{x} for continuous curves (list)
              'T' : temperatures (K) (list),
@@ -689,7 +901,7 @@ class AlloyThermo(object):
             return read_json(fjson)
 
 
-class AlloyPlotter(object):
+class HeteroAlloyPlotter(object):
     def __init__(
         self,
         alloy_dict,
@@ -704,7 +916,7 @@ class AlloyPlotter(object):
         """
         Args:
             alloy_dict (dict):
-                From AlloyThermo(args).to_dict()
+                From HeteroAlloy(args).to_dict()
         """
         self.alloy_dict = alloy_dict
         colors = get_colors(color_palette)
@@ -945,7 +1157,7 @@ def main():
     beta_energies = {1: 0, 0.8: 0.05, 0.6: 0.09, 0.4: 0.1, 0.2: 0.12, 0: 0.125}
     # beta_energies = alpha_energies.copy()
 
-    alloy = AlloyThermo(alpha_energies, beta_energies)
+    alloy = HeteroAlloy(alpha_energies, beta_energies)
 
     fjson = "/Users/cbartel/Downloads/alloy.json"
     remake = False
@@ -955,7 +1167,7 @@ def main():
     else:
         alloy_dict = read_json(fjson)
 
-    plotter = AlloyPlotter(alloy_dict)
+    plotter = HeteroAlloyPlotter(alloy_dict)
     fig = plt.figure()
     ax = plt.subplot(111)
     ax = plotter.ax_mixing_enthalpies
