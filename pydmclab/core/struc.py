@@ -407,6 +407,8 @@ class StrucTools(object):
         center_slab=True,
         in_unit_planes=False,
         reorient_lattice=True,
+        symmetrize=True,
+        tolerance=0.1,
     ):
         """
         Args:
@@ -440,7 +442,7 @@ class StrucTools(object):
             reorient_lattice=reorient_lattice,
         )
 
-        slabs = slabgen.get_slabs(symmetrize=True)
+        slabs = slabgen.get_slabs(symmetrize=symmetrize, tol=tolerance)
 
         out = {}
         for i, slab in enumerate(slabs):
