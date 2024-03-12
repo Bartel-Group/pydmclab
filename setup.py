@@ -19,7 +19,11 @@ REQUIRED = [
     "mp-api>=0.39",
     "pymatgen>=2023.0.0",
 ]
-EXTRAS = {"mlp": ["chgnet"], "defects": ["pymatgen-analysis-defects"]}
+EXTRAS = {
+    "mlp": ["chgnet"],
+    "defects": ["pymatgen-analysis-defects"],
+    "phonons": ["phonopy"],
+}
 here = os.path.abspath(os.path.dirname(__file__))
 try:
     with io.open(os.path.join(here, "README.md"), encoding="utf-8") as f:
