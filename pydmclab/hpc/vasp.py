@@ -491,6 +491,7 @@ class VASPSetUp(object):
             ],
             "num_prob": ["num prob"],
             "sym_too_tight": ["try changing SYMPREC"],
+            "coef": ["while reading plane", "while reading WAVECAR"],
         }
 
     @property
@@ -658,6 +659,9 @@ class VASPSetUp(object):
             incar_changes["ISMEAR"] = -1
         if "sym_too_tight" in errors:
             incar_changes["ISYM"] = -1
+        if "coef" in errors:
+            if os.path.exists(wavecar):
+                os.remove(wavecar)
         return incar_changes
 
 

@@ -18,6 +18,8 @@ from shutil import copyfile, rmtree
 import subprocess
 import warnings
 
+from subprocess import call
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 
@@ -830,6 +832,32 @@ class SubmitTools(object):
                                 f.write("cd %s\n" % parchg_dir)
                                 f.write("%s\n" % vasp_command)
 
+                            if vasp_configs["generate_finite_displacements"]:
+                                phonon_dir = setup_finite_displacements(
+                                    supercell_grid=vasp_configs[
+                                        "supercell_grid_for_finite_displacements"
+                                    ]
+                                )
+                            else:
+                                phonon_dir = None
+
+                            if phonon_dir:
+                                f.write(
+                                    "echo working on %s-phonon >> %s\n"
+                                    % (xc_calc, fstatus)
+                                )
+
+                                displacement_dirs = os.listdir(phonon_dir)
+                                displacement_dirs = [
+                                    os.path.join(phonon_dir, d)
+                                    for d in displacement_dirs
+                                    if "disp" in d
+                                ]
+
+                                for disp_dir in displacement_dirs:
+                                    f.write("cd %s\n" % disp_dir)
+                                    f.write("%s\n" % vasp_command)
+
                         f.write("echo %s is done >> %s\n" % (xc_calc, fstatus))
                     else:
                         if status == "continue":
@@ -1135,6 +1163,94 @@ def setup_parchg(converged_static_dir, rerun=False, eint=-1):
                 f_dst.write(line)
 
     return parchg_dir
+
+
+def setup_finite_displacements(converged_static_dir, supercell_grid=[2, 2, 2]):
+    """
+    Args:
+        converged_static_dir (str)
+            path to converged static calculation
+
+        supercell_grid (list)
+            the supercell grid to create from original POSCAR
+
+    Returns:
+        phonon_dir
+            disp-*/
+            POSCAR-*
+    """
+    # make sure static is converged
+    av = AnalyzeVASP(converged_static_dir)
+    if not av.is_converged:
+        print("static calculation not converged; not setting up parchg calc yet")
+        return None
+
+    # get the paths to relevant input files from the static calculation
+    files_from_static = ["KPOINTS", "POTCAR", "INCAR"]
+
+    # some special INCAR settings for the static calculations of each displacement
+    new_incar_params = {
+        "IBRION": 2,
+        "ISIF": 3,
+        "ENCUT": 700,
+        "EDIFF": 1e-7,
+        "LAECHG": False,
+        "LREAL": False,
+        "ALGO": "Normal",
+        "NSW": 0,
+        "LCHARG": False,
+    }
+
+    # create a directory called phonons within the static directory
+    phonon_dir = os.path.join(converged_static_dir, "phonons")
+    if not os.path.exists(phonon_dir):
+        os.mkdir(phonon_dir)
+
+    # use my current directory as a reference point
+    curr_dir = os.getcwd()
+
+    # go into the phonon directory and generate the displacement POSCARs
+    os.chdir(phonon_dir)
+    call(["phonopy", "-d", '--dim="%s %s %s"' % tuple(supercell_grid)])
+    os.chdir(curr_dir)
+
+    # grab the created POSCARs
+    created_poscars = os.listdir(phonon_dir)
+
+    # for each displacement,
+    # create a disp-00* directory,
+    # grab the POSCAR-00*,
+    # copy the static calculation files,
+    # modify the INCAR
+    for poscar in created_poscars:
+        number = poscar.split("-")[-1]
+
+        # create disp-00* dir
+        disp_dir = os.path.join(phonon_dir, "disp-%s" % number)
+        if not os.path.exists(disp_dir):
+            os.mkdir(disp_dir)
+
+        # copy the displaced POSCAR-00* into the disp-00* dir
+        displaced_poscar = os.path.join(phonon_dir, poscar)
+        copyfile(displaced_poscar, os.path.join(disp_dir, "POSCAR"))
+
+        # copy KPOINTS, INCAR, POTCAR from the static calculation into disp-* dir
+        for file_to_copy in files_from_static:
+            f_src = os.path.join(converged_static_dir, file_to_copy)
+            f_dst = os.path.join(disp_dir, file_to_copy)
+            copyfile(f_src, f_dst)
+
+        # modify the INCAR in the disp-* dir
+        with open(os.path.join(converged_static_dir, "INCAR")) as f_src:
+            with open(os.path.join(disp_dir, "INCAR"), "w") as f_dst:
+                for key in new_incar_params:
+                    f_dst.write("%s = %s\n" % (key, new_incar_params[key]))
+                for line in f_src:
+                    if line.split("=")[0].strip() in new_incar_params:
+                        continue
+                    f_dst.write(line)
+
+    return phonon_dir
 
 
 def main():
