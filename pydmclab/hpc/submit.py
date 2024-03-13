@@ -1199,7 +1199,7 @@ def generate_finite_displacements(
 
     # see if POSCARs are already created
     created_poscars = os.listdir(phonon_dir)
-    created_poscars = [f for f in created_poscars if "POSCAR" in f if "disp" in f]
+    created_poscars = [f for f in created_poscars if "POSCAR-" in f]
 
     # go into the phonon directory and generate the displacement POSCARs
     if remake or not created_poscars:
@@ -1261,7 +1261,7 @@ def setup_finite_displacement_calcs(phonon_dir, remake=False, rerun=False):
 
     # grab the created POSCARs
     created_poscars = os.listdir(phonon_dir)
-    created_poscars = [f for f in created_poscars if "POSCAR" in f if "disp" in f]
+    created_poscars = [f for f in created_poscars if "POSCAR-" in f]
 
     # get the paths to relevant input files from the static calculation
     files_from_static = ["KPOINTS", "POTCAR", "INCAR"]

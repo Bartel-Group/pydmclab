@@ -659,6 +659,7 @@ class VASPSetUp(object):
             incar_changes["ISMEAR"] = -1
         if "sym_too_tight" in errors:
             incar_changes["ISYM"] = -1
+            incar_changes["SYMPREC"] = 1e-3
         if "coef" in errors:
             if os.path.exists(wavecar):
                 os.remove(wavecar)
