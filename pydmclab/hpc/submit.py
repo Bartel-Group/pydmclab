@@ -1259,6 +1259,24 @@ def generate_finite_displacements(
             for line in f_src:
                 if line.split("=")[0].strip() in new_incar_params:
                     continue
+                if "MAGMOM" in line:
+                    magmom = line.split("=")[1].strip()
+                    magmoms = magmom.split(" ")
+                    new_magmoms = []
+                    for mag in magmoms:
+                        if mag:
+                            old_number = int(mag.split("*")[0])
+                            new_number = (
+                                old_number
+                                * supercell_grid[0]
+                                * supercell_grid[1]
+                                * supercell_grid[2]
+                            )
+                            old_mag = mag.split("*")[1]
+                            new_mag = old_mag
+                            new_magmoms.append("%s*%s" % (new_number, new_mag))
+                    f_dst.write("MAGMOM = %s\n" % " ".join(new_magmoms))
+                    continue
                 f_dst.write(line)
 
     return phonon_dir
