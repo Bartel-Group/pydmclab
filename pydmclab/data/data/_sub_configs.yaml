@@ -15,6 +15,8 @@ execute_flags: ['srun', 'python', 'lobster', 'bader', 'mpirun'] # what to look f
 
 perturb_first_struc: 0.1 # if float, perturb internal coordinates of all ions for POSCAR of first structure by perturb_first_struc
 
+skip_loose: False
+
 # this defines what jobs should be chained together and in what order they should be executed
 # if you only wanted to run a static calculation for metagga, you might pass packing['metagga'] = ['metagga-static']
 packing: 

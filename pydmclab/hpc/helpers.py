@@ -248,6 +248,7 @@ def get_sub_configs(
     mpi_command="mpirun",
     special_packing=False,
     vasp_version=6,
+    skip_loose=False,
 ):
     """
 
@@ -307,6 +308,14 @@ def get_sub_configs(
         sub_configs["packing"] = {}
         for xc in special_packing:
             sub_configs["packing"][xc] = special_packing[xc]
+
+    if skip_loose:
+        sub_configs["skip_loose"] = True
+
+        packing = sub_configs["packing"].copy()
+        for xc in packing:
+            if "loose" in packing[xc]:
+                packing[xc].remove("loose")
 
     sub_configs["machine"] = machine
 
