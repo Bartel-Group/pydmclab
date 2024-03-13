@@ -850,8 +850,8 @@ class SubmitTools(object):
                                 )
                                 print(">>> here are disp statuses: ", disp_statuses)
                                 for disp in disp_statuses:
-                                    disp_dir = disp["calc_dir"]
-                                    convergence = disp["convergence"]
+                                    disp_dir = disp_statuses[disp]["calc_dir"]
+                                    convergence = disp_statuses[disp]["convergence"]
                                     if convergence:
                                         continue
 
