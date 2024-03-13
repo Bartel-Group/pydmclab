@@ -839,6 +839,7 @@ class SubmitTools(object):
                                         "supercell_grid_for_finite_displacements"
                                     ],
                                 )
+                                print('phonon_dir = "%s"' % phonon_dir)
                             else:
                                 phonon_dir = None
 
@@ -847,6 +848,7 @@ class SubmitTools(object):
                                 disp_statuses = setup_finite_displacement_calcs(
                                     phonon_dir
                                 )
+                                print(">>> here are disp statuses" % disp_statuses)
                                 for disp in disp_statuses:
                                     disp_dir = disp["calc_dir"]
                                     convergence = disp["convergence"]
