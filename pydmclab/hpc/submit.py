@@ -486,8 +486,8 @@ class SubmitTools(object):
                 xc_to_run, calc_to_run = xc_calc.split("-")
                 calc_configs["xc_to_run"] = xc_to_run
                 calc_configs["calc_to_run"] = calc_to_run
-                
-                if sub_configs['skip_loose'] and (xc_to_run == 'loose'):
+
+                if sub_configs["skip_loose"] and (xc_to_run == "loose"):
                     continue
 
                 # (1) make calc_dir (or remove and remake if fresh_restart)
@@ -763,6 +763,8 @@ class SubmitTools(object):
                 # use this counter to figure if there are parents for a given calc and who those parents are
                 xc_calc_counter = -1
                 for xc_calc in packing[final_xc]:
+                    if ("loose" in xc_calc) and (sub_configs["skip_loose"]):
+                        continue
                     # loop through the calculations that should be chained together for a given final_xc
                     xc_calc_counter += 1
 
