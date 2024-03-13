@@ -696,7 +696,7 @@ class SubmitTools(object):
         # statuses = {final_xc : {xc_calc : status}}
         # e.g., statuses['metagga']['gga-relax'] = 'done'
         statuses = self.prepare_directories
-        for final_xc in statuses:
+        for final_xc, v in statuses.items():
             # initialize a submission script for this chain
             # this is what we'll launch with sbatch sub_...sh
             fsub = os.path.join(launch_dir, "sub_%s.sh" % final_xc)
@@ -716,7 +716,7 @@ class SubmitTools(object):
             slurm_options["job-name"] = job_name
 
             # if job isnt in queue already, start writing our submission script
-            with open(fsub, "w") as f:
+            with open(fsub, "w", encoding="utf-8") as f:
                 # slurm requires this header
                 f.write("#!/bin/bash -l\n")
 
@@ -834,9 +834,10 @@ class SubmitTools(object):
 
                             if vasp_configs["generate_finite_displacements"]:
                                 phonon_dir = generate_finite_displacements(
+                                    converged_static_dir=calc_dir,
                                     supercell_grid=vasp_configs[
                                         "supercell_grid_for_finite_displacements"
-                                    ]
+                                    ],
                                 )
                             else:
                                 phonon_dir = None
@@ -912,7 +913,7 @@ class SubmitTools(object):
                                 if file_to_inherit == "CONTCAR":
                                     # make sure CONTCAR is not empty
                                     if os.path.exists(fsrc):
-                                        with open(fsrc, "r") as f_tmp:
+                                        with open(fsrc, "r", encoding="utf-8") as f_tmp:
                                             contents = f_tmp.readlines()
                                         if len(contents) < 0:
                                             continue

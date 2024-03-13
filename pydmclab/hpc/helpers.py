@@ -16,6 +16,7 @@ def get_vasp_configs(
     run_bandstructure=False,
     run_parchg=False,
     run_dielectric=False,
+    run_phonons=False,
     detailed_dos=False,
     modify_loose_incar=False,
     modify_relax_incar=False,
@@ -95,12 +96,12 @@ def get_vasp_configs(
 
             to get passed as user_configs to VASPSetUp (through SubmitTools)
     """
-    # DOS-related
     vasp_configs = {
         "lobster_static": run_lobster,
         "generate_bandstructure": run_bandstructure,
         "generate_parchg": run_parchg,
         "generate_dielectric": run_dielectric,
+        "generate_finite_displacements": run_phonons,
     }
 
     if vasp_configs["generate_bandstructure"]:
@@ -136,11 +137,11 @@ def get_vasp_configs(
         else:
             vasp_configs["COHPSteps"] = detailed_dos
 
-        if "static_incar" in vasp_configs:
-            if isinstance(vasp_configs["static_incar"], dict):
-                vasp_configs["static_incar"]["NEDOS"] = vasp_configs["COHPSteps"]
-            else:
-                vasp_configs["static_incar"] = {"NEDOS": vasp_configs["COHPSteps"]}
+        if ("static_incar" in vasp_configs) and isinstance(
+            vasp_configs["static_incar"], dict
+        ):
+            vasp_configs["static_incar"]["NEDOS"] = vasp_configs["COHPSteps"]
+
         else:
             vasp_configs["static_incar"] = {"NEDOS": vasp_configs["COHPSteps"]}
 
