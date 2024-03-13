@@ -459,10 +459,10 @@ class SubmitTools(object):
         if sub_configs["skip_loose"]:
             new_packing = {}
             for xc in packing:
-                new_packing[xc] = {}
+                new_packing[xc] = []
                 for calc in packing[xc]:
                     if "loose" not in calc:
-                        new_packing[xc][calc] = packing[xc][calc]
+                        new_packing[xc].append(calc)
             packing = new_packing.copy()
 
         print("\n\n~~~~~ starting to work on %s ~~~~~\n\n" % launch_dir)
@@ -704,10 +704,10 @@ class SubmitTools(object):
         if sub_configs["skip_loose"]:
             new_packing = {}
             for xc in packing:
-                new_packing[xc] = {}
+                new_packing[xc] = []
                 for calc in packing[xc]:
                     if "loose" not in calc:
-                        new_packing[xc][calc] = packing[xc][calc]
+                        new_packing[xc].append(calc)
             packing = new_packing.copy()
 
         # get our statuses from when we prepared VASP input files for each directory
