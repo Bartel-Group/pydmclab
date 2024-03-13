@@ -1186,7 +1186,7 @@ def generate_finite_displacements(
     # make sure static is converged
     av = AnalyzeVASP(converged_static_dir)
     if not av.is_converged:
-        print("static calculation not converged; not setting up parchg calc yet")
+        print("static calculation not converged; not setting up phonon calcs yet")
         return None
 
     # create a directory called phonons within the static directory
@@ -1199,10 +1199,14 @@ def generate_finite_displacements(
 
     # see if POSCARs are already created
     created_poscars = os.listdir(phonon_dir)
-    created_poscars = [f for f in created_poscars if "POSCAR" in f]
+    created_poscars = [f for f in created_poscars if "POSCAR" in f if "disp" in f]
 
     # go into the phonon directory and generate the displacement POSCARs
     if remake or not created_poscars:
+        copyfile(
+            os.path.join(converged_static_dir, "CONTCAR"),
+            os.path.join(phonon_dir, "POSCAR"),
+        )
         os.chdir(phonon_dir)
         subprocess.call(
             [
@@ -1257,7 +1261,7 @@ def setup_finite_displacement_calcs(phonon_dir, remake=False, rerun=False):
 
     # grab the created POSCARs
     created_poscars = os.listdir(phonon_dir)
-    created_poscars = [f for f in created_poscars if "POSCAR" in f]
+    created_poscars = [f for f in created_poscars if "POSCAR" in f if "disp" in f]
 
     # get the paths to relevant input files from the static calculation
     files_from_static = ["KPOINTS", "POTCAR", "INCAR"]
