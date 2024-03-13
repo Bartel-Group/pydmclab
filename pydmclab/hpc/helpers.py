@@ -50,6 +50,11 @@ def get_vasp_configs(
         run_dielectric (bool):
             True to get the dielectric tensor on your static calculation
 
+        run_phonons (False or list):
+            False = don't do phonons
+            list (3 elements) = supercell expansion for finite displacements (eg [2, 3, 4])
+            True = use default supercell expansion = [2, 2, 2]
+
         detailed_dos (bool or int):
             if you're running LOBSTER, this will determine how many (E, DOS/COHP) points you get
                 if False, COHPSteps = 400
@@ -101,8 +106,15 @@ def get_vasp_configs(
         "generate_bandstructure": run_bandstructure,
         "generate_parchg": run_parchg,
         "generate_dielectric": run_dielectric,
-        "generate_finite_displacements": run_phonons,
     }
+
+    if isinstance(run_phonons, list):
+        vasp_configs["supercell_grid_for_finite_displacements"] = run_phonons
+        generate_finite_displacements = True
+    else:
+        generate_finite_displacements = run_phonons
+
+    vasp_configs["generate_finite_displacements"] = generate_finite_displacements
 
     if vasp_configs["generate_bandstructure"]:
         vasp_configs["lobster_static"] = True
