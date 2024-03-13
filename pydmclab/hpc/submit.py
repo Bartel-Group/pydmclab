@@ -486,6 +486,9 @@ class SubmitTools(object):
                 xc_to_run, calc_to_run = xc_calc.split("-")
                 calc_configs["xc_to_run"] = xc_to_run
                 calc_configs["calc_to_run"] = calc_to_run
+                
+                if sub_configs['skip_loose'] and (xc_to_run == 'loose'):
+                    continue
 
                 # (1) make calc_dir (or remove and remake if fresh_restart)
                 calc_dir = os.path.join(launch_dir, xc_calc)
