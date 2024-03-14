@@ -1092,7 +1092,10 @@ class AnalyzeVASP(object):
             ComputedStructureEntry
         """
         calc_setup = self.calc_setup
-        entry = self.outputs.vasprun.get_computed_entry()
+        vr = self.outputs.vasprun
+        if not vr:
+            return None
+        entry = vr.get_computed_entry()
         for key in calc_setup:
             entry.data[key] = calc_setup[key]
         entry.data["material_id"] = "--".join(
