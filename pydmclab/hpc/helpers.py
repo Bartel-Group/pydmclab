@@ -386,9 +386,8 @@ def get_launch_configs(
                 continue
             to_launch[standard].append(xc)
 
-    for standard in to_launch:
-        if not to_launch[standard]:
-            del to_launch[standard]
+    standards_to_keep = [standard for standard in to_launch if to_launch[standard]]
+    to_launch = {standard: to_launch[standard] for standard in standards_to_keep}
 
     if use_mp_thermo_data:
         # make sure we run GGA+U for MP consistency
