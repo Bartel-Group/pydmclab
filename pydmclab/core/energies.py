@@ -3,6 +3,9 @@ import math
 from itertools import combinations
 from pymatgen.analysis.reaction_calculator import Reaction
 from pymatgen.core.composition import Composition
+from pymatgen.entries.computed_entries import ComputedStructureEntry
+from pymatgen.analysis.phase_diagram import PhaseDiagram
+from pymatgen.entries.mixing_scheme import MaterialsProjectDFTMixingScheme
 
 from pydmclab.data.thermochem import (
     mp2020_compatibility_dmus,
@@ -717,7 +720,6 @@ class DefectFormationEnergy(object):
 
 
 class ReactionEnergy(object):
-
     """
     *** This is a work in progress ***
 
@@ -875,6 +877,72 @@ class ReactionEnergy(object):
         else:
             # keep molar reaction energy if norm is per mole
             return dE_rxn
+
+
+class MPFormationEnergy(object):
+    """
+    *** This is a work in progress ***
+    """
+
+    def __init__(self, all_entries, override_mp_with_my_calcs=False):
+        """
+        Args:
+            all_entries (dict)
+                {entry_id (str) : ComputedStructureEntry}
+        """
+        if isinstance(all_entries[0], dict):
+            # convert to pymatgen ComputedStructureEntry objects
+            all_entries = [ComputedStructureEntry.from_dict(e) for e in all_entries]
+        self.scheme = MaterialsProjectDFTMixingScheme(check_potcar=False)
+        self.override = override_mp_with_my_calcs
+        self.all_entries = all_entries
+        self.queried_entries = [e for e in all_entries if e.data["queried"]]
+        self.my_entries = [e for e in all_entries if not e.data["queried"]]
+
+    @property
+    def entries(self):
+        all_entries = self.all_entries
+        queried_entries = self.queried_entries
+        my_entries = self.my_entries
+        if not self.override:
+            return all_entries
+
+        my_formulas = sorted(list(set([e.data["formula"] for e in my_entries])))
+
+        queried_entries_to_keep = [
+            e for e in queried_entries if e.data["formula"] not in my_formulas
+        ]
+        entries = my_entries + queried_entries_to_keep
+        return entries
+
+    @property
+    def corrected_entries(self):
+        scheme = self.scheme
+        entries = self.entries
+        corrected_entries = scheme.process_entries(entries)
+        return corrected_entries
+
+    @property
+    def pd(self):
+        entries = self.corrected_entries
+        pd = PhaseDiagram(entries)
+        return pd
+
+    @property
+    def Efs(self):
+        pd = self.pd
+        entries = pd.all_entries
+        formulas = sorted(list(set([e.data["formula"] for e in entries])))
+
+        d = {}
+        for formula in formulas:
+            d[formula] = {}
+            relevant_entries = [e for e in entries if e.data["formula"] == formula]
+            for e in relevant_entries:
+                Ef = pd.get_form_energy_per_atom(e)
+                ID = e.material_id
+                d[formula][ID] = Ef
+        return d
 
 
 def main():

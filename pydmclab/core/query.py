@@ -311,6 +311,26 @@ class MPQuery(object):
             d[mpid] = d_doc["structure"]
         return d
 
+    def get_entries_for_chemsys(self, chemsys):
+        """
+        Args:
+            chemsys (str)
+                chemical system of elements joined by "-"
+
+        Returns:
+            {chemsys (str) : [entries (dicts)]}
+        """
+        mpr = self.mpr
+        entries = mpr.get_entries_in_chemsys(
+            elements=chemsys.split("-"),
+            additional_criteria={"thermo_types": ["GGA_GGA+U", "R2SCAN"]},
+        )
+        for entry in entries:
+            entry.data["formula"] = CompTools(entry.composition.reduced_formula).clean
+            entry.data["queried"] = True
+
+        return {e.entry_id: e.as_dict() for e in entries}
+
 
 class MPLegacyQuery(object):
     # Chris B API KEY =

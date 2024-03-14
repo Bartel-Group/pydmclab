@@ -9,6 +9,7 @@ from pymatgen.io.vasp.inputs import Kpoints, Incar
 from pymatgen.io.lobster.outputs import Doscar, Cohpcar, Charge, MadelungEnergies
 
 from pydmclab.core.struc import StrucTools, SiteTools
+from pydmclab.core.comp import CompTools
 from pydmclab.utils.handy import read_json, write_json, read_yaml, write_yaml
 from pydmclab.data.configs import load_batch_vasp_analysis_configs
 
@@ -1084,6 +1085,30 @@ class AnalyzeVASP(object):
             "calc": xc_calc.split("-")[1],
         }
 
+    @property
+    def computed_structure_entry(self):
+        """
+        Returns:
+            ComputedStructureEntry
+        """
+        calc_setup = self.calc_setup
+        entry = self.outputs.vasprun.get_computed_entry()
+        for key in calc_setup:
+            entry.data[key] = calc_setup[key]
+        entry.data["material_id"] = "--".join(
+            [
+                entry.data["formula_tag"],
+                entry.data["ID"],
+                entry.data["standard"],
+                entry.data["mag"],
+                entry.data["xc"],
+                entry.data["calc"],
+            ]
+        )
+        entry.data["formula"] = CompTools(entry.composition.reduced_formula).clean
+        entry.data["queried"] = False
+        return entry.as_dict()
+
     def summary(
         self,
         include_meta=False,
@@ -1102,6 +1127,7 @@ class AnalyzeVASP(object):
         include_pcoop=False,
         include_tcobi=False,
         include_pcobi=False,
+        include_entry=False,
     ):
         """
         Returns all desired data for post-processing DFT calculations
@@ -1167,6 +1193,8 @@ class AnalyzeVASP(object):
             data["tcobi"] = self.tcohp(are_cobis=True)
         if include_pcobi:
             data["pcobi"] = self.pcohp(are_cobis=True)
+        if include_entry:
+            data["entry"] = self.computed_structure_entry
         return data
 
 
@@ -1282,6 +1310,7 @@ class AnalyzeBatch(object):
         include_pcoop = configs["include_pcoop"]
         include_tcobi = configs["include_tcobi"]
         include_pcobi = configs["include_pcobi"]
+        include_entry = configs["include_entry"]
         check_relax = configs["check_relax"]
         create_cif = configs["create_cif"]
 
@@ -1304,6 +1333,7 @@ class AnalyzeBatch(object):
             include_pcoop=include_pcoop,
             include_tcobi=include_tcobi,
             include_pcobi=include_pcobi,
+            include_entry=include_entry,
         )
 
         # store the relax energy if we asked to

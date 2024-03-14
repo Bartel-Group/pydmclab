@@ -16,6 +16,7 @@ include_tcoop: False # include light COOPCAR data
 include_pcoop: False # include heavy COOPCAR data
 include_tcobi: False # include light COBICAR data
 include_pcobi: False # include heavy COBICAR data
+include_entry: False # include pymatgen computed structure entry
 create_cif: True # create a .cif file for each CONTCAR
 verbose: True # print stuff as things get analyzed
 n_procs: 1 # how many cores to parallelize the analysis over
