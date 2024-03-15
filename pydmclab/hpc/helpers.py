@@ -1595,7 +1595,7 @@ def get_merged_entries(
         return read_json(fjson)
 
     entries = mp_entries.copy()
-    relevant_chemsyses = list(my_entries.keys())
+    relevant_chemsyses = list(mp_entries.keys())
 
     my_entries = my_entries["entries"]
     for e in my_entries:
