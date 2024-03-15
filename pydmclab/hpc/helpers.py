@@ -936,6 +936,7 @@ def submit_one_calc(submit_args):
     user_configs = submit_args["user_configs"]
     refresh_configs = submit_args["refresh_configs"]
     ready_to_launch = submit_args["ready_to_launch"]
+    running_in_parallel = submit_args["parallel"]
 
     curr_user_configs = user_configs.copy()
 
@@ -951,7 +952,28 @@ def submit_one_calc(submit_args):
     # what magmoms apply to that launch_dir
     magmom = launch_dirs[launch_dir]["magmom"]
 
-    try:
+    if running_in_parallel:
+        try:
+            sub = SubmitTools(
+                launch_dir=launch_dir,
+                final_xcs=final_xcs,
+                magmom=magmom,
+                user_configs=curr_user_configs,
+                refresh_configs=refresh_configs,
+            )
+
+            # prepare VASP directories and write submission script
+            sub.write_sub
+
+            # submit submission script to the queue
+            if ready_to_launch:
+                sub.launch_sub
+
+            success = True
+        except TypeError:
+            print("\nERROR: %s\n   will submit without multiprocessing" % launch_dir)
+            success = False
+    else:
         sub = SubmitTools(
             launch_dir=launch_dir,
             final_xcs=final_xcs,
@@ -968,9 +990,6 @@ def submit_one_calc(submit_args):
             sub.launch_sub
 
         success = True
-    except TypeError:
-        print("\nERROR: %s\n   will submit without multiprocessing" % launch_dir)
-        success = False
 
     return {"launch_dir": launch_dir, "success": success}
 
@@ -1008,6 +1027,7 @@ def submit_calcs(
         "user_configs": user_configs,
         "refresh_configs": refresh_configs,
         "ready_to_launch": ready_to_launch,
+        "parallel": False if n_procs == 1 else True,
     }
 
     if n_procs == 1:
