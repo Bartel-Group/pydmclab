@@ -3,10 +3,11 @@ import os
 from pydmclab.hpc.launch import LaunchTools
 from pydmclab.hpc.submit import SubmitTools
 from pydmclab.hpc.analyze import AnalyzeVASP, AnalyzeBatch
+from pydmclab.core.comp import CompTools
 from pydmclab.core.query import MPQuery, MPLegacyQuery
 from pydmclab.core.struc import StrucTools
 from pydmclab.core.mag import MagTools
-from pydmclab.core.energies import ChemPots, FormationEnthalpy
+from pydmclab.core.energies import ChemPots, FormationEnthalpy, MPFormationEnergy
 from pydmclab.utils.handy import read_json, write_json
 from pydmclab.data.configs import load_partition_configs
 
@@ -1543,6 +1544,89 @@ def get_dos_results(
             thermo_results[standard][xc][formula][ID]["pcobi"] = pcohp
 
     write_json(thermo_results, fjson)
+    return read_json(fjson)
+
+
+def get_entries(
+    results,
+    data_dir=os.getcwd().replace("scripts", "data"),
+    savename="entries.json",
+    remake=False,
+):
+    fjson = os.path.join(data_dir, savename)
+    if os.path.exists(fjson) and not remake:
+        return read_json(fjson)
+    d = {"entries": [results[k]["entry"] for k in results]}
+    write_json(d, fjson)
+    return read_json(fjson)
+
+
+def get_mp_entries(
+    chemsyses,
+    api_key,
+    data_dir=os.getcwd().replace("scripts", "data"),
+    savename="mp_entries.json",
+    remake=False,
+):
+    fjson = os.path.join(data_dir, savename)
+    if os.path.exists(fjson) and not remake:
+        return read_json(fjson)
+
+    mpq = MPQuery(api_key=api_key)
+    out = {}
+    for chemsys in chemsyses:
+        data = mpq.get_entries_for_chemsys(chemsys)
+        out[chemsys] = list(data.values())
+    write_json(out, fjson)
+    return read_json(fjson)
+
+
+def get_merged_entries(
+    my_entries,
+    mp_entries,
+    data_dir=os.getcwd().replace("scripts", "data"),
+    savename="merged_entries_for_mp_Ef.json",
+    remake=False,
+):
+    fjson = os.path.join(data_dir, savename)
+    if os.path.exists(fjson) and not remake:
+        return read_json(fjson)
+
+    entries = mp_entries.copy()
+    relevant_chemsyses = list(my_entries.keys())
+
+    my_entries = my_entries["entries"]
+    for e in my_entries:
+        if e.data["standard"] != "mp":
+            continue
+        formula = e.data["formula"]
+        for chemsys in relevant_chemsyses:
+            if set(CompTools(formula).els).issubset(set(chemsys.split("-"))):
+                entries[chemsys].append(e)
+
+    write_json(entries, fjson)
+    return read_json(fjson)
+
+
+def get_mp_compatible_Efs(
+    merged_entries,
+    data_dir=os.getcwd().replace("scripts", "data"),
+    savename="mp_compatible_Efs.json",
+    remake=False,
+):
+    fjson = os.path.join(data_dir, savename)
+    if os.path.exists(fjson) and not remake:
+        return read_json(fjson)
+
+    out = {}
+    for chemsys in merged_entries:
+        mpfe = MPFormationEnergy(
+            merged_entries[chemsys], override_mp_with_my_calcs=True
+        )
+        Efs = mpfe.Efs
+        out[chemsys] = Efs
+
+    write_json(out, fjson)
     return read_json(fjson)
 
 
