@@ -11,6 +11,8 @@ from pydmclab.core.energies import ChemPots, FormationEnthalpy, MPFormationEnerg
 from pydmclab.utils.handy import read_json, write_json
 from pydmclab.data.configs import load_partition_configs
 
+# from pymatgen.entries.computed_entries import ComputedStructureEntry
+
 
 def get_vasp_configs(
     run_lobster=False,
@@ -1597,9 +1599,9 @@ def get_merged_entries(
 
     my_entries = my_entries["entries"]
     for e in my_entries:
-        if e.data["standard"] != "mp":
+        if e["data"]["standard"] != "mp":
             continue
-        formula = e.data["formula"]
+        formula = e["data"]["formula"]
         for chemsys in relevant_chemsyses:
             if set(CompTools(formula).els).issubset(set(chemsys.split("-"))):
                 entries[chemsys].append(e)
