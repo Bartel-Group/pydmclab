@@ -887,8 +887,7 @@ class MPFormationEnergy(object):
     def __init__(self, all_entries, override_mp_with_my_calcs=False):
         """
         Args:
-            all_entries (dict)
-                {entry_id (str) : ComputedStructureEntry}
+            all_entries (list)
         """
         if isinstance(all_entries[0], dict):
             # convert to pymatgen ComputedStructureEntry objects
@@ -940,7 +939,7 @@ class MPFormationEnergy(object):
             relevant_entries = [e for e in entries if e.data["formula"] == formula]
             for e in relevant_entries:
                 Ef = pd.get_form_energy_per_atom(e)
-                ID = e.material_id
+                ID = e.data["material_id"]
                 d[formula][ID] = Ef
         return d
 

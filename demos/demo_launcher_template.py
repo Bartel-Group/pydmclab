@@ -23,6 +23,11 @@ from pydmclab.hpc.helpers import (
     make_sub_for_launcher,
 )
 
+from pydmclab.utils.handy import read_json, write_json
+from pydmclab.core.comp import CompTools
+from pydmclab.core.struc import StrucTools
+from pydmclab.hpc.analyze import AnalyzeVASP
+
 # where is this file
 SCRIPTS_DIR = os.getcwd()
 
@@ -108,6 +113,16 @@ GEN_MAGMOMS = True if LAUNCH_CONFIGS["n_afm_configs"] else False
 # NOTE: the default is to use the imported functions from pydmclab.hpc.helpers
 # You will often want to write your own "get_query" and/or "get_strucs" functions instead
 # See below (or within pydmclab.hpc.helpers) for some more detailed docs
+
+
+def get_custom_data(savename="custom.json", remake=False):
+    fjson = os.path.join(DATA_DIR, savename)
+    if not remake and os.path.exists(fjson):
+        return read_json(fjson)
+
+    d = {}
+    write_json(d, fjson)
+    return read_json(fjson)
 
 
 def main():
