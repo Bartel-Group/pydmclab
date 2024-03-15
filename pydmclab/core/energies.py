@@ -893,9 +893,9 @@ class MPFormationEnergy(object):
             # convert to pymatgen ComputedStructureEntry objects
             all_entries = [ComputedStructureEntry.from_dict(e) for e in all_entries]
         for e in all_entries:
-            old_run_type = e.data["run_type"]
+            old_run_type = e.parameters["run_type"]
             new_run_type = old_run_type.replace("PBE", "GGA")
-            e.data["run_type"] = new_run_type
+            e.parameters["run_type"] = new_run_type
         self.all_entries = all_entries
         self.scheme = MaterialsProjectDFTMixingScheme(check_potcar=False)
         self.override = override_mp_with_my_calcs
