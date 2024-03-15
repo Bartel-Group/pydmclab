@@ -82,7 +82,7 @@ def make_project_tree():
     tree = {
         "dev": ["scripts", "data", "figures"],
         "results": ["scripts", "data", "figures"],
-        "prep": ["notes", "background"],
+        "background": ["notes"],
         "products": ["drafts", "slides", "other"],
     }
     for first_layer in tree:
