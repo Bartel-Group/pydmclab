@@ -1640,8 +1640,8 @@ def get_merged_entries(
             if mp_allowed_xcs and (e["parameters"]["run_type"] not in mp_allowed_xcs):
                 continue
             entries[chemsys].append(e)
-    entries = mp_entries.copy()
-    relevant_chemsyses = list(mp_entries.keys())
+
+    relevant_chemsyses = list(entries.keys())
 
     my_entries = my_entries["entries"]
     for e in my_entries:
