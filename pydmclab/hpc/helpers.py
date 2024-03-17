@@ -1625,7 +1625,7 @@ def get_merged_entries(
     else:
         my_allowed_xcs = None
 
-    if restrict_my_xc_to in ["GGA", "GGA+U"]:
+    if restrict_mp_xc_to in ["GGA", "GGA+U"]:
         mp_allowed_xcs = ["GGA", "GGA+U", "PBE", "PBE+U"]
     elif restrict_my_xc_to == "r2SCAN":
         mp_allowed_xcs = ["r2SCAN"]
