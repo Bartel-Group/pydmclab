@@ -1606,6 +1606,8 @@ def get_mp_entries(
 def get_merged_entries(
     my_entries,
     mp_entries,
+    restrict_mp_xc_to=None,
+    restrict_my_xc_to=None,
     data_dir=os.getcwd().replace("scripts", "data"),
     savename="merged_entries_for_mp_Ef.json",
     remake=False,
@@ -1614,12 +1616,38 @@ def get_merged_entries(
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
 
+    if restrict_my_xc_to == "GGA":
+        my_allowed_xcs = ["gga"]
+    elif restrict_my_xc_to == "GGA+U":
+        my_allowed_xcs = ["ggau"]
+    elif restrict_my_xc_to == "r2SCAN":
+        my_allowed_xcs = ["r2scan"]
+    else:
+        my_allowed_xcs = None
+
+    if restrict_my_xc_to in ["GGA", "GGA+U"]:
+        mp_allowed_xcs = ["GGA", "GGA+U", "PBE", "PBE+U"]
+    elif restrict_my_xc_to == "r2SCAN":
+        mp_allowed_xcs = ["r2SCAN"]
+    else:
+        mp_allowed_xcs = None
+
+    entries = {}
+    for chemsys in mp_entries:
+        entries[chemsys] = []
+        mp_entries_for_chemsys = mp_entries[chemsys]
+        for e in mp_entries_for_chemsys:
+            if mp_allowed_xcs and (e["parameters"]["run_type"] not in mp_allowed_xcs):
+                continue
+            entries[chemsys].append(e)
     entries = mp_entries.copy()
     relevant_chemsyses = list(mp_entries.keys())
 
     my_entries = my_entries["entries"]
     for e in my_entries:
         if e["data"]["standard"] != "mp":
+            continue
+        if my_allowed_xcs and (e["data"]["xc"] not in my_allowed_xcs):
             continue
         formula = e["data"]["formula"]
         for chemsys in relevant_chemsyses:
