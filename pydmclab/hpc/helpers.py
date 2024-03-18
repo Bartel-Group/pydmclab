@@ -1654,7 +1654,6 @@ def get_merged_entries(
 
 def get_mp_compatible_Efs(
     merged_entries,
-    override_mp_with_my_calcs=False,
     data_dir=os.getcwd().replace("scripts", "data"),
     savename="mp_compatible_Efs.json",
     remake=False,
@@ -1665,9 +1664,7 @@ def get_mp_compatible_Efs(
 
     out = {}
     for chemsys in merged_entries:
-        mpfe = MPFormationEnergy(
-            merged_entries[chemsys], override_mp_with_my_calcs=override_mp_with_my_calcs
-        )
+        mpfe = MPFormationEnergy(merged_entries[chemsys])
         Efs = mpfe.Efs
         out[chemsys] = Efs
 
