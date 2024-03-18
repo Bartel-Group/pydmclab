@@ -1578,7 +1578,7 @@ def get_entries(
     fjson = os.path.join(data_dir, savename)
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
-    d = {"entries": [results[k]["entry"] for k in results]}
+    d = {"entries": [results[k]["entry"] for k in results if results[k]["entry"]]}
     write_json(d, fjson)
     return read_json(fjson)
 
