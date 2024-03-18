@@ -311,7 +311,7 @@ class MPQuery(object):
             d[mpid] = d_doc["structure"]
         return d
 
-    def get_entries_for_chemsys(self, chemsys):
+    def get_entries_for_chemsys(self, chemsys, thermo_types=["GGA_GGA+U", "R2SCAN"]):
         """
         Args:
             chemsys (str)
@@ -323,7 +323,7 @@ class MPQuery(object):
         mpr = self.mpr
         entries = mpr.get_entries_in_chemsys(
             elements=chemsys.split("-"),
-            additional_criteria={"thermo_types": ["GGA_GGA+U", "R2SCAN"]},
+            additional_criteria={"thermo_types": thermo_types},
         )
         for entry in entries:
             entry.data["formula"] = CompTools(entry.composition.reduced_formula).clean

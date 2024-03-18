@@ -1586,6 +1586,7 @@ def get_entries(
 def get_mp_entries(
     chemsyses,
     api_key,
+    thermo_types=None,
     data_dir=os.getcwd().replace("scripts", "data"),
     savename="mp_entries.json",
     remake=False,
@@ -1597,7 +1598,10 @@ def get_mp_entries(
     mpq = MPQuery(api_key=api_key)
     out = {}
     for chemsys in chemsyses:
-        data = mpq.get_entries_for_chemsys(chemsys)
+        if thermo_types:
+            data = mpq.get_entries_for_chemsys(chemsys, thermo_types=thermo_types)
+        else:
+            data = mpq.get_entries_for_chemsys(chemsys)
         out[chemsys] = list(data.values())
     write_json(out, fjson)
     return read_json(fjson)
@@ -1616,6 +1620,7 @@ def get_merged_entries(
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
 
+    """
     if restrict_my_xc_to == "GGA":
         my_allowed_xcs = ["gga"]
     elif restrict_my_xc_to == "GGA+U":
@@ -1631,6 +1636,7 @@ def get_merged_entries(
         mp_allowed_xcs = ["r2SCAN"]
     else:
         mp_allowed_xcs = None
+    """
 
     entries = {}
     for chemsys in mp_entries:
