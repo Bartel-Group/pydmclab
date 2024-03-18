@@ -884,7 +884,7 @@ class MPFormationEnergy(object):
     *** This is a work in progress ***
     """
 
-    def __init__(self, all_entries, override_mp_with_my_calcs=False):
+    def __init__(self, all_entries):
         """
         Args:
             all_entries (list)
@@ -898,17 +898,13 @@ class MPFormationEnergy(object):
             e.parameters["run_type"] = new_run_type
         self.all_entries = all_entries
         self.scheme = MaterialsProjectDFTMixingScheme(check_potcar=False)
-        self.override = override_mp_with_my_calcs
         self.queried_entries = [e for e in all_entries if e.data["queried"]]
         self.my_entries = [e for e in all_entries if not e.data["queried"]]
 
     @property
     def entries(self):
-        all_entries = self.all_entries
         queried_entries = self.queried_entries
         my_entries = self.my_entries
-        if not self.override:
-            return all_entries
 
         my_formulas = sorted(list(set([e.data["formula"] for e in my_entries])))
 
@@ -926,15 +922,35 @@ class MPFormationEnergy(object):
         return corrected_entries
 
     @property
-    def pd(self):
+    def my_pd(self):
         entries = self.corrected_entries
         pd = PhaseDiagram(entries)
         return pd
 
     @property
+    def mp_pd(self):
+        entries = self.queried_entries
+        pd = PhaseDiagram(entries)
+        return pd
+
+    @property
     def Efs(self):
-        pd = self.pd
-        entries = pd.all_entries
+        my_pd = self.my_pd
+        my_entries = my_pd.all_entries
+
+        for e in my_entries:
+            Ef = my_pd.get_form_energy_per_atom(e)
+            e.data["Ef"] = Ef
+
+        mp_pd = self.mp_pd
+        mp_entries = mp_pd.all_entries
+
+        for e in mp_entries:
+            Ef = mp_pd.get_form_energy_per_atom(e)
+            e.data["Ef"] = Ef
+
+        entries = mp_entries + my_entries
+
         formulas = sorted(list(set([e.data["formula"] for e in entries])))
 
         d = {}
@@ -942,7 +958,7 @@ class MPFormationEnergy(object):
             d[formula] = {}
             relevant_entries = [e for e in entries if e.data["formula"] == formula]
             for e in relevant_entries:
-                Ef = pd.get_form_energy_per_atom(e)
+                Ef = e.data["Ef"]
                 ID = e.data["material_id"]
                 d[formula][ID] = Ef
         return d
