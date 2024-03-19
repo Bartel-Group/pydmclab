@@ -881,13 +881,39 @@ class ReactionEnergy(object):
 
 class MPFormationEnergy(object):
     """
-    *** This is a work in progress ***
+    This class allows you to compare your calculations to calculations that are in MP (next-gen version)
+
+    For instance, if you calculate some formation energies and you want to see if your material is stable vs MP,
+    this would be a good way to generate compatible formation energies for the hull analysis
+
+    To get all_entries:
+        Run some calculations on whatever materials you want
+            retrieve their ComputedStructureEntry objects using hpc.helpers.get_entries
+        Query MP for all chemical spaces spanned by those materials
+            eg using core.query.MPQuery.get_entries_for_chemsys or hpc.helpers.get_mp_entries
+        Combine the two lists of entries
+            eg using hpc.helpers.get_merged_entries
+
+    This class gets called by hpc.helpers.get_mp_compatible_Efs
+
     """
 
     def __init__(self, all_entries):
         """
         Args:
             all_entries (list)
+                list of ComputedStructureEntry (or ...as_dict()) objects for all calculations you want to consider
+                    could include MP and your own calculations
+
+        Returns:
+            all_entries (list)
+                list of ComputedStructureEntry objects
+            scheme (MaterialsProjectDFTMixingScheme)
+                how to mix functionals (if necessary)
+            queried_entries (list)
+                entries you got from MP
+            my_entries (list)
+                entries that you calculated
         """
         if isinstance(all_entries[0], dict):
             # convert to pymatgen ComputedStructureEntry objects
@@ -899,42 +925,52 @@ class MPFormationEnergy(object):
         self.all_entries = all_entries
         self.scheme = MaterialsProjectDFTMixingScheme(check_potcar=False)
         self.queried_entries = [e for e in all_entries if e.data["queried"]]
-        self.my_entries = [e for e in all_entries if not e.data["queried"]]
-
-    @property
-    def entries(self):
-        queried_entries = self.queried_entries
-        my_entries = self.my_entries
-
-        my_formulas = sorted(list(set([e.data["formula"] for e in my_entries])))
-
-        queried_entries_to_keep = [
-            e for e in queried_entries if e.data["formula"] not in my_formulas
+        self.my_entries = [
+            e for e in all_entries if "queried" not in e.data or not e.data["queried"]
         ]
-        entries = my_entries + queried_entries_to_keep
-        return entries
 
     @property
-    def corrected_entries(self):
+    def my_corrected_entries(self):
+        """
+        Returns:
+            list of your entries after applying MP compatibility corrections
+        """
         scheme = self.scheme
-        entries = self.entries
+        entries = self.my_entries
         corrected_entries = scheme.process_entries(entries)
         return corrected_entries
 
     @property
     def my_pd(self):
-        entries = self.corrected_entries
+        """
+        Returns:
+            PhaseDiagram built from your corrected entries
+        """
+        entries = self.my_corrected_entries
         pd = PhaseDiagram(entries)
         return pd
 
     @property
     def mp_pd(self):
+        """
+        Returns:
+            PhaseDiagram built from MP entries (these were queried from MP so they don't need correcting)
+        """
         entries = self.queried_entries
         pd = PhaseDiagram(entries)
         return pd
 
     @property
     def Efs(self):
+        """
+        Returns:
+            {formula (str) :
+                ID (str) :
+                    formation energy (eV/atom)}
+            all formation energies in this dict should be compatible with one another
+            note: this will include all polymorphs
+            note: this will include MP data (ID = mp-id) and your data (ID = formula--ID--standard--mag--xc-calc)
+        """
         my_pd = self.my_pd
         my_entries = my_pd.all_entries
 

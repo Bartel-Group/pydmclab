@@ -1575,6 +1575,27 @@ def get_entries(
     savename="entries.json",
     remake=False,
 ):
+    """
+    Args:
+        results (dict)
+            from get_results
+                {formula--ID--standard--mag--xc-calc (str) : {scraped results from VASP calculation}}
+
+        data_dir (str)
+            path to data directory
+
+        savename (str)
+            name of json file to save results to
+
+        remake (bool)
+            if True, remake the json file
+
+    Returns:
+        dictionary with ComputedStructureEntry objects for each of your completed calculations
+            {'entries' : [list of ComputedStructureEntry.as_dict() objects]}
+
+        note: each of these entries has the "key" from the results dictionary stored as entry['data']['material_id']
+    """
     fjson = os.path.join(data_dir, savename)
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
@@ -1591,6 +1612,38 @@ def get_mp_entries(
     savename="mp_entries.json",
     remake=False,
 ):
+    """
+    Args:
+        chemsyses (list)
+            list of chemical systems to get entries for (e.g., ['Li-Fe-O', 'Mg-Cr-O'])
+                will include "sub phase diagrams" in query
+                e.g., for 'Li-Fe-O', will include 'Li-Fe-O', 'Li-Fe', 'Li-O', 'Fe-O', 'Li', 'Fe', 'O'
+
+        api_key (str)
+            your Materials Project API key
+
+        thermo_types (list)
+            list of thermo types to get entries for
+                this could be ['GGA_GGA+U'], ['R2SCAN'], ['GGA_GGA+U', 'R2SCAN']
+            if None, will get all data regardless of thermo_type (note: this should be equivalent to thermo_types=['GGA_GGA+U', 'R2SCAN'])
+
+        data_dir (str)
+            path to data directory
+
+        savename (str)
+            name of json file to save results to
+
+        remake (bool)
+            if True, remake the json file
+
+    Returns:
+        dictionary of ComputedStructureEntry objects from the Materials Project
+            {chemsys (str) :
+                [list of ComputedStructureEntry.as_dict() objects]}
+            note: the mp-id is stored as entry['data']['material_id']
+            note: the xc is stored in entry['parameters']['run_type']
+
+    """
     fjson = os.path.join(data_dir, savename)
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
@@ -1615,6 +1668,36 @@ def get_merged_entries(
     savename="merged_entries_for_mp_Ef.json",
     remake=False,
 ):
+    """
+    Args:
+        my_entries (dict)
+            from get_entries
+                {'entries' : [list of ComputedStructureEntry.as_dict() objects]}
+
+        mp_entries (dict)
+            from get_mp_entries
+                {chemsys (str) : [list of ComputedStructureEntry.as_dict() objects]}
+
+        restrict_my_xc_to (str)
+            if not None, only include my entries with this xc
+                e.g., 'GGA', 'GGA+U', 'r2SCAN'
+
+        data_dir (str)
+            path to data directory
+
+        savename (str)
+            name of json file to save results to
+
+        remake (bool)
+            if True, remake the json file
+
+    Returns:
+        dictionary of ComputedStructureEntry objects from the Materials Project and your calculations
+            {chemsys (str) :
+                [list of ComputedStructureEntry.as_dict() objects]}
+            note: this will exclude any of your calculations where standard != 'mp' because the purpose of this is to compare to MP
+                if you're not comparing to MP, then you can just get your own entries from get_entries
+    """
     fjson = os.path.join(data_dir, savename)
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
@@ -1625,6 +1708,8 @@ def get_merged_entries(
         my_allowed_xcs = ["ggau"]
     elif restrict_my_xc_to == "r2SCAN":
         my_allowed_xcs = ["r2scan"]
+    elif restrict_my_xc_to == "GGA_GGA+U":
+        my_allowed_xcs = ["gga", "ggau"]
     else:
         my_allowed_xcs = None
 
@@ -1658,6 +1743,29 @@ def get_mp_compatible_Efs(
     savename="mp_compatible_Efs.json",
     remake=False,
 ):
+    """
+    Args:
+        merged_entries (dict)
+            from get_merged_entries
+                {chemsys (str) : [list of ComputedStructureEntry.as_dict() objects]}
+
+        data_dir (str)
+            path to data directory
+
+        savename (str)
+            name of json file to save results to
+
+        remake (bool)
+            if True, remake the json file
+
+    Returns:
+        dictionary of compatible formation energies for each chemsys
+            {chemsys (str) :
+                {formula (str) :
+                    ID (str) : formation energy (eV/atom)}
+            note: this will include all polymorphs
+            note: this will include MP data (ID = mp-id) and your data (ID = formula--ID--standard--mag--xc-calc)
+    """
     fjson = os.path.join(data_dir, savename)
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
