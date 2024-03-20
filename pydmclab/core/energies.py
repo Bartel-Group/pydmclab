@@ -937,6 +937,11 @@ class MPFormationEnergy(object):
         """
         scheme = self.scheme
         entries = self.my_entries
+        formulas = sorted(list(set([e.data["formula"] for e in entries])))
+        mp_entries = self.queried_entries
+        for e in mp_entries:
+            if CompTools(e.data["formula"]).clean not in formulas:
+                entries.append(e)
         corrected_entries = scheme.process_entries(entries)
         return corrected_entries
 
