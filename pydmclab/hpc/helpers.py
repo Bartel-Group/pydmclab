@@ -20,6 +20,7 @@ def get_vasp_configs(
     run_parchg=False,
     run_dielectric=False,
     run_phonons=False,
+    phonon_mode="dfpt",
     detailed_dos=False,
     modify_loose_incar=False,
     modify_relax_incar=False,
@@ -112,12 +113,12 @@ def get_vasp_configs(
     }
 
     if isinstance(run_phonons, list):
-        vasp_configs["supercell_grid_for_finite_displacements"] = run_phonons
+        vasp_configs["supercell_grid_for_%s" % phonon_mode] = run_phonons
         generate_finite_displacements = True
     else:
         generate_finite_displacements = run_phonons
 
-    vasp_configs["generate_finite_displacements"] = generate_finite_displacements
+    vasp_configs["generate_%s" % phonon_mode] = generate_finite_displacements
 
     if vasp_configs["generate_bandstructure"]:
         vasp_configs["lobster_static"] = True
