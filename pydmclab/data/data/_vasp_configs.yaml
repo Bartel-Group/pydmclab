@@ -21,6 +21,9 @@ generate_dielectric: False # if True, prepare the INCAR for the static calculati
 generate_finite_displacements: False
 supercell_grid_for_finite_displacements: [2,2,2]
 
+generate_dfpt: False
+supercell_grid_for_dfpt: [2,2,2]
+
 # some output files
 fvaspout: vasp.o # where vasp output goes in calc_dir for each vasp run
 fvasperrors: errors.o # where vasp errors go in calc_dir for each vasp run

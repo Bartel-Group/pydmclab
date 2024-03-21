@@ -1,3 +1,4 @@
+from pydmclab.core.struc import StrucTools
 from pydmclab.hpc.vasp import VASPSetUp
 from pydmclab.hpc.analyze import AnalyzeVASP
 from pydmclab.utils.handy import read_yaml, write_yaml
@@ -880,6 +881,25 @@ class SubmitTools(object):
                                     f.write("cd %s\n" % disp_dir)
                                     f.write("%s\n" % vasp_command)
 
+                            if vasp_configs["generate_dfpt"]:
+                                phonon_dir = setup_dfpt(
+                                    converged_static_dir=calc_dir,
+                                    supercell_grid=vasp_configs[
+                                        "supercell_grid_for_dfpt"
+                                    ],
+                                )
+                            else:
+                                phonon_dir = None
+
+                            if phonon_dir:
+                                f.write(
+                                    "echo working on %s-dfpt >> %s\n"
+                                    % (xc_calc, fstatus)
+                                )
+                                f.write("cd %s\n" % phonon_dir)
+                                f.write("%s\n" % vasp_command)
+                                f.write("phonopy --fc vasprun.xml\n")
+
                         f.write("echo %s is done >> %s\n" % (xc_calc, fstatus))
                     else:
                         if status == "continue":
@@ -1185,6 +1205,80 @@ def setup_parchg(converged_static_dir, rerun=False, eint=-1):
                 f_dst.write(line)
 
     return parchg_dir
+
+
+def setup_dfpt(converged_static_dir, supercell_grid=[2, 2, 2], rerun=False):
+    """
+    function to create input files (INCAR, KPOINTS, POTCAR, POSCAR, WAVECAR, CHGCAR) for partial charge calculation
+        after static calculations
+
+    Args:
+        converged_static_dir (str)
+            path to converged static calculation
+
+        supercell_grid (list)
+            the supercell grid to create from original POSCAR
+
+        rerun (bool)
+            if True, rerun bandstructure calculation even if it's already converged
+
+    Returns:
+        directory to band structure calculation (str) or None if not ready to run this
+
+    """
+    # make sure static is converged
+    av = AnalyzeVASP(converged_static_dir)
+    if not av.is_converged:
+        print("static calculation not converged; not setting up dfpt calc yet")
+        return None
+
+    # get the paths to relevant input files from the static calculation
+    files_from_static = ["POSCAR", "KPOINTS", "POTCAR"]
+
+    # make a directory for the bandstructure calculation
+    dfpt_dir = converged_static_dir.replace("-static", "-dfpt")
+    if not os.path.exists(dfpt_dir):
+        os.mkdir(dfpt_dir)
+
+    # make sure dfpt calc didn't already run
+    av = AnalyzeVASP(dfpt_dir)
+    if av.is_converged and not rerun:
+        print("dfpt already converged")
+        return None
+
+    for file_to_copy in files_from_static:
+        f_src = os.path.join(converged_static_dir, file_to_copy)
+        f_dst = os.path.join(dfpt_dir, file_to_copy)
+        copyfile(f_src, f_dst)
+
+    copyfile(
+        os.path.join(dfpt_dir, "POSCAR"), os.path.join(dfpt_dir, "POSCAR-unitcell")
+    )
+    st_unit = StrucTools(os.path.join(dfpt_dir, "POSCAR-unitcell"))
+    supercell = st_unit.make_supercell(supercell_grid)
+    supercell.to("POSCAR", os.path.join(dfpt_dir, "POSCAR"))
+
+    fstatic_incar = os.path.join(converged_static_dir, "INCAR")
+    fdfpt_incar = os.path.join(dfpt_dir, "INCAR")
+
+    new_incar_params = {
+        "IBRION": 8,
+        "NSW": 1,
+        "IALGO": 38,
+        "EDIFF": 1e-7,
+        "ADDGRID": True,
+    }
+
+    with open(fstatic_incar) as f_src:
+        with open(fdfpt_incar, "w") as f_dst:
+            for line in f_src:
+                if line.split("=")[0].strip() in new_incar_params:
+                    continue
+                f_dst.write(line)
+            for key in new_incar_params:
+                f_dst.write("%s = %s\n" % (key, new_incar_params[key]))
+
+    return dfpt_dir
 
 
 def generate_finite_displacements(
