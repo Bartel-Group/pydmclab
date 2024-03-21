@@ -1256,7 +1256,7 @@ def setup_dfpt(converged_static_dir, supercell_grid=[2, 2, 2], rerun=False):
     )
     st_unit = StrucTools(os.path.join(dfpt_dir, "POSCAR-unitcell"))
     supercell = st_unit.make_supercell(supercell_grid)
-    supercell.to("POSCAR", os.path.join(dfpt_dir, "POSCAR"))
+    supercell.to(fmt="POSCAR", filename=os.path.join(dfpt_dir, "POSCAR"))
 
     fstatic_incar = os.path.join(converged_static_dir, "INCAR")
     fdfpt_incar = os.path.join(dfpt_dir, "INCAR")
