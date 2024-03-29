@@ -13,7 +13,7 @@ set_rc_params()
 
 
 class IsoAlloy(object):
-    """ """
+    """ THIS DOESNT WORK YET """
 
     def __init__(
         self,
@@ -207,7 +207,7 @@ class IsoAlloy(object):
 
         elif min(G_mix_curve) >= 0:
             return "solid solution nowhere"
-        elif:
+        else:
             # trying to deal with a few cases:
                 # G_mix_curve is a single parabola --> don't need common tangent
                 # G_mix_curve is a double parabola --> need common tangent
