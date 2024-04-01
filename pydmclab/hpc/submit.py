@@ -1262,11 +1262,13 @@ def setup_dfpt(converged_static_dir, supercell_grid=[2, 2, 2], rerun=False):
     fdfpt_incar = os.path.join(dfpt_dir, "INCAR")
 
     new_incar_params = {
-        "IBRION": 8,
+        "IBRION": 7,
         "NSW": 1,
         "IALGO": 38,
-        "EDIFF": 1e-7,
+        "EDIFF": 1e-6,
         "ADDGRID": True,
+        "NCORE": 8,
+        "ALGO": "Normal",
     }
 
     with open(fstatic_incar) as f_src:
@@ -1295,6 +1297,13 @@ def setup_dfpt(converged_static_dir, supercell_grid=[2, 2, 2], rerun=False):
                     f_dst.write(line)
             for key in new_incar_params:
                 f_dst.write("%s = %s\n" % (key, new_incar_params[key]))
+
+    fdfpt_kpoints = os.path.join(dfpt_dir, "KPOINTS")
+    with open(fdfpt_kpoints, "w") as f_dst:
+        f_dst.write("Regular\n")
+        f_dst.write("0 0 0\n")
+        f_dst.write("Gamma\n")
+        f_dst.write("1 1 1\n")
 
     return dfpt_dir
 
