@@ -18,11 +18,11 @@ generate_parchg: False # if True, generate a partial charge
 eint_for_parchg: -1 # the lower energy (relative to E_Fermi) that you want to analyze
 generate_dielectric: False # if True, prepare the INCAR for the static calculation to generate the dielectric tensor
 
-generate_finite_displacements: False
-supercell_grid_for_finite_displacements: [2,2,2]
+generate_finite_displacements: False # if True, run finite displacements
+supercell_grid_for_finite_displacements: [2,2,2] # supercell grid for finite displacements
 
-generate_dfpt: False
-supercell_grid_for_dfpt: [2,2,2]
+generate_dfpt: False # if True, run dfpt
+supercell_grid_for_dfpt: [2,2,2] # supercell grid for dfpt
 
 generate_magtest: False # this will pass MAGMOMs from relax to a new static calc
 

@@ -1490,8 +1490,8 @@ def setup_static_magtest(converged_static_dir, rerun=False):
         return None
 
     relax_dir = converged_static_dir.replace("-static", "-relax")
-    av = AnalyzeVASP(relax_dir)
-    if not av.is_converged:
+    av_relax = AnalyzeVASP(relax_dir)
+    if not av_relax.is_converged:
         print("relax calculation not converged; not setting up static mag test")
         return None
 
@@ -1510,7 +1510,7 @@ def setup_static_magtest(converged_static_dir, rerun=False):
         return None
 
     mag_decorated_relax_structure = get_structure_from_prev_run(
-        av.outputs.vasprun, av.outputs.outcar
+        av_relax.outputs.vasprun, av_relax.outputs.outcar
     )
 
     magmom = mag_decorated_relax_structure.site_properties["magmom"]
