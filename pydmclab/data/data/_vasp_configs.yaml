@@ -24,6 +24,8 @@ supercell_grid_for_finite_displacements: [2,2,2]
 generate_dfpt: False
 supercell_grid_for_dfpt: [2,2,2]
 
+generate_magtest: False # this will pass MAGMOMs from relax to a new static calc
+
 # some output files
 fvaspout: vasp.o # where vasp output goes in calc_dir for each vasp run
 fvasperrors: errors.o # where vasp errors go in calc_dir for each vasp run

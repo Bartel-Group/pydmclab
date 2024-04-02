@@ -21,6 +21,7 @@ def get_vasp_configs(
     run_dielectric=False,
     run_phonons=False,
     phonon_mode="dfpt",
+    run_magtest=False,
     detailed_dos=False,
     modify_loose_incar=False,
     modify_relax_incar=False,
@@ -110,6 +111,7 @@ def get_vasp_configs(
         "generate_bandstructure": run_bandstructure,
         "generate_parchg": run_parchg,
         "generate_dielectric": run_dielectric,
+        "generate_magtest": run_magtest,
     }
 
     if isinstance(run_phonons, list):

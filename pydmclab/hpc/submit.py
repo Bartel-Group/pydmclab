@@ -21,6 +21,8 @@ import warnings
 
 from subprocess import call
 
+from pymatgen.io.vasp.sets import get_structure_from_prev_run
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 
@@ -900,6 +902,21 @@ class SubmitTools(object):
                                 f.write("%s\n" % vasp_command)
                                 f.write("phonopy --fc vasprun.xml\n")
 
+                            if vasp_configs["generate_magtest"]:
+                                magtest_dir = setup_static_magtest(
+                                    converged_static_dir=calc_dir
+                                )
+                            else:
+                                magtest_dir = None
+
+                            if magtest_dir:
+                                f.write(
+                                    "echo working on %s-static_magtest >> %s\n"
+                                    % (xc_calc, fstatus)
+                                )
+                                f.write("cd %s\n" % magtest_dir)
+                                f.write("%s\n" % vasp_command)
+
                         f.write("echo %s is done >> %s\n" % (xc_calc, fstatus))
                     else:
                         if status == "continue":
@@ -1463,6 +1480,59 @@ def setup_finite_displacement_calcs(phonon_dir, remake=False, rerun=False):
                 copyfile(f_src, f_dst)
 
     return statuses
+
+
+def setup_static_magtest(converged_static_dir, rerun=False):
+    # make sure relax is converged
+    av = AnalyzeVASP(converged_static_dir)
+    if not av.is_converged:
+        print("static calculation not converged; not setting up static mag test")
+        return None
+
+    relax_dir = converged_static_dir.replace("-static", "-relax")
+    av = AnalyzeVASP(relax_dir)
+    if not av.is_converged:
+        print("relax calculation not converged; not setting up static mag test")
+        return None
+
+    # get the paths to relevant input files from the static calculation
+    files_from_relax = ["POSCAR", "KPOINTS", "POTCAR", "INCAR", "WAVECAR", "CHGCAR"]
+
+    # make a directory for the magtest calculation
+    magtest_dir = converged_static_dir.replace("-static", "-static_magtest")
+    if not os.path.exists(magtest_dir):
+        os.mkdir(magtest_dir)
+
+    # make sure bandstructure calc didn't already run
+    av = AnalyzeVASP(magtest_dir)
+    if av.is_converged and not rerun:
+        print("magtest already converged")
+        return None
+
+    mag_decorated_relax_structure = get_structure_from_prev_run(
+        av.outputs.vasprun, av.outputs.outcar
+    )
+
+    magmom = mag_decorated_relax_structure.site_properties["magmom"]
+    magmom_string = " ".join([str(m) for m in magmom])
+
+    new_incar_params = {"MAGMOM": magmom_string}
+
+    for file_to_copy in files_from_relax:
+        f_src = os.path.join(converged_static_dir, file_to_copy)
+        f_dst = os.path.join(magtest_dir, file_to_copy)
+        copyfile(f_src, f_dst)
+
+    with open(os.path.join(converged_static_dir, "INCAR"), "r") as f_src:
+        with open(os.path.join(magtest_dir, "INCAR"), "w") as f_dst:
+            for key in new_incar_params:
+                f_dst.write("%s = %s\n" % (key, new_incar_params[key]))
+            for line in f_src:
+                if line.split("=")[0].strip() in new_incar_params:
+                    continue
+                f_dst.write(line)
+
+    return magtest_dir
 
 
 def main():
