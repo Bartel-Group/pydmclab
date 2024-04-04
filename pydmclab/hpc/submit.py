@@ -1286,6 +1286,7 @@ def setup_dfpt(converged_static_dir, supercell_grid=[2, 2, 2], rerun=False):
         "ADDGRID": True,
         "NCORE": 8,
         "ALGO": "Normal",
+        "ISYM": 2,
     }
 
     with open(fstatic_incar) as f_src:
