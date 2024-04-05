@@ -1284,18 +1284,20 @@ def setup_dfpt(converged_static_dir, supercell_grid=[2, 2, 2], rerun=False):
         "IALGO": 38,
         "EDIFF": 1e-6,
         "ADDGRID": True,
-        "NCORE": 8,
         "ALGO": "Normal",
         "ISYM": 2,
-        "NPAR": 1,
     }
+
+    incar_params_to_exclude = ["NPAR", "NCORE"]
 
     with open(fstatic_incar) as f_src:
         with open(fdfpt_incar, "w") as f_dst:
             for line in f_src:
                 if line.split("=")[0].strip() in new_incar_params:
                     continue
-                elif "MAGMOM" in line:
+                if line.split("=")[0].strip() in incar_params_to_exclude:
+                    continue
+                if "MAGMOM" in line:
                     magmom = line.split("=")[1].strip()
                     magmoms = magmom.split(" ")
                     new_magmoms = []
