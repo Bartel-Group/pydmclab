@@ -272,7 +272,64 @@ class Gibbs(object):
     ):
         """
         Args:
+            structure (pymatgen.Structure)
+                The structure for which to calculate the Gibbs free energy
 
+            scales (np.array)
+                Isotropic volume scaling for QHA
+                    what fractions of the equilibrium volume do we want to assess
+
+            supercell_grid (tuple)
+                The supercell grid for the phonon calculations
+
+            calculator (ase Calculator)
+                The calculator to use for the phonon calculations
+
+            displacement_delta (float)
+                The displacement delta for the phonon calculations (for finite displacements method)
+
+            kpts_for_dos (tuple)
+                The k-points for the DOS calculations
+
+            npts_for_dos (int)
+                The number of points for the DOS calculations
+
+            dos_delta (float)
+                The delta for the DOS calculations
+
+            temperatures (np.array)
+                The temperatures for the Gibbs free energy calculations
+
+            data_dir (str)
+                The directory where the data is stored
+
+            displacement_dir (str):
+                The directory where the displacements are stored
+                    within data_dir
+
+            fjson_dos (str)
+                The filename for the phonon DOS data
+                    within data_dir
+
+            fjson_helmholtz (str)
+                The filename for the Helmholtz free energy data
+                    within data_dir
+
+            fjson_gibbs (str)
+                The filename for the Gibbs free energy data
+                    within data_dir
+
+            remake_displacements (bool)
+                Whether to remake the displacements
+
+            remake_dos (bool)
+                Whether to remake the DOS
+
+            remake_helmholtz (bool)
+                Whether to remake the Helmholtz free energy
+
+            remake_gibbs (bool)
+                Whether to remake the Gibbs free energy
         """
 
         self.scales = scales
@@ -298,6 +355,11 @@ class Gibbs(object):
 
     @property
     def structures(self):
+        """
+        Returns:
+            list of isotropically strained structures
+
+        """
         scales = self.scales
         structure = self.structure
         return [
@@ -307,11 +369,20 @@ class Gibbs(object):
 
     @property
     def volumes(self):
+        """
+        Returns:
+            list of volumes (A**3) for the structures
+        """
         structures = self.structures
         return [StrucTools(structure).structure.volume for structure in structures]
 
     @property
     def harmonic(self):
+        """
+        Returns:
+            dict
+                {scaling (float) : HarmonicPhonons object for structure at that scaling}
+        """
         structures = self.structures
         scales = self.scales
         return {
@@ -334,11 +405,32 @@ class Gibbs(object):
 
     @property
     def dos(self):
+        """
+        Returns:
+            dict
+                {scaling (float) :
+                    {'E0' : 0 K internal energy (eV/cell),
+                    'dos' :
+                        [{'E' : energy level (eV),
+                        'dos' : phonon DOS at E (float)}]
+                    }
+                }
+        """
         harmonic = self.harmonic
         return {scale: harmonic[scale].phonon_dos for scale in harmonic}
 
     @property
     def helmholtz(self):
+        """
+        Returns:
+            dict
+                {volume (A**3) :
+                    {'data' :
+                        [{'T' : temperature (K),
+                        'F' : Helmholtz free energy (eV/cell)}]
+                    }
+                }
+        """
         scales = self.scales
         volumes = self.volumes
         dos = self.dos
@@ -357,6 +449,13 @@ class Gibbs(object):
 
     @property
     def gibbs(self):
+        """
+        Returns:
+            {'data' :
+                [{'T' : temperature (K),
+                'G' : Gibbs free energy (eV/cell)}]
+            }
+        """
         fjson = self.fjson_gibbs
         if not self.remake_gibbs and os.path.exists(fjson):
             return read_json(fjson)
@@ -369,17 +468,13 @@ class Gibbs(object):
             F = [Fs[vol]["data"][i]["F"] for vol in volumes]
             V = [float(vol) for vol in volumes]
             eos = Murnaghan(V, F)
-
-            print("\n")
-            print(F)
-            print(V)
-            eos.fit()
-            # try:
-            #    eos.fit()
-            # except:
-            #    continue
-            min_F = eos.e0
-            Gs.append({"T": T, "G": min_F})
+            try:
+                eos.fit()
+                min_F = eos.e0
+                Gs.append({"T": T, "G": min_F})
+            except:
+                print("Failed to fit Murnaghan EOS at T = %s K" % T)
+                continue
         out = {"data": Gs}
         write_json(out, fjson)
         return read_json(fjson)
