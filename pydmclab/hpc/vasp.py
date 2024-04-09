@@ -128,6 +128,11 @@ class VASPSetUp(object):
             initial_structure = self.structure.copy()
             perturbed_structure = StrucTools(initial_structure).perturb(perturbation)
             self.structure = perturbed_structure
+            
+    @property
+    def get_relevant_mods(self):
+        
+        
 
     @property
     def get_vasp_input(self):
