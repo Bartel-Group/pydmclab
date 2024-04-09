@@ -13,7 +13,7 @@ set_rc_params()
 
 
 class IsoAlloy(object):
-    """ THIS DOESNT WORK YET """
+    """THIS DOESNT WORK YET"""
 
     def __init__(
         self,
@@ -209,8 +209,8 @@ class IsoAlloy(object):
             return "solid solution nowhere"
         else:
             # trying to deal with a few cases:
-                # G_mix_curve is a single parabola --> don't need common tangent
-                # G_mix_curve is a double parabola --> need common tangent
+            # G_mix_curve is a single parabola --> don't need common tangent
+            # G_mix_curve is a double parabola --> need common tangent
             return
         result = minimize(
             fun=equations_to_solve,
@@ -912,6 +912,7 @@ class HeteroAlloyPlotter(object):
         beta_label=r"$\beta$",
         A_label="A",
         B_label="B",
+        temp_unit="C",
     ):
         """
         Args:
@@ -928,6 +929,7 @@ class HeteroAlloyPlotter(object):
             "B": B_label,
             "spinodal": {"color": "gray"},
         }
+        self.temp_unit = temp_unit
 
     @property
     def ax_mixing_enthalpies(self):
@@ -1075,6 +1077,12 @@ class HeteroAlloyPlotter(object):
             spinodal["beta"][i]["T"] for i in range(len(spinodal["beta"]))
         ]
 
+        if self.temp_unit == "C":
+            T_alpha_binodal = [T - 273.15 for T in T_alpha_binodal]
+            T_beta_binodal = [T - 273.15 for T in T_beta_binodal]
+            T_alpha_spinodal = [T - 273.15 for T in T_alpha_spinodal]
+            T_beta_spinodal = [T - 273.15 for T in T_beta_spinodal]
+
         ax = plt.plot(
             x_alpha_binodal,
             T_alpha_binodal,
@@ -1148,7 +1156,10 @@ class HeteroAlloyPlotter(object):
         ax = plt.legend(frameon=True)
 
         ax = plt.xlabel(r"$%s_{1-x}%s_{x}$" % (A, B))
-        ax = plt.ylabel(r"$T\/(K)$")
+        if self.temp_unit == "C":
+            ax = plt.ylabel("Temperature (°C)")
+        else:
+            ax = plt.ylabel(r"$T\/(K)$")
         return ax
 
 
