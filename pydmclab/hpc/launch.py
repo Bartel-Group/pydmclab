@@ -21,7 +21,7 @@ class LaunchTools(object):
 
     The output is going to be:
         {launch_dir (str) : {'xcs' : [list of final xcs for each chain (str)],
-                             'magmom' : [list of magmoms for the structure in that launch_dir (list)],}}
+                             'magmom' : [list of magmoms for the structure in that launch_dir (list)]}}
     """
 
     def __init__(
@@ -30,11 +30,12 @@ class LaunchTools(object):
         structure,
         top_level,
         unique_ID,
-        magmoms=None,
+        relaxation_xcs=["gga"],
+        static_addons={"gga": ["lobster"]},
+        start_with_loose=False,
+        initial_magmoms=None,
         ID_specific_vasp_configs={},
         user_configs={},
-        refresh_configs=True,
-        launch_configs_yaml=os.path.join(os.getcwd(), "_launch_configs.yaml"),
     ):
         """
         Args:
@@ -113,13 +114,7 @@ class LaunchTools(object):
         if not os.path.exists(calcs_dir):
             os.mkdir(calcs_dir)
 
-        # make our local launch_configs file if it doesn't exist
-        if not os.path.exists(launch_configs_yaml) or refresh_configs:
-            _launch_configs = load_launch_configs()
-            write_yaml(_launch_configs, launch_configs_yaml)
-
-        # initialize our baseline launch_configs
-        _launch_configs = read_yaml(launch_configs_yaml)
+        _launch_configs = load_launch_configs()
 
         # update our baseline launch_configs with user_configs
         configs = {**_launch_configs, **user_configs}
@@ -131,7 +126,7 @@ class LaunchTools(object):
         # check to make sure we have magmoms if we're running AFM calcs
         if configs["n_afm_configs"] > 0:
             if MagTools(structure).could_be_afm:
-                if not magmoms:
+                if not initial_magmoms:
                     raise ValueError(
                         "You are running afm calculations but provided no magmoms, generate these first, then pass to LaunchTools"
                     )
@@ -142,13 +137,16 @@ class LaunchTools(object):
         configs["calcs_dir"] = calcs_dir
 
         # store our magmoms and structure
-        self.magmoms = magmoms
+        self.initial_magmoms = initial_magmoms
         self.structure = structure
 
         # make a copy of our configs to prevent unwanted changes
         self.configs = configs.copy()
 
         self.ID_specific_vasp_configs = ID_specific_vasp_configs.copy()
+
+        self.relaxation_xcs = relaxation_xcs
+        self.static_addons = static_addons
 
     @property
     def valid_mags(self):
@@ -186,7 +184,7 @@ class LaunchTools(object):
         # shift for 0 index
         max_desired_afm_idx = configs["n_afm_configs"] - 1
 
-        magmoms = self.magmoms
+        magmoms = self.initial_magmoms
 
         # figure out what configs we have magmoms for
         configs_in_magmoms = list(magmoms.keys())
@@ -225,7 +223,7 @@ class LaunchTools(object):
                     (if (2) was a unique compositional indicator and (3) was a unique structural indicator)
         """
         structure = self.structure
-        magmoms = self.magmoms
+        magmoms = self.initial_magmoms
         ID_specific_vasp_configs = self.ID_specific_vasp_configs.copy()
 
         # make a copy of our configs to prevent unwanted changes
@@ -277,9 +275,9 @@ class LaunchTools(object):
                 launch_dirs[launch_dir] = {"xcs": xcs, "magmom": magmom}
 
                 if "_".join([level1, level2]) in ID_specific_vasp_configs:
-                    launch_dirs[launch_dir][
-                        "ID_specific_vasp_configs"
-                    ] = ID_specific_vasp_configs["_".join([level1, level2])]
+                    launch_dirs[launch_dir]["ID_specific_vasp_configs"] = (
+                        ID_specific_vasp_configs["_".join([level1, level2])]
+                    )
                 else:
                     launch_dirs[launch_dir]["ID_specific_vasp_configs"] = {}
 

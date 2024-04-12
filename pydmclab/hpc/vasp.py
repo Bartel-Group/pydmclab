@@ -32,6 +32,70 @@ Now that this has been done, new users must just do:
 """
 
 
+class NewVASPSetUp(object):
+
+    @property
+    def magnetic_structure(self):
+        configs = self.configs
+        if configs["inherit_mag"]:
+            if self.prev_calc:
+                structure = AnalyzeVASP(self.prev_calc).magnetic_structure
+            else:
+                raise ValueError(
+                    "you must provide a previous calculation to inherit magnetic structure"
+                )
+            return structure
+
+        structure = self.structure
+        # add MAGMOM to structure
+        if configs["mag"] == "nm":
+            # if non-magnetic, MagTools takes care of this
+            structure = MagTools(structure).get_nonmagnetic_structure
+        elif configs["mag"] == "fm":
+            # if ferromagnetic, MagTools takes care of this
+            structure = MagTools(structure).get_ferromagnetic_structure
+        elif "afm" in configs["mag"]:
+            # if antiferromagnetic, we need to aprovide a MAGMOM
+            magmom = configs["magmom"]
+            if not magmom:
+                raise ValueError("you must specify a magmom for an AFM calculation\n")
+            if (min(magmom) >= 0) and (max(magmom) <= 0):
+                raise ValueError(
+                    "provided magmom that is not AFM, but you are trying to run an AFM calculation\n"
+                )
+
+    @property
+    def kpoints_dict(self):
+        configs = self.configs
+        user_kpoints_settings = configs["modify_this_kpoints"]
+        if user_kpoints_settings:
+            return user_kpoints_settings
+
+        if (configs["standard"] == "mp") and (configs["xc_to_run"] in ["gga", "ggau"]):
+            user_kpoints_settings["reciprocal_density"] = 64
+
+        if not user_kpoints_settings:
+            return None
+        return user_kpoints_settings
+
+    @property
+    def incar_dict(self):
+        configs = self.configs
+        user_incar_settings = configs["modify_this_incar"]
+
+        if not user_incar_settings:
+            return None
+        return user_incar_settings
+
+    @property
+    def potcar_dict(self):
+        configs = self.configs
+        user_potcar_settings = configs["modify_this_potcar"]
+        if not user_potcar_settings:
+            return None
+        return user_potcar_settings
+
+
 class VASPSetUp(object):
     """
     Use to write VASP inputs for a single VASP calculation
@@ -47,49 +111,11 @@ class VASPSetUp(object):
         - instead we'll manage things through pydmc.hpc.submit.SubmitTools and pydmc.hpc.launch.LaunchTools
     """
 
-    def __init__(
-        self,
-        calc_dir,
-        user_configs={},
-        vasp_configs_yaml=os.path.join(
-            os.getcwd(),
-            "_vasp_configs.yaml",
-        ),
-        refresh_configs=True,
-    ):
-        """
-        Args:
-            calc_dir (os.PathLike)
-                directory where I want to execute VASP
-                    there must be a POSCAR in calc_dir
-                        should get placed there with pydmclab.hpc.launch.LaunchTools
-
-                    other input files (INCAR, KPOINTS, POTCAR) will be added using pydmclab.hpc.submit.SubmitTools
-
-            user_configs (dict)
-                user-defined configs related to VASP
-                    options (and defaults) in pydmclab.data.data._vasp_configs_yaml
-
-            vasp_configs_yaml (os.PathLike)
-                where to write yaml file for current vasp configs
-
-            refresh_configs (bool)
-                if True, will copy pydmclab baseline configs to your local directory
-                    this is useful if you've made changes to the configs files in the directory you're working in and want to start over
-
-        Returns:
-            calc_dir (os.PathLike)
-                directory where I want to execute VASP
-
-            structure (pymatgen.Structure)
-                structure to be used for VASP calculation (read from calc_dir/POSCAR)
-
-            configs (dict)
-                see pydmclab.data.data._vasp_configs_yaml for options
-        """
+    def __init__(self, calc_dir, prev_calc=None, user_configs={}):
 
         # this is where we will execute VASP
         self.calc_dir = calc_dir
+        self.prev_calc = prev_calc
 
         # we should have a POSCAR in calc_dir already
         # e.g., LaunchTools will set this up for you
@@ -97,42 +123,37 @@ class VASPSetUp(object):
         if not os.path.exists(fpos):
             raise FileNotFoundError("POSCAR not found in {}".format(calc_dir))
         else:
-            self.structure = Structure.from_file(fpos)
+            structure = Structure.from_file(fpos)
+            perturbation = user_configs["perturb_struc"]
+            if perturbation:
+                initial_structure = structure.copy()
+                structure = StrucTools(initial_structure).perturb(perturbation)
+            self.structure = structure
 
-        # write a local yaml with vasp configs
-        # if you don't have one or
-        # if you want to "refresh" them
-        if not os.path.exists(vasp_configs_yaml) or refresh_configs:
-            _vasp_configs = load_vasp_configs()
-            write_yaml(_vasp_configs, vasp_configs_yaml)
+        self.default_configs = load_vasp_configs()
+        self.user_configs = user_configs
 
-        # read local yaml to get baseline vasp_configs
-        _vasp_configs = read_yaml(vasp_configs_yaml)
-
-        # augment baseline vasp_configs with user_configs
-        # NOTE: user_configs will overwrite any keys shared with vasp_configs
-        configs = {**_vasp_configs, **user_configs}
-
-        # these are essential configs that must be specified
-        essential_configs = ["xc_to_run", "calc_to_run", "standard", "mag"]
-        for essential in essential_configs:
-            if essential not in configs.keys():
-                raise KeyError("{} must be specified in user_configs".format(essential))
-
-        # copy configs to prevent further changes
-        self.configs = configs.copy()
-
-        # perturb structure right away if that was requested
-        perturbation = self.configs["perturb_struc"]
-        if perturbation:
-            initial_structure = self.structure.copy()
-            perturbed_structure = StrucTools(initial_structure).perturb(perturbation)
-            self.structure = perturbed_structure
-            
     @property
-    def get_relevant_mods(self):
-        
-        
+    def configs(self):
+        user_configs = self.user_configs
+        xc_to_run = user_configs["xc_to_run"]
+        calc_to_run = user_configs["calc_to_run"]
+
+        relevant_mod_keys = [
+            "-".join([xc, calc])
+            for xc in [xc_to_run, "all"]
+            for calc in [calc_to_run, "all"]
+        ]
+
+        for input_file in ["incar", "kpoints", "potcar"]:
+            user_configs["modify_this_%s" % input_file] = {
+                key: user_configs["%s_mods" % input_file][key]
+                for key in user_configs["%s_mods" % input_file]
+                if key in relevant_mod_keys
+            }
+
+        configs = {**self.default_configs, **user_configs}
+        return configs.copy()
 
     @property
     def get_vasp_input(self):
@@ -148,40 +169,16 @@ class VASPSetUp(object):
         configs = self.configs.copy()
 
         # initialize how we're going to modify each vasp input file with configs specs
-        modify_incar = configs["%s_incar" % configs["calc_to_run"]].copy()
-        modify_kpoints = configs["%s_kpoints" % configs["calc_to_run"]].copy()
-        modify_potcar = configs["%s_potcar" % configs["calc_to_run"]].copy()
+
+        modify_incar = modifications["incar"]
+        modify_kpoints = modifications["kpoints"]
+        modify_potcar = modifications["potcar"]
 
         # initialize potcar functional
         potcar_functional = configs["potcar_functional"]
 
         # this should be kept off in general, gives unuseful warnings (I think)
         validate_magmom = configs["validate_magmom"]
-
-        # tell user what they are modifying in case they are trying to match MP or other people's calculations
-        if configs["standard"] and modify_incar:
-            warnings.warn(
-                "you are attempting to generate consistent data, but modifying things in the INCAR\n"
-            )
-            # print('e.g., %s' % str(modify_incar))
-
-        if configs["standard"] and modify_kpoints:
-            warnings.warn(
-                "you are attempting to generate consistent data, but modifying things in the KPOINTS\n"
-            )
-            # print('e.g., %s' % str(modify_kpoints))
-
-        if configs["standard"] and modify_potcar:
-            warnings.warn(
-                "you are attempting to generate consistent data, but modifying things in the POTCAR\n"
-            )
-            # print('e.g., %s' % str(modify_potcar))
-
-        # tell user they are doing a nonmagnetic calculation for a compound w/ magnetic elements
-        if MagTools(self.structure).could_be_magnetic and (configs["mag"] == "nm"):
-            warnings.warn(
-                "structure could be magnetic, but you are performing a nonmagnetic calculation\n"
-            )
 
         structure = self.structure
 
@@ -208,9 +205,7 @@ class VASPSetUp(object):
             # use our default functional
             fun = None
             # set KPOINTS to be MP-consistent
-            if not isinstance(modify_kpoints, dict):
-                modify_kpoints = {}
-                modify_kpoints["reciprocal_density"] = 64
+            modify_kpoints = {"reciprocal_density": 64}
 
         # setting DMC standards --> what to do on top of MPRelaxSet or MPScanRelaxSet (pymatgen defaults)
         if configs["standard"] == "dmc":
@@ -231,15 +226,11 @@ class VASPSetUp(object):
                 "ENAUG": 1040,
                 "ISYM": 0,
                 "SIGMA": 0.01,
+                "KSPACING": 0.22,
             }
             for key in dmc_standard_settings:
                 if key not in modify_incar:
                     modify_incar[key] = dmc_standard_settings[key]
-
-            # use length = 25 means reciprocal space discretization of 25 K-points per Å−1
-            if configs["calc_to_run"] != "loose":
-                if not modify_kpoints:
-                    modify_kpoints = {"length": 25}
 
             # turn off +U unless we are specifying GGA+U
             if configs["xc_to_run"] != "ggau":

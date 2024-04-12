@@ -57,3 +57,5 @@ packing:
   - gga-static
   - hse06-relax
   - hse06-static
+
+custom_calc_list:
