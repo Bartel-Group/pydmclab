@@ -210,20 +210,8 @@ class Passer(object):
 
 
 def main():
-    xc_calc, calc_list, calc_dir, vasp_configs, launch_dir = (
-        sys.argv[1],
-        sys.argv[2],
-        sys.argv[3],
-        sys.argv[4],
-        sys.argv[5],
-    )
-    passer = Passer(
-        xc_calc=xc_calc,
-        calc_list=calc_list,
-        calc_dir=calc_dir,
-        vasp_configs=vasp_configs,
-        launch_dir=launch_dir,
-    )
+    passer_dict_as_str = sys.argv[1]
+    passer = Passer(passer_dict_as_str=passer_dict_as_str)
     passer.write_to_job_killer
     passer.complete_pass
 
