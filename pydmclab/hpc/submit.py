@@ -739,11 +739,17 @@ class SubmitTools(object):
                 xc_to_run, calc_to_run = xc_calc.split("-")
                 calc_dir = os.path.join(launch_dir, xc_calc)
 
+                incar_mods = vasp_configs["incar_mods"]
+                if xc_calc in incar_mods:
+                    incar_mods = incar_mods[xc_calc]
+                else:
+                    incar_mods = None
+
                 passer_dict = {
                     "xc_calc": xc_calc,
                     "calc_list": calc_list,
                     "calc_dir": calc_dir,
-                    "vasp_configs": vasp_configs,
+                    "incar_mods": incar_mods,
                     "launch_dir": launch_dir,
                 }
 

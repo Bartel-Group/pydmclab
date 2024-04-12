@@ -18,7 +18,7 @@ class Passer(object):
         self.xc_calc = passer_dict["xc_calc"]
         self.calc_list = passer_dict["calc_list"]
         self.calc_dir = passer_dict["calc_dir"]
-        self.vasp_configs = passer_dict["vasp_configs"]
+        self.incar_mods = passer_dict["incar_mods"]
         self.launch_dir = passer_dict["launch_dir"]
 
     @property
@@ -182,9 +182,8 @@ class Passer(object):
             **bandgap_based_incar_adjustments,
             **magmomg_based_incar_adjustments,
         }
-        vasp_configs = self.vasp_configs
         curr_xc_calc = self.xc_calc
-        user_incar_mods = vasp_configs["incar_mods"][curr_xc_calc]
+        user_incar_mods = self.incar_mods
         incar = Incar.from_file(os.path.join(self.calc_dir, "INCAR"))
         for key, value in incar_adjustments.items():
             if key not in user_incar_mods:
