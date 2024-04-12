@@ -133,7 +133,6 @@ class SubmitTools(object):
         """
 
         self.launch_dir = launch_dir
-        self.fresh_restart = fresh_restart
 
         # just a reminder of how a launch directory looks
         # NOTE: should be made with LaunchTools
