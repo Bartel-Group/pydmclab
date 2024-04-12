@@ -812,7 +812,7 @@ class SubmitTools(object):
 
         # if we made it this far, launch it
         os.chdir(launch_dir)
-        subprocess.call(["sbatch", "sub_.sh"])
+        subprocess.call(["sbatch", "sub.sh"])
         os.chdir(scripts_dir)
 
 

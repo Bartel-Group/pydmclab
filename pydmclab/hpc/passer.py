@@ -24,7 +24,7 @@ class Passer(object):
     @property
     def prev_xc_calc(self):
         curr_xc_calc = self.xc_calc
-        curr_xc, curr_calc = curr_xc_calc.split("_")
+        curr_xc, curr_calc = curr_xc_calc.split("-")
         calc_list = self.calc_list
         if curr_calc == "loose":
             prev_xc_calc = curr_xc_calc.replace(curr_calc, "pre_loose")
@@ -92,7 +92,7 @@ class Passer(object):
         if not prev_ready:
             return None
         curr_xc_calc = self.xc_calc
-        curr_calc = curr_xc_calc.split("_")[1]
+        curr_calc = curr_xc_calc.split("-")[1]
 
         if curr_calc in ["relax", "lobster"]:
             return None
@@ -135,7 +135,7 @@ class Passer(object):
     def bandgap_based_incar_adjustments(self):
         bandgap_label = self.bandgap_label
         if not bandgap_label:
-            return None
+            return {}
 
         incar_dict = Incar.from_file(os.path.join(self.calc_dir, "INCAR")).as_dict()
 
@@ -158,11 +158,13 @@ class Passer(object):
     @property
     def magmom_based_incar_adjustments(self):
         prev_calc_dir = self.prev_calc_dir
+        if not os.path.exists(prev_calc_dir):
+            return {}
         prev_incar = Incar.from_file(os.path.join(prev_calc_dir, "INCAR")).as_dict()
         if "ISPIN" not in prev_incar:
-            return None
+            return {}
         if prev_incar["ISPIN"] == 1:
-            return None
+            return {}
 
         av_prev = AnalyzeVASP(prev_calc_dir)
         prev_structure = get_structure_from_prev_run(
@@ -177,17 +179,21 @@ class Passer(object):
     @property
     def update_incar(self):
         bandgap_based_incar_adjustments = self.bandgap_based_incar_adjustments
-        magmomg_based_incar_adjustments = self.magmom_based_incar_adjustments
-        incar_adjustments = {
-            **bandgap_based_incar_adjustments,
-            **magmomg_based_incar_adjustments,
-        }
+        magmom_based_incar_adjustments = self.magmom_based_incar_adjustments
+
+        incar_adjustments = magmom_based_incar_adjustments.copy()
+        incar_adjustments.update(bandgap_based_incar_adjustments)
+
         curr_xc_calc = self.xc_calc
         user_incar_mods = self.incar_mods
         incar = Incar.from_file(os.path.join(self.calc_dir, "INCAR"))
         for key, value in incar_adjustments.items():
-            if key not in user_incar_mods:
+            if user_incar_mods:
+                if key not in user_incar_mods:
+                    incar[key] = value
+            else:
                 incar[key] = value
+
         incar.write_file(os.path.join(self.calc_dir, "INCAR"))
         return "updated incar"
 
