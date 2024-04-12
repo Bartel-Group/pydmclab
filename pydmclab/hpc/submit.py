@@ -682,9 +682,6 @@ class SubmitTools(object):
         vasp_configs = self.vasp_configs.copy()
         sub_configs = self.sub_configs.copy()
 
-        # determine which files will be passed from parent calcs to children
-        files_to_inherit = sub_configs["files_to_inherit"]
-
         launch_dir = self.launch_dir
 
         vasp_command = self.vasp_command
