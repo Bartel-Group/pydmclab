@@ -338,11 +338,9 @@ def get_sub_configs(
 
 
 def get_launch_configs(
-    standards=["dmc"],
-    xcs=["metagga"],
-    use_mp_thermo_data=False,
     n_afm_configs=0,
-    skip_xcs_for_standards={"mp": ["gga", "metagga"]},
+    override_mag=False,
+    ID_specific_vasp_configs={},
 ):
     """
 
@@ -379,31 +377,11 @@ def get_launch_configs(
             {config param : config value}
     """
 
-    launch_configs = {}
-
-    to_launch = {}
-
-    for standard in standards:
-        to_launch[standard] = []
-        for xc in xcs:
-            if (standard in skip_xcs_for_standards) and (
-                xc in skip_xcs_for_standards[standard]
-            ):
-                continue
-            to_launch[standard].append(xc)
-
-    standards_to_keep = [standard for standard in to_launch if to_launch[standard]]
-    to_launch = {standard: to_launch[standard] for standard in standards_to_keep}
-
-    if use_mp_thermo_data:
-        # make sure we run GGA+U for MP consistency
-        to_launch["mp"] = ["ggau"]
-
-    launch_configs["to_launch"] = to_launch
-
-    launch_configs["n_afm_configs"] = n_afm_configs
-
-    return launch_configs
+    return {
+        "override_mag": override_mag,
+        "n_afm_configs": n_afm_configs,
+        "ID_specific_vasp_configs": ID_specific_vasp_configs,
+    }
 
 
 def get_analysis_configs(
@@ -815,9 +793,7 @@ def get_launch_dirs(
     strucs,
     magmoms,
     user_configs,
-    ID_specific_vasp_configs={},
     make_launch_dirs=True,
-    refresh_configs=True,
     data_dir=os.getcwd().replace("scripts", "data"),
     calcs_dir=os.getcwd().replace("scripts", "calcs"),
     savename="launch_dirs.json",
@@ -882,13 +858,11 @@ def get_launch_dirs(
 
             launch = LaunchTools(
                 calcs_dir=calcs_dir,
-                user_configs=user_configs,
-                magmoms=curr_magmoms,
-                ID_specific_vasp_configs=ID_specific_vasp_configs,
                 structure=structure,
-                top_level=top_level,
-                unique_ID=unique_ID,
-                refresh_configs=refresh_configs,
+                formula_indicator=formula,
+                struc_indicator=ID,
+                initial_magmoms=curr_magmoms,
+                user_configs=user_configs,
             )
 
             launch_dirs = launch.launch_dirs(make_dirs=make_launch_dirs)
@@ -904,7 +878,6 @@ def check_launch_dirs(launch_dirs):
     print("\nanalyzing launch directories")
     for d in launch_dirs:
         print("\nlaunching from %s" % d)
-        print("   these final xcs: %s" % launch_dirs[d]["xcs"])
 
 
 def submit_one_calc(submit_args):

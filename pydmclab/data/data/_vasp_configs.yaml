@@ -1,6 +1,6 @@
 # VASPSetUp (general)
 # these should get passed through LaunchTools
-standard: # make mp if comparing to MP data
+standard: dmc # make mp if comparing to MP data
 mag:  # **change** as desired
 magmom: # you will need to pass this for AFM calcs {'magmom' : [list of magmoms (float)]}
 
@@ -35,26 +35,6 @@ fvasperrors: errors.o # where vasp errors go in calc_dir for each vasp run
 # KPOINTs should be Kpoints object
 # POTCARs should be {el (str) : potcar flag (str)}
 
-# loose calculations
-loose_incar: {} # e.g., {'ENCUT' : 555}
-loose_kpoints: {} # e.g., {'length' : 25}
-loose_potcar: {} # e.g., {'W' : 'W_pv'}
-
-# relax calculations
-relax_incar: {}
-relax_kpoints: {}
-relax_potcar: {}
-
-# static calculations
-static_incar: {}
-static_kpoints: {}
-static_potcar: {}
-
-# lobster calculations
-lobster_incar: {}
-lobster_kpoints: {}
-lobster_potcar: {}
-
 # revised modifications
 incar_mods: {} # {'gga-relax' : {'ISIF' : 2}}
 kpoint_mods: {} # {'gga-relax' : {'grid' : [2,2,2]}}; {'xc-calc' : {'length' : 25}}
@@ -67,5 +47,3 @@ validate_magmom: False # probably don't change
 
 # how fine of a LOBSTER DOS do you want (more = more detailed)
 COHPSteps: 400
-
-inherit_mag: False

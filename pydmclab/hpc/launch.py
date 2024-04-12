@@ -28,13 +28,9 @@ class LaunchTools(object):
         self,
         calcs_dir,
         structure,
-        top_level,
-        unique_ID,
-        relaxation_xcs=["gga"],
-        static_addons={"gga": ["lobster"]},
-        start_with_loose=False,
+        formula_indicator,
+        struc_indicator,
         initial_magmoms=None,
-        ID_specific_vasp_configs={},
         user_configs={},
     ):
         """
@@ -132,8 +128,8 @@ class LaunchTools(object):
                     )
 
         # add the required arguments to our configs file
-        configs["top_level"] = top_level
-        configs["unique_ID"] = unique_ID
+        configs["formula_indicator"] = formula_indicator
+        configs["struc_indicator"] = struc_indicator
         configs["calcs_dir"] = calcs_dir
 
         # store our magmoms and structure
@@ -143,10 +139,7 @@ class LaunchTools(object):
         # make a copy of our configs to prevent unwanted changes
         self.configs = configs.copy()
 
-        self.ID_specific_vasp_configs = ID_specific_vasp_configs.copy()
-
-        self.relaxation_xcs = relaxation_xcs
-        self.static_addons = static_addons
+        self.ID_specific_vasp_configs = configs["ID_specific_vasp_configs"]
 
     @property
     def valid_mags(self):
@@ -232,82 +225,48 @@ class LaunchTools(object):
         # the list of mags we can run
         mags = self.valid_mags
 
-        # final_xcs we want to run for each standard
-        to_launch = configs["to_launch"]
-
-        # level0 houses all our launch_dirs
-        level0 = configs["calcs_dir"]
-
-        # level1 describes the composition
-        level1 = configs["top_level"]
-
-        # level2 describes the structure
-        level2 = configs["unique_ID"]
-
         launch_dirs = {}
-        for standard in to_launch:
-            # for each standard we asked for, use that as level3
-            level3 = standard
+        for mag in mags:
+            # start w/ magmom = None, then check for updating if we have AFM configs
+            magmom = None
+            if "afm" in mag:
+                # grab the magmom if our calc is AFM
+                idx = mag.split("_")[1]
+                if str(idx) in magmoms:
+                    magmom = magmoms[str(idx)]
+                elif int(idx) in magmoms:
+                    magmom = magmoms[int(idx)]
+            launch_dir = os.path.join(
+                configs["calcs_dir"],
+                configs["formula_indicator"],
+                configs["struc_indicator"],
+                mag,
+            )
+            launch_dirs[launch_dir] = {"magmom": magmom}
 
-            # we asked for certain xcs at each standard, hold them here
-            xcs = to_launch[standard]
+            formula_struc = "_".join(
+                [configs["formula_indicator"], configs["struc_indicator"]]
+            )
 
-            for mag in mags:
-                # for each mag we can run, use that as level4
-                level4 = mag
+            if formula_struc in ID_specific_vasp_configs:
+                launch_dirs[launch_dir]["ID_specific_vasp_configs"] = (
+                    ID_specific_vasp_configs[formula_struc]
+                )
 
-                # start w/ magmom = None, then check for updating if we have AFM configs
-                magmom = None
-                if "afm" in mag:
-                    # grab the magmom if our calc is AFM
-                    idx = mag.split("_")[1]
-                    if str(idx) in magmoms:
-                        magmom = magmoms[str(idx)]
-                    elif int(idx) in magmoms:
-                        magmom = magmoms[int(idx)]
+            else:
+                launch_dirs[launch_dir]["ID_specific_vasp_configs"] = {}
 
-                # our launch_dir is now defined
-                launch_dir = os.path.join(level0, level1, level2, level3, level4)
+            # if make_dirs, make the launch_dir and put a POSCAR in there
+            if make_dirs:
+                # make the launch_dir if it doesn't exist
+                if not os.path.exists(launch_dir):
+                    os.makedirs(launch_dir)
 
-                # save the final_xcs we want to submit in this launch_dir
-                # SubmitTools will make 1 submission script for each final_xc
-                # save the magmom as well. VASPSetUp will need that to set the INCARs for all calcs in this launch_dir
-                launch_dirs[launch_dir] = {"xcs": xcs, "magmom": magmom}
-
-                if "_".join([level1, level2]) in ID_specific_vasp_configs:
-                    launch_dirs[launch_dir]["ID_specific_vasp_configs"] = (
-                        ID_specific_vasp_configs["_".join([level1, level2])]
-                    )
-                else:
-                    launch_dirs[launch_dir]["ID_specific_vasp_configs"] = {}
-
-                # if make_dirs, make the launch_dir and put a POSCAR in there
-                if make_dirs:
-                    # make the launch_dir if it doesn't exist
-                    if not os.path.exists(launch_dir):
-                        os.makedirs(launch_dir)
-
-                    # make the POSCAR if it doesn't exist
-                    fposcar = os.path.join(launch_dir, "POSCAR")
-                    if not os.path.exists(fposcar):
-                        struc = Structure.from_dict(structure)
-
-                        # perturb if requested
-                        if configs["perturb_launch_poscar"]:
-                            initial_structure = struc.copy()
-                            if isinstance(configs["perturb_launch_poscar"], bool):
-                                perturbation = 0.05
-                            else:
-                                perturbation = configs["perturb_launch_poscar"]
-                            perturbed_structure = StrucTools(initial_structure).perturb(
-                                perturbation
-                            )
-
-                            # write it
-                            perturbed_structure.to(fmt="poscar", filename=fposcar)
-                        else:
-                            # write it (w/o perturbing)
-                            struc.to(fmt="poscar", filename=fposcar)
+                # make the POSCAR if it doesn't exist
+                fposcar = os.path.join(launch_dir, "POSCAR")
+                if not os.path.exists(fposcar):
+                    struc = Structure.from_dict(structure)
+                    struc.to(fmt="poscar", filename=fposcar)
 
         # return the dictionary (to be passed to SubmitTools)
         return launch_dirs

@@ -6,56 +6,8 @@ machine: msi # which supercomputer
 
 fqueue: q.o # this will be created in the folder where you execute python
 
-fresh_restart: False # True if you want to re-run all calculations; False if you want to pick up where you left off
-force_postprocess: False # if True, run LOBSTER and Bader again if vasp_configs.lobster_static = True even if output files exist
-
-files_to_inherit: ['WAVECAR', 'CONTCAR'] # usually no need to change
-
 execute_flags: ['srun', 'python', 'lobster', 'bader', 'mpirun'] # what to look for in a submission script to see if it should be launched
 
 perturb_first_struc: 0.1 # if float, perturb internal coordinates of all ions for POSCAR of first structure by perturb_first_struc
-
-skip_loose: False
-
-# this defines what jobs should be chained together and in what order they should be executed
-# if you only wanted to run a static calculation for metagga, you might pass packing['metagga'] = ['metagga-static']
-packing: 
- gga: 
-  - gga-loose
-  - gga-relax
-  - gga-static
- ggau:
-  - ggau-loose
-  - ggau-relax
-  - ggau-static
- metagga:
-  - gga-loose
-  - gga-relax
-  - gga-static
-  - metagga-relax
-  - metagga-static
- gga_hse06:
-  - gga-loose
-  - gga-relax
-  - gga-static
-  - hse06-static
- ggau_hse06:
-  - ggau-loose
-  - ggau-relax
-  - ggau-static
-  - hse06-static
- metagga_hse06:
-  - gga-loose
-  - gga-relax
-  - gga-static
-  - metagga-relax
-  - metagga-static
-  - hse06-static
- hse06:
-  - gga-loose
-  - gga-relax
-  - gga-static
-  - hse06-relax
-  - hse06-static
 
 custom_calc_list:

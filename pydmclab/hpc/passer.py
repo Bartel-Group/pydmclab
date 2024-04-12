@@ -26,7 +26,10 @@ class Passer(object):
             prev_xc_calc = curr_xc_calc.replace(curr_calc, "pre_loose")
             return prev_xc_calc
         if curr_calc == "relax":
-            prev_xc_calc = curr_xc_calc.replace(curr_calc, "loose")
+            if curr_xc in ["gga", "ggau"]:
+                prev_xc_calc = curr_xc_calc.replace(curr_calc, "loose")
+            else:
+                prev_xc_calc = curr_xc_calc.replace(curr_xc, "gga")
             return prev_xc_calc
         if curr_calc == "static":
             prev_xc_calc = curr_xc_calc.replace(curr_calc, "relax")
@@ -204,7 +207,7 @@ class Passer(object):
 
 
 def main():
-    xc_calc, calc_list, calc_to_run, vasp_configs, launch_dir = (
+    xc_calc, calc_list, calc_dir, vasp_configs, launch_dir = (
         sys.argv[1],
         sys.argv[2],
         sys.argv[3],
@@ -214,7 +217,7 @@ def main():
     passer = Passer(
         xc_calc=xc_calc,
         calc_list=calc_list,
-        calc_to_run=calc_to_run,
+        calc_dir=calc_dir,
         vasp_configs=vasp_configs,
         launch_dir=launch_dir,
     )

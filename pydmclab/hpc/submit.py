@@ -137,10 +137,11 @@ class SubmitTools(object):
         """
 
         self.launch_dir = launch_dir
+        self.fresh_restart = fresh_restart
 
         # just a reminder of how a launch directory looks
         # NOTE: should be made with LaunchTools
-        top_level, unique_ID, standard, mag = launch_dir.split("/")[-4:]
+        formula_indicator, struc_indicator, mag = launch_dir.split("/")[-3:]
 
         vasp_configs = load_vasp_configs()
         slurm_configs = load_slurm_configs()
@@ -209,6 +210,7 @@ class SubmitTools(object):
         self.static_addons = static_addons
         self.start_with_loose = start_with_loose
         self.scripts_dir = os.getcwd()
+        self.job_dir = self.scripts_dir.split("/")[-2]
 
     @property
     def calc_list(self):
@@ -400,7 +402,7 @@ class SubmitTools(object):
         """
         Returns job name based on launch_dir
         """
-        return ".".join(self.launch_dir.split("/")[-4:])
+        return self.job_dir + "." + ".".join(self.launch_dir.split("/")[-3:])
 
     @property
     def is_job_in_queue(self):
