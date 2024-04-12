@@ -40,10 +40,6 @@ class SubmitTools(object):
         self,
         launch_dir,
         initial_magmom,
-        relaxation_xcs=["gga"],
-        static_addons={"gga": ["lobster"]},
-        start_with_loose=False,
-        fresh_restart=None,
         user_configs={},
     ):
         """
@@ -178,7 +174,6 @@ class SubmitTools(object):
                     user_configs_used.append(option)
 
         # determine standard and mag from launch_dir
-        vasp_configs["standard"] = standard
         vasp_configs["mag"] = mag
 
         # include magmom in vasp_configs
@@ -206,9 +201,10 @@ class SubmitTools(object):
 
         # these are the xcs we want energies for --> each one of these should have a submission script
         # i.e., they are the end of individual chains
-        self.relaxation_xcs = relaxation_xcs
-        self.static_addons = static_addons
-        self.start_with_loose = start_with_loose
+        self.relaxation_xcs = self.sub_configs["relaxation_xcs"]
+        self.static_addons = self.sub_configs["static_addons"]
+        self.start_with_loose = self.sub_configs["start_with_loose"]
+        self.fresh_restart = self.sub_configs["fresh_restart"]
         self.scripts_dir = os.getcwd()
         self.job_dir = self.scripts_dir.split("/")[-2]
 
@@ -525,7 +521,7 @@ class SubmitTools(object):
             if not os.path.exists(calc_dir):
                 os.mkdir(calc_dir)
 
-            if xc_calc in restart_this_one:
+            if restart_this_one:
                 statuses[xc_calc] = "new"
                 continue
 
@@ -592,11 +588,20 @@ class SubmitTools(object):
             status = statuses[xc_calc]
             if status in ["done", "queued"]:
                 continue
+            if xc_calc == calc_list[0]:
+                first_calc = True
+            else:
+                first_calc = False
             xc_to_run, calc_to_run = xc_calc.split("-")
 
             user_vasp_configs_before_error_handling = vasp_configs.copy()
             user_vasp_configs_before_error_handling["xc_to_run"] = xc_to_run
             user_vasp_configs_before_error_handling["calc_to_run"] = calc_to_run
+
+            if first_calc and (status == "new"):
+                user_vasp_configs_before_error_handling["perturb_struc"] = (
+                    self.sub_configs["perturb_first_struc"]
+                )
 
             calc_dir = os.path.join(launch_dir, xc_calc)
 

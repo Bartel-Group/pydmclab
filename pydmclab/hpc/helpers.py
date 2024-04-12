@@ -261,12 +261,14 @@ def get_slurm_configs(
 def get_sub_configs(
     machine="msi",
     submit_calculations_in_parallel=False,
-    delete_all_calculations_and_start_over=False,
-    rerun_lobster=False,
     mpi_command="mpirun",
-    special_packing=False,
     vasp_version=6,
-    skip_loose=False,
+    restart_these_calcs=[],
+    custom_calc_list=None,
+    start_with_loose=False,
+    perturb_first_struc=False,
+    relaxation_xcs=["gga"],
+    static_addons={"gga": ["lobster"]},
 ):
     """
 
@@ -313,26 +315,18 @@ def get_sub_configs(
             n_procs = int(submit_calculations_in_parallel)
 
     sub_configs["n_procs"] = n_procs
-
-    if delete_all_calculations_and_start_over:
-        sub_configs["fresh_restart"] = True
-
-    if rerun_lobster:
-        sub_configs["force_postprocess"] = True
-
     sub_configs["mpi_command"] = mpi_command
 
-    if special_packing:
-        sub_configs["packing"] = {}
-        for xc in special_packing:
-            sub_configs["packing"][xc] = special_packing[xc]
+    if custom_calc_list:
+        sub_configs["custom_calc_list"] = custom_calc_list
 
+    sub_configs["fresh_restart"] = restart_these_calcs
+    sub_configs["start_with_loose"] = start_with_loose
+    sub_configs["perturb_first_struc"] = perturb_first_struc
+    sub_configs["relaxation_xcs"] = relaxation_xcs
+    sub_configs["static_addons"] = static_addons
     sub_configs["machine"] = machine
-
     sub_configs["vasp_version"] = vasp_version
-
-    if skip_loose:
-        sub_configs["skip_loose"] = True
 
     return sub_configs
 
@@ -910,32 +904,20 @@ def submit_one_calc(submit_args):
     launch_dir = submit_args["launch_dir"]
     launch_dirs = submit_args["launch_dirs"]
     user_configs = submit_args["user_configs"]
-    refresh_configs = submit_args["refresh_configs"]
     ready_to_launch = submit_args["ready_to_launch"]
     running_in_parallel = submit_args["parallel"]
 
     curr_user_configs = user_configs.copy()
 
-    if "ID_specific_vasp_configs" in launch_dirs[launch_dir]:
-        if launch_dirs[launch_dir]["ID_specific_vasp_configs"]:
-            curr_user_configs.update(
-                launch_dirs[launch_dir]["ID_specific_vasp_configs"]
-            )
-
-    # what are our terminal xcs for that launch_dir
-    final_xcs = launch_dirs[launch_dir]["xcs"]
-
     # what magmoms apply to that launch_dir
-    magmom = launch_dirs[launch_dir]["magmom"]
+    initial_magmom = launch_dirs[launch_dir]["magmom"]
 
     if running_in_parallel:
         try:
             sub = SubmitTools(
                 launch_dir=launch_dir,
-                final_xcs=final_xcs,
-                magmom=magmom,
+                initial_magmom=initial_magmom,
                 user_configs=curr_user_configs,
-                refresh_configs=refresh_configs,
             )
 
             # prepare VASP directories and write submission script
@@ -952,10 +934,8 @@ def submit_one_calc(submit_args):
     else:
         sub = SubmitTools(
             launch_dir=launch_dir,
-            final_xcs=final_xcs,
-            magmom=magmom,
+            initial_magmom=initial_magmom,
             user_configs=curr_user_configs,
-            refresh_configs=refresh_configs,
         )
 
         # prepare VASP directories and write submission script
@@ -973,7 +953,6 @@ def submit_one_calc(submit_args):
 def submit_calcs(
     launch_dirs,
     user_configs={},
-    refresh_configs=["vasp", "sub", "slurm"],
     ready_to_launch=True,
     n_procs=1,
 ):
@@ -1001,7 +980,6 @@ def submit_calcs(
     submit_args = {
         "launch_dirs": launch_dirs,
         "user_configs": user_configs,
-        "refresh_configs": refresh_configs,
         "ready_to_launch": ready_to_launch,
         "parallel": False if n_procs == 1 else True,
     }
@@ -1018,7 +996,6 @@ def submit_calcs(
 
     print("\n\n submitting calculations in parallel\n\n")
     print("not refreshing configs for parallel --> causes trouble")
-    submit_args["refresh_configs"] = refresh_configs
     list_of_submit_args = []
     for launch_dir in launch_dirs:
         curr_submit_args = submit_args.copy()

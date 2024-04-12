@@ -8,6 +8,12 @@ fqueue: q.o # this will be created in the folder where you execute python
 
 execute_flags: ['srun', 'python', 'lobster', 'bader', 'mpirun'] # what to look for in a submission script to see if it should be launched
 
-perturb_first_struc: 0.1 # if float, perturb internal coordinates of all ions for POSCAR of first structure by perturb_first_struc
+perturb_first_struc: None # if float, perturb internal coordinates of all ions for POSCAR of first structure by perturb_first_struc
+custom_calc_list: None
+start_with_loose: False
+fresh_restart: None
 
-custom_calc_list:
+relaxation_xcs: ['gga']
+static_addons: 
+  gga
+    - lobster
