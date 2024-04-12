@@ -137,23 +137,23 @@ class Passer(object):
         if not bandgap_label:
             return {}
 
-        incar_dict = Incar.from_file(os.path.join(self.calc_dir, "INCAR")).as_dict()
+        adjustments = {}
 
         if bandgap_label == "metal":
-            incar_dict["ISMEAR"] = 0
-            incar_dict["SIGMA"] = 0.2
+            adjustments["ISMEAR"] = 0
+            adjustments["SIGMA"] = 0.2
             rmin = max(1.5, 25.22 - 2.87 * self.prev_gap)  # Eq. 25
             kspacing = 2 * np.pi * 1.0265 / (rmin - 1.0183)  # Eq. 29
             return min(kspacing, 0.44)
         elif bandgap_label == "semiconductor":
-            incar_dict["ISMEAR"] = 0
-            incar_dict["SIGMA"] = 0.05
-            incar_dict["KSPACING"] = 0.22
+            adjustments["ISMEAR"] = 0
+            adjustments["SIGMA"] = 0.05
+            adjustments["KSPACING"] = 0.22
         elif bandgap_label == "insulator":
-            incar_dict["ISMEAR"] = -5
-            incar_dict["KSPACING"] = 0.22
+            adjustments["ISMEAR"] = -5
+            adjustments["KSPACING"] = 0.22
 
-        return incar_dict
+        return adjustments
 
     @property
     def magmom_based_incar_adjustments(self):
@@ -189,7 +189,7 @@ class Passer(object):
         incar = Incar.from_file(os.path.join(self.calc_dir, "INCAR"))
         for key, value in incar_adjustments.items():
             if user_incar_mods:
-                if key not in user_incar_mods:
+                if (key not in user_incar_mods) or (key == "MAGMOM"):
                     incar[key] = value
             else:
                 incar[key] = value

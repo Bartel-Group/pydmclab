@@ -400,7 +400,7 @@ class SubmitTools(object):
         """
         Returns job name based on launch_dir
         """
-        return self.job_dir + "." + ".".join(self.launch_dir.split("/")[-3:])
+        return ".".join(self.launch_dir.split("/")[-3:])+'.'+self.job_dir
 
     @property
     def is_job_in_queue(self):
