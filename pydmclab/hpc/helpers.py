@@ -920,6 +920,7 @@ def submit_one_calc(submit_args):
                 user_configs=curr_user_configs,
             )
 
+            print(sub.calc_list)
             # prepare VASP directories and write submission script
             sub.write_sub
 
