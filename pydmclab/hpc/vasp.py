@@ -32,70 +32,6 @@ Now that this has been done, new users must just do:
 """
 
 
-class NewVASPSetUp(object):
-
-    @property
-    def magnetic_structure(self):
-        configs = self.configs
-        if configs["inherit_mag"]:
-            if self.prev_calc:
-                structure = AnalyzeVASP(self.prev_calc).magnetic_structure
-            else:
-                raise ValueError(
-                    "you must provide a previous calculation to inherit magnetic structure"
-                )
-            return structure
-
-        structure = self.structure
-        # add MAGMOM to structure
-        if configs["mag"] == "nm":
-            # if non-magnetic, MagTools takes care of this
-            structure = MagTools(structure).get_nonmagnetic_structure
-        elif configs["mag"] == "fm":
-            # if ferromagnetic, MagTools takes care of this
-            structure = MagTools(structure).get_ferromagnetic_structure
-        elif "afm" in configs["mag"]:
-            # if antiferromagnetic, we need to aprovide a MAGMOM
-            magmom = configs["magmom"]
-            if not magmom:
-                raise ValueError("you must specify a magmom for an AFM calculation\n")
-            if (min(magmom) >= 0) and (max(magmom) <= 0):
-                raise ValueError(
-                    "provided magmom that is not AFM, but you are trying to run an AFM calculation\n"
-                )
-
-    @property
-    def kpoints_dict(self):
-        configs = self.configs
-        user_kpoints_settings = configs["modify_this_kpoints"]
-        if user_kpoints_settings:
-            return user_kpoints_settings
-
-        if (configs["standard"] == "mp") and (configs["xc_to_run"] in ["gga", "ggau"]):
-            user_kpoints_settings["reciprocal_density"] = 64
-
-        if not user_kpoints_settings:
-            return None
-        return user_kpoints_settings
-
-    @property
-    def incar_dict(self):
-        configs = self.configs
-        user_incar_settings = configs["modify_this_incar"]
-
-        if not user_incar_settings:
-            return None
-        return user_incar_settings
-
-    @property
-    def potcar_dict(self):
-        configs = self.configs
-        user_potcar_settings = configs["modify_this_potcar"]
-        if not user_potcar_settings:
-            return None
-        return user_potcar_settings
-
-
 class VASPSetUp(object):
     """
     Use to write VASP inputs for a single VASP calculation
@@ -170,9 +106,9 @@ class VASPSetUp(object):
 
         # initialize how we're going to modify each vasp input file with configs specs
 
-        modify_incar = modifications["incar"]
-        modify_kpoints = modifications["kpoints"]
-        modify_potcar = modifications["potcar"]
+        modify_incar = configs["modify_this_incar"]
+        modify_kpoints = configs["modify_this_kpoints"]
+        modify_potcar = configs["modify_this_potcar"]
 
         # initialize potcar functional
         potcar_functional = configs["potcar_functional"]
