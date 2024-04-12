@@ -37,7 +37,7 @@ fvasperrors: errors.o # where vasp errors go in calc_dir for each vasp run
 
 # revised modifications
 incar_mods: {} # {'gga-relax' : {'ISIF' : 2}}
-kpoint_mods: {} # {'gga-relax' : {'grid' : [2,2,2]}}; {'xc-calc' : {'length' : 25}}
+kpoints_mods: {} # {'gga-relax' : {'grid' : [2,2,2]}}; {'xc-calc' : {'length' : 25}}
 potcar_mods: {} # {'gga-relax' : {'W' : 'W_sv'}}
 
 # rarely need to change these:
