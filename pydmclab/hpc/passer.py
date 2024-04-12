@@ -7,15 +7,19 @@ from pydmclab.core.struc import StrucTools
 from pymatgen.io.vasp.inputs import Incar
 from pymatgen.io.vasp.sets import get_structure_from_prev_run
 
+import json
+
 
 class Passer(object):
 
-    def __init__(self, xc_calc, calc_list, calc_dir, vasp_configs, launch_dir):
-        self.xc_calc = xc_calc
-        self.calc_list = calc_list
-        self.calc_dir = calc_dir
-        self.vasp_configs = vasp_configs
-        self.launch_dir = launch_dir
+    def __init__(self, passer_dict_as_str):
+        passer_dict = json.loads(passer_dict_as_str)
+
+        self.xc_calc = passer_dict["xc_calc"]
+        self.calc_list = passer_dict["calc_list"]
+        self.calc_dir = passer_dict["calc_dir"]
+        self.vasp_configs = passer_dict["vasp_configs"]
+        self.launch_dir = passer_dict["launch_dir"]
 
     @property
     def prev_xc_calc(self):

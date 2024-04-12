@@ -18,6 +18,7 @@ import os
 from shutil import copyfile, rmtree
 import subprocess
 import warnings
+import json
 
 from subprocess import call
 
@@ -214,7 +215,9 @@ class SubmitTools(object):
             [xc-calc in the order they should be executed]
         """
         sub_configs = self.sub_configs
-        if ("custom_calc_list" in sub_configs) and (sub_configs["custom_calc_list"] is not None):
+        if ("custom_calc_list" in sub_configs) and (
+            sub_configs["custom_calc_list"] is not None
+        ):
             return sub_configs["custom_calc_list"]
 
         relaxation_xcs = self.relaxation_xcs
@@ -728,7 +731,7 @@ class SubmitTools(object):
 
             for xc_calc in calc_list:
                 status = statuses[xc_calc]
-                f.write('echo "%s is %s" >> %s\n' % (xc_calc, status, fstatus))
+                f.write('\necho "%s is %s" >> %s\n' % (xc_calc, status, fstatus))
 
                 if status in ["done", "queued"]:
                     continue
@@ -736,11 +739,18 @@ class SubmitTools(object):
                 xc_to_run, calc_to_run = xc_calc.split("-")
                 calc_dir = os.path.join(launch_dir, xc_calc)
 
-                f.write("cd %s" % self.scripts_dir)
-                f.write(
-                    "python passer.py %s %s %s %s %s \n"
-                    % (xc_calc, calc_list, calc_dir, vasp_configs, launch_dir)
-                )
+                passer_dict = {
+                    "xc_calc": xc_calc,
+                    "calc_list": calc_list,
+                    "calc_dir": calc_dir,
+                    "vasp_configs": vasp_configs,
+                    "launch_dir": launch_dir,
+                }
+
+                passer_dict_as_str = json.dumps(passer_dict)
+
+                f.write("cd %s\n" % self.scripts_dir)
+                f.write("python passer.py '%s' \n" % passer_dict_as_str)
 
                 # before passing data, make sure parent has finished without crashing (using bash..)
                 f.write(
