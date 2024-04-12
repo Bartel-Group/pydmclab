@@ -214,7 +214,7 @@ class SubmitTools(object):
             [xc-calc in the order they should be executed]
         """
         sub_configs = self.sub_configs
-        if ("custom_calc_list" in sub_configs) and (sub_configs["custom_calc_list"]):
+        if ("custom_calc_list" in sub_configs) and (sub_configs["custom_calc_list"] is not None):
             return sub_configs["custom_calc_list"]
 
         relaxation_xcs = self.relaxation_xcs
