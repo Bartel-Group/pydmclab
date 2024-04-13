@@ -8,9 +8,7 @@ class GetSet(object):
     def __init__(
         self,
         structure,
-        xc_calc,
-        standard,
-        mag,
+        configs,
         potcar_functional=None,
         validate_magmom=False,
         U_values=None,
@@ -18,13 +16,17 @@ class GetSet(object):
         modify_kpoints={},
         modify_potcar={},
     ):
-
+        standard = configs["standard"]
+        mag = configs["mag"]
+        xc_calc = configs["xc_calc"]
         xc, calc = xc_calc.split("-")
         self.xc, self.calc = xc, calc
 
         self.structure = StrucTools(structure).structure
         self.standard = standard
         self.mag = mag
+
+        self.configs = configs
 
         self.modify_incar = modify_incar.copy()
         self.modify_kpoints = modify_kpoints.copy()
@@ -132,14 +134,14 @@ class GetSet(object):
 
         if xc in ["metagga", "metaggau"]:
             new_settings["GGA"] = None
-            functional = user_passed_settings["functional"]
+            functional = self.configs["functional"]
             if not functional:
                 new_settings["METAGGA"] = "R2SCAN"
             else:
                 new_settings["METAGGA"] = functional
 
         if xc in ["gga", "ggau"]:
-            functional = user_passed_settings["functional"]
+            functional = self.configs["functional"]
             if not functional:
                 new_settings["GGA"] = "PE"
             else:

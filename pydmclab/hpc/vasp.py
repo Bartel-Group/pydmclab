@@ -141,9 +141,7 @@ class VASPSetUp(object):
 
         vaspset = GetSet(
             structure=structure,
-            xc_calc=xc_calc,
-            standard=configs["standard"],
-            mag=configs["mag"],
+            configs=configs,
             potcar_functional=potcar_functional,
             validate_magmom=validate_magmom,
             modify_incar=modify_incar,

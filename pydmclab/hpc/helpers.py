@@ -14,11 +14,12 @@ from pydmclab.data.configs import load_partition_configs
 # from pymatgen.entries.computed_entries import ComputedStructureEntry
 
 
-def get_vasp_configs(dont_relax_cell=False):
+def get_vasp_configs(standard="dmc", dont_relax_cell=False):
+    configs = {}
     if dont_relax_cell:
-        return {"incar_mods": {"all-all": {"ISIF": 2}}}
-    else:
-        return {}
+        configs.update({"incar_mods": {"all-all": {"ISIF": 2}}})
+    configs["standard"] = standard
+    return configs
 
 
 def get_slurm_configs(
