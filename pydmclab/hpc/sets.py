@@ -165,7 +165,11 @@ class GetSet(object):
 
         if (xc in ["ggau", "metaggau"]) and (standard != "mp"):
             # note: need to pass U values as eg {'LDAUU' : {'Fe' : 5}}
-            pass
+            new_settings["LDAU"] = True
+            new_settings["LDAUTYPE"] = 2
+            new_settings["LDAUPRINT"] = 1
+            new_settings["LDAUL"] = [2] * len(self.structure.species)
+            new_settings["LDAUJ"] = [0] * len(self.structure.species)
 
         if calc == "loose":
             new_settings["ENCUT"] = 400
