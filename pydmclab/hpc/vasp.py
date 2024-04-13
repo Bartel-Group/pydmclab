@@ -442,10 +442,12 @@ class VASPSetUp(object):
             incar_changes["ISMEAR"] = 0
             incar_changes["ISYM"] = -1
         if "nelm_too_low" in unconverged_log:
-            incar_changes["NELM"] = 399
+            prev_nelm = curr_incar["NELM"]
+            incar_changes["NELM"] = prev_nelm + 100
             incar_changes["ALGO"] = "All"
         if "nsw_too_low" in unconverged_log:
-            incar_changes["NSW"] = 399
+            prev_nsw = curr_incar["NSW"]
+            incar_changes["NSW"] = prev_nsw + 100
         if "real_optlay" in errors:
             incar_changes["LREAL"] = False
         if "bad_sym" in errors:
