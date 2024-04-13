@@ -227,8 +227,13 @@ class Passer(object):
 def main():
     passer_dict_as_str = sys.argv[1]
     passer = Passer(passer_dict_as_str=passer_dict_as_str)
-    passer.write_to_job_killer
-    passer.complete_pass
+    try:
+        passer.write_to_job_killer
+        passer.complete_pass
+    except:
+        fready_to_pass = os.path.join(passer.launch_dir, "job_killer.o")
+        with open(fready_to_pass, "w", encoding="utf-8") as f:
+            f.write("kill this job")
 
 
 if __name__ == "__main__":
