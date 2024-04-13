@@ -104,6 +104,9 @@ class GetSet(object):
             new_settings["NSW"] = 0
             new_settings["LCHARG"] = False
 
+        if calc in ["relax", "static"]:
+            new_settings["LWAVE"] = True
+
         if calc == "parchg":
             new_settings["ISTART"] = 1
             new_settings["LPARD"] = True
