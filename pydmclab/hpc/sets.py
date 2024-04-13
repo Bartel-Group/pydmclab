@@ -240,6 +240,8 @@ class GetSet(object):
             validate_magmom = False
         if not potcar_functional:
             potcar_functional = "PBE" if self.standard == "mp" else "PBE_54"
+
+        print(self.user_incar_settings)
         return self.base_set(
             structure=self.structure,
             user_incar_settings=self.user_incar_settings,
