@@ -448,11 +448,17 @@ class VASPSetUp(object):
             incar_changes["ISMEAR"] = 0
             incar_changes["ISYM"] = -1
         if "nelm_too_low" in unconverged_log:
-            prev_nelm = curr_incar["NELM"]
+            if "NELM" in curr_incar:
+                prev_nelm = curr_incar["NELM"]
+            else:
+                prev_nelm = 100
             incar_changes["NELM"] = prev_nelm + 100
             incar_changes["ALGO"] = "All"
         if "nsw_too_low" in unconverged_log:
-            prev_nsw = curr_incar["NSW"]
+            if "NSW" in curr_incar:
+                prev_nsw = curr_incar["NSW"]
+            else:
+                prev_nsw = 199
             incar_changes["NSW"] = prev_nsw + 100
         if "real_optlay" in errors:
             incar_changes["LREAL"] = False
@@ -467,7 +473,10 @@ class VASPSetUp(object):
             incar_changes["ISMEAR"] = -1
         if "sym_too_tight" in errors:
             incar_changes["ISYM"] = -1
-            prev_symprec = curr_incar["SYMPREC"]
+            if "SYMPREC" in curr_incar:
+                prev_symprec = curr_incar["SYMPREC"]
+            else:
+                prev_symprec = 1e-6
             new_symprec = prev_symprec / 10
             incar_changes["SYMPREC"] = new_symprec
             # incar_changes["SYMPREC"] = 1e-3
