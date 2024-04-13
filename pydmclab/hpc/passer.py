@@ -185,6 +185,10 @@ class Passer(object):
         incar_adjustments.update(bandgap_based_incar_adjustments)
 
         curr_xc_calc = self.xc_calc
+        if curr_xc_calc.split("-")[1] == "lobster":
+            incar_adjustments["KSPACING"] = None
+            incar_adjustments["ISMEAR"] = 0
+            incar_adjustments["SIGMA"] = 0.05
         user_incar_mods = self.incar_mods
         incar = Incar.from_file(os.path.join(self.calc_dir, "INCAR"))
         for key, value in incar_adjustments.items():

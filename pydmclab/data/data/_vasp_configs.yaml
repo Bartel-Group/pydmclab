@@ -8,23 +8,12 @@ magmom: # you will need to pass this for AFM calcs {'magmom' : [list of magmoms 
 xc_to_run:  # gga, ggau, or metagga
 calc_to_run: # usually this is what we want unless you want an independent "static" or "loose" calc
 
-fun: # usually this is fine
-lobster_static: False # can make False if you don't want to run LOBSTER
+functional: # usually this is fine
+
 perturb_struc: False # if float, perturb internal ionic coordinates by perturb_struc
 generate_bandstructure: False # if True, run a bandstructure calculation at the end
 bs_symprec: 0.1 # symprec for generating primitive cell for bs calculation
 bs_line_density: 20 # kpoint line density for bs calculation
-generate_parchg: False # if True, generate a partial charge
-eint_for_parchg: -1 # the lower energy (relative to E_Fermi) that you want to analyze
-generate_dielectric: False # if True, prepare the INCAR for the static calculation to generate the dielectric tensor
-
-generate_finite_displacements: False # if True, run finite displacements
-supercell_grid_for_finite_displacements: [2,2,2] # supercell grid for finite displacements
-
-generate_dfpt: False # if True, run dfpt
-supercell_grid_for_dfpt: [2,2,2] # supercell grid for dfpt
-
-generate_magtest: False # this will pass MAGMOMs from relax to a new static calc
 
 # some output files
 fvaspout: vasp.o # where vasp output goes in calc_dir for each vasp run
@@ -42,8 +31,8 @@ potcar_mods: {} # {'gga-relax' : {'W' : 'W_sv'}}
 
 # rarely need to change these:
 mag_override: False # if True, allows user to run nm calcs for mag systems and vice versa
-potcar_functional: PBE_54 # probably don't change
-validate_magmom: False # probably don't change
+potcar_functional:  # probably don't change
+validate_magmom:  # probably don't change
 
 # how fine of a LOBSTER DOS do you want (more = more detailed)
-COHPSteps: 400
+COHPSteps: 2000

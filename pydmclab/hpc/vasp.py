@@ -3,6 +3,7 @@ from pydmclab.core.struc import StrucTools
 from pydmclab.hpc.analyze import AnalyzeVASP, VASPOutputs
 from pydmclab.data.configs import load_vasp_configs
 from pydmclab.utils.handy import read_yaml, write_yaml, dotdict
+from pydmclab.hpc.sets import GetSet
 
 import os
 import warnings
@@ -10,7 +11,7 @@ from shutil import copyfile
 
 from pymatgen.io.vasp.sets import MPRelaxSet, MPScanRelaxSet, MPHSERelaxSet
 from pymatgen.core.structure import Structure
-from pymatgen.io.vasp.inputs import Kpoints
+from pymatgen.io.vasp.inputs import Kpoints, Incar
 from pymatgen.io.lobster.inputs import Lobsterin
 
 """
@@ -92,7 +93,7 @@ class VASPSetUp(object):
         return configs.copy()
 
     @property
-    def get_vasp_input(self):
+    def get_vaspset(self):
         """
         Returns:
             vasp_input (pymatgen.io.vasp.sets.VaspInputSet)
@@ -118,6 +119,8 @@ class VASPSetUp(object):
 
         structure = self.structure
 
+        xc_calc = "_".join([configs["xc_to_run"], configs["calc_to_run"]])
+
         # add MAGMOM to structure
         if configs["mag"] == "nm":
             # if non-magnetic, MagTools takes care of this
@@ -136,192 +139,19 @@ class VASPSetUp(object):
                 )
             structure.add_site_property("magmom", magmom)
 
-        # don't mess with much if trying to match Materials Project
-        if configs["standard"] == "mp":
-            # use our default functional
-            fun = None
-            # set KPOINTS to be MP-consistent
-            modify_kpoints = {"reciprocal_density": 64}
-
-        # setting DMC standards --> what to do on top of MPRelaxSet or MPScanRelaxSet (pymatgen defaults)
-        if configs["standard"] == "dmc":
-            # use our default functional
-            fun = None
-
-            # tweak a few INCAR settings
-            # converge using forces (EDIFFG < 0)
-            # stricter EDIFF
-            # ISMEAR = 0 (less convergence errors)
-            # fix ENCUT, ENAUG to be reasonable
-            # turn off symmetry (mostly, ISYM = 0)
-            dmc_standard_settings = {
-                "EDIFF": 1e-6,
-                "EDIFFG": -0.03,
-                "ISMEAR": 0,
-                "ENCUT": 520,
-                "ENAUG": 1040,
-                "ISYM": 0,
-                "SIGMA": 0.01,
-                "KSPACING": 0.22,
-            }
-            for key in dmc_standard_settings:
-                if key not in modify_incar:
-                    modify_incar[key] = dmc_standard_settings[key]
-
-            # turn off +U unless we are specifying GGA+U
-            if configs["xc_to_run"] != "ggau":
-                if "LDAU" not in modify_incar:
-                    modify_incar["LDAU"] = False
-
-            # turn off ISPIN for nonmagnetic calculations
-            if "ISPIN" not in modify_incar:
-                modify_incar["ISPIN"] = 1 if configs["mag"] == "nm" else 2
-
-        # start from MPRelaxSet for GGA or GGA+U
-        if configs["xc_to_run"] in ["gga", "ggau"]:
-            vaspset = MPRelaxSet
-
-            # use custom functional (eg PBEsol) if you want
-            # needs to be specified in user_configs['fun']
-            # otherwise use PBE for gga, gga+u
-            if "GGA" not in modify_incar:
-                if fun:
-                    modify_incar["GGA"] = fun.upper()
-                else:
-                    modify_incar["GGA"] = "PE"
-
-            # for strict comparison to Materials Project GGA(+U) calculations, we need to use the old POTCARs
-            if configs["standard"] == "mp":
-                potcar_functional = "PBE"
-
-        # start from MPScanRelaxSet for meta-GGA
-        elif configs["xc_to_run"] == "metagga":
-            vaspset = MPScanRelaxSet
-
-            # use custom functional (eg SCAN) if you want
-            # needs to be specified in user_configs['fun']
-            # otherwise use r2SCAN for metagga
-            if "METAGGA" not in modify_incar:
-                if fun:
-                    modify_incar["METAGGA"] = fun.upper()
-                else:
-                    modify_incar["METAGGA"] = "R2SCAN"
-
-        elif configs["xc_to_run"] == "hse06":
-            vaspset = MPHSERelaxSet
-
-        # default "loose" relax
-        if configs["calc_to_run"] == "loose":
-            # use only 1 kpoint
-            modify_kpoints = Kpoints()
-            # make the settings a little looser
-            loose_settings = {
-                "ENCUT": 400,
-                "ENAUG": 800,
-                "ISIF": 3,
-                "EDIFF": 1e-5,
-                "NELM": 40,
-            }
-            for key in loose_settings:
-                if key not in modify_incar:
-                    modify_incar[key] = loose_settings[key]
-
-        # default "static" claculation
-        if configs["calc_to_run"] == "static":
-            # don't optimize the geometry
-            # do save things like charge density
-            static_settings = {
-                "LCHARG": True,
-                "LREAL": False,
-                "NSW": 0,
-                "LORBIT": 0,
-                "LVHAR": True,
-                "ICHARG": 0,
-                "LAECHG": True,
-            }
-            for key in static_settings:
-                if key not in modify_incar:
-                    modify_incar[key] = static_settings[key]
-
-        # make sure WAVECAR is written unless told user specified not to
-        if "LWAVE" not in modify_incar:
-            modify_incar["LWAVE"] = True
-
-        # use better parallelization
-        if ("NCORE" not in modify_incar) and ("NPAR" not in modify_incar):
-            modify_incar["NCORE"] = 4
-
-        # add more ionic steps
-        if "NSW" not in modify_incar:
-            if configs["calc_to_run"] == "static":
-                modify_incar["NSW"] = 0
-            else:
-                modify_incar["NSW"] = 199
-
-        # make sure spin is off for nm calculations
-        if (configs["mag"] == "nm") and ("ISPIN" not in modify_incar):
-            modify_incar["ISPIN"] = 1
-        else:
-            # make sure magnetization is written to OUTCAR for magnetic calcs
-            modify_incar["LORBIT"] = 11
-
-        # if we are doing LOBSTER, need special parameters
-        # note: some of this gets handled later for us
-        if configs["lobster_static"] and (configs["calc_to_run"] == "static"):
-            if configs["standard"] != "mp":
-                # want to write charge densities
-                # new NBANDS so don't want to start from WAVECAR
-                lobster_incar_settings = {"ISTART": 0, "LAECHG": True}
-                for key in lobster_incar_settings:
-                    if key not in configs["lobster_incar"]:
-                        if key not in modify_incar:
-                            modify_incar[key] = lobster_incar_settings[key]
-
-                for key in configs["lobster_incar"]:
-                    if key not in modify_incar:
-                        modify_incar[key] = configs["lobster_incar"][key]
-
-                if not modify_kpoints:
-                    if not configs["lobster_kpoints"]:
-                        # need KPOINTS file for LOBSTER (as opposed to KSPACING)
-                        modify_kpoints = {"length": 25}
-                    else:
-                        modify_kpoints = configs["lobster_kpoints"]
-
-        if configs["lobster_static"]:
-            if configs["xc_to_run"] == "metagga":
-                # gga-static will get ISYM = -1, so need to pass that to metagga relax otherwise WAVECAR from GGA doesnt help metagga
-                modify_incar["ISYM"] = -1
-
-        if configs["generate_dielectric"]:
-            if configs["calc_to_run"] == "static":
-                if configs["xc_to_run"] != "metagga":
-                    modify_incar["LVTOT"] = True
-                    modify_incar["LEPSILON"] = True
-                    modify_incar["LOPTICS"] = True
-                    modify_incar["IBRION"] = 8
-                else:
-                    warnings.warn(
-                        "\nyou cannot run METAGGA and generate a dielectric. the METAGGA calculation will run but without a dielectric\n"
-                    )
-
-        print("modify_incar = %s" % modify_incar)
-
-        if configs["standard"] == "dmc":
-            if "W" not in modify_potcar:
-                modify_potcar["W"] = "W"
-
-        # initialize new VASPSet with all our settings
-        vasp_input = vaspset(
-            structure,
-            user_incar_settings=modify_incar,
-            user_kpoints_settings=modify_kpoints,
-            user_potcar_settings=modify_potcar,
-            user_potcar_functional=potcar_functional,
+        vaspset = GetSet(
+            structure=structure,
+            xc_calc=xc_calc,
+            standard=configs["standard"],
+            mag=configs["mag"],
+            potcar_functional=potcar_functional,
             validate_magmom=validate_magmom,
-        )
+            modify_incar=modify_incar,
+            modify_kpoints=modify_kpoints,
+            modify_potcar=modify_potcar,
+        ).vaspset
 
-        return vasp_input
+        return vaspset
 
     @property
     def prepare_calc(self):
@@ -332,32 +162,66 @@ class VASPSetUp(object):
         configs = self.configs.copy()
         calc_dir = self.calc_dir
 
-        vasp_input = self.get_vasp_input
-        if not vasp_input:
+        vaspset = self.get_vaspset
+        if not vaspset:
             return None
 
         # write input files
-        vasp_input.write_input(calc_dir)
+        vaspset.write_input(calc_dir)
 
         # for LOBSTER, use Janine George's Lobsterin approach (mainly to get NBANDS)
-        if (configs["lobster_static"]) and (configs["calc_to_run"] == "static"):
+        if configs["calc_to_run"] in ["lobster", "bs"]:
             INCAR_input = os.path.join(calc_dir, "INCAR_input")
             INCAR_output = os.path.join(calc_dir, "INCAR")
             copyfile(INCAR_output, INCAR_input)
-            POSCAR_input = os.path.join(calc_dir, "POSCAR")
+            POSCAR_input = os.path.join(calc_dir, "POSCAR_input")
+            POSCAR_output = os.path.join(calc_dir, "POSCAR")
+            copyfile(POSCAR_output, POSCAR_input)
+            KPOINTS_input = os.path.join(calc_dir, "KPOINTS_input")
+            KPOINTS_output = os.path.join(calc_dir, "KPOINTS")
+            copyfile(KPOINTS_output, KPOINTS_input)
             POTCAR_input = os.path.join(calc_dir, "POTCAR")
-            lobsterin = Lobsterin.standard_calculations_from_vasp_files(
-                POSCAR_input=POSCAR_input,
-                INCAR_input=INCAR_input,
-                POTCAR_input=POTCAR_input,
-                option="standard",
-            )
+            POTCAR_output = os.path.join(calc_dir, "POTCAR_input")
+            copyfile(POTCAR_output, POTCAR_input)
 
-            lobsterin_dict = lobsterin.as_dict()
+            if configs["calc_to_run"] == "lobster":
 
-            lobsterin_dict["COHPSteps"] = configs["COHPSteps"]
-            lobsterin = Lobsterin.from_dict(lobsterin_dict)
+                lobsterin = Lobsterin.standard_calculations_from_vasp_files(
+                    POSCAR_input=POSCAR_input,
+                    INCAR_input=INCAR_input,
+                    POTCAR_input=POTCAR_input,
+                    option="standard",
+                )
 
+                lobsterin_dict = lobsterin.as_dict()
+
+                lobsterin_dict["COHPSteps"] = configs["COHPSteps"]
+                lobsterin = Lobsterin.from_dict(lobsterin_dict)
+
+            elif configs["calc_to_run"] == "bs":
+                lobsterin = Lobsterin
+                lobsterin.write_POSCAR_with_standard_primitive(
+                    POSCAR_input=POSCAR_input,
+                    POSCAR_output=POSCAR_output,
+                    symprec=configs["bs_symprec"],
+                )
+                try:
+                    lobsterin.write_KPOINTS(
+                        POSCAR_input=POSCAR_output,
+                        KPOINTS_output=KPOINTS_output,
+                        line_mode=True,
+                        symprec=configs["bs_symprec"],
+                        kpoints_line_density=configs["bs_line_density"],
+                    )
+                except ValueError:
+                    print("trying higher symprec")
+                    lobsterin.write_KPOINTS(
+                        POSCAR_input=POSCAR_output,
+                        KPOINTS_output=KPOINTS_output,
+                        line_mode=True,
+                        symprec=configs["bs_symprec"] * 2,
+                        kpoints_line_density=configs["bs_line_density"],
+                    )
             flobsterin = os.path.join(calc_dir, "lobsterin")
             lobsterin.write_lobsterin(flobsterin)
 
@@ -366,8 +230,7 @@ class VASPSetUp(object):
                 incar_output=INCAR_output,
                 poscar_input=POSCAR_input,
             )
-
-        return vasp_input
+        return vaspset
 
     @property
     def error_msgs(self):
@@ -536,6 +399,8 @@ class VASPSetUp(object):
         chgcar = os.path.join(calc_dir, "CHGCAR")
         wavecar = os.path.join(calc_dir, "WAVECAR")
 
+        curr_incar = Incar.from_file(os.path.join(calc_dir, "INCAR")).as_dict()
+
         incar_changes = {}
         if "grad_not_orth" in errors:
             incar_changes["SIGMA"] = 0.05
@@ -591,7 +456,10 @@ class VASPSetUp(object):
             incar_changes["ISMEAR"] = -1
         if "sym_too_tight" in errors:
             incar_changes["ISYM"] = -1
-            incar_changes["SYMPREC"] = 1e-3
+            prev_symprec = curr_incar["SYMPREC"]
+            new_symprec = prev_symprec / 10
+            incar_changes["SYMPREC"] = new_symprec
+            # incar_changes["SYMPREC"] = 1e-3
         if "coef" in errors:
             if os.path.exists(wavecar):
                 os.remove(wavecar)

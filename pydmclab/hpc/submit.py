@@ -400,7 +400,7 @@ class SubmitTools(object):
         """
         Returns job name based on launch_dir
         """
-        return ".".join(self.launch_dir.split("/")[-3:])+'.'+self.job_dir
+        return ".".join(self.launch_dir.split("/")[-3:]) + "." + self.job_dir
 
     @property
     def is_job_in_queue(self):
@@ -1305,15 +1305,7 @@ def setup_static_magtest(converged_static_dir, rerun=False):
 
 
 def main():
-    sub = SubmitTools(
-        launch_dir=os.getcwd(),
-        initial_magmom=None,
-        relaxation_xcs=["metagga"],
-        static_addons={"gga": ["lobster"], "metagga": ["lobster", "dfpt"]},
-        start_with_loose=True,
-    )
-    print(sub.calc_list)
-    return sub
+    return
 
 
 if __name__ == "__main__":
