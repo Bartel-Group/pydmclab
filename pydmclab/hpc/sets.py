@@ -167,9 +167,11 @@ class GetSet(object):
             # note: need to pass U values as eg {'LDAUU' : {'Fe' : 5}}
             new_settings["LDAU"] = True
             new_settings["LDAUTYPE"] = 2
-            new_settings["LDAUPRINT"] = 1
-            new_settings["LDAUL"] = [2] * len(self.structure.species)
-            new_settings["LDAUJ"] = [0] * len(self.structure.species)
+            LDAUU = user_passed_settings["LDAUU"]
+            LDAUL = {el: 2 for el in LDAUU}
+            LDAUJ = {el: 0 for el in LDAUU}
+            new_settings["LDAUL"] = LDAUL
+            new_settings["LDAUJ"] = LDAUJ
 
         if calc == "loose":
             new_settings["ENCUT"] = 400
