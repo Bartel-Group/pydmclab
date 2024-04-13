@@ -339,6 +339,10 @@ class VASPSetUp(object):
         if not ionic_convergence:
             unconverged.append("nsw_too_low")
 
+        Etot = analyzer.E_per_at
+        if Etot > 0:
+            unconverged.append("Etot_positive")
+
         return unconverged
 
     @property
@@ -405,6 +409,8 @@ class VASPSetUp(object):
         curr_incar = Incar.from_file(os.path.join(calc_dir, "INCAR")).as_dict()
 
         incar_changes = {}
+        if "Etot_positive" in unconverged_log:
+            incar_changes["ALGO"] = "All"
         if "grad_not_orth" in errors:
             incar_changes["SIGMA"] = 0.05
             if os.path.exists(wavecar):

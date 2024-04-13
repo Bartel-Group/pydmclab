@@ -191,7 +191,8 @@ class Passer(object):
 
         curr_xc_calc = self.xc_calc
         if curr_xc_calc.split("-")[1] == "lobster":
-            incar_adjustments["KSPACING"] = None
+            if "KSPACING" in incar_adjustments:
+                del incar_adjustments["KSPACING"]
             incar_adjustments["ISMEAR"] = 0
             incar_adjustments["SIGMA"] = 0.05
         user_incar_mods = self.incar_mods
@@ -230,10 +231,11 @@ def main():
     try:
         passer.write_to_job_killer
         passer.complete_pass
-    except:
+    except Exception as e:
         fready_to_pass = os.path.join(passer.launch_dir, "job_killer.o")
         with open(fready_to_pass, "w", encoding="utf-8") as f:
-            f.write("kill this job")
+            f.write("kill this job\n\n\n")
+            f.write(str(e))
 
 
 if __name__ == "__main__":

@@ -761,9 +761,9 @@ class SubmitTools(object):
                 # before passing data, make sure parent has finished without crashing (using bash..)
                 f.write(
                     "isInFile=$(cat %s | grep -c %s)\n"
-                    % (os.path.join(launch_dir, "job_killer.o"), "pass")
+                    % (os.path.join(launch_dir, "job_killer.o"), "kill")
                 )
-                f.write("if [ $isInFile -eq 0 ]; then\n")
+                f.write("if [ $isInFile -ge 1 ]; then\n")
                 f.write("   scancel $SLURM_JOB_ID\n")
                 f.write("fi\n")
 
