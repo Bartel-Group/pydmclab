@@ -84,7 +84,7 @@ class Passer(object):
         src_dir = self.prev_calc_dir
         dst_dir = self.calc_dir
         fsrc = os.path.join(src_dir, "WAVECAR")
-        if os.path.exist(fsrc):
+        if os.path.exists(fsrc):
             copyfile(fsrc, os.path.join(dst_dir, "POSCAR"))
         return "copied contcar"
 
@@ -103,7 +103,7 @@ class Passer(object):
         dst_dir = self.calc_dir
 
         fsrc = os.path.join(src_dir, "WAVECAR")
-        if os.path.exist(fsrc):
+        if os.path.exists(fsrc):
             copyfile(fsrc, os.path.join(dst_dir, "WAVECAR"))
         return "copied wavecar"
 
