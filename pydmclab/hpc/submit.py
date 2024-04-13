@@ -607,6 +607,8 @@ class SubmitTools(object):
 
             calc_dir = os.path.join(launch_dir, xc_calc)
 
+            print("\n~~~~~ working on %s ~~~~~\n" % calc_dir)
+
             # (6) initialize VASPSetUp with current VASP configs for this calculation
             vsu = VASPSetUp(
                 calc_dir=calc_dir,
