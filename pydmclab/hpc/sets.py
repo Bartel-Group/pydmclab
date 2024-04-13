@@ -132,14 +132,14 @@ class GetSet(object):
 
         if xc in ["metagga", "metaggau"]:
             new_settings["GGA"] = None
-            functional = user_passed_settings["fun"]
+            functional = user_passed_settings["functional"]
             if not functional:
                 new_settings["METAGGA"] = "R2SCAN"
             else:
                 new_settings["METAGGA"] = functional
 
         if xc in ["gga", "ggau"]:
-            functional = user_passed_settings["fun"]
+            functional = user_passed_settings["functional"]
             if not functional:
                 new_settings["GGA"] = "PE"
             else:
