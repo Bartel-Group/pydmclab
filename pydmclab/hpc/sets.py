@@ -231,6 +231,6 @@ class GetSet(object):
             user_incar_settings=self.user_incar_settings,
             user_kpoints_settings=self.user_kpoints_settings,
             user_potcar_settings=self.user_potcar_settings,
-            potcar_functional=potcar_functional,
+            user_potcar_functional=potcar_functional,
             validate_magmom=validate_magmom,
         )
