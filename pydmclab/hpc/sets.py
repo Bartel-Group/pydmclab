@@ -146,6 +146,14 @@ class GetSet(object):
             else:
                 new_settings["GGA"] = functional
 
+        if xc == "gga":
+            if standard != "mp":
+                new_settings["LDAU"] = False
+        elif xc in ["metagga", "hse06"]:
+            new_settings["LDAU"] = False
+        elif xc in ["ggau", "metaggau"]:
+            new_settings["LDAU"] = True
+
         if calc == "dielectric":
             new_settings["LVTOT"] = True
             new_settings["LEPSILON"] = True
