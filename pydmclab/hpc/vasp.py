@@ -183,8 +183,8 @@ class VASPSetUp(object):
             KPOINTS_input = os.path.join(calc_dir, "KPOINTS_input")
             KPOINTS_output = os.path.join(calc_dir, "KPOINTS")
             copyfile(KPOINTS_output, KPOINTS_input)
-            POTCAR_input = os.path.join(calc_dir, "POTCAR")
-            POTCAR_output = os.path.join(calc_dir, "POTCAR_input")
+            POTCAR_input = os.path.join(calc_dir, "POTCAR_input")
+            POTCAR_output = os.path.join(calc_dir, "POTCAR")
             copyfile(POTCAR_output, POTCAR_input)
 
             if configs["calc_to_run"] == "lobster":
