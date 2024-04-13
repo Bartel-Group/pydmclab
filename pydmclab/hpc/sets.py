@@ -18,9 +18,8 @@ class GetSet(object):
     ):
         standard = configs["standard"]
         mag = configs["mag"]
-        xc_calc = configs["xc_calc"]
-        xc, calc = xc_calc.split("-")
-        self.xc, self.calc = xc, calc
+
+        self.xc, self.calc = configs["xc_to_run"], configs["calc_to_run"]
 
         self.structure = StrucTools(structure).structure
         self.standard = standard
