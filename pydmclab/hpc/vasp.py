@@ -87,12 +87,13 @@ class VASPSetUp(object):
             for calc in [calc_to_run, "all"]
         ]
 
-        for input_file in ["incar", "kpoints", "potcar"]:
-            user_configs["modify_this_%s" % input_file] = {
-                key: user_configs["%s_mods" % input_file][key]
-                for key in user_configs["%s_mods" % input_file]
-                if key in relevant_mod_keys
-            }
+        for xc_calc in relevant_mod_keys:
+            for input_file in ["incar", "kpoints", "potcar"]:
+                if xc_calc in user_configs["%s_mods" % input_file]:
+                    for key in user_configs["%s_mods" % input_file][xc_calc]:
+                        user_configs["%s_mods" % input_file][key] = user_configs[
+                            "%s_mods" % input_file
+                        ][xc_calc][key]
 
         configs = {**self.default_configs, **user_configs}
         return configs.copy()
