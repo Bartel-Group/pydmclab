@@ -14,7 +14,7 @@ from pydmclab.data.configs import load_partition_configs
 # from pymatgen.entries.computed_entries import ComputedStructureEntry
 
 
-def get_vasp_configs(dont_relax_cell):
+def get_vasp_configs(dont_relax_cell=False):
     if dont_relax_cell:
         return {"incar_mods": {"all-all": {"ISIF": 2}}}
     else:

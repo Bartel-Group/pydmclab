@@ -119,7 +119,7 @@ class VASPSetUp(object):
 
         structure = self.structure
 
-        xc_calc = "_".join([configs["xc_to_run"], configs["calc_to_run"]])
+        xc_calc = "-".join([configs["xc_to_run"], configs["calc_to_run"]])
 
         # add MAGMOM to structure
         if configs["mag"] == "nm":
