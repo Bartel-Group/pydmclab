@@ -223,6 +223,13 @@ class VASPSetUp(object):
                         symprec=configs["bs_symprec"] * 2,
                         kpoints_line_density=configs["bs_line_density"],
                     )
+
+                lobsterin = Lobsterin.standard_calculations_from_vasp_files(
+                    POSCAR_input=POSCAR_output,
+                    INCAR_input=INCAR_input,
+                    POTCAR_input=POTCAR_output,
+                    option="standard_with_fatband",
+                )
             flobsterin = os.path.join(calc_dir, "lobsterin")
             lobsterin.write_lobsterin(flobsterin)
 
