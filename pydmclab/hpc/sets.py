@@ -175,9 +175,9 @@ class GetSet(object):
         for k, v in user_passed_settings.items():
             new_settings[k] = v
 
-        for k, v in new_settings.items():
-            if v is None:
-                del new_settings[k]
+        none_keys = [k for k in new_settings if new_settings[k] is None]
+        for k in none_keys:
+            del new_settings[k]
 
         return new_settings.copy()
 
