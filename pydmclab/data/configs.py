@@ -5,7 +5,7 @@ DATA_PATH = os.path.join(this_dir, "data")
 
 
 def load_base_configs():
-    with open(os.path.join(DATA_DIR, "_hpc_configs.yaml")) as f:
+    with open(os.path.join(DATA_PATH, "_hpc_configs.yaml")) as f:
         return yaml.safe_load(f)
 
 
