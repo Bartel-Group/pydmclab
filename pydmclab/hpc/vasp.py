@@ -236,11 +236,6 @@ class VASPSetUp(object):
             flobsterin = os.path.join(calc_dir, "lobsterin")
             lobsterin.write_lobsterin(flobsterin)
 
-            lobsterin.write_INCAR(
-                incar_input=INCAR_input,
-                incar_output=INCAR_output,
-                poscar_input=POSCAR_input,
-            )
         return vaspset
 
     @property

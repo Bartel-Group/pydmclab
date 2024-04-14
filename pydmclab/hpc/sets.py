@@ -142,6 +142,8 @@ class GetSet(object):
             new_settings["ISYM"] = -1
             new_settings["KSPACING"] = None
             new_settings["ISMEAR"] = 0
+            new_settings["NSW"] = 0
+            new_settings["LWAVE"] = True
 
         if standard == "dmc":
             dmc_options = {

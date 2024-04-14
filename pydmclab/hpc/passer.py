@@ -182,6 +182,19 @@ class Passer(object):
         return {"MAGMOM": magmom_string}
 
     @property
+    def nbands_based_incar_adjustments(self):
+        prev_calc_dir = self.prev_calc_dir
+        if not os.path.exists(prev_calc_dir):
+            return None
+        av = AnalyzeVASP(prev_calc_dir)
+        prev_settings = av.outputs.all_input_settings
+        new_nbands = {}
+        if prev_settings:
+            old_nbands = prev_settings["NBANDS"]
+            new_nbands = {"NBANDS": 1.5 * old_nbands}
+        return new_nbands
+
+    @property
     def update_incar(self):
         bandgap_based_incar_adjustments = self.bandgap_based_incar_adjustments
         magmom_based_incar_adjustments = self.magmom_based_incar_adjustments
@@ -195,6 +208,8 @@ class Passer(object):
                 del incar_adjustments["KSPACING"]
             incar_adjustments["ISMEAR"] = 0
             incar_adjustments["SIGMA"] = 0.05
+            nbands_based_incar_adjustments = self.nbands_based_incar_adjustments
+            incar_adjustments.update(nbands_based_incar_adjustments)
         user_incar_mods = self.incar_mods
         incar = Incar.from_file(os.path.join(self.calc_dir, "INCAR"))
         for key, value in incar_adjustments.items():
