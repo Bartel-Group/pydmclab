@@ -363,6 +363,8 @@ class VASPSetUp(object):
         """
         error_msgs = self.error_msgs
         out_file = os.path.join(self.calc_dir, self.configs["fvaspout"])
+        if not os.path.exists(out_file):
+            return []
         errors = []
         with open(out_file) as f:
             contents = f.read()
