@@ -1002,7 +1002,7 @@ class AnalyzeVASP(object):
         if self.calc == "static":
             if os.path.exists(self.calc_dir.replace("static", "relax")):
                 E_relax = AnalyzeVASP(self.calc_dir.replace("static", "relax")).E_per_at
-                if E_relax and (abs(E_relax - E_per_at) < 0.1):
+                if E_relax and E_per_at and (abs(E_relax - E_per_at) < 0.1):
                     convergence = True
                 else:
                     convergence = False

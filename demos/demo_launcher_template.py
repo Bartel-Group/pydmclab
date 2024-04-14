@@ -107,6 +107,10 @@ ANALYSIS_CONFIGS = get_analysis_configs(
     exclude=[],
 )
 
+CONFIGS = {**ANALYSIS_CONFIGS, **VASP_CONFIGS, **SLURM_CONFIGS, **SUB_CONFIGS}
+
+CONFIGS = write_json(CONFIGS, os.path.join(SCRIPTS_DIR, "configs.json"))
+
 # whether or not you want to generate MAGMOMs (only if you're running AFM)
 GEN_MAGMOMS = True if LAUNCH_CONFIGS["n_afm_configs"] else False
 
