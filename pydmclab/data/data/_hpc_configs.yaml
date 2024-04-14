@@ -1,0 +1,118 @@
+###################### VASP_CONFIGS ############################
+###### these are settings that pertain to a single VASP execution ######
+
+# specify how you would like your calculations to run
+standard: dmc # make mp if comparing to MP data
+functional: # None --> gga = pbe; metagga = r2SCAN; feel free to pass your own
+
+# specific calculation being executed (usually passed through SubmitTools)
+xc_to_run:  # gga, ggau, metagga, metaggau, hse06 
+calc_to_run: # loose, relax, static, lobster, bs, dfpt, finite_displacements, parchg, dielectric
+
+# how is magnetism going to be handled (usually passed through LaunchTools)
+mag:  # nm, fm, afm_0, afm_1, ...
+magmom: # you will need to pass this for AFM calcs. eg {'magmom' : [list of magmoms (float)]}
+
+# modifications to the standard calculation protocols. these should be passed as {xc-calc (str) : {mod_key (str) : mod_value (str)}}
+incar_mods: {} # eg {'gga-relax' : {'ISIF' : 2}}. see pydmclab.hpc.sets.GetSet.user_incar_settings for more details
+kpoints_mods: {} # eg {'gga-relax' : {'grid' : [2,2,2]}}. see pydmclab.hpc.sets.GetSet.user_kpoints_settings for more details
+potcar_mods: {} # eg {'gga-relax' : {'W' : 'W_sv'}}. see pydmclab.hpc.sets.GetSet.user_potcar_settings for more details
+
+# related to pymatgen VaspSet. rarely need to change
+potcar_functional:  # probably don't change (this will get handled in pydmclab.hpc.sets.GetSet)
+validate_magmom:  # probably don't change (strange pymatgen thing.. not quite sure what this does)
+
+# some output file names that you rarely need to change
+fvaspout: vasp.o # where vasp output goes in calc_dir for each vasp run
+fvasperrors: errors.o # where vasp errors go in calc_dir for each vasp run
+
+# related to bandstructure calculations (calc = 'bs')
+bs_symprec: 0.1 # symprec for generating primitive cell for bs calculation
+bs_line_density: 20 # kpoint line density for bs calculation
+
+# related to LOBSTER calculations (calc = 'lobster')
+COHPSteps: 2000 # how fine of a LOBSTER DOS do you want (more = more detailed)
+
+
+###################### SUB_CONFIGS ############################
+###### these are settings that pertain to a chain of VASP executions ######
+
+
+# the most important settings --> what do you want to calculate
+relaxation_xcs: ['gga'] # list of xcs you want to at least run relax + static for
+static_addons: # dictionary of things you want to do after a static is converged. eg {'metagga' : ['lobster', 'bs']}
+  gga
+    - lobster
+
+# the calc_list gets determined based on relaxation_xcs and static_addons. if you want to do something different than defaults, set custom_calc_list
+custom_calc_list: # eg ['gga-static', 'metagga-static'] would only run those two calcs
+start_with_loose: False # if True, add gga-loose or ggau-loose as your very first calc in the list to calculate
+fresh_restart: # if you want to start certain calcs over set them in a list here. eg ['metaggau-lobster', 'metagga-bs']
+
+# what kind of VASP to use
+vasp: vasp_std # use vasp_gam for "loose" calcs (havent implemented yet)
+vasp_version: 6 # version of VASP (can be 5 for 5.4.4 or 6 for 6.4.1)
+
+# how to run VASP in parallel
+mpi_command: mpirun # how to launch on multicore/multinode (may be mpirun depending on compilation)
+
+# how to talk to supercomputer
+manager: '#SBATCH' # how to manage interactions with the queue (some machines dont use slurm)
+machine: msi # which supercomputer
+
+# how to figure out whether or not to launch a calc. if these things are present in sub.sh, need to launch
+execute_flags: ['srun', 'python', 'bin/lobster', 'bin/vasp', 'bader', 'mpirun'] 
+
+
+
+###################### SLURM_CONFIGS ############################
+##### these are settings that pertain to the HPC configuration you want for your chain of VASP executions #####
+
+nodes: 1 # how many nodes
+ntasks: 8 # how many total cores
+time: 1440 # how long in minutes before hitting walltime 
+error: log.e # where to write slurm errors to in launch_dir
+output: log.o # where to write slurm output to in launch_dir
+account: cbartel # account to charge
+partition: agsmall,msismall,msidmc # partition to use
+job-name: # unique job name; if none provided, will default to formula_indicator.struc_indicator.mag.xc.project_dir
+mem-per-cpu: # specify mem per core
+mem-per-gpu: # specify mem per gpu core
+constraint: # may not need this ever on MSI
+qos: # may not need this ever on MSI
+
+
+
+####################### LAUNCH_CONFIGS ########################
+###### these are settings that pertain to how you figure out which directories to create a submission script in ######
+n_afm_configs: 0 # how many AFM configurations to run
+override_mag: False # could be ['nm'] if you only want to run nonmagnetic, won't check for whether structure is mag or not mag, it will just do as you say (not sure if this is properly implemented)
+ID_specific_vasp_configs: # not sure if this is implemented correctly. {<formula_indicator>_<struc_indicator> : {any_config}}
+
+
+#################### ANALYSIS_CONFIGS ########################
+##### these are settings that pertain to how you want to parse completed calculations and aggregate results #####
+
+only_calc: 'static' # only retrieve data from the static calculations
+only_xc: # if None, retrieve all xcs, else retrieve only the one specified
+
+check_relax_energy: True # make sure the relax calculation and the static have similar energies
+include_metadata: True # include metadata like INCAR, KPOINTS, POTCAR settings
+include_calc_setup: True # include things related to the calculation setup -- mag, xc, etc
+include_structure: True # include the relaxed crystal structure as a dict
+include_trajectory: False # include the compact trajectory from the vasprun.xml
+include_mag: False # include the relaxed magnetization info as as dict
+include_tdos: False # include the light version of the density of states
+include_pdos: False # include heavy dos
+include_charge: False # include partial chage info
+include_madelung: False # include Madelung energies
+include_tcohp: False # include light COHPCAR data
+include_pcohp: False # include heavy COHPCAR data
+include_tcoop: False # include light COOPCAR data
+include_pcoop: False # include heavy COOPCAR data
+include_tcobi: False # include light COBICAR data
+include_pcobi: False # include heavy COBICAR data
+include_entry: False # include pymatgen computed structure entry
+create_cif: True # create a .cif file for each CONTCAR
+verbose: True # print stuff as things get analyzed
+n_procs: 1 # how many cores to parallelize the launcher on (also pertains to submitting calcs)

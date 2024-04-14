@@ -1,7 +1,7 @@
 from pydmclab.core.mag import MagTools
 from pydmclab.core.struc import StrucTools
 from pydmclab.hpc.analyze import AnalyzeVASP, VASPOutputs
-from pydmclab.data.configs import load_vasp_configs
+from pydmclab.data.configs import load_base_configs
 from pydmclab.utils.handy import read_yaml, write_yaml, dotdict
 from pydmclab.hpc.sets import GetSet
 
@@ -46,14 +46,13 @@ class VASPSetUp(object):
     Also changes inputs based on errors that are encountered
 
     Note that we rarely need to call this class directly
-        - instead we'll manage things through pydmc.hpc.submit.SubmitTools and pydmc.hpc.launch.LaunchTools
+        - instead we'll manage things through pydmclab.hpc.submit.SubmitTools and pydmclab.hpc.launch.LaunchTools
     """
 
-    def __init__(self, calc_dir, prev_calc=None, user_configs={}):
+    def __init__(self, calc_dir, user_configs={}):
 
         # this is where we will execute VASP
         self.calc_dir = calc_dir
-        self.prev_calc = prev_calc
 
         # we should have a POSCAR in calc_dir already
         # e.g., LaunchTools will set this up for you
@@ -62,13 +61,9 @@ class VASPSetUp(object):
             raise FileNotFoundError("POSCAR not found in {}".format(calc_dir))
         else:
             structure = Structure.from_file(fpos)
-            perturbation = user_configs["perturb_struc"]
-            if perturbation:
-                initial_structure = structure.copy()
-                structure = StrucTools(initial_structure).perturb(perturbation)
             self.structure = structure
 
-        self.default_configs = load_vasp_configs()
+        self.default_configs = load_base_configs()
         self.user_configs = user_configs
 
     @property

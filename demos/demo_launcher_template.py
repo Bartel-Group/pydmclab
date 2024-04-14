@@ -28,6 +28,8 @@ from pydmclab.core.comp import CompTools
 from pydmclab.core.struc import StrucTools
 from pydmclab.hpc.analyze import AnalyzeVASP
 
+from shutil import copyfile
+
 # where is this file
 SCRIPTS_DIR = os.getcwd()
 
@@ -41,6 +43,11 @@ for d in [CALCS_DIR, DATA_DIR]:
     if not os.path.exists(d):
         os.makedirs(d)
 
+# copy our passer.py file to your scripts_dir. if you want to use a custom passer, just set this = True and put your passer.py in the scripts dir
+CUSTOM_PASSER = False
+if not CUSTOM_PASSER:
+    copyfile("/home/cbartel/cbartel/bin/pydmclab/pydmclab/hpc/passer.py", "passer.py")
+
 # if you need data from MP as a starting point (often the case), you need your API key
 API_KEY = "__YOUR API KEY__"
 
@@ -50,20 +57,15 @@ COMPOSITIONS = None
 
 # any configurations related to LaunchTools
 LAUNCH_CONFIGS = get_launch_configs(
-    standards=["dmc"],
-    xcs=["metagga"],
-    use_mp_thermo_data=False,
-    n_afm_configs=0,
-    skip_xcs_for_standards={"mp": ["gga", "metagga"]},
+    n_afm_configs=0, override_mag=False, ID_specific_vasp_configs={}
 )
 
 # any configurations related to SubmitTools
 SUB_CONFIGS = get_sub_configs(
+    relaxation_xcs=["gga"],
+    static_addons={"gga": ["lobster"]},
     submit_calculations_in_parallel=False,
-    rerun_lobster=False,
     mpi_command="mpirun",
-    special_packing=False,
-    delete_all_calculations_and_start_over=False,
     machine="msi",
     vasp_version=6,
 )
@@ -74,27 +76,14 @@ SLURM_CONFIGS = get_slurm_configs(
     cores_per_node=8,
     walltime_in_hours=95,
     mem_per_core="all",
-    partition="agsmall,msidmc",
+    partition="agsmall,msismall,msidmc",
     error_file="log.e",
     output_file="log.o",
     account="cbartel",
 )
 
 # any configurations related to VASPSetUp
-VASP_CONFIGS = get_vasp_configs(
-    run_lobster=False,
-    run_bandstructure=False,
-    detailed_dos=False,
-    modify_loose_incar=False,
-    modify_relax_incar=False,
-    modify_static_incar=False,
-    modify_loose_kpoints=False,
-    modify_relax_kpoints=False,
-    modify_static_kpoints=False,
-    modify_loose_potcar=False,
-    modify_relax_potcar=False,
-    modify_static_potcar=False,
-)
+VASP_CONFIGS = get_vasp_configs(dont_relax_cell=False)
 
 # any configurations related to AnalyzeBatch
 ANALYSIS_CONFIGS = get_analysis_configs(

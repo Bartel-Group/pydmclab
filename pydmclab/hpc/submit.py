@@ -2,12 +2,7 @@ from pydmclab.core.struc import StrucTools
 from pydmclab.hpc.vasp import VASPSetUp
 from pydmclab.hpc.analyze import AnalyzeVASP
 from pydmclab.utils.handy import read_yaml, write_yaml
-from pydmclab.data.configs import (
-    load_vasp_configs,
-    load_slurm_configs,
-    load_sub_configs,
-    load_partition_configs,
-)
+from pydmclab.data.configs import load_base_configs, load_partition_configs
 
 from pymatgen.core.structure import Structure
 from pymatgen.io.lobster import Lobsterin
@@ -139,48 +134,26 @@ class SubmitTools(object):
         # NOTE: should be made with LaunchTools
         formula_indicator, struc_indicator, mag = launch_dir.split("/")[-3:]
 
-        vasp_configs = load_vasp_configs()
-        slurm_configs = load_slurm_configs()
-        sub_configs = load_sub_configs()
+        _base_configs = load_base_configs()
+        configs = _base_configs.copy()
 
         # we're going to modify vasp, slurm, and sub configs using one user_configs dict, so let's keep track of what's been applied
         user_configs_used = []
 
-        for option in slurm_configs:
+        for option in _base_configs:
             if option in user_configs:
                 if option not in user_configs_used:
                     new_value = user_configs[option]
-                    slurm_configs[option] = new_value
-                    user_configs_used.append(option)
-
-        # create copy of slurm_configs to prevent unwanted updates
-        self.slurm_configs = slurm_configs.copy()
-
-        for option in sub_configs:
-            if option in user_configs:
-                if option not in user_configs_used:
-                    new_value = user_configs[option]
-                    sub_configs[option] = new_value
-                    user_configs_used.append(option)
-
-        # create copy of sub_configs to prevent unwanted updates
-        self.sub_configs = sub_configs.copy()
-
-        for option in vasp_configs:
-            if option in user_configs:
-                if option not in user_configs_used:
-                    new_value = user_configs[option]
-                    vasp_configs[option] = new_value
+                    configs[option] = new_value
                     user_configs_used.append(option)
 
         # determine standard and mag from launch_dir
-        vasp_configs["mag"] = mag
+        configs["mag"] = mag
 
         # include magmom in vasp_configs
-        vasp_configs["magmom"] = initial_magmom
+        configs["magmom"] = initial_magmom
 
-        # create copy of vasp_configs to prevent unwanted updates
-        self.vasp_configs = vasp_configs.copy()
+        self.configs = configs.copy()
 
         # need a POSCAR to initialize setup
         # LaunchTools should take care of this
@@ -201,10 +174,10 @@ class SubmitTools(object):
 
         # these are the xcs we want energies for --> each one of these should have a submission script
         # i.e., they are the end of individual chains
-        self.relaxation_xcs = self.sub_configs["relaxation_xcs"]
-        self.static_addons = self.sub_configs["static_addons"]
-        self.start_with_loose = self.sub_configs["start_with_loose"]
-        self.fresh_restart = self.sub_configs["fresh_restart"]
+        self.relaxation_xcs = self.configs["relaxation_xcs"]
+        self.static_addons = self.configs["static_addons"]
+        self.start_with_loose = self.configs["start_with_loose"]
+        self.fresh_restart = self.configs["fresh_restart"]
         self.scripts_dir = os.getcwd()
         self.job_dir = self.scripts_dir.split("/")[-2]
 
@@ -214,11 +187,11 @@ class SubmitTools(object):
         Returns:
             [xc-calc in the order they should be executed]
         """
-        sub_configs = self.sub_configs
-        if ("custom_calc_list" in sub_configs) and (
-            sub_configs["custom_calc_list"] is not None
+        configs = self.configs
+        if ("custom_calc_list" in configs) and (
+            configs["custom_calc_list"] is not None
         ):
-            return sub_configs["custom_calc_list"]
+            return configs["custom_calc_list"]
 
         relaxation_xcs = self.relaxation_xcs
         static_addons = self.static_addons
@@ -260,7 +233,7 @@ class SubmitTools(object):
         """
         Returns queue manager (eg #SBATCH)
         """
-        return self.sub_configs["manager"]
+        return self.configs["manager"]
 
     @property
     def slurm_options(self):
@@ -270,11 +243,23 @@ class SubmitTools(object):
 
         To be written at the top of submission files
         """
-        slurm_configs = self.slurm_configs.copy()
+        possible_options = [
+            "nodes",
+            "ntasks",
+            "time",
+            "error",
+            "output",
+            "account",
+            "partition",
+            "job-name",
+            "mem-per-cpu",
+            "mem-per-gpu",
+            "constraint",
+            "qos",
+        ]
+        configs = self.configs.copy()
         options = {
-            option: slurm_configs[option]
-            for option in slurm_configs
-            if slurm_configs[option]
+            option: configs[option] for option in possible_options if configs[option]
         }
         partitions = self.partitions.copy()
         if options["partition"] in partitions:
@@ -317,8 +302,8 @@ class SubmitTools(object):
         """
         Returns bin directory where things (eg LOBSTER) are located
         """
-        sub_configs = self.sub_configs.copy()
-        machine = sub_configs["machine"]
+        configs = self.configs.copy()
+        machine = configs["machine"]
         if machine == "msi":
             return "/home/cbartel/shared/bin"
         elif machine == "bridges2":
@@ -333,8 +318,9 @@ class SubmitTools(object):
         """
         Returns directory containing vasp executable
         """
-        machine = self.sub_configs["machine"]
-        version = self.sub_configs["vasp_version"]
+        configs = self.configs.copy()
+        machine = configs["machine"]
+        version = configs["vasp_version"]
         if machine == "msi":
             preamble = "%s/vasp" % self.bin_dir
             if version == 5:
@@ -356,24 +342,22 @@ class SubmitTools(object):
             e.g., 'srun -n 24 PATH_TO_VASP/vasp_std > vasp.o' (if mpi_command == 'srun')
             e.g., 'mpirun -np 24 PATH_TO_VASP/vasp_std > vasp.o' (if mpi_command == 'mpirun')
         """
-        sub_configs = self.sub_configs.copy()
-        vasp_configs = self.vasp_configs.copy()
-        vasp_exec = os.path.join(self.vasp_dir, sub_configs["vasp"])
-        slurm_options = self.slurm_options.copy()
+        configs = self.configs.copy()
+        vasp_exec = os.path.join(self.vasp_dir, configs["vasp"])
 
-        if sub_configs["mpi_command"] == "srun":
+        if configs["mpi_command"] == "srun":
             return "\n%s --ntasks=%s --mpi=pmi2 %s > %s\n" % (
-                sub_configs["mpi_command"],
-                str(slurm_options["ntasks"]),
+                configs["mpi_command"],
+                str(configs["ntasks"]),
                 vasp_exec,
-                vasp_configs["fvaspout"],
+                configs["fvaspout"],
             )
-        elif sub_configs["mpi_command"] == "mpirun":
+        elif configs["mpi_command"] == "mpirun":
             return "\n%s -np=%s %s > %s\n" % (
-                sub_configs["mpi_command"],
-                str(slurm_options["ntasks"]),
+                configs["mpi_command"],
+                str(configs["ntasks"]),
                 vasp_exec,
-                vasp_configs["fvaspout"],
+                configs["fvaspout"],
             )
 
     @property
@@ -482,11 +466,9 @@ class SubmitTools(object):
                 will likely make edits to INCAR
         """
 
-        # make copies of relevant configs dicts
-        vasp_configs = self.vasp_configs.copy()
-        sub_configs = self.sub_configs.copy()
+        configs = self.configs.copy()
 
-        fresh_restart = sub_configs["fresh_restart"]
+        fresh_restart = configs["fresh_restart"]
         launch_dir = self.launch_dir
 
         calc_list = self.calc_list
@@ -510,8 +492,8 @@ class SubmitTools(object):
 
             # (0) update vasp configs with the current xc and calc
             xc_to_run, calc_to_run = xc_calc.split("-")
-            vasp_configs["xc_to_run"] = xc_to_run
-            vasp_configs["calc_to_run"] = calc_to_run
+            configs["xc_to_run"] = xc_to_run
+            configs["calc_to_run"] = calc_to_run
 
             # (1) make calc_dir (or remove and remake if fresh_restart)
             calc_dir = os.path.join(launch_dir, xc_calc)
@@ -529,7 +511,7 @@ class SubmitTools(object):
             E_per_at = AnalyzeVASP(calc_dir).E_per_at
             convergence = True if E_per_at else False
             if convergence:
-                vsu = VASPSetUp(calc_dir, user_configs=vasp_configs)
+                vsu = VASPSetUp(calc_dir, user_configs=configs)
                 is_calc_clean = vsu.is_clean
                 if not is_calc_clean:
                     statuses[xc_calc] = "continue"
@@ -555,7 +537,7 @@ class SubmitTools(object):
 
             else:
                 # (4) check for POSCAR
-                # flag to check whether POSCAR is newly copied (don't want to perturb already-perturbed structures)
+                # flag to check whether POSCAR is newly copied
                 fpos_dst = os.path.join(calc_dir, "POSCAR")
                 if os.path.exists(fpos_dst):
                     # if there is a POSCAR, make sure its not empty
@@ -586,27 +568,19 @@ class SubmitTools(object):
     @property
     def prepare_directories(self):
         statuses = self.statuses
-        vasp_configs = self.vasp_configs
+        configs = self.configs.copy()
         launch_dir = self.launch_dir
         calc_list = self.calc_list
         for xc_calc in calc_list:
             status = statuses[xc_calc]
             if status in ["done", "queued"]:
                 continue
-            if xc_calc == calc_list[0]:
-                first_calc = True
-            else:
-                first_calc = False
+
             xc_to_run, calc_to_run = xc_calc.split("-")
 
-            user_vasp_configs_before_error_handling = vasp_configs.copy()
+            user_vasp_configs_before_error_handling = configs.copy()
             user_vasp_configs_before_error_handling["xc_to_run"] = xc_to_run
             user_vasp_configs_before_error_handling["calc_to_run"] = calc_to_run
-
-            if first_calc and (status == "new"):
-                user_vasp_configs_before_error_handling["perturb_struc"] = (
-                    self.sub_configs["perturb_first_struc"]
-                )
 
             calc_dir = os.path.join(launch_dir, xc_calc)
 
@@ -686,14 +660,11 @@ class SubmitTools(object):
         7) if lobster_static and calc is static, write LOBSTER and BADER commands
         """
 
-        # make copies of our starting configs
-        vasp_configs = self.vasp_configs.copy()
-        sub_configs = self.sub_configs.copy()
+        configs = self.configs.copy()
+        slurm_options = self.slurm_options.copy()
 
         launch_dir = self.launch_dir
 
-        vasp_command = self.vasp_command
-        slurm_options = self.slurm_options.copy()
         queue_manager = self.queue_manager
 
         calc_list = self.calc_list
@@ -713,11 +684,11 @@ class SubmitTools(object):
             # this is for running MPI jobs that may require large memory
             f.write("ulimit -s unlimited\n")
             # load certain modules if needed for MPI command
-            if sub_configs["mpi_command"] == "mpirun":
-                if sub_configs["machine"] == "msi":
-                    if sub_configs["vasp_version"] == 5:
+            if configs["mpi_command"] == "mpirun":
+                if configs["machine"] == "msi":
+                    if configs["vasp_version"] == 5:
                         f.write("module load impi/2018/release_multithread\n")
-                    elif sub_configs["vasp_version"] == 6:
+                    elif configs["vasp_version"] == 6:
                         unload = [
                             "mkl",
                             "intel/2018.release",
@@ -731,7 +702,7 @@ class SubmitTools(object):
                             f.write("module unload %s\n" % module)
                         for module in load:
                             f.write("module load %s\n" % module)
-                elif sub_configs["machine"] == "bridges2":
+                elif configs["machine"] == "bridges2":
                     f.write("module load intelmpi\nexport OMP_NUM_THREADS=1\n")
 
             for xc_calc in calc_list:
@@ -744,7 +715,7 @@ class SubmitTools(object):
                 xc_to_run, calc_to_run = xc_calc.split("-")
                 calc_dir = os.path.join(launch_dir, xc_calc)
 
-                incar_mods = vasp_configs["incar_mods"]
+                incar_mods = configs["incar_mods"]
                 if xc_calc in incar_mods:
                     incar_mods = incar_mods[xc_calc]
                 else:
@@ -791,6 +762,7 @@ class SubmitTools(object):
             if there's something to launch
                 (ie if all calcs are done, dont launch)
         """
+        configs = self.configs.copy()
         if self.is_job_in_queue:
             return
 
@@ -799,7 +771,7 @@ class SubmitTools(object):
         launch_dir = self.launch_dir
 
         # determine what keywords to look for to see if job needs to be launched
-        flags_that_need_to_be_executed = self.sub_configs["execute_flags"]
+        flags_that_need_to_be_executed = configs["execute_flags"]
 
         fsub = os.path.join(launch_dir, "sub.sh")
 

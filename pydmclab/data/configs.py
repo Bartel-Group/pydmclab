@@ -4,6 +4,11 @@ this_dir, this_filename = os.path.split(__file__)
 DATA_PATH = os.path.join(this_dir, "data")
 
 
+def load_base_configs():
+    with open(os.path.join(DATA_DIR, "_hpc_configs.yaml")) as f:
+        return yaml.safe_load(f)
+
+
 def load_vasp_configs():
     with open(os.path.join(DATA_PATH, "_vasp_configs.yaml")) as f:
         return yaml.safe_load(f)

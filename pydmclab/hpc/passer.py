@@ -1,18 +1,41 @@
 import sys
 import os
+import json
 from shutil import copyfile
 import numpy as np
-from pydmclab.hpc.analyze import AnalyzeVASP
-from pydmclab.core.struc import StrucTools
+
 from pymatgen.io.vasp.inputs import Incar
 from pymatgen.io.vasp.sets import get_structure_from_prev_run
 
-import json
+from pydmclab.hpc.analyze import AnalyzeVASP
+from pydmclab.core.struc import StrucTools
 
 
 class Passer(object):
+    """
+    This class is made to be executed on compute nodes (ie it gets called between VASP calls for a series of jobs that are packed together)
+
+    The idea is to run this to figure out how to pass stuff from freshly converged calcs to subsequent calcs
+
+    The main things we care about are:
+        - changing smearing (ISMEAR, SIGMA) based on band gap
+        - changing kpoints (KSPACING) based on band gap
+        - passing CONTCAR --> POSCAR
+        - passing WAVECAR
+        - passing optimized magnetic moments as initial guesses (MAGMOM)
+        - passing NBANDS for lobster
+    """
 
     def __init__(self, passer_dict_as_str):
+        """
+        Args:
+            passer_dict_as_str (str): a json string that contains the following keys
+                - xc_calc (str): the current xc-calculation type (eg "gga-static")
+                - calc_list (list): the list of all xc-calculation types that have been run (eg ["gga-static", "gga-relax", "gga-lobster"])
+                - calc_dir (str): the directory of the current calculation
+                - incar_mods (dict): a dictionary of user-defined INCAR modifications
+                - launch_dir (str): the directory from which the job was launched
+        """
         passer_dict = json.loads(passer_dict_as_str)
 
         self.xc_calc = passer_dict["xc_calc"]
@@ -23,25 +46,40 @@ class Passer(object):
 
     @property
     def prev_xc_calc(self):
+        """
+        Returns:
+            the parent xc_calc that should pass stuff to the present xc_calc
+        """
         curr_xc_calc = self.xc_calc
         curr_xc, curr_calc = curr_xc_calc.split("-")
-        calc_list = self.calc_list
         if curr_calc == "loose":
+            # just setting some dummy thing b/c nothing should come before loose
             prev_xc_calc = curr_xc_calc.replace(curr_calc, "pre_loose")
             return prev_xc_calc
+
         if curr_calc == "relax":
+            # for gga/gga+u, inherit from loose if it exists, otherwise don't inherit
             if curr_xc in ["gga", "ggau"]:
                 prev_xc_calc = curr_xc_calc.replace(curr_calc, "loose")
+            # for metagga/hse, inherit from gga
             else:
                 prev_xc_calc = curr_xc_calc.replace(curr_xc, "gga")
             return prev_xc_calc
+
         if curr_calc == "static":
+            # static calcs inherit from relax
             prev_xc_calc = curr_xc_calc.replace(curr_calc, "relax")
             return prev_xc_calc
+
+        # everything else inherits from static
         return curr_xc_calc.replace(curr_calc, "static")
 
     @property
     def prev_calc_dir(self):
+        """
+        Returns:
+            calc_dir (str) for parent calculation
+        """
         calc_dir = self.calc_dir
         curr_xc_calc = self.xc_calc
         prev_xc_calc = self.prev_xc_calc
@@ -49,6 +87,10 @@ class Passer(object):
 
     @property
     def prev_calc_convergence(self):
+        """
+        Returns:
+            True if parent is converged else False
+        """
         prev_calc_dir = self.prev_calc_dir
         if not os.path.exists(prev_calc_dir):
             return False
@@ -56,6 +98,14 @@ class Passer(object):
 
     @property
     def kill_job(self):
+        """
+        Returns:
+            True if child should not be launched
+                - if parent is not converged
+            False if child should be launched
+                - parent doesn't exist (ie nothing to inherit)
+                - parent is converged
+        """
         calc_list = self.calc_list
         prev_xc_calc = self.prev_xc_calc
         if prev_xc_calc not in calc_list:
@@ -67,6 +117,11 @@ class Passer(object):
 
     @property
     def prev_ready_to_pass(self):
+        """
+        Returns:
+            True if parent is converged
+            False if parent doesn't exist or is not ready to pass
+        """
         kill_job = self.kill_job
         if kill_job:
             return False
@@ -78,6 +133,9 @@ class Passer(object):
 
     @property
     def copy_contcar_to_poscar(self):
+        """
+        Copies CONTCAR from parent to POSCAR of child
+        """
         prev_ready = self.prev_ready_to_pass
         if not prev_ready:
             return None
@@ -90,6 +148,11 @@ class Passer(object):
 
     @property
     def copy_wavecar(self):
+        """
+        Copies WAVECAR from parent to child
+            doesn't pass if current calculation is relax or lobster
+                (because KPOINTS will be different)
+        """
         prev_ready = self.prev_ready_to_pass
         if not prev_ready:
             return None
@@ -109,6 +172,10 @@ class Passer(object):
 
     @property
     def prev_gap(self):
+        """
+        Returns:
+            parent's band gap (float) if parent is ready to pass else None
+        """
         prev_ready = self.prev_ready_to_pass
         if prev_ready:
             return AnalyzeVASP(self.prev_calc_dir).gap_properties["bandgap"]
@@ -116,11 +183,17 @@ class Passer(object):
             return None
 
     @property
-    def structure(self):
-        return StrucTools(os.path.join(self.calc_dir, "POSCAR")).structure
-
-    @property
     def bandgap_label(self):
+        """
+        Returns:
+            'metal'
+                - if parent band gap is < 0.01 eV
+            'semiconductor'
+                - if parent band gap is < 0.5 eV or the structure is very large
+            'insulator'
+                - if parent band gap is > 0.5 eV and structure is small
+        need to worry about size of structure b/c ISMEAR = -5 is no good for large strucs
+        """
         prev_gap = self.prev_gap
         if prev_gap is None:
             return None
@@ -128,7 +201,7 @@ class Passer(object):
         if prev_gap < 1e-2:
             return "metal"
         else:
-            if len(self.structure) > 64:
+            if len(StrucTools(os.path.join(self.calc_dir, "POSCAR")).structure) > 64:
                 return "semiconductor"
             else:
                 if prev_gap < 0.5:
@@ -138,12 +211,18 @@ class Passer(object):
 
     @property
     def bandgap_based_incar_adjustments(self):
+        """
+        Returns:
+            a dictionary of INCAR adjustments based on band gap
+                KSPACING, ISMEAR, SIGMA
+        """
         bandgap_label = self.bandgap_label
         if not bandgap_label:
             return {}
 
         adjustments = {}
 
+        # more or less stolen from pymatgen
         if bandgap_label == "metal":
             adjustments["ISMEAR"] = 0
             adjustments["SIGMA"] = 0.2
@@ -162,6 +241,11 @@ class Passer(object):
 
     @property
     def magmom_based_incar_adjustments(self):
+        """
+        Returns:
+            a dictionary of INCAR adjustments based on magnetic moments
+                MAGMOM drawn from previous calculation's optimized magnetic moments
+        """
         prev_calc_dir = self.prev_calc_dir
         if not os.path.exists(prev_calc_dir):
             return {}
@@ -183,6 +267,11 @@ class Passer(object):
 
     @property
     def nbands_based_incar_adjustments(self):
+        """
+        Returns:
+            a dictionary of INCAR adjustments based on NBANDS
+                NBANDS = 1.5 * NBANDS of previous calculation for LOBSTER
+        """
         prev_calc_dir = self.prev_calc_dir
         if not os.path.exists(prev_calc_dir):
             return None
@@ -191,11 +280,18 @@ class Passer(object):
         new_nbands = {}
         if prev_settings:
             old_nbands = prev_settings["NBANDS"]
+            # based on CJB heuristic; note pymatgen io lobster seems to set too few bands by default
             new_nbands = {"NBANDS": int(1.5 * old_nbands)}
         return new_nbands
 
     @property
     def update_incar(self):
+        """
+        Returns: Nothing
+            Updates INCAR based on band gap, magnetic moments, and NBANDS
+
+            Writes new INCAR to file
+        """
         bandgap_based_incar_adjustments = self.bandgap_based_incar_adjustments
         magmom_based_incar_adjustments = self.magmom_based_incar_adjustments
 
@@ -224,6 +320,10 @@ class Passer(object):
 
     @property
     def write_to_job_killer(self):
+        """
+        Writes to a file in launch_dir called job_killer.o that will trigger the job to be canceled
+            if a required parent is not converged (ie errored out) before the child job is launched
+        """
         kill_job = self.kill_job
         fready_to_pass = os.path.join(self.launch_dir, "job_killer.o")
         with open(fready_to_pass, "w", encoding="utf-8") as f:
@@ -234,6 +334,9 @@ class Passer(object):
 
     @property
     def complete_pass(self):
+        """
+        copy files + update INCAR
+        """
         self.copy_contcar_to_poscar
         self.copy_wavecar
         self.update_incar
@@ -241,6 +344,9 @@ class Passer(object):
 
 
 def main():
+    """
+    This gets executed from your scripts_dir
+    """
     passer_dict_as_str = sys.argv[1]
     passer = Passer(passer_dict_as_str=passer_dict_as_str)
     try:

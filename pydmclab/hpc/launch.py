@@ -3,7 +3,7 @@ import os
 from pymatgen.core.structure import Structure
 
 from pydmclab.core.mag import MagTools
-from pydmclab.data.configs import load_launch_configs
+from pydmclab.data.configs import load_base_configs
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -108,10 +108,10 @@ class LaunchTools(object):
         if not os.path.exists(calcs_dir):
             os.mkdir(calcs_dir)
 
-        _launch_configs = load_launch_configs()
+        _base_configs = load_base_configs()
 
         # update our baseline launch_configs with user_configs
-        configs = {**_launch_configs, **user_configs}
+        configs = {**_base_configs, **user_configs}
 
         # make structure a dict() for easier handling
         if not isinstance(structure, dict):
