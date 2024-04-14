@@ -191,7 +191,7 @@ class Passer(object):
         new_nbands = {}
         if prev_settings:
             old_nbands = prev_settings["NBANDS"]
-            new_nbands = {"NBANDS": 1.5 * old_nbands}
+            new_nbands = {"NBANDS": int(1.5 * old_nbands)}
         return new_nbands
 
     @property
