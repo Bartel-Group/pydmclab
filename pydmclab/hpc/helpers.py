@@ -11,15 +11,51 @@ from pydmclab.core.energies import ChemPots, FormationEnthalpy, MPFormationEnerg
 from pydmclab.utils.handy import read_json, write_json
 from pydmclab.data.configs import load_partition_configs
 
-# from pymatgen.entries.computed_entries import ComputedStructureEntry
 
+def get_vasp_configs(
+    standard="dmc",
+    dont_relax_cell=False,
+    special_functional=None,
+    incar_mods={},
+    kpoints_mods={},
+    potcar_mods={},
+    lobster_configs={"COHPSteps": 2000},
+    bs_configs={"bs_symprec": 0.1, "bs_line_density": 20},
+):
+    """
+    configs related to particular VASP calculations
 
-def get_vasp_configs(standard="dmc", dont_relax_cell=False):
-    configs = {}
+    Args:
+        standard (str) : dmc for group standard, mp for Materials Project standard
+        dont_relax_cell (bool): if True, sets ISIF = 2 for all calculations
+        special_functional (str): if you're not using r2SCAN, PBE, or HSE06
+        incar_mods (dict): modifications to INCAR
+            {xc-calc (str) : {INCAR tag : value}}
+                use xc = 'all' or calc = 'all' to apply to all xcs or all calcs
+        kpoints_mods (dict): modifications to KPOINTS
+            {xc-calc (str) : {KPOINTS generator tag ('grid', 'auto', 'density', 'reciprocal_density') : value}}
+        potcar_mods (dict): modifications to POTCAR
+            {xc-calc (str) : {element : potcar symbol}}
+        lobster_configs (dict): modifications to LOBSTER
+            {'COHPSteps' : int}
+                how fine a grid do you want for DOS (larger means finer energy discretization)
+        bs_configs (dict): modifications to band structure calculations
+            {'bs_symprec' : float, 'bs_line_density' : int}
+                symprec for finding primitive cell for band structure calculations, line density for band structure kpoints
+    """
+    vasp_configs = {}
     if dont_relax_cell:
-        configs.update({"incar_mods": {"all-all": {"ISIF": 2}}})
-    configs["standard"] = standard
-    return configs
+        incar_mods.update({"all-all": {"ISIF": 2}})
+    vasp_configs["standard"] = standard
+    vasp_configs["incar_mods"] = incar_mods
+    vasp_configs["kpoints_mods"] = kpoints_mods
+    vasp_configs["potcar_mods"] = potcar_mods
+    vasp_configs["functional"] = special_functional
+    vasp_configs["bs_symprec"] = bs_configs["bs_symprec"]
+    vasp_configs["bs_line_density"] = bs_configs["bs_line_density"]
+    vasp_configs["COHPSteps"] = lobster_configs["COHPSteps"]
+
+    return vasp_configs
 
 
 def get_slurm_configs(
@@ -27,18 +63,14 @@ def get_slurm_configs(
     cores_per_node=8,
     walltime_in_hours=95,
     mem_per_core="all",
-    partition="agsmall,msidmc",
+    partition="agsmall,msismall,msidmc",
     error_file="log.e",
     output_file="log.o",
     account="cbartel",
 ):
     """
 
-    how to modify slurm configurations for each VASP job
-
-    (see pydmclab.data.data._slurm_configs.yaml for defaults)
-
-    see pydmclab.hpc.submit.SubmitTools for more info
+    configs related to HPC settings for each submission script
 
 
     Args:
@@ -115,25 +147,40 @@ def get_slurm_configs(
 
 
 def get_sub_configs(
-    machine="msi",
-    submit_calculations_in_parallel=False,
-    mpi_command="mpirun",
-    vasp_version=6,
-    restart_these_calcs=[],
-    custom_calc_list=None,
-    start_with_loose=False,
-    perturb_first_struc=False,
     relaxation_xcs=["gga"],
     static_addons={"gga": ["lobster"]},
+    custom_calc_list=None,
+    restart_these_calcs=[],
+    start_with_loose=False,
+    machine="msi",
+    mpi_command="mpirun",
+    vasp_version=6,
+    submit_calculations_in_parallel=False,
 ):
     """
 
-    configs related to preparing submission scripts and submitting VASP calculations
-
-        see defaults in pydmclab.data.data._sub_configs.yaml
-        see pydmclab.hpc.submit.SubmitTools for more info
+    configs related to generating submission scripts
 
     Args:
+        relaxation_xcs (list):
+            list of xcs you want to at least run relax + static for
+                e.g., ['gga', 'metaggau']
+        static_addons (dict):
+            {xc : [list of additional calculations to run after static]}
+                e.g., {'gga' : ['lobster', 'parchg']}
+
+        relaxation_xcs and static_addons generate a calc_list (order of xc-calcs to be executed)
+            e.g., ['gga-relax', 'gga-static', 'metagga-relax', 'metagga-static', 'metagga-lobster', 'metagga-parchg']
+
+        customc_calc_list (list):
+            if you don't want to autogenerate a calc_list, you can specify the full list you want to run here
+
+        restart_these_calcs (list):
+            list of xc-calcs you want to start over (e.g., ['gga-lobster'])
+
+        start_with_loose (bool):
+            prepend your calc_list with a loose calc if True
+
         submit_calculations_in_parallel (bool or int):
             whether to prepare submission scripts in parallel or not
                 False: use 1 processor
@@ -141,20 +188,14 @@ def get_sub_configs(
                 int: use that many processors
             if this is not False, you should not run this on a login node
 
-        delete_all_calculations_and_start_over (bool):
-            if True, start all calculations over (ie delete all outputs)
-                ** you should rarely use this! **
-
-        rerun_lobster (bool) :
-            if True, rerun lobster even if it has already been run
-                ** you should rarely use this! **
+        machine (str):
+            name of supercomputer
 
         mpi_command (str):
             the command to use for mpi (eg mpirun, srun, etc)
 
-        special_packing (dict):
-            if you want to change the loose --> relax --> static flow for some functional
-                e.g., {'metagga' : ['metagga-loose', 'metagga-static']}
+        vasp_version (int):
+            5 for 5.4.4 or 6 for 6.4.1
 
     Returns:
         {config_name : config_value}
@@ -178,7 +219,6 @@ def get_sub_configs(
 
     sub_configs["fresh_restart"] = restart_these_calcs
     sub_configs["start_with_loose"] = start_with_loose
-    sub_configs["perturb_first_struc"] = perturb_first_struc
     sub_configs["relaxation_xcs"] = relaxation_xcs
     sub_configs["static_addons"] = static_addons
     sub_configs["machine"] = machine
@@ -196,31 +236,18 @@ def get_launch_configs(
 
     configs related to launching chains of calculations
 
-    see defaults in pydmclab.data.data._launch_configs.yaml
-
-    see pydmclab.hpc.launch.LaunchTools for more info
-
     Args:
-        standards (list):
-            list of standards (str) you'd like to calculate
-                e.g., ['dmc']
-
-        xcs (list):
-            list of xcs (str) you'd like to calculate for each standard
-                e.g., ['metagga', 'ggau']
-
-        use_mp_thermo_data (bool):
-            True if you are going to use formation energies provided in Materials Project for phase stability analysis
-                will automatically update the xcs/standards you want to launch to run these calcs
 
         n_afm_configs (int):
             number of antiferromagnetic configurations to run for each structure (0 if you don't want to run AFM)
 
-        skip_xcs_for_standards (dict):
-            dictionary of xcs to skip for a given standard
-                in principle, you may not want to run every xc for every standard. this gives you a mechanism to encode skipping combinations
-                Defaults to {"mp": ["gga", "metagga"]}.
-                    - e.g., we don't want to run GGA or MetaGGA MP calculations because MP uses GGA+U (for now)
+        override_mag (bool):
+            if True, let user decide mag completely (rather than auto figuring out whether magnetic)
+                NOTE: not sure if this is working
+
+        ID_specific_vasp_configs (dict):
+            {<formula_indicator>_<struc_indicator> : {any_config}}
+                NOTE: not sure if this is working
 
     Returns:
         dictionary of launch configurations
@@ -246,7 +273,7 @@ def get_analysis_configs(
 ):
     """
 
-    function for modifying analysis configs from the defaults (see pydmclab.data.data._batch_analysis_configs.yaml for defaults)
+    configs related to parsing calculations and compiling results
 
     Args:
         analyze_calculations_in_parallel (bool or int): whether to analyze calculation results in parallel or not
@@ -327,12 +354,12 @@ def get_query(
     api_key,
     search_for,
     properties=None,
-    max_Ehull=0.1,
-    max_sites_per_structure=100,
+    max_Ehull=0.05,
+    max_sites_per_structure=41,
     max_polymorph_energy=0.1,
     only_gs=False,
     include_structure=True,
-    max_strucs_per_cmpd=5,
+    max_strucs_per_cmpd=1,
     include_sub_phase_diagrams=False,
     data_dir=os.getcwd().replace("scripts", "data"),
     savename="query.json",

@@ -57,17 +57,22 @@ COMPOSITIONS = None
 
 # any configurations related to LaunchTools
 LAUNCH_CONFIGS = get_launch_configs(
-    n_afm_configs=0, override_mag=False, ID_specific_vasp_configs={}
+    n_afm_configs=0,
+    override_mag=False,
+    ID_specific_vasp_configs={},
 )
 
 # any configurations related to SubmitTools
 SUB_CONFIGS = get_sub_configs(
     relaxation_xcs=["gga"],
     static_addons={"gga": ["lobster"]},
-    submit_calculations_in_parallel=False,
-    mpi_command="mpirun",
+    custom_calc_list=None,
+    restart_these_calcs=[],
+    start_with_loose=False,
     machine="msi",
+    mpi_command="mpirun",
     vasp_version=6,
+    submit_calculations_in_parallel=False,
 )
 
 # any configurations related to Slurm
@@ -83,12 +88,22 @@ SLURM_CONFIGS = get_slurm_configs(
 )
 
 # any configurations related to VASPSetUp
-VASP_CONFIGS = get_vasp_configs(dont_relax_cell=False)
+VASP_CONFIGS = get_vasp_configs(
+    standard="dmc",
+    dont_relax_cell=False,
+    special_functional=None,
+    incar_mods={},
+    kpoints_mods={},
+    potcar_mods={},
+    lobster_configs={"COHPSteps": 2000},
+    bs_configs={"bs_symprec": 0.1, "bs_line_density": 20},
+)
 
 # any configurations related to AnalyzeBatch
 ANALYSIS_CONFIGS = get_analysis_configs(
     analyze_calculations_in_parallel=False,
     analyze_structure=True,
+    analyze_trajectory=False,
     analyze_mag=False,
     analyze_charge=False,
     analyze_dos=False,
@@ -96,7 +111,11 @@ ANALYSIS_CONFIGS = get_analysis_configs(
     exclude=[],
 )
 
-CONFIGS = {**ANALYSIS_CONFIGS, **VASP_CONFIGS, **SLURM_CONFIGS, **SUB_CONFIGS}
+CONFIGS = ANALYSIS_CONFIGS.copy()
+CONFIGS.update(VASP_CONFIGS)
+CONFIGS.update(SLURM_CONFIGS)
+CONFIGS.update(SUB_CONFIGS)
+CONFIGS.update(LAUNCH_CONFIGS)
 
 CONFIGS = write_json(CONFIGS, os.path.join(SCRIPTS_DIR, "configs.json"))
 
@@ -166,11 +185,10 @@ def main():
     else:
         magmoms = None
 
-    launch_configs = LAUNCH_CONFIGS
     launch_dirs = get_launch_dirs(
         strucs=strucs,
         magmoms=magmoms,
-        user_configs=launch_configs,
+        user_configs=CONFIGS,
         data_dir=DATA_DIR,
         calcs_dir=CALCS_DIR,
         remake=remake_launch_dirs,
@@ -178,22 +196,17 @@ def main():
     if print_launch_dirs_check:
         check_launch_dirs(launch_dirs)
 
-    sub_configs = SUB_CONFIGS
-    slurm_configs = SLURM_CONFIGS
-    vasp_configs = VASP_CONFIGS
-    user_sub_configs = {**sub_configs, **slurm_configs, **vasp_configs}
     if remake_subs:
         submit_calcs(
             launch_dirs=launch_dirs,
-            user_configs=user_sub_configs,
+            user_configs=CONFIGS,
             ready_to_launch=ready_to_launch,
-            n_procs=sub_configs["n_procs"],
+            n_procs=CONFIGS["n_procs"],
         )
 
-    analysis_configs = ANALYSIS_CONFIGS
     results = get_results(
         launch_dirs=launch_dirs,
-        user_configs=analysis_configs,
+        user_configs=CONFIGS,
         data_dir=DATA_DIR,
         remake=remake_results,
     )
