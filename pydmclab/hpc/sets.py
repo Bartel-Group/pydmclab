@@ -145,6 +145,24 @@ class GetSet(object):
             new_settings["NSW"] = 0
             new_settings["LWAVE"] = True
 
+        elif calc == "sphse06":
+            calc_settings = {
+                "NSW": 0,
+                "ALGO": "Normal",
+                "GGA": "PE",
+                "HFSCREEN": 0.2,
+                "LHFCALC": True,
+                "PRECFOCK": "Fast",
+                "ISMEAR": -5,
+                "LORBIT": 11,
+                "LCHARG": True,
+                "LASPH": True,
+                "LREAL": False,
+                "LDAU": False,
+            }
+            for key in calc_settings:
+                new_settings[key] = calc_settings[key]
+
         if standard == "dmc":
             dmc_options = {
                 "EDIFF": 1e-6,
