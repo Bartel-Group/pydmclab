@@ -999,7 +999,17 @@ class AnalyzeVASP(object):
             'sg' : dict of spacegroup information}
         """
         E_per_at = self.E_per_at
-        convergence = True if E_per_at else False
+        if self.calc == "static":
+            if os.path.exists(self.calc_dir.replace("static", "relax")):
+                E_relax = AnalyzeVASP(self.calc_dir.replace("static", "relax")).E_per_at
+                if E_relax and (abs(E_relax - E_per_at) < 0.1):
+                    convergence = True
+                else:
+                    convergence = False
+            else:
+                convergence = True if E_per_at else False
+        else:
+            convergence = True if E_per_at else False
         return {
             "convergence": convergence,
             "E_per_at": E_per_at,
