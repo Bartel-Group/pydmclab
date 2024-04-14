@@ -915,9 +915,7 @@ def get_results(
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
 
-    analyzer = AnalyzeBatch(
-        launch_dirs, user_configs=user_configs, refresh_configs=refresh_configs
-    )
+    analyzer = AnalyzeBatch(launch_dirs, user_configs=user_configs)
 
     data = analyzer.results
 
@@ -929,12 +927,11 @@ def check_results(results):
     keys_to_check = list(results.keys())
 
     converged = 0
+    static_converged = 0
+    total_static = 0
     for key in keys_to_check:
-        if "--" in key:
-            delimiter = "--"
-        else:
-            delimiter = "."
-        top_level, ID, standard, mag, xc_calc = key.split(delimiter)
+        formula_indicator, struc_indicator, mag, xc_calc = key.split("--")
+        xc, calc = xc_calc.split("-")
         data = results[key]
         convergence = results[key]["results"]["convergence"]
         print("\n%s" % key)
@@ -942,9 +939,14 @@ def check_results(results):
         if convergence:
             converged += 1
             # print("\n%s" % key)
-            print("E (static) = %.2f" % data["results"]["E_per_at"])
+            print("E (%s) = %.2f" % (xc_calc, data["results"]["E_per_at"]))
+            if calc == "static":
+                static_converged += 1
+        if calc == "static":
+            total_static += 1
 
     print("\n\n SUMMARY: %i/%i converged" % (converged, len(keys_to_check)))
+    print("\n\n SUMMARY: %i/%i converged" % (static_converged, total_static))
 
 
 def get_gs(
@@ -952,6 +954,7 @@ def get_gs(
     include_structure=False,
     non_default_functional=None,
     compute_Ef=True,
+    standard="dmc",
     data_dir=os.getcwd().replace("scripts", "data"),
     savename="gs.json",
     remake=False,
@@ -995,86 +998,68 @@ def get_gs(
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
 
-    standards = sorted(
-        list(set([results[key]["meta"]["setup"]["standard"] for key in results]))
-    )
-
-    gs = {
-        standard: {
-            xc: {}
-            for xc in sorted(
-                list(
-                    set(
-                        [
-                            results[key]["meta"]["setup"]["xc"]
-                            for key in results
-                            if results[key]["meta"]["setup"]["standard"] == standard
-                        ]
-                    )
-                )
-            )
-        }
-        for standard in standards
+    results = {
+        key: results[key] for key in results if results[key]["meta"]["calc"] == "static"
     }
 
-    for standard in gs:
-        for xc in gs[standard]:
-            keys = [
-                k
-                for k in results
-                if results[k]["meta"]["setup"]["standard"] == standard
-                if results[k]["meta"]["setup"]["xc"] == xc
-                if results[k]["results"]["formula"]
-            ]
+    gs = {
+        xc: {}
+        for xc in sorted(
+            list(set([results[key]["meta"]["setup"]["xc"] for key in results]))
+        )
+    }
 
-            unique_formulas = sorted(
-                list(set([results[key]["results"]["formula"] for key in keys]))
-            )
-            for formula in unique_formulas:
-                gs[standard][xc][formula] = {}
-                formula_keys = [
-                    k for k in keys if results[k]["results"]["formula"] == formula
-                ]
-                converged_keys = [
-                    k for k in formula_keys if results[k]["results"]["convergence"]
-                ]
-                if not converged_keys:
-                    gs_energy, gs_structure, gs_key = None, None, None
-                else:
-                    energies = [
-                        results[k]["results"]["E_per_at"] for k in converged_keys
-                    ]
-                    gs_energy = min(energies)
-                    gs_key = converged_keys[energies.index(gs_energy)]
-                    gs_structure = results[gs_key]["structure"]
-                complete = True if len(formula_keys) == len(converged_keys) else False
-                gs[standard][xc][formula] = {
-                    "E": gs_energy,
-                    "key": gs_key,
-                    "n_started": len(formula_keys),
-                    "n_converged": len(converged_keys),
-                    "complete": complete,
-                }
-                if include_structure:
-                    gs[standard][xc][formula]["structure"] = gs_structure
+    for xc in gs:
+        keys = [
+            k
+            for k in results
+            if results[k]["meta"]["setup"]["xc"] == xc
+            if results[k]["results"]["formula"]
+        ]
+
+        unique_formulas = sorted(
+            list(set([results[key]["results"]["formula"] for key in keys]))
+        )
+        for formula in unique_formulas:
+            gs[xc][formula] = {}
+            formula_keys = [
+                k for k in keys if results[k]["results"]["formula"] == formula
+            ]
+            converged_keys = [
+                k for k in formula_keys if results[k]["results"]["convergence"]
+            ]
+            if not converged_keys:
+                gs_energy, gs_structure, gs_key = None, None, None
+            else:
+                energies = [results[k]["results"]["E_per_at"] for k in converged_keys]
+                gs_energy = min(energies)
+                gs_key = converged_keys[energies.index(gs_energy)]
+                gs_structure = results[gs_key]["structure"]
+            complete = True if len(formula_keys) == len(converged_keys) else False
+            gs[xc][formula] = {
+                "E": gs_energy,
+                "key": gs_key,
+                "n_started": len(formula_keys),
+                "n_converged": len(converged_keys),
+                "complete": complete,
+            }
+            if include_structure:
+                gs[xc][formula]["structure"] = gs_structure
 
     if compute_Ef:
-        for standard in gs:
-            for xc in gs[standard]:
-                if not non_default_functional:
-                    functional = "r2scan" if xc == "metagga" else "pbe"
+        for xc in gs:
+            if not non_default_functional:
+                functional = "r2scan" if xc == "metagga" else "pbe"
+            else:
+                functional = non_default_functional
+            mus = ChemPots(functional=functional, standard=standard).chempots
+            for formula in gs[xc]:
+                E = gs[xc][formula]["E"]
+                if E:
+                    Ef = FormationEnthalpy(formula=formula, E_DFT=E, chempots=mus).Ef
                 else:
-                    functional = non_default_functional
-                mus = ChemPots(functional=functional, standard=standard).chempots
-                for formula in gs[standard][xc]:
-                    E = gs[standard][xc][formula]["E"]
-                    if E:
-                        Ef = FormationEnthalpy(
-                            formula=formula, E_DFT=E, chempots=mus
-                        ).Ef
-                    else:
-                        Ef = None
-                    gs[standard][xc][formula]["Ef"] = Ef
+                    Ef = None
+                gs[xc][formula]["Ef"] = Ef
     write_json(gs, fjson)
     return read_json(fjson)
 
@@ -1089,29 +1074,20 @@ def check_gs(gs):
     """
 
     print("\nchecking ground-states")
-    standards = gs.keys()
-    print("standards = ", standards)
-    for standard in standards:
-        print("\nworking on %s standard" % standard)
-        xcs = list(gs[standard].keys())
-        for xc in xcs:
-            print("  xc = %s" % xc)
-            formulas = list(gs[standard][xc].keys())
-            n_formulas = len(formulas)
-            n_formulas_complete = len(
-                [k for k in formulas if gs[standard][xc][k]["complete"]]
-            )
-            print(
-                "%i/%i formulas with all calculations completed"
-                % (n_formulas_complete, n_formulas)
-            )
-            for formula in gs[standard][xc]:
-                if "Ef" in gs[standard][xc][formula]:
-                    if gs[standard][xc][formula]["Ef"]:
-                        print(
-                            "%s : %.2f eV/at"
-                            % (formula, gs[standard][xc][formula]["Ef"])
-                        )
+    xcs = list(gs.keys())
+    for xc in xcs:
+        print("  xc = %s" % xc)
+        formulas = list(gs[xc].keys())
+        n_formulas = len(formulas)
+        n_formulas_complete = len([k for k in formulas if gs[xc][k]["complete"]])
+        print(
+            "%i/%i formulas with all calculations completed"
+            % (n_formulas_complete, n_formulas)
+        )
+        for formula in gs[xc]:
+            if "Ef" in gs[xc][formula]:
+                if gs[xc][formula]["Ef"]:
+                    print("%s : %.2f eV/at" % (formula, gs[xc][formula]["Ef"]))
 
 
 def get_thermo_results(
@@ -1154,23 +1130,17 @@ def get_thermo_results(
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
 
-    thermo_results = {
-        standard: {
-            xc: {formula: {} for formula in gs[standard][xc]} for xc in gs[standard]
-        }
-        for standard in gs
-    }
+    thermo_results = {xc: {formula: {} for formula in gs[xc]} for xc in gs}
 
     for key in results:
         tmp_thermo = {}
 
-        standard = results[key]["meta"]["setup"]["standard"]
         xc = results[key]["meta"]["setup"]["xc"]
         formula = results[key]["results"]["formula"]
         ID = "__".join(
             [
-                results[key]["meta"]["setup"]["formula_tag"],
-                results[key]["meta"]["setup"]["ID"],
+                results[key]["meta"]["setup"]["formula_indicator"],
+                results[key]["meta"]["setup"]["struc_indicator"],
                 results[key]["meta"]["setup"]["mag"],
             ]
         )
@@ -1187,12 +1157,12 @@ def get_thermo_results(
         tmp_thermo["calculated_formula"] = calcd_formula
 
         if E:
-            gs_key = gs[standard][xc][formula]["key"]
-            if "Ef" in gs[standard][xc][formula]:
-                gs_Ef = gs[standard][xc][formula]["Ef"]
+            gs_key = gs[xc][formula]["key"]
+            if "Ef" in gs[xc][formula]:
+                gs_Ef = gs[xc][formula]["Ef"]
             else:
                 gs_Ef = None
-            gs_E = gs[standard][xc][formula]["E"]
+            gs_E = gs[xc][formula]["E"]
             delta_E_gs = E - gs_E
 
             if key == gs_key:
@@ -1205,9 +1175,7 @@ def get_thermo_results(
                 tmp_thermo["Ef"] = gs_Ef + delta_E_gs
             else:
                 tmp_thermo["Ef"] = None
-            tmp_thermo["all_polymorphs_converged"] = gs[standard][xc][formula][
-                "complete"
-            ]
+            tmp_thermo["all_polymorphs_converged"] = gs[xc][formula]["complete"]
 
         else:
             tmp_thermo["dE_gs"] = None
@@ -1215,7 +1183,7 @@ def get_thermo_results(
             tmp_thermo["is_gs"] = False
             tmp_thermo["all_polymorphs_converged"] = False
 
-        thermo_results[standard][xc][formula][ID] = tmp_thermo
+        thermo_results[xc][formula][ID] = tmp_thermo
 
     write_json(thermo_results, fjson)
     return read_json(fjson)
@@ -1224,46 +1192,33 @@ def get_thermo_results(
 def check_thermo_results(thermo):
     print("\nchecking thermo results")
 
-    for standard in thermo:
-        print("\n\nworking on %s standard" % standard)
-        for xc in thermo[standard]:
-            print("\nxc = %s" % xc)
-            for formula in thermo[standard][xc]:
-                print("formula = %s" % formula)
-                print(
-                    "%i polymorphs converged"
-                    % len(
-                        [
-                            k
-                            for k in thermo[standard][xc][formula]
-                            if thermo[standard][xc][formula][k]["E"]
-                        ]
-                    )
-                )
-                gs_ID = [
-                    k
-                    for k in thermo[standard][xc][formula]
-                    if thermo[standard][xc][formula][k]["is_gs"]
-                ]
-                if gs_ID:
-                    gs_ID = gs_ID[0]
-                    print("%s is the ground-state structure" % gs_ID)
+    for xc in thermo:
+        print("\nxc = %s" % xc)
+        for formula in thermo[xc]:
+            print("formula = %s" % formula)
+            print(
+                "%i polymorphs converged"
+                % len([k for k in thermo[xc][formula] if thermo[xc][formula][k]["E"]])
+            )
+            gs_ID = [k for k in thermo[xc][formula] if thermo[xc][formula][k]["is_gs"]]
+            if gs_ID:
+                gs_ID = gs_ID[0]
+                print("%s is the ground-state structure" % gs_ID)
 
     print("\n\n  SUMMARY  ")
-    for standard in thermo:
-        for xc in thermo[standard]:
-            print("~~%s~~" % "_".join([standard, xc]))
-            converged_formulas = []
-            for formula in thermo[standard][xc]:
-                for ID in thermo[standard][xc][formula]:
-                    if thermo[standard][xc][formula][ID]["all_polymorphs_converged"]:
-                        converged_formulas.append(formula)
+    for xc in thermo:
+        print("~~%s~~" % xc)
+        converged_formulas = []
+        for formula in thermo[xc]:
+            for ID in thermo[xc][formula]:
+                if thermo[xc][formula][ID]["all_polymorphs_converged"]:
+                    converged_formulas.append(formula)
 
-            converged_formulas = list(set(converged_formulas))
-            print(
-                "%i/%i formulas have all polymorphs converged"
-                % (len(converged_formulas), len(thermo[standard][xc].keys()))
-            )
+        converged_formulas = list(set(converged_formulas))
+        print(
+            "%i/%i formulas have all polymorphs converged"
+            % (len(converged_formulas), len(thermo[xc].keys()))
+        )
 
 
 def get_dos_results(
@@ -1324,19 +1279,19 @@ def get_dos_results(
 
     for key in results:
         calc_dir = results[key]["meta"]["calc_dir"]
-        standard, xc = (
-            results[key]["meta"]["setup"]["standard"],
-            results[key]["meta"]["setup"]["xc"],
-        )
+        xc = results[key]["meta"]["setup"]["xc"]
+        calc = results[key]["meta"]["setup"]["calc"]
+        if calc not in ["lobster", "bs"]:
+            continue
         ID = "__".join(
             [
-                results[key]["meta"]["setup"]["formula_tag"],
-                results[key]["meta"]["setup"]["ID"],
+                results[key]["meta"]["setup"]["formula_indicator"],
+                results[key]["meta"]["setup"]["struc_indicator"],
                 results[key]["meta"]["setup"]["mag"],
             ]
         )
         formula = results[key]["results"]["formula"]
-        thermo_result = thermo_results[standard][xc][formula][ID]
+        thermo_result = thermo_results[xc][formula][ID]
         if only_gs:
             if not thermo_result["is_gs"]:
                 continue
@@ -1346,34 +1301,31 @@ def get_dos_results(
         if only_xc:
             if xc != only_xc:
                 continue
-        if only_standard:
-            if standard != only_standard:
-                continue
         av = AnalyzeVASP(calc_dir)
         if "tdos" in dos_to_store:
             pdos = av.pdos(remake=regenerate_dos)
             tdos = av.tdos(pdos=pdos, remake=regenerate_dos)
-            thermo_results[standard][xc][formula][ID]["tdos"] = tdos
+            thermo_results[xc][formula][ID]["tdos"] = tdos
         if "pdos" in dos_to_store:
-            thermo_results[standard][xc][formula][ID]["pdos"] = pdos
+            thermo_results[xc][formula][ID]["pdos"] = pdos
         if "tcohp" in dos_to_store:
             pcohp = av.pcohp(remake=regenerate_cohp)
             tcohp = av.tcohp(pcohp=pcohp, remake=regenerate_cohp)
-            thermo_results[standard][xc][formula][ID]["tcohp"] = tcohp
+            thermo_results[xc][formula][ID]["tcohp"] = tcohp
         if "pcohp" in dos_to_store:
-            thermo_results[standard][xc][formula][ID]["pcohp"] = pcohp
+            thermo_results[xc][formula][ID]["pcohp"] = pcohp
         if "tcoop" in dos_to_store:
             pcohp = av.pcohp(are_coops=True, remake=regenerate_cohp)
             tcohp = av.tcohp(pcohp=pcohp, remake=regenerate_cohp)
-            thermo_results[standard][xc][formula][ID]["tcoop"] = tcohp
+            thermo_results[xc][formula][ID]["tcoop"] = tcohp
         if "pcoop" in dos_to_store:
-            thermo_results[standard][xc][formula][ID]["pcoop"] = pcohp
+            thermo_results[xc][formula][ID]["pcoop"] = pcohp
         if "tcobi" in dos_to_store:
             pcohp = av.pcohp(are_cobis=True, remake=regenerate_cohp)
             tcohp = av.tcohp(pcohp=pcohp, remake=regenerate_cohp)
-            thermo_results[standard][xc][formula][ID]["tcobi"] = tcohp
+            thermo_results[xc][formula][ID]["tcobi"] = tcohp
         if "pcobi" in dos_to_store:
-            thermo_results[standard][xc][formula][ID]["pcobi"] = pcohp
+            thermo_results[xc][formula][ID]["pcobi"] = pcohp
 
     write_json(thermo_results, fjson)
     return read_json(fjson)

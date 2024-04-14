@@ -309,8 +309,9 @@ class AnalyzeVASP(object):
         Returns True if VASP calculation is converged, else False
         """
         vr = self.outputs.vasprun
+        incar = self.outputs.incar
         if vr:
-            if self.calc == "static":
+            if int(incar["NSW"]) in [0, 1]:
                 return vr.converged_electronic
             else:
                 return vr.converged
@@ -1020,6 +1021,34 @@ class AnalyzeVASP(object):
             return None
 
     @property
+    def run_stats(self):
+        outcar = self.outputs.outcar
+        if outcar:
+            run_stats = outcar.run_stats
+            run_stats.update(self.outcar_metadata)
+        else:
+            return None
+
+    @property
+    def outcar_metadata(self):
+        foutcar = os.path.join(self.calc_dir, "OUTCAR")
+        if not os.path.exists(foutcar):
+            return None
+        vasp_version = None
+        execution_date = None
+        with open(foutcar, "r") as f:
+            for line in f:
+                if ("vasp" in line) and not vasp_version:
+                    line = line.split(" ")
+                    vasp_version = [v for v in line if "vasp" in v][0]
+                if "executed on" in line and not execution_date:
+                    line = line[:-1].split(" ")
+                    date = [v for v in line if "." in v][0]
+                    time = [v for v in line if ":" in v][0]
+                    execution_date = "_".join([date, time])
+        return {"vasp_version": vasp_version, "execution_date": execution_date}
+
+    @property
     def metadata(self):
         """returns compiled metadata
 
@@ -1065,6 +1094,8 @@ class AnalyzeVASP(object):
 
         meta["calc_dir"] = self.calc_dir
 
+        meta["run_stats"] = self.run_stats
+
         return meta
 
     @property
@@ -1075,14 +1106,14 @@ class AnalyzeVASP(object):
             self explanatory?
         """
         calc_dir = self.calc_dir
-        formula, ID, standard, mag, xc_calc = calc_dir.split("/")[-5:]
+        project_dir, scripts, formula, ID, mag, xc_calc = calc_dir.split("/")[-6:]
         return {
-            "formula_tag": formula,
-            "ID": ID,
-            "standard": standard,
+            "formula_indicator": formula,
+            "struc_indicator": ID,
             "mag": mag,
             "xc": xc_calc.split("-")[0],
             "calc": xc_calc.split("-")[1],
+            "project": project_dir,
         }
 
     @property
@@ -1100,12 +1131,12 @@ class AnalyzeVASP(object):
             entry.data[key] = calc_setup[key]
         entry.data["material_id"] = "--".join(
             [
-                entry.data["formula_tag"],
-                entry.data["ID"],
-                entry.data["standard"],
+                entry.data["formula_indicator"],
+                entry.data["struc_indicator"],
                 entry.data["mag"],
                 entry.data["xc"],
                 entry.data["calc"],
+                entry.data["project"],
             ]
         )
         entry.data["formula"] = CompTools(entry.composition.reduced_formula).clean
@@ -1202,15 +1233,7 @@ class AnalyzeVASP(object):
 
 
 class AnalyzeBatch(object):
-    def __init__(
-        self,
-        launch_dirs,
-        user_configs={},
-        analysis_configs_yaml=os.path.join(
-            os.getcwd(), "_batch_VASP_analysis_configs.yaml"
-        ),
-        refresh_configs=True,
-    ):
+    def __init__(self, launch_dirs, user_configs={}):
         """
         Args:
             launch_dirs (dict) : {launch directory : {'xcs' : [final_xcs for each chain of jobs], 'magmom' : [list of magmoms for that launch directory]}}
@@ -1233,11 +1256,7 @@ class AnalyzeBatch(object):
         self.launch_dirs = launch_dirs
 
         # write baseline analysis configs locally if not there or want to be refreshed
-        if not os.path.exists(analysis_configs_yaml) or refresh_configs:
-            _analysis_configs = load_batch_vasp_analysis_configs()
-            write_yaml(_analysis_configs, analysis_configs_yaml)
-
-        _analysis_configs = read_yaml(analysis_configs_yaml)
+        _analysis_configs = load_batch_vasp_analysis_configs()
 
         # update configs with any user_configs
         configs = {**_analysis_configs, **user_configs}
@@ -1257,19 +1276,15 @@ class AnalyzeBatch(object):
         """
         launch_dirs = self.launch_dirs
         all_calc_dirs = []
-        calcs = (
-            ["loose", "relax", "static"]
-            if not self.configs["only_static"]
-            else ["static"]
-        )
         for launch_dir in launch_dirs:
-            files_in_launch_dir = os.listdir(launch_dir)
-            calc_dirs = [
-                os.path.join(launch_dir, c)
-                for c in files_in_launch_dir
+            stuff_in_launch_dir = os.listdir(launch_dir)
+            relevant_stuff = [
+                c
+                for c in stuff_in_launch_dir
                 if "-" in c
-                if c.split("-")[1] in calcs
+                if any(xc in c for xc in ["gga", "metagga", "hse"])
             ]
+            calc_dirs = [os.path.join(launch_dir, c) for c in relevant_stuff]
             calc_dirs = [
                 c for c in calc_dirs if os.path.exists(os.path.join(c, "POSCAR"))
             ]
@@ -1285,7 +1300,7 @@ class AnalyzeBatch(object):
             a string that can be used as a key for a dictionary
                 top_level.unique_ID.standard.mag.xc_calc
         """
-        return "--".join(calc_dir.split("/")[-5:])
+        return "--".join(calc_dir.split("/")[-4:])
 
     def _results_for_calc_dir(self, calc_dir):
         """
@@ -1298,7 +1313,27 @@ class AnalyzeBatch(object):
                 - see AnalyzeVASP.summary() for more info
         """
 
+        xc_calc = self._key_for_calc_dir(calc_dir).split("--")[-1]
+        xc, calc = xc_calc.split("-")
+
         configs = self.configs.copy()
+
+        if calc != "relax":
+            configs["include_trajectory"] = False
+        if calc not in ["lobster", "bs"]:
+            configs["include_tcohp"] = False
+            configs["include_pcohp"] = False
+            configs["include_tcoop"] = False
+            configs["include_pcoop"] = False
+            configs["include_tcobi"] = False
+            configs["include_pcobi"] = False
+            configs["include_tdos"] = False
+            configs["include_pdos"] = False
+        if calc != "static":
+            configs["include_mag"] = False
+            configs["include_entry"] = False
+            configs["include_structure"] = False
+
         verbose = configs["verbose"]
         include_meta = configs["include_meta"]
         include_calc_setup = configs["include_calc_setup"]
@@ -1342,10 +1377,7 @@ class AnalyzeBatch(object):
         # store the relax energy if we asked to
         if check_relax:
             relax_energy = AnalyzeVASP(calc_dir.replace("static", "relax")).E_per_at
-            summary["meta"]["E_relax"] = relax_energy
-            if not relax_energy:
-                summary["results"]["convergence"] = False
-                summary["results"]["E_per_at"] = None
+            summary["results"]["E_relax"] = relax_energy
 
         # save the data in a dictionary with a key for that calc_dir
         key = self._key_for_calc_dir(calc_dir)

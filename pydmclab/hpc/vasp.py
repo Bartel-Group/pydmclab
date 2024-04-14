@@ -163,6 +163,8 @@ class VASPSetUp(object):
         Write input files (INCAR, KPOINTS, POTCAR)
         """
 
+        warnings.filterwarnings("ignore", category=BadInputSetWarning)
+
         configs = self.configs.copy()
         calc_dir = self.calc_dir
 

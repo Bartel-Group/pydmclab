@@ -1,7 +1,8 @@
 only_static: True # only retrieve data from the static calculations
-one_xc: # if None, retrieve all xcs, else retrieve only the one specified
-check_relax: True # make sure the relax calculation and the static have similar energies
-include_meta: True # include metadata like INCAR, KPOINTS, POTCAR settings
+only_xc: # if None, retrieve all xcs, else retrieve only the one specified
+
+check_relax_energy: True # make sure the relax calculation and the static have similar energies
+include_metadata: True # include metadata like INCAR, KPOINTS, POTCAR settings
 include_calc_setup: True # include things related to the calculation setup -- standard, mag, final_xc, etc
 include_structure: False # include the relaxed crystal structure as a dict
 include_trajectory: False # include the compact trajectory from the vasprun.xml

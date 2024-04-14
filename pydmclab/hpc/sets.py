@@ -71,10 +71,21 @@ class GetSet(object):
         ):
             new_settings["NCORE"] = 4
 
-        if calc == "relax":
+        if calc == "loose":
+            new_settings["ENCUT"] = 400
+            new_settings["ENAUG"] = 800
+            new_settings["ISIF"] = 3
+            new_settings["EDIFF"] = 1e-5
+            new_settings["NELM"] = 40
+
+        elif calc == "relax":
             new_settings["NSW"] = 199
 
-        if calc in ["static", "lobster", "parchg", "dfpt", "finite_displacements"]:
+        elif calc in [
+            "static",
+            "lobster",
+            "parchg",
+        ]:
             new_settings["NSW"] = 0
             new_settings["ISIF"] = None
             new_settings["IBRION"] = None
@@ -85,7 +96,7 @@ class GetSet(object):
             new_settings["ICHARG"] = 0
             new_settings["LAECHG"] = True
 
-        if calc == "dfpt":
+        elif calc == "dfpt":
             new_settings["IBRION"] = 7
             new_settings["ISYM"] = 2
             new_settings["ALGO"] = "Normal"
@@ -93,8 +104,9 @@ class GetSet(object):
             new_settings["IALGO"] = 38
             new_settings["NPAR"] = None
             new_settings["NCORE"] = None
+            new_settings["NSW"] = 1
 
-        if calc == "finite_displacements":
+        elif calc == "finite_displacements":
             new_settings["IBRION"] = 2
             new_settings["ENCUT"] = 700
             new_settings["EDIFF"] = 1e-7
@@ -104,10 +116,16 @@ class GetSet(object):
             new_settings["NSW"] = 0
             new_settings["LCHARG"] = False
 
-        if calc in ["relax", "static"]:
+        elif calc == "dielectric":
+            new_settings["LVTOT"] = True
+            new_settings["LEPSILON"] = True
+            new_settings["LOPTICS"] = True
+            new_settings["IBRION"] = 8
+
+        elif calc in ["relax", "static"]:
             new_settings["LWAVE"] = True
 
-        if calc == "parchg":
+        elif calc == "parchg":
             new_settings["ISTART"] = 1
             new_settings["LPARD"] = True
             new_settings["LSEPB"] = False
@@ -116,23 +134,30 @@ class GetSet(object):
             new_settings["NBMOD"] = -3
             if "EINT" not in user_passed_settings:
                 print("WARNING: PARCH analysis but no EINT set. Setting to Ef - 2 eV")
-                new_settings["EINT"] = -2.0
+                new_settings["EINT"] = "".join([str(v) for v in [-2.0, 0]])
+
+        elif calc == "lobster":
+            new_settings["ISTART"] = 0
+            new_settings["LAECHG"] = True
+            new_settings["ISYM"] = -1
+            new_settings["KSPACING"] = None
+            new_settings["ISMEAR"] = 0
 
         if standard == "dmc":
-            new_settings["EDIFF"] = 1e-6
-            new_settings["EDIFFG"] = -0.03
-
-            new_settings["ISMEAR"] = 0
-            new_settings["SIGMA"] = 0.05
-
-            new_settings["ENCUT"] = 520
-            new_settings["ENAUG"] = 1040
-
-            new_settings["LREAL"] = False
-
-            new_settings["ISYM"] = 0
-
-            new_settings["KSPACING"] = 0.22
+            dmc_options = {
+                "EDIFF": 1e-6,
+                "EDIFFG": -0.03,
+                "ISYM": 0,
+                "LREAL": False,
+                "KSPACING": 0.22,
+                "ENCUT": 520,
+                "ENAUB": 1040,
+                "ISMEAR": 0,
+                "SIGMA": 0.05,
+            }
+            for key in dmc_options:
+                if key not in new_settings:
+                    new_settings[key] = dmc_options[key]
 
         if xc in ["metagga", "metaggau"]:
             new_settings["GGA"] = None
@@ -157,12 +182,6 @@ class GetSet(object):
         elif xc in ["ggau", "metaggau"]:
             new_settings["LDAU"] = True
 
-        if calc == "dielectric":
-            new_settings["LVTOT"] = True
-            new_settings["LEPSILON"] = True
-            new_settings["LOPTICS"] = True
-            new_settings["IBRION"] = 8
-
         if (xc in ["ggau", "metaggau"]) and (standard != "mp"):
             # note: need to pass U values as eg {'LDAUU' : {'Fe' : 5}}
             new_settings["LDAU"] = True
@@ -173,19 +192,6 @@ class GetSet(object):
             new_settings["LDAUL"] = LDAUL
             new_settings["LDAUJ"] = LDAUJ
 
-        if calc == "loose":
-            new_settings["ENCUT"] = 400
-            new_settings["ENAUG"] = 800
-            new_settings["ISIF"] = 3
-            new_settings["EDIFF"] = 1e-5
-            new_settings["NELM"] = 40
-
-        if calc == "lobster":
-            new_settings["ISTART"] = 0
-            new_settings["LAECHG"] = True
-            new_settings["ISYM"] = -1
-            new_settings["KSPACING"] = None
-            new_settings["ISMEAR"] = 0
         if user_passed_kpoints_settings:
             new_settings["KSPACING"] = None
 
