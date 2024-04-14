@@ -1397,21 +1397,29 @@ class AnalyzeBatch(object):
         Returns:
             {calc_dir key : results for that calc_dir}
         """
-        
+
         configs = self.configs.copy()
 
         n_procs = configs["n_procs"]
 
         calc_dirs = self.calc_dirs
-        
+
         only_xc = configs["only_xc"]
-        only_calc = configs['only_calc']
-        
+        only_calc = configs["only_calc"]
+
         if only_xc:
-            calc_dirs = [c for c in calc_dirs if self._key_for_calc_dir(c).split("--")[-1].split("-")[0] == only_xc]
- 
-         if only_calc:
-            calc_dirs = [c for c in calc_dirs if self._key_for_calc_dir(c).split("--")[-1].split("-")[1] == only_calc]       
+            calc_dirs = [
+                c
+                for c in calc_dirs
+                if self._key_for_calc_dir(c).split("--")[-1].split("-")[0] == only_xc
+            ]
+
+        if only_calc:
+            calc_dirs = [
+                c
+                for c in calc_dirs
+                if self._key_for_calc_dir(c).split("--")[-1].split("-")[1] == only_calc
+            ]
 
         # run serial if only one processor
         if n_procs == 1:
