@@ -507,8 +507,6 @@ class SubmitTools(object):
         for xc_calc in calc_list:
 
             restart_this_one = True if xc_calc in fresh_restart else False
-            # initialize configs that are particular to this particular VASP calc in this chain
-            calc_configs = {}
 
             # (0) update vasp configs with the current xc and calc
             xc_to_run, calc_to_run = xc_calc.split("-")

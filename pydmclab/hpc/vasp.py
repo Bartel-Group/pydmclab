@@ -380,20 +380,25 @@ class VASPSetUp(object):
         configs = self.configs.copy()
         calc_dir = self.calc_dir
         clean = False
-        if AnalyzeVASP(calc_dir).is_converged:
+        error_log = self.error_log
+        unconverged_log = self.unconverged_log
+        errors = error_log + unconverged_log
+        if AnalyzeVASP(calc_dir).is_converged and (len(errors) == 0):
             clean = True
-        if not os.path.exists(os.path.join(calc_dir, configs["fvaspout"])):
+        elif not os.path.exists(os.path.join(calc_dir, configs["fvaspout"])):
             clean = True
+        else:
+            clean = False
+
         if clean == True:
             with open(os.path.join(calc_dir, configs["fvasperrors"]), "w") as f:
                 f.write("")
             return clean
-        errors = self.error_log + self.unconverged_log
-        if len(errors) == 0:
-            return True
-        with open(os.path.join(calc_dir, configs["fvasperrors"]), "w") as f:
-            for e in errors:
-                f.write(e + "\n")
+        elif clean == False:
+            with open(os.path.join(calc_dir, configs["fvasperrors"]), "w") as f:
+                for e in errors:
+                    f.write(e + "\n")
+            return clean
         return clean
 
     @property
