@@ -348,7 +348,7 @@ class VASPSetUp(object):
             unconverged.append("nsw_too_low")
 
         Etot = analyzer.E_per_at
-        if Etot > 0:
+        if Etot and (Etot > 0):
             unconverged.append("Etot_positive")
 
         return unconverged
