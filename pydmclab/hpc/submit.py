@@ -531,7 +531,7 @@ class SubmitTools(object):
             E_per_at = AnalyzeVASP(calc_dir).E_per_at
             convergence = True if E_per_at else False
             if convergence:
-                vsu = VASPSetUp(calc_dir)
+                vsu = VASPSetUp(calc_dir, user_configs=vasp_configs)
                 is_calc_clean = vsu.is_clean
                 if not is_calc_clean:
                     statuses[xc_calc] = "continue"
