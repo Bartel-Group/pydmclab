@@ -9,8 +9,8 @@ import os
 import warnings
 from shutil import copyfile
 
-from pymatgen.io.vasp.sets import BadInputSetWarning,
-)
+from pymatgen.io.vasp.sets import BadInputSetWarning
+
 from pymatgen.core.structure import Structure
 from pymatgen.io.vasp.inputs import Kpoints, Incar
 from pymatgen.io.lobster.inputs import Lobsterin
