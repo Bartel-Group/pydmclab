@@ -351,6 +351,16 @@ class VASPSetUp(object):
         if Etot and (Etot > 0):
             unconverged.append("Etot_positive")
 
+        if ("static" in calc_dir) and os.path.exists(
+            calc_dir.replace("static", "relax")
+        ):
+            relax_dir = calc_dir.replace("static", "relax")
+            E_relax = AnalyzeVASP(relax_dir).E_per_at
+            if E_relax:
+                if Etot:
+                    if abs(E_relax - Etot) > 0.1:
+                        unconverged.append("static_energy_changed_alot")
+
         return unconverged
 
     @property
@@ -418,6 +428,8 @@ class VASPSetUp(object):
 
         incar_changes = {}
         if "Etot_positive" in unconverged_log:
+            incar_changes["ALGO"] = "All"
+        if "static_energy_changed_alot" in unconverged_log:
             incar_changes["ALGO"] = "All"
         if "grad_not_orth" in errors:
             incar_changes["SIGMA"] = 0.05
