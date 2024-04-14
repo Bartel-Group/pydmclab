@@ -19,7 +19,7 @@ class LaunchTools(object):
 
     The output is going to be:
         {launch_dir (str) : {'magmom' : [list of magmoms for the structure in that launch_dir (list)],
-                             'ID_specific_vasp_configs' : {<formula_indicator>_<struc_indicator> : {}
+                             'ID_specific_vasp_configs' : {<formula_indicator>_<struc_indicator> : {}}}
     """
 
     def __init__(

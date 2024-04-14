@@ -687,9 +687,6 @@ def get_launch_dirs(
         user_configs (dict)
             optional launch configurations
 
-        ID_specific_vasp_configs (dict)
-            optional VASP configurations for specific IDs
-
         make_launch_dirs (bool)
             make launch directories (True) or just return launch dict (False)
 
@@ -709,11 +706,13 @@ def get_launch_dirs(
             write (True) or just read (False) fjson
 
     Returns:
-        {launch dir (str, formula/ID/standard/mag) :
-            {'xcs' : [list of final xcs to run (str)],
-            'magmoms' : [list of magmoms (floats) for each site in the structure]}}
+
+        {launch_dir (str) : {'magmom' : [list of magmoms for the structure in that launch_dir (list)],
+                             'ID_specific_vasp_configs' : {<formula_indicator>_<struc_indicator> : {}}}
 
         also makes launch_dir and populates with POSCAR using strucs if make_dirs=True
+
+        NOTE: ID_specific_vasp_configs is not working as intended
 
     """
 
@@ -730,8 +729,6 @@ def get_launch_dirs(
                 curr_magmoms = magmoms[formula][ID]
             else:
                 curr_magmoms = None
-            top_level = formula
-            unique_ID = ID
 
             launch = LaunchTools(
                 calcs_dir=calcs_dir,
@@ -772,12 +769,13 @@ def submit_one_calc(submit_args):
             'user_configs' :
                 user_configs (dict)
                     optional sub, slurm, or VASP configurations,
-            'refresh_configs' :
-                refresh_configs (list)
-                    list of which configs to refresh,
             'ready_to_launch':
                 ready_to_launch (bool)
                     write and launch (True) or just write submission scripts (False)
+
+            'parallel':
+                running_in_parallel (bool)
+                    whether to run in parallel (True) or not (False)
                 }
 
     Returns:
@@ -850,11 +848,11 @@ def submit_calcs(
         user_configs (dict)
             optional sub, slurm, or VASP configurations
 
-        refresh_configs (list)
-            list of which configs to refresh
-
         ready_to_launch (bool)
-            write and launch (True) or just write submission scripts (False
+            write and launch (True) or just write submission scripts (False)
+
+        n_procs (int or str)
+            if parallelizing, how many processors
 
     Returns:
         None
@@ -915,13 +913,10 @@ def get_results(
     """
     Args:
         launch_dirs (dict)
-            {launch_dir (formula/ID/standard/mag) : {'xcs' : [list of final_xcs], 'magmoms' : [list of magmoms for each site in structure in launch_dir]}}
+            {launch_dir (formula_indicator/struc_indicator/mag) : {'magmoms' : [list of magmoms for each site in structure in launch_dir], 'ID_specific_vasp_configs' : {}}}
 
         user_configs (dict)
             optional analysis configurations
-
-        refresh_configs (bool)
-            refresh configs (True) or just use existing configs (False)
 
         data_dir (str)
             directory to save fjson
@@ -1014,7 +1009,6 @@ def get_gs(
             write (True) or just read (False) fjson
 
     Returns:
-    {standard (str, the calculation standard) :
         {xc (str, the exchange-correlation method) :
             {formula (str) :
                 {'E' : energy of the ground-structure,
@@ -1149,15 +1143,14 @@ def get_thermo_results(
             Read (False) or write (True) json
 
     Returns:
-        {standard (str) :
-            {xc (str) :
-                {formula (str) :
-                    {ID (str) :
-                        {'E' : energy of the structure (DFT total energy in eV/atom),
-                        'Ef' : formation enthalpy at 0 K (eV/atom),
-                        'is_gs' : True if this is the lowest energy polymorph for this formula,
-                        'dE_gs' : how high above the ground-state this structure is in energy (eV/atom)
-                        'all_polymorphs_converged' : True if every structure that was computed for this formula is converged}}
+        {xc (str) :
+            {formula (str) :
+                {ID (str) :
+                    {'E' : energy of the structure (DFT total energy in eV/atom),
+                    'Ef' : formation enthalpy at 0 K (eV/atom),
+                    'is_gs' : True if this is the lowest energy polymorph for this formula,
+                    'dE_gs' : how high above the ground-state this structure is in energy (eV/atom)
+                    'all_polymorphs_converged' : True if every structure that was computed for this formula is converged}}
     """
     fjson = os.path.join(data_dir, savename)
     if os.path.exists(fjson) and not remake:
@@ -1262,7 +1255,6 @@ def get_dos_results(
     only_gs=True,
     only_xc="metagga",
     only_formulas=[],
-    only_standard="dmc",
     dos_to_store=["tdos", "tcohp"],
     regenerate_dos=False,
     regenerate_cohp=False,
