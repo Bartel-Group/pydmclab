@@ -319,13 +319,27 @@ class VASPSetUp(object):
         outputs = VASPOutputs(calc_dir)
         unconverged = []
 
-        # if calc is fully converged, return empty list (calc is done)
-        if analyzer.is_converged:
-            return unconverged
-
         # if vasprun doesnt exist, return empty list (calc errored out or didnt start yet)
         vr = outputs.vasprun
         if not vr:
+            return unconverged
+
+        Etot = analyzer.E_per_at
+        if Etot and (Etot > 0):
+            unconverged.append("Etot_positive")
+
+        if ("static" in calc_dir) and os.path.exists(
+            calc_dir.replace("static", "relax")
+        ):
+            relax_dir = calc_dir.replace("static", "relax")
+            E_relax = AnalyzeVASP(relax_dir).E_per_at
+            if E_relax:
+                if Etot:
+                    if abs(E_relax - Etot) > 0.1:
+                        unconverged.append("static_energy_changed_alot")
+
+        # if calc is fully converged, return empty list (calc is done)
+        if analyzer.is_converged:
             return unconverged
 
         # make sure last electronic loop converged in calc
@@ -341,20 +355,6 @@ class VASPSetUp(object):
             unconverged.append("nelm_too_low")
         if not ionic_convergence:
             unconverged.append("nsw_too_low")
-
-        Etot = analyzer.E_per_at
-        if Etot and (Etot > 0):
-            unconverged.append("Etot_positive")
-
-        if ("static" in calc_dir) and os.path.exists(
-            calc_dir.replace("static", "relax")
-        ):
-            relax_dir = calc_dir.replace("static", "relax")
-            E_relax = AnalyzeVASP(relax_dir).E_per_at
-            if E_relax:
-                if Etot:
-                    if abs(E_relax - Etot) > 0.1:
-                        unconverged.append("static_energy_changed_alot")
 
         return unconverged
 

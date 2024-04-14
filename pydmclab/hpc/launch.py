@@ -2,10 +2,8 @@ import os
 
 from pymatgen.core.structure import Structure
 
-from pydmclab.utils.handy import read_yaml, write_yaml, is_calc_valid
 from pydmclab.core.mag import MagTools
 from pydmclab.data.configs import load_launch_configs
-from pydmclab.core.struc import StrucTools
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -20,8 +18,8 @@ class LaunchTools(object):
         a launch_dir pertains to a particular structure with a particular magnetic configuration calculated with a particular method
 
     The output is going to be:
-        {launch_dir (str) : {'xcs' : [list of final xcs for each chain (str)],
-                             'magmom' : [list of magmoms for the structure in that launch_dir (list)]}}
+        {launch_dir (str) : {'magmom' : [list of magmoms for the structure in that launch_dir (list)],
+                             'ID_specific_vasp_configs' : {<formula_indicator>_<struc_indicator> : {}
     """
 
     def __init__(
