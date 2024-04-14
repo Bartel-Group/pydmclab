@@ -533,26 +533,26 @@ class SubmitTools(object):
                 is_calc_clean = vsu.is_clean
                 if not is_calc_clean:
                     statuses[xc_calc] = "continue"
-                    continue
-                if calc_to_run == "relax":
-                    statuses[xc_calc] = "done"
-                    continue
-                elif calc_to_run != "loose":
-                    xc_calc_relax = "%s-relax" % xc_to_run
-                    if xc_calc_relax in statuses:
-                        if statuses[xc_calc_relax] == "done":
-                            statuses[xc_calc] = "done"
-                            continue
-                        else:
-                            statuses[xc_calc] = "new"
-                            continue
-                    else:
-                        print(
-                            "WARNING: %s not in statuses; did you mean to only run static?"
-                            % xc_calc_relax
-                        )
+                else:
+                    if calc_to_run == "relax":
                         statuses[xc_calc] = "done"
-                        continue
+
+                    elif calc_to_run != "loose":
+                        xc_calc_relax = "%s-relax" % xc_to_run
+                        if xc_calc_relax in statuses:
+                            if statuses[xc_calc_relax] == "done":
+                                statuses[xc_calc] = "done"
+
+                            else:
+                                statuses[xc_calc] = "new"
+
+                        else:
+                            print(
+                                "WARNING: %s not in statuses; did you mean to only run static?"
+                                % xc_calc_relax
+                            )
+                            statuses[xc_calc] = "done"
+
             else:
                 # (4) check for POSCAR
                 # flag to check whether POSCAR is newly copied (don't want to perturb already-perturbed structures)
