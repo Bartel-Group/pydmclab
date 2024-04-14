@@ -1152,9 +1152,8 @@ def get_thermo_results(
         )
         E = results[key]["results"]["E_per_at"]
         formula = results[key]["results"]["formula"]
-        structure = results[key]["structure"]
-        if structure:
-            calcd_formula = StrucTools(structure).formula
+        if ("structure" in results["key"]) and results[key]["structure"]:
+            calcd_formula = StrucTools(results[key]["structure"]).formula
         else:
             calcd_formula = None
         tmp_thermo["E"] = E
