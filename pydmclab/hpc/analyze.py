@@ -1335,7 +1335,7 @@ class AnalyzeBatch(object):
             configs["include_structure"] = False
 
         verbose = configs["verbose"]
-        include_meta = configs["include_meta"]
+        include_meta = configs["include_metadata"]
         include_calc_setup = configs["include_calc_setup"]
         include_structure = configs["include_structure"]
         include_trajectory = configs["include_trajectory"]

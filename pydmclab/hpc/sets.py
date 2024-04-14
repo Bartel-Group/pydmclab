@@ -151,7 +151,7 @@ class GetSet(object):
                 "LREAL": False,
                 "KSPACING": 0.22,
                 "ENCUT": 520,
-                "ENAUB": 1040,
+                "ENAUG": 1040,
                 "ISMEAR": 0,
                 "SIGMA": 0.05,
             }
