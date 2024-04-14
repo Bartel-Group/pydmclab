@@ -1168,7 +1168,10 @@ def get_thermo_results(
             else:
                 gs_Ef = None
             gs_E = gs[xc][formula]["E"]
-            delta_E_gs = E - gs_E
+            if gs_E:
+                delta_E_gs = E - gs_E
+            else:
+                delta_E_gs = None
 
             if key == gs_key:
                 tmp_thermo["is_gs"] = True
