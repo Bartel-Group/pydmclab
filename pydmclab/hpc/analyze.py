@@ -11,7 +11,7 @@ from pymatgen.io.lobster.outputs import Doscar, Cohpcar, Charge, MadelungEnergie
 from pydmclab.core.struc import StrucTools, SiteTools
 from pydmclab.core.comp import CompTools
 from pydmclab.utils.handy import read_json, write_json, read_yaml, write_yaml
-from pydmclab.data.configs import load_batch_vasp_analysis_configs
+from pydmclab.data.configs import load_base_configs
 
 
 class VASPOutputs(object):
@@ -1266,10 +1266,10 @@ class AnalyzeBatch(object):
         self.launch_dirs = launch_dirs
 
         # write baseline analysis configs locally if not there or want to be refreshed
-        _analysis_configs = load_batch_vasp_analysis_configs()
+        _base_configs = load_base_configs()
 
         # update configs with any user_configs
-        configs = {**_analysis_configs, **user_configs}
+        configs = {**_base_configs, **user_configs}
 
         # figure out how many processors to use
         if configs["n_procs"] == "all":
