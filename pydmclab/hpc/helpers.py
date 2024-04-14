@@ -881,7 +881,6 @@ def submit_calcs(
 def get_results(
     launch_dirs,
     user_configs,
-    refresh_configs=True,
     data_dir=os.getcwd().replace("scripts", "data"),
     savename="results.json",
     remake=False,
@@ -945,8 +944,13 @@ def check_results(results):
         if calc == "static":
             total_static += 1
 
-    print("\n\n SUMMARY: %i/%i converged" % (converged, len(keys_to_check)))
-    print("\n\n SUMMARY: %i/%i converged" % (static_converged, total_static))
+    print(
+        "\n\n SUMMARY: %i/%i of all calcs converged" % (converged, len(keys_to_check))
+    )
+    print(
+        "\n\n SUMMARY: %i/%i of static calcs converged"
+        % (static_converged, total_static)
+    )
 
 
 def get_gs(
@@ -999,7 +1003,9 @@ def get_gs(
         return read_json(fjson)
 
     results = {
-        key: results[key] for key in results if results[key]["meta"]["calc"] == "static"
+        key: results[key]
+        for key in results
+        if results[key]["meta"]["setup"]["calc"] == "static"
     }
 
     gs = {
