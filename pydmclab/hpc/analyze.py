@@ -1349,7 +1349,7 @@ class AnalyzeBatch(object):
         include_tcobi = configs["include_tcobi"]
         include_pcobi = configs["include_pcobi"]
         include_entry = configs["include_entry"]
-        check_relax = configs["check_relax"]
+        check_relax = configs["check_relax_energy"]
         create_cif = configs["create_cif"]
 
         if verbose:
