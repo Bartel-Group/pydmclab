@@ -512,8 +512,8 @@ class SubmitTools(object):
 
             # (0) update vasp configs with the current xc and calc
             xc_to_run, calc_to_run = xc_calc.split("-")
-            calc_configs["xc_to_run"] = xc_to_run
-            calc_configs["calc_to_run"] = calc_to_run
+            vasp_configs["xc_to_run"] = xc_to_run
+            vasp_configs["calc_to_run"] = calc_to_run
 
             # (1) make calc_dir (or remove and remake if fresh_restart)
             calc_dir = os.path.join(launch_dir, xc_calc)
