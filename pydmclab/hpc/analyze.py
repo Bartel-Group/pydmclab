@@ -1036,6 +1036,7 @@ class AnalyzeVASP(object):
         if outcar:
             run_stats = outcar.run_stats
             run_stats.update(self.outcar_metadata)
+            return run_stats
         else:
             return None
 
