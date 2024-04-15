@@ -660,6 +660,9 @@ class SubmitTools(object):
         7) if lobster_static and calc is static, write LOBSTER and BADER commands
         """
 
+        if self.is_job_in_queue:
+            return
+
         configs = self.configs.copy()
         slurm_options = self.slurm_options.copy()
 

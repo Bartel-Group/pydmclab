@@ -211,7 +211,7 @@ def get_sub_configs(
         else:
             n_procs = int(submit_calculations_in_parallel)
 
-    sub_configs["n_procs"] = n_procs
+    sub_configs["n_procs_for_submission"] = n_procs
     sub_configs["mpi_command"] = mpi_command
 
     if custom_calc_list:
@@ -328,7 +328,7 @@ def get_analysis_configs(
         else:
             n_procs = analyze_calculations_in_parallel
 
-    analysis_configs["n_procs"] = n_procs
+    analysis_configs["n_procs_for_analysis"] = n_procs
 
     includes = []
     if analyze_structure:

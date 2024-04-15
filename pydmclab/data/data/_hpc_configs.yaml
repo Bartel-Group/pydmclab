@@ -63,6 +63,8 @@ machine: msi # which supercomputer
 # how to figure out whether or not to launch a calc. if these things are present in sub.sh, need to launch
 execute_flags: ['srun', 'python', 'bin/lobster', 'bin/vasp', 'bader', 'mpirun'] 
 
+n_procs_for_submission: 1 # how many cores to parallelize the submission part of the launcher on
+
 
 
 ###################### SLURM_CONFIGS ############################
@@ -115,4 +117,4 @@ include_pcobi: False # include heavy COBICAR data
 include_entry: False # include pymatgen computed structure entry
 create_cif: True # create a .cif file for each CONTCAR
 verbose: True # print stuff as things get analyzed
-n_procs: 1 # how many cores to parallelize the launcher on (also pertains to submitting calcs)
+n_procs_for_analysis: 1 # how many cores to parallelize the analysis part of the launcher on
