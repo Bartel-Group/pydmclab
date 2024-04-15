@@ -224,7 +224,7 @@ class Passer(object):
 
         # more or less stolen from pymatgen
         if bandgap_label == "metal":
-            adjustments["ISMEAR"] = 0
+            adjustments["ISMEAR"] = 2
             adjustments["SIGMA"] = 0.2
             rmin = max(1.5, 25.22 - 2.87 * self.prev_gap)  # Eq. 25
             kspacing = 2 * np.pi * 1.0265 / (rmin - 1.0183)  # Eq. 29
