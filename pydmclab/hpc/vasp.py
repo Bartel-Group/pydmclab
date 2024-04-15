@@ -466,6 +466,10 @@ class VASPSetUp(object):
                 prev_nelm = curr_incar["NELM"]
             else:
                 prev_nelm = 100
+            if prev_nelm > 300:
+                print("electronic relaxation troubles. changing EDIFF")
+                prev_ediff = curr_incar["EDIFF"]
+                incar_changes["EDIFF"] = prev_ediff * 10
             incar_changes["NELM"] = prev_nelm + 100
             incar_changes["ALGO"] = "All"
         if "nsw_too_low" in unconverged_log:
@@ -473,6 +477,13 @@ class VASPSetUp(object):
                 prev_nsw = curr_incar["NSW"]
             else:
                 prev_nsw = 199
+            if prev_nsw > 299:
+                print("ionic relaxation troubles. changing EDIFF")
+                prev_ediffg = curr_incar["EDIFFG"]
+                if prev_ediffg > 0:
+                    incar_changes["EDIFFG"] = prev_ediffg * 10
+                elif prev_ediffg < 0:
+                    incar_changes["EDIFFG"] = prev_ediffg * 2
             incar_changes["NSW"] = prev_nsw + 100
         if "real_optlay" in errors:
             incar_changes["LREAL"] = False
