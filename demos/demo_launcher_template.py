@@ -203,7 +203,7 @@ def main():
             launch_dirs=launch_dirs,
             user_configs=CONFIGS,
             ready_to_launch=ready_to_launch,
-            n_procs=CONFIGS["n_procs"],
+            n_procs=CONFIGS["n_procs_for_submission"],
         )
 
     results = get_results(
