@@ -21,6 +21,7 @@ def get_vasp_configs(
     potcar_mods={},
     lobster_configs={"COHPSteps": 2000},
     bs_configs={"bs_symprec": 0.1, "bs_line_density": 20},
+    flexible_convergence_criteria=False,
 ):
     """
     configs related to particular VASP calculations
@@ -42,6 +43,9 @@ def get_vasp_configs(
         bs_configs (dict): modifications to band structure calculations
             {'bs_symprec' : float, 'bs_line_density' : int}
                 symprec for finding primitive cell for band structure calculations, line density for band structure kpoints
+
+        flexible_convergence_criteria (bool):
+            if True, reduce EDIFF/EDIFFG if convergence is taking very many steps
     """
     vasp_configs = {}
     if dont_relax_cell:
@@ -54,6 +58,7 @@ def get_vasp_configs(
     vasp_configs["bs_symprec"] = bs_configs["bs_symprec"]
     vasp_configs["bs_line_density"] = bs_configs["bs_line_density"]
     vasp_configs["COHPSteps"] = lobster_configs["COHPSteps"]
+    vasp_configs["flexible_convergence_criteria"] = flexible_convergence_criteria
 
     return vasp_configs
 

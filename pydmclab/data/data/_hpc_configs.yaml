@@ -33,6 +33,9 @@ bs_line_density: 20 # kpoint line density for bs calculation
 # related to LOBSTER calculations (calc = 'lobster')
 COHPSteps: 2000 # how fine of a LOBSTER DOS do you want (more = more detailed)
 
+# related to error handling
+flexible_convergence_criteria: False # if True, reduce EDIFF or EDIFFG if convergence is taking very many steps
+
 
 ###################### SUB_CONFIGS ############################
 ###### these are settings that pertain to a chain of VASP executions ######

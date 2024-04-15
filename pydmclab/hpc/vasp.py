@@ -411,6 +411,9 @@ class VASPSetUp(object):
         These error fixes are mostly taken from custodian (https://github.com/materialsproject/custodian/blob/809d8047845ee95cbf0c9ba45f65c3a94840f168/custodian/vasp/handlers.py)
             + a few of my own fixes I've added over the years
         """
+
+        configs = self.configs.copy()
+
         calc_dir = self.calc_dir
         errors = self.error_log
         unconverged_log = self.unconverged_log
@@ -466,7 +469,7 @@ class VASPSetUp(object):
                 prev_nelm = curr_incar["NELM"]
             else:
                 prev_nelm = 100
-            if prev_nelm > 300:
+            if (prev_nelm > 300) and configs["flexible_convergence_criteria"]:
                 print("electronic relaxation troubles. changing EDIFF")
                 prev_ediff = curr_incar["EDIFF"]
                 incar_changes["EDIFF"] = prev_ediff * 10
@@ -477,7 +480,7 @@ class VASPSetUp(object):
                 prev_nsw = curr_incar["NSW"]
             else:
                 prev_nsw = 199
-            if prev_nsw > 299:
+            if (prev_nsw > 299) and configs["flexible_convergence_criteria"]:
                 print("ionic relaxation troubles. changing EDIFF")
                 prev_ediffg = curr_incar["EDIFFG"]
                 if prev_ediffg > 0:
