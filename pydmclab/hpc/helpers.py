@@ -262,7 +262,7 @@ def get_launch_configs(
 
 
 def get_analysis_configs(
-    only_calc=None,
+    only_calc="static",
     only_xc=None,
     analyze_calculations_in_parallel=False,
     analyze_structure=True,
@@ -355,6 +355,9 @@ def get_analysis_configs(
     if exclude:
         for ex in exclude:
             analysis_configs["include_" + ex] = False
+
+    analysis_configs["only_calc"] = only_calc
+    analysis_configs["only_xc"] = only_xc
 
     return analysis_configs
 

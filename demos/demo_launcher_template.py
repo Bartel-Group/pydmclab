@@ -101,6 +101,8 @@ VASP_CONFIGS = get_vasp_configs(
 
 # any configurations related to AnalyzeBatch
 ANALYSIS_CONFIGS = get_analysis_configs(
+    only_xc=None,
+    only_calc="static",
     analyze_calculations_in_parallel=False,
     analyze_structure=True,
     analyze_trajectory=False,
