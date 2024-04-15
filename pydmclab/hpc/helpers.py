@@ -262,6 +262,8 @@ def get_launch_configs(
 
 
 def get_analysis_configs(
+    only_calc=None,
+    only_xc=None,
     analyze_calculations_in_parallel=False,
     analyze_structure=True,
     analyze_trajectory=False,
@@ -276,6 +278,13 @@ def get_analysis_configs(
     configs related to parsing calculations and compiling results
 
     Args:
+
+        only_calc (bool or str):
+            if str, only analyze this calc (eg 'static')
+
+        only_xc (bool or str):
+            if str, only analyze this xc (eg 'gga')
+
         analyze_calculations_in_parallel (bool or int): whether to analyze calculation results in parallel or not
             - False: use 1 processor
             - True: use all available processors
