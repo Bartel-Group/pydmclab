@@ -1273,8 +1273,8 @@ class AnalyzeBatch(object):
         configs = {**_base_configs, **user_configs}
 
         # figure out how many processors to use
-        if configs["n_procs"] == "all":
-            configs["n_procs"] = multip.cpu_count() - 1
+        if configs["n_procs_for_analysis"] == "all":
+            configs["n_procs_for_analysis"] = multip.cpu_count() - 1
 
         # copy configs to prevent unwanted changes
         self.configs = configs.copy()
@@ -1411,7 +1411,7 @@ class AnalyzeBatch(object):
 
         configs = self.configs.copy()
 
-        n_procs = configs["n_procs"]
+        n_procs = configs["n_procs_for_analysis"]
 
         calc_dirs = self.calc_dirs
 
