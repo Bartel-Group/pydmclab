@@ -1193,6 +1193,9 @@ class AnalyzeVASP(object):
         """
         data = {}
         data["results"] = self.basic_info
+
+        convergence = data["results"]["convergence"]
+
         if include_meta:
             data["meta"] = self.metadata
         if include_calc_setup:
@@ -1205,41 +1208,82 @@ class AnalyzeVASP(object):
             # )
             data["structure"] = self.relaxed_structure
         if include_trajectory:
-            data["trajectory"] = self.compact_trajectory
+            if convergence:
+                data["trajectory"] = self.compact_trajectory
+            else:
+                data["trajectory"] = None
         if include_mag:
-            data["magnetization"] = self.magnetization
+            if convergence:
+                data["magnetization"] = self.magnetization
+            else:
+                data["magnetization"] = None
         if include_tdos:
-            pdos = self.pdos()
-            tdos = self.tdos(pdos=pdos)
-            data["tdos"] = tdos
+            if convergence:
+                pdos = self.pdos()
+                tdos = self.tdos(pdos=pdos)
+                data["tdos"] = tdos
+            else:
+                data["tdos"] = None
         if include_pdos:
-            pdos = self.pdos()
-            data["pdos"] = pdos
+            if convergence:
+                pdos = self.pdos()
+                data["pdos"] = pdos
+            else:
+                data["pdos"] = None
         if include_gap:
-            data["gap"] = self.gap_properties
+            if convergence:
+                data["gap"] = self.gap_properties
+            else:
+                data["gap"] = None
         if include_charge:
             data["charge"] = {}
+
             for source in ["bader", "mulliken", "lowdin"]:
-                data["charge"][source] = self.charge(source)
+                if convergence:
+                    data["charge"][source] = self.charge(source)
+                else:
+                    data["charge"][source] = None
         if include_madelung:
-            data["madelung"] = self.E_madelung
+            if convergence:
+                data["madelung"] = self.E_madelung
+            else:
+                data["madelung"] = None
         if include_tcohp:
-            pcohp = self.pcohp()
-            tcohp = self.tcohp(pcohp=pcohp)
-            data["tcohp"] = tcohp
+            if convergence:
+                pcohp = self.pcohp()
+                tcohp = self.tcohp(pcohp=pcohp)
+                data["tcohp"] = tcohp
+            else:
+                data["tcohp"] = None
         if include_pcohp:
-            pcohp = self.pcohp()
-            data["pcohp"] = pcohp
+            if convergence:
+                pcohp = self.pcohp()
+                data["pcohp"] = pcohp
+            else:
+                data["pcohp"] = None
         if include_tcoop:
-            data["tcoop"] = self.tcohp(are_coops=True)
+            if convergence:
+                data["tcoop"] = self.tcohp(are_coops=True)
+            else:
+                data["tcoop"] = None
         if include_pcoop:
-            data["pcoop"] = self.pcohp(are_coops=True)
+            if convergence:
+                data["pcoop"] = self.pcohp(are_coops=True)
+            else:
+                data["pcoop"] = None
         if include_tcobi:
-            data["tcobi"] = self.tcohp(are_cobis=True)
+            if convergence:
+                data["tcobi"] = self.tcohp(are_cobis=True)
+            else:
+                data["tcobi"] = None
         if include_pcobi:
-            data["pcobi"] = self.pcohp(are_cobis=True)
+            if convergence:
+                data["pcobi"] = self.pcohp(are_cobis=True)
+            else:
+                data["pcobi"] = None
         if include_entry:
             data["entry"] = self.computed_structure_entry
+
         return data
 
 
@@ -1387,7 +1431,7 @@ class AnalyzeBatch(object):
 
         # store the relax energy if we asked to
         if check_relax:
-            relax_energy = AnalyzeVASP(calc_dir.replace("static", "relax")).E_per_at
+            relax_energy = AnalyzeVASP(calc_dir.replace(calc, "relax")).E_per_at
             summary["results"]["E_relax"] = relax_energy
 
         # save the data in a dictionary with a key for that calc_dir
@@ -1434,12 +1478,18 @@ class AnalyzeBatch(object):
 
         # run serial if only one processor
         if n_procs == 1:
-            data = [self._results_for_calc_dir(calc_dir) for calc_dir in calc_dirs]
+            data = [_results_for_calc_dir(calc_dir, configs) for calc_dir in calc_dirs]
 
         # otherwise, run parallel
         if n_procs > 1:
             pool = multip.Pool(processes=n_procs)
-            data = pool.map(self._results_for_calc_dir, calc_dirs)
+            data = [
+                r
+                for r in pool.starmap(
+                    _results_for_calc_dir,
+                    [(calc_dir, configs) for calc_dir in calc_dirs],
+                )
+            ]
             pool.close()
 
         # each item in data is a dictionary that looks like {key : data for that key}
@@ -1450,3 +1500,89 @@ class AnalyzeBatch(object):
                 out[key] = d[key]
 
         return out
+
+
+def _results_for_calc_dir(calc_dir, configs):
+    """
+    Args:
+        calc_dir (str) : path to a calculation directory where VASP was executed
+
+    Returns:
+        a dictionary of results for that calculation directory
+            - format varies based on self.configs
+            - see AnalyzeVASP.summary() for more info
+    """
+    key = "--".join(calc_dir.split("/")[-4:])
+    xc_calc = key.split("--")[-1]
+    xc, calc = xc_calc.split("-")
+
+    configs = configs.copy()
+
+    if calc != "relax":
+        configs["include_trajectory"] = False
+    if calc not in ["lobster", "bs"]:
+        configs["include_tcohp"] = False
+        configs["include_pcohp"] = False
+        configs["include_tcoop"] = False
+        configs["include_pcoop"] = False
+        configs["include_tcobi"] = False
+        configs["include_pcobi"] = False
+        configs["include_tdos"] = False
+        configs["include_pdos"] = False
+    if calc != "static":
+        configs["include_mag"] = False
+        configs["include_entry"] = False
+        configs["include_structure"] = False
+
+    verbose = configs["verbose"]
+    include_meta = configs["include_metadata"]
+    include_calc_setup = configs["include_calc_setup"]
+    include_structure = configs["include_structure"]
+    include_trajectory = configs["include_trajectory"]
+    include_mag = configs["include_mag"]
+    include_tdos = configs["include_tdos"]
+    include_pdos = configs["include_pdos"]
+    include_tcohp = configs["include_tcohp"]
+    include_pcohp = configs["include_pcohp"]
+    include_tcoop = configs["include_tcoop"]
+    include_pcoop = configs["include_pcoop"]
+    include_tcobi = configs["include_tcobi"]
+    include_pcobi = configs["include_pcobi"]
+    include_entry = configs["include_entry"]
+    check_relax = configs["check_relax_energy"]
+    create_cif = configs["create_cif"]
+
+    if verbose:
+        print("analyzing %s" % calc_dir)
+    analyzer = AnalyzeVASP(calc_dir)
+
+    # collect the data we asked for
+    summary = analyzer.summary(
+        include_meta=include_meta,
+        include_calc_setup=include_calc_setup,
+        include_structure=include_structure,
+        include_trajectory=include_trajectory,
+        include_mag=include_mag,
+        include_tdos=include_tdos,
+        include_pdos=include_pdos,
+        include_tcohp=include_tcohp,
+        include_pcohp=include_pcohp,
+        include_tcoop=include_tcoop,
+        include_pcoop=include_pcoop,
+        include_tcobi=include_tcobi,
+        include_pcobi=include_pcobi,
+        include_entry=include_entry,
+    )
+
+    # store the relax energy if we asked to
+    if check_relax:
+        relax_energy = AnalyzeVASP(calc_dir.replace(calc, "relax")).E_per_at
+        summary["results"]["E_relax"] = relax_energy
+
+    if create_cif and summary["results"]["convergence"] and include_structure:
+        if summary["structure"]:
+            s = Structure.from_dict(summary["structure"])
+            s.to(fmt="cif", filename=os.path.join(calc_dir, key + ".cif"))
+        else:
+            print("no structure, cant make cif")
+    return {key: summary}
