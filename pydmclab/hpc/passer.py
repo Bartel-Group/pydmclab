@@ -314,7 +314,8 @@ class Passer(object):
                     incar[key] = value
             else:
                 incar[key] = value
-
+        for key, value in user_incar_mods:
+            incar[key] = value
         incar.write_file(os.path.join(self.calc_dir, "INCAR"))
         return "updated incar"
 
