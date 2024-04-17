@@ -256,6 +256,9 @@ class Passer(object):
             return {}
 
         av_prev = AnalyzeVASP(prev_calc_dir)
+        vr_prev = av_prev.outputs.vasprun
+        if not vr_prev:
+            return {}
         prev_structure = get_structure_from_prev_run(
             av_prev.outputs.vasprun, av_prev.outputs.outcar
         )
