@@ -167,8 +167,8 @@ class MPQuery(object):
                     search_key = "material_id"
                 else:
                     search_key = "chemsys"
-            elif CompTools(first_search).n_els == 1:
-                search_key = "elements"
+            #    elif CompTools(first_search).n_els == 1:
+            #        search_key = "elements"
             else:
                 search_key = "formula"
         elif isinstance(search_for, str):
@@ -194,10 +194,10 @@ class MPQuery(object):
             search_for = chemsyses
 
         # query MP based on a search for compounds containing at least these elements
-        if search_key == "elements":
-            docs = mpr.summary.search(
-                elements=search_for, energy_above_hull=(0, max_Ehull)
-            )
+        # if search_key == "elements":
+        #    docs = mpr.summary.search(
+        #        elements=search_for, energy_above_hull=(0, max_Ehull)
+        #    )
         # query MP based on a search for compounds in these chemical systems
         elif search_key == "chemsys":
             docs = mpr.summary.search(
