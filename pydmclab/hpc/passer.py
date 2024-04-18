@@ -178,7 +178,10 @@ class Passer(object):
         """
         prev_ready = self.prev_ready_to_pass
         if prev_ready:
-            return AnalyzeVASP(self.prev_calc_dir).gap_properties["bandgap"]
+            gap_props = AnalyzeVASP(self.prev_calc_dir).gap_properties
+            if gap_props and ("bandgap" in gap_props):
+                return gap_props["bandgap"]
+            return None
         else:
             return None
 
@@ -277,7 +280,7 @@ class Passer(object):
         """
         prev_calc_dir = self.prev_calc_dir
         if not os.path.exists(prev_calc_dir):
-            return None
+            return {}
         av = AnalyzeVASP(prev_calc_dir)
         prev_settings = av.outputs.all_input_settings
         new_nbands = {}
@@ -310,6 +313,10 @@ class Passer(object):
             nbands_based_incar_adjustments = self.nbands_based_incar_adjustments
             incar_adjustments.update(nbands_based_incar_adjustments)
         user_incar_mods = self.incar_mods
+        if user_incar_mods is None:
+            user_incar_mods = {}
+        if incar_adjustments is None:
+            incar_adjustments = {}
         incar = Incar.from_file(os.path.join(self.calc_dir, "INCAR"))
         for key, value in incar_adjustments.items():
             if user_incar_mods:
