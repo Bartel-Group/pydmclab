@@ -44,9 +44,12 @@ for d in [CALCS_DIR, DATA_DIR]:
         os.makedirs(d)
 
 # copy our passer.py file to your scripts_dir. if you want to use a custom passer, just set this = True and put your passer.py in the scripts dir
+USER_NAME = "cbartel"
 CUSTOM_PASSER = False
 if not CUSTOM_PASSER:
-    copyfile("/home/cbartel/cbartel/bin/pydmclab/pydmclab/hpc/passer.py", "passer.py")
+    copyfile(
+        "/home/cbartel/%s/bin/pydmclab/pydmclab/hpc/passer.py" % USER_NAME, "passer.py"
+    )
 
 # if you need data from MP as a starting point (often the case), you need your API key
 API_KEY = "__YOUR API KEY__"
