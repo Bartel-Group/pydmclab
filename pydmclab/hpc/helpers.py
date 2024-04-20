@@ -19,7 +19,7 @@ def get_vasp_configs(
     incar_mods={},
     kpoints_mods={},
     potcar_mods={},
-    lobster_configs={"COHPSteps": 2000},
+    lobster_configs={"COHPSteps": 2000, "reciprocal_kpoints_density_for_lobster": 100},
     bs_configs={"bs_symprec": 0.1, "bs_line_density": 20},
     flexible_convergence_criteria=False,
     compare_static_and_relax_energies=0.1,
@@ -61,8 +61,6 @@ def get_vasp_configs(
 
         lobster_configs (dict):
             modifications to LOBSTER (only affects 'all-lobster' xc-calcs)
-                {'COHPSteps' : int}
-                    how fine a grid do you want for DOS (larger means finer energy discretization)
 
         bs_configs (dict):
             modifications to band structure calculations (only affects 'all-bs' xc-calcs)
@@ -186,6 +184,7 @@ def get_slurm_configs(
 def get_sub_configs(
     relaxation_xcs=["gga"],
     static_addons={"gga": ["lobster"]},
+    prioritize_relaxes=True,
     custom_calc_list=None,
     restart_these_calcs=[],
     start_with_loose=False,
@@ -209,7 +208,10 @@ def get_sub_configs(
         relaxation_xcs and static_addons generate a calc_list (order of xc-calcs to be executed)
             e.g., ['gga-relax', 'gga-static', 'metagga-relax', 'metagga-static', 'metagga-lobster', 'metagga-parchg']
 
-        customc_calc_list (list):
+        prioritize_relaxes (bool):
+            if True, run relaxes before static addons
+
+        custom_calc_list (list):
             if you don't want to autogenerate a calc_list, you can specify the full list you want to run here
 
         restart_these_calcs (list):
@@ -234,6 +236,8 @@ def get_sub_configs(
         vasp_version (int):
             5 for 5.4.4 or 6 for 6.4.1
 
+
+
     Returns:
         {config_name : config_value}
 
@@ -243,7 +247,7 @@ def get_sub_configs(
     if not submit_calculations_in_parallel:
         n_procs = 1
     else:
-        if submit_calculations_in_parallel == True:
+        if submit_calculations_in_parallel is True:
             n_procs = multip.cpu_count() - 1
         else:
             n_procs = int(submit_calculations_in_parallel)
@@ -260,6 +264,11 @@ def get_sub_configs(
     sub_configs["static_addons"] = static_addons
     sub_configs["machine"] = machine
     sub_configs["vasp_version"] = vasp_version
+
+    if prioritize_relaxes:
+        sub_configs["run_static_addons_before_all_relaxes"] = False
+    else:
+        sub_configs["run_static_addons_before_all_relaxes"] = True
 
     return sub_configs
 

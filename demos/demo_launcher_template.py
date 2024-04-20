@@ -69,6 +69,7 @@ LAUNCH_CONFIGS = get_launch_configs(
 SUB_CONFIGS = get_sub_configs(
     relaxation_xcs=["gga"],
     static_addons={"gga": ["lobster"]},
+    prioritize_relaxes=True,
     custom_calc_list=None,
     restart_these_calcs=[],
     start_with_loose=False,
@@ -98,8 +99,10 @@ VASP_CONFIGS = get_vasp_configs(
     incar_mods={},
     kpoints_mods={},
     potcar_mods={},
-    lobster_configs={"COHPSteps": 2000},
+    lobster_configs={"COHPSteps": 2000, "reciprocal_kpoints_density_for_lobster": 100},
     bs_configs={"bs_symprec": 0.1, "bs_line_density": 20},
+    flexible_convergence_criteria=False,
+    compare_static_and_relax_energies=0.1,
 )
 
 # any configurations related to AnalyzeBatch
