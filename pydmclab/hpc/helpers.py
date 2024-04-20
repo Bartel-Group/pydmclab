@@ -276,7 +276,7 @@ def get_sub_configs(
 def get_launch_configs(
     n_afm_configs=0,
     override_mag=False,
-    ID_specific_vasp_configs={},
+    ID_specific_vasp_configs=None,
 ):
     """
 
@@ -292,14 +292,15 @@ def get_launch_configs(
                 NOTE: not sure if this is working
 
         ID_specific_vasp_configs (dict):
-            {<formula_indicator>_<struc_indicator> : {any_config}}
-                NOTE: not sure if this is working
+            {<formula_indicator>_<struc_indicator> : {'incar_mods' : {<INCAR tag> : <value>}, {'kpoints' : <kpoints value>}, {'potcar' : <potcar value>}}
 
     Returns:
         dictionary of launch configurations
             {config param : config value}
     """
 
+    if ID_specific_vasp_configs is None:
+        ID_specific_vasp_configs = {}
     return {
         "override_mag": override_mag,
         "n_afm_configs": n_afm_configs,
@@ -663,7 +664,7 @@ def check_strucs(strucs):
 def get_magmoms(
     strucs,
     max_afm_combos=50,
-    treat_as_nm=[],
+    treat_as_nm=None,
     data_dir=os.getcwd().replace("scripts", "data"),
     savename="magmoms.json",
     remake=False,
@@ -697,6 +698,9 @@ def get_magmoms(
     fjson = os.path.join(data_dir, savename)
     if not remake and os.path.exists(fjson):
         return read_json(fjson)
+
+    if treat_as_nm is None:
+        treat_as_nm = []
 
     magmoms = {}
     for formula in strucs:

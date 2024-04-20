@@ -62,7 +62,7 @@ COMPOSITIONS = None
 LAUNCH_CONFIGS = get_launch_configs(
     n_afm_configs=0,
     override_mag=False,
-    ID_specific_vasp_configs={},
+    ID_specific_vasp_configs=None,
 )
 
 # any configurations related to SubmitTools
@@ -175,19 +175,42 @@ def main():
     if remake_sub_for_launcher:
         make_sub_for_launcher()
 
-    comp = COMPOSITIONS
     query = get_query(
-        search_for=comp, api_key=API_KEY, data_dir=DATA_DIR, remake=remake_query
+        api_key=API_KEY,
+        search_for=COMPOSITIONS,
+        properties=None,
+        max_Ehull=0.05,
+        max_sites_per_structure=41,
+        max_polymorph_energy=0.1,
+        only_gs=False,
+        include_structure=True,
+        max_strucs_per_cmpd=1,
+        include_sub_phase_diagrams=False,
+        data_dir=DATA_DIR,
+        savename="query.json",
+        remake=remake_query,
     )
     if print_query_check:
         check_query(query)
 
-    strucs = get_strucs(query=query, data_dir=DATA_DIR, remake=remake_strucs)
+    strucs = get_strucs(
+        query=query,
+        data_dir=DATA_DIR,
+        savename="strucs.json",
+        remake=remake_strucs,
+    )
     if print_strucs_check:
         check_strucs(strucs)
 
     if GEN_MAGMOMS:
-        magmoms = get_magmoms(strucs=strucs, data_dir=DATA_DIR, remake=remake_magmoms)
+        magmoms = get_magmoms(
+            strucs=strucs,
+            max_afm_combos=50,
+            treat_as_nm=None,
+            data_dir=DATA_DIR,
+            savename="magmoms.json",
+            remake=remake_magmoms,
+        )
         if print_magmoms_check:
             check_magmoms(strucs=strucs, magmoms=magmoms)
     else:
@@ -197,8 +220,10 @@ def main():
         strucs=strucs,
         magmoms=magmoms,
         user_configs=CONFIGS,
+        make_launch_dirs=True,
         data_dir=DATA_DIR,
         calcs_dir=CALCS_DIR,
+        savename="launch_dirs.json",
         remake=remake_launch_dirs,
     )
     if print_launch_dirs_check:
@@ -209,7 +234,7 @@ def main():
             launch_dirs=launch_dirs,
             user_configs=CONFIGS,
             ready_to_launch=ready_to_launch,
-            n_procs=CONFIGS["n_procs_for_submission"],
+            n_procs=CONFIGS["submit_calculations_in_parallel"],
         )
 
     results = get_results(

@@ -96,7 +96,7 @@ qos: # may not need this ever on MSI
 ####################### LAUNCH_CONFIGS ########################
 ###### these are settings that pertain to how you figure out which directories to create a submission script in ######
 n_afm_configs: 0 # how many AFM configurations to run
-override_mag: False # could be ['nm'] if you only want to run nonmagnetic, won't check for whether structure is mag or not mag, it will just do as you say (not sure if this is properly implemented)
+override_mag: False # could be 'nm' if you only want to run nonmagnetic, won't check for whether structure is mag or not mag, it will just do as you say (not sure if this is properly implemented)
 ID_specific_vasp_configs: # not sure if this is implemented correctly. {<formula_indicator>_<struc_indicator> : {'incar_mods' : {<incar_key> : <incar_val>}, {'kpoints_mods' : {<kpoints_key> : <kpoints_val>}, {'potcar_mods' : {<potcar_key> : <potcar_val>}}
 
 

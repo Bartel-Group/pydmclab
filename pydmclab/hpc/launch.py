@@ -155,7 +155,7 @@ class LaunchTools(object):
 
         # return override_mag if we set it
         if configs["override_mag"]:
-            return configs["override_mag"]
+            return [configs["override_mag"]]
 
         structure = self.structure
 
@@ -196,18 +196,19 @@ class LaunchTools(object):
         Returns:
             a dictionary of:
                 {launch_dir (str) : {'xcs': [list of final_xcs to submit w/ SubmitTools],
-                                     'magmom' : [list of magmoms for the structure in launch_dir to pass to SubmitTools]}}
+                                     'magmom' : [list of magmoms for the structure in launch_dir to pass to SubmitTools],
+                                     'ID_specific_vasp_configs' : {'incar_mods' : {<incar_key> : <incar_val>}, 'kpoints_mods' : {<kpoints_key> : <kpoints_val>}, 'potcar_mods' : {<potcar_key> : <potcar_val>}}
 
         Returns the minimal list of directories that will house submission files (each of which launch a chain of calcs)
             note a chain of calcs must have the same structure and magnetic information, otherwise, there's no reason to chain them
-                so the launch_dir defines: structure, standard, magmom
+                so the launch_dir defines: structure, magmom
 
         These launch_dirs have a very prescribed structure:
-            calcs_dir / top_level / unique_ID / standard / mag
+            calcs_dir / formula_indicator / struc_indicator / mag
 
             e.g.,
-                ../calcs/Nd2O7Ru2/mp-19930/dmc/fm
-                ../calcs/2/3/dmc/afm_4
+                ../calcs/Nd2O7Ru2/mp-19930/fm
+                ../calcs/2/3/afm_4
                     (if (2) was a unique compositional indicator and (3) was a unique structural indicator)
         """
         structure = self.structure
@@ -241,6 +242,7 @@ class LaunchTools(object):
             )
             launch_dirs[launch_dir] = {"magmom": magmom}
 
+            # check for ID specific VASP configs
             formula_struc = "_".join(
                 [configs["formula_indicator"], configs["struc_indicator"]]
             )
