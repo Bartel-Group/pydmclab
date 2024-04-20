@@ -351,7 +351,7 @@ class Passer(object):
                 incar[key] = value
 
         # apply our user-defined mods last to give them precedence
-        for key, value in user_incar_mods:
+        for key, value in user_incar_mods.items():
             incar[key] = value
 
         # write to INCAR
@@ -381,6 +381,20 @@ class Passer(object):
         self.copy_wavecar
         self.update_incar
         return "completed pass"
+
+
+def debug():
+    """
+    Execute this to avoid the try/except and really figure out what's causing this script to fail
+    """
+    # get info that pertains to the present calculation
+    passer_dict_as_str = sys.argv[1]
+
+    # initialize the Passer for this claculation
+    passer = Passer(passer_dict_as_str=passer_dict_as_str)
+
+    passer.write_to_job_killer
+    passer.complete_pass
 
 
 def main():

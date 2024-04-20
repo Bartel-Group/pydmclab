@@ -28,6 +28,7 @@ class SubmitTools(object):
         self,
         launch_dir,
         initial_magmom,
+        ID_specific_vasp_configs=None,
         user_configs={},
     ):
         """
@@ -47,6 +48,10 @@ class SubmitTools(object):
                     generated using MagTools
                     you should pass this here or let pydmclab.hpc.launch.LaunchTools put it there
                 if not AFM, no need to pass anything. VASPSetUp handles nm and fm
+
+            ID_specific_vasp_configs (dict)
+                any configs that pertain to a particular structure for a particular formula
+                    usually passed here from your launch_dirs.json file (just like magmom)
 
             user_configs (dict)
                 any non-default parameters you want to pass
@@ -68,6 +73,15 @@ class SubmitTools(object):
 
         # merge default configs with user configs
         configs = {**_base_configs, **user_configs}
+
+        if ID_specific_vasp_configs:
+            for input_file in ["incar", "kpoints", "potcar"]:
+                key = "%s_mods" % input_file
+                if key in ID_specific_vasp_configs:
+                    if "all-all" in configs[key]:
+                        configs[key]["all-all"].update(ID_specific_vasp_configs[key])
+                    else:
+                        configs[key].update({"all-all": ID_specific_vasp_configs[key]})
 
         # set mag based on launch_dir
         configs["mag"] = mag
@@ -542,7 +556,6 @@ class SubmitTools(object):
             vsu = VASPSetUp(calc_dir=calc_dir, user_configs=updated_configs.copy())
             vsu.prepare_calc
 
-            print("-------------- warnings should be done ---------------")
             print("  %s is prepared\n" % xc_calc)
         return statuses
 

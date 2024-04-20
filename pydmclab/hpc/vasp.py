@@ -181,6 +181,9 @@ class VASPSetUp(object):
         """
         # ignore pymatgen warnings about bad input sets. we should be handling the ones that matter to us already
         warnings.filterwarnings("ignore", category=BadInputSetWarning)
+        warnings.filterwarnings(
+            "ignore", message="Always check and test the provided basis functions."
+        )
 
         # get our configs dict
         configs = self.configs.copy()

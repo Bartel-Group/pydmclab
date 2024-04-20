@@ -29,7 +29,7 @@ class LaunchTools(object):
         formula_indicator,
         struc_indicator,
         initial_magmoms=None,
-        user_configs={},
+        user_configs=None,
     ):
         """
         Args:
@@ -51,53 +51,46 @@ class LaunchTools(object):
                     usually I want to run a series of calculations for some input structure
                         this is the input structure
 
-            top_level (str):
+            formula_indicator (str):
                 top level directory within calcs_dir
 
-                could be whatever you want, but usually this will be a chemical formula
-                    could also be a placeholder for a formula (e.g., Li1S2Ti1_bigsupercell)
+                could be whatever you want, but usually this will be a chemical formula (eg BaZrS3)
+                    could also be a placeholder for a formula (e.g., Li2FeP2S6_with_some_rules_on_occupation)
 
 
-            unique_ID (str):
-                level below top_level (should uniquely define this particular structure for the top_level formula)
+            struc_indicator (str):
+                level below formula_indicator (should uniquely define a particular structure for the formula_indicator of interest)
                     could be a material ID in materials project (for standard geometry relaxations, this makes sense)
-                    could be x in the LiCoO2 example I described previously
-                    it's really up to you, but it must be unique within the top_level directory
+                    could be something else that signifies structure (eg 0, 1, 2 for different orderings)
+                    it's really up to you, but it must be unique within the calcs/formula_indicator directory
 
-            magmoms (dict):
+            initial_magmoms (dict or bool):
                 if you are running AFM calculations
-                    {index of configuration index (int) : magmom (list)} generated using MagTools
+                    {index of configuration (int) : magmom (list)} generated using MagTools
                         best practice is to save this as a json in data_dir so you only call MagTools once
 
                 if you are not running AFM calculations (you don't need a specific MAGMOM)
                     can be None or {}
 
-            ID_specific_vasp_configs (dict):
-                if you want certain VASP configs (eg INCAR, KPOINTS, POTCAR) to apply to particular IDs,
-                    you would pass that here
-                the format should be the same as _vasp_configs.yaml
-                    i.e., specify for loose, relax, static as needed
-
-                    {formula_ID (str) :
-                        {'loose_incar' : {'NELECT' : 123},
-                         'relax_incar' : {'NELECT' : 123},
-                         'static_incar' : {'NELECT' : 123}}
 
 
             user_configs (dict):
-                any setting you want to pass that's not default in pydmclab.data.data._launch_configs.yaml
-                    these configs pertain to how you want to set up the launch of many calculations
+                any setting you want to pass that's not default in pydmclab.data.data._hpc_configs.yaml
+                    specifically, configs related to LAUNCH_CONFIGS will be passed here
                     e.g., how many AFM configs to launch
 
-            refresh_configs (bool)
-                if True, will copy pydmclab baseline configs to your local directory
-                this is useful if you've made changes to the configs files in the directory you're working in and want to start over
+                one slightly involved setting:
+                    ID_specific_vasp_configs (dict):
+                        if you want certain VASP configs (eg INCAR, KPOINTS, POTCAR) to apply to particular IDs,
+                            you would pass that here
+                        in this case an ID is '_'.join([formula_indicator, struc_indicator])
 
-            launch_configs_yaml (os.pathLike)
-                path to yaml file containing launch configs
-                    there's usually no reason to change this
-                    this holds some default configs for LaunchTools
-                    can always be changed with user_configs
+                        the format should be
+                            {<formula_indicator>_<struc_indicator> :
+                                {'incar_mods' : {<incar_key> : <incar_val>},
+                                {'kpoints_mods' : {<kpoints_key> : <kpoints_val>},
+                                {'potcar_mods' : {<potcar_key> : <potcar_val>}}
+                            you can specify any, none, or all of these
 
         Returns:
             configs (dict):
@@ -109,6 +102,9 @@ class LaunchTools(object):
             os.mkdir(calcs_dir)
 
         _base_configs = load_base_configs()
+
+        if user_configs is None:
+            user_configs = {}
 
         # update our baseline launch_configs with user_configs
         configs = {**_base_configs, **user_configs}
@@ -134,10 +130,11 @@ class LaunchTools(object):
         self.initial_magmoms = initial_magmoms
         self.structure = structure
 
+        if configs["ID_specific_vasp_configs"] is None:
+            configs["ID_specific_vasp_configs"] = {}
+
         # make a copy of our configs to prevent unwanted changes
         self.configs = configs.copy()
-
-        self.ID_specific_vasp_configs = configs["ID_specific_vasp_configs"]
 
     @property
     def valid_mags(self):
@@ -215,10 +212,12 @@ class LaunchTools(object):
         """
         structure = self.structure
         magmoms = self.initial_magmoms
-        ID_specific_vasp_configs = self.ID_specific_vasp_configs.copy()
 
         # make a copy of our configs to prevent unwanted changes
         configs = self.configs.copy()
+
+        # get ID-specific configs
+        ID_specific_vasp_configs = configs["ID_specific_vasp_configs"]
 
         # the list of mags we can run
         mags = self.valid_mags
