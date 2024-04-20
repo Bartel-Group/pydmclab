@@ -18,23 +18,31 @@ class Passer(object):
     The idea is to run this to figure out how to pass stuff from freshly converged calcs to subsequent calcs
 
     The main things we care about are:
-        - changing smearing (ISMEAR, SIGMA) based on band gap
-        - changing kpoints (KSPACING) based on band gap
-        - passing CONTCAR --> POSCAR
-        - passing WAVECAR
-        - passing optimized magnetic moments as initial guesses (MAGMOM)
-        - passing NBANDS for lobster
+        changing smearing (ISMEAR, SIGMA) based on band gap
+        changing kpoints (KSPACING) based on band gap
+        passing CONTCAR --> POSCAR
+        passing WAVECAR
+        passing optimized magnetic moments as initial guesses (MAGMOM)
+        passing NBANDS for lobster
+
+    Can be customized to do whatever you'd like between calculations that are chained together in your calc_list
     """
 
     def __init__(self, passer_dict_as_str):
         """
         Args:
-            passer_dict_as_str (str): a json string that contains the following keys
-                - xc_calc (str): the current xc-calculation type (eg "gga-static")
-                - calc_list (list): the list of all xc-calculation types that have been run (eg ["gga-static", "gga-relax", "gga-lobster"])
-                - calc_dir (str): the directory of the current calculation
-                - incar_mods (dict): a dictionary of user-defined INCAR modifications
-                - launch_dir (str): the directory from which the job was launched
+            passer_dict_as_str (str):
+                a json string that contains the following keys
+            xc_calc (str):
+                the current xc-calculation type (eg "gga-static")
+            calc_list (list):
+                the list of all xc-calculation types that have been run (eg ["gga-static", "gga-relax", "gga-lobster"])
+            calc_dir (str):
+                the directory of the current calculation
+            incar_mods (dict):
+                a dictionary of user-defined INCAR modifications that apply to the recipient of the passing
+            launch_dir (str):
+                the directory from which the job was launched
         """
         passer_dict = json.loads(passer_dict_as_str)
 
@@ -48,7 +56,7 @@ class Passer(object):
     def prev_xc_calc(self):
         """
         Returns:
-            the parent xc_calc that should pass stuff to the present xc_calc
+            the parent xc_calc (eg 'gga-relax') that should pass stuff to the present xc_calc (eg 'gga-static)
         """
         curr_xc_calc = self.xc_calc
         curr_xc, curr_calc = curr_xc_calc.split("-")
@@ -79,6 +87,7 @@ class Passer(object):
         """
         Returns:
             calc_dir (str) for parent calculation
+                take the current calc_dir and replace the current xc_calc with the previous xc_calc
         """
         calc_dir = self.calc_dir
         curr_xc_calc = self.xc_calc
@@ -101,10 +110,10 @@ class Passer(object):
         """
         Returns:
             True if child should not be launched
-                - if parent is not converged
+                if parent is not converged
             False if child should be launched
-                - parent doesn't exist (ie nothing to inherit)
-                - parent is converged
+                parent doesn't exist (ie nothing to inherit)
+                parent is converged
         """
         calc_list = self.calc_list
         prev_xc_calc = self.prev_xc_calc
@@ -116,28 +125,12 @@ class Passer(object):
         return False
 
     @property
-    def prev_ready_to_pass(self):
-        """
-        Returns:
-            True if parent is converged
-            False if parent doesn't exist or is not ready to pass
-        """
-        kill_job = self.kill_job
-        if kill_job:
-            return False
-        calc_list = self.calc_list
-        prev_xc_calc = self.prev_xc_calc
-        if prev_xc_calc not in calc_list:
-            return False
-        return True
-
-    @property
     def copy_contcar_to_poscar(self):
         """
         Copies CONTCAR from parent to POSCAR of child
         """
-        prev_ready = self.prev_ready_to_pass
-        if not prev_ready:
+        kill_job = self.kill_job
+        if kill_job:
             return None
         src_dir = self.prev_calc_dir
         dst_dir = self.calc_dir
@@ -153,12 +146,14 @@ class Passer(object):
             doesn't pass if current calculation is relax or lobster
                 (because KPOINTS will be different)
         """
-        prev_ready = self.prev_ready_to_pass
-        if not prev_ready:
+        kill_job = self.kill_job
+        if kill_job:
             return None
+
         curr_xc_calc = self.xc_calc
         curr_calc = curr_xc_calc.split("-")[1]
 
+        # don't pass WAVECAR for these calcs
         if curr_calc in ["relax", "lobster"]:
             return None
 
@@ -176,25 +171,27 @@ class Passer(object):
         Returns:
             parent's band gap (float) if parent is ready to pass else None
         """
-        prev_ready = self.prev_ready_to_pass
-        if prev_ready:
-            gap_props = AnalyzeVASP(self.prev_calc_dir).gap_properties
-            if gap_props and ("bandgap" in gap_props):
-                return gap_props["bandgap"]
+        kill_job = self.kill_job
+        if kill_job:
             return None
-        else:
-            return None
+
+        # try to get bandgap
+        gap_props = AnalyzeVASP(self.prev_calc_dir).gap_properties
+        if gap_props and ("bandgap" in gap_props):
+            return gap_props["bandgap"]
+        return None
 
     @property
     def bandgap_label(self):
         """
         Returns:
             'metal'
-                - if parent band gap is < 0.01 eV
+                if parent band gap is < 0.01 eV
             'semiconductor'
-                - if parent band gap is < 0.5 eV or the structure is very large
+                if parent band gap is < 0.5 eV or the structure is very large
             'insulator'
-                - if parent band gap is > 0.5 eV and structure is small
+                if parent band gap is > 0.5 eV and structure is small
+
         need to worry about size of structure b/c ISMEAR = -5 is no good for large strucs
         """
         prev_gap = self.prev_gap
@@ -219,6 +216,7 @@ class Passer(object):
             a dictionary of INCAR adjustments based on band gap
                 KSPACING, ISMEAR, SIGMA
         """
+        # if no parent bandgap can't be found, just stick to defaults
         bandgap_label = self.bandgap_label
         if not bandgap_label:
             return {}
@@ -248,7 +246,12 @@ class Passer(object):
         Returns:
             a dictionary of INCAR adjustments based on magnetic moments
                 MAGMOM drawn from previous calculation's optimized magnetic moments
+        return no adjustments if
+            parent doesn't exist
+            parent calc is nonmagnetic
+            parent calc is not converged
         """
+
         prev_calc_dir = self.prev_calc_dir
         if not os.path.exists(prev_calc_dir):
             return {}
@@ -262,6 +265,11 @@ class Passer(object):
         vr_prev = av_prev.outputs.vasprun
         if not vr_prev:
             return {}
+
+        if not av_prev.is_converged:
+            return {}
+
+        # if parent exists, is magnetic, has a vasprun, is converged, get its optimized magnetic moments as child's initial MAGMOM
         prev_structure = get_structure_from_prev_run(
             av_prev.outputs.vasprun, av_prev.outputs.outcar
         )
@@ -281,13 +289,17 @@ class Passer(object):
         prev_calc_dir = self.prev_calc_dir
         if not os.path.exists(prev_calc_dir):
             return {}
-        av = AnalyzeVASP(prev_calc_dir)
-        prev_settings = av.outputs.all_input_settings
-        new_nbands = {}
-        if prev_settings:
-            old_nbands = prev_settings["NBANDS"]
-            # based on CJB heuristic; note pymatgen io lobster seems to set too few bands by default
-            new_nbands = {"NBANDS": int(1.5 * old_nbands)}
+
+        # grab NBANDS from parent's OUTCAR
+        av_prev = AnalyzeVASP(prev_calc_dir)
+        prev_settings = av_prev.outputs.all_input_settings
+        # if no OUTCAR, don't change NBANDS
+        if not prev_settings:
+            return {}
+
+        old_nbands = prev_settings["NBANDS"]
+        # based on CJB heuristic; note pymatgen io lobster seems to set too few bands by default
+        new_nbands = {"NBANDS": int(1.5 * old_nbands)}
         return new_nbands
 
     @property
@@ -298,34 +310,51 @@ class Passer(object):
 
             Writes new INCAR to file
         """
+        # get bandgap related adjustments if relevant (ISMEAR, SIGMA, KSPACING)
         bandgap_based_incar_adjustments = self.bandgap_based_incar_adjustments
+
+        # get new magmom if relevant (MAGMOM)
         magmom_based_incar_adjustments = self.magmom_based_incar_adjustments
 
+        # merge bandgap and magmom
         incar_adjustments = magmom_based_incar_adjustments.copy()
         incar_adjustments.update(bandgap_based_incar_adjustments)
 
         curr_xc_calc = self.xc_calc
         if curr_xc_calc.split("-")[1] == "lobster":
+            # for lobster calcs, we can't use KSPACING
             if "KSPACING" in incar_adjustments:
                 del incar_adjustments["KSPACING"]
+
+            # lobster calcs should have ISMEAR = 0 and SIGMA = 0.05 (I think there are issues with other ISMEAR values)
             incar_adjustments["ISMEAR"] = 0
             incar_adjustments["SIGMA"] = 0.05
+
+            # update NBANDS if doing lobster
             nbands_based_incar_adjustments = self.nbands_based_incar_adjustments
             incar_adjustments.update(nbands_based_incar_adjustments)
+
+        # make sure we don't override user-defined INCAR modifications
         user_incar_mods = self.incar_mods
         if user_incar_mods is None:
             user_incar_mods = {}
         if incar_adjustments is None:
             incar_adjustments = {}
         incar = Incar.from_file(os.path.join(self.calc_dir, "INCAR"))
+
+        # loop through adjustments and apply them
         for key, value in incar_adjustments.items():
             if user_incar_mods:
                 if (key not in user_incar_mods) or (key == "MAGMOM"):
                     incar[key] = value
             else:
                 incar[key] = value
+
+        # apply our user-defined mods last to give them precedence
         for key, value in user_incar_mods:
             incar[key] = value
+
+        # write to INCAR
         incar.write_file(os.path.join(self.calc_dir, "INCAR"))
         return "updated incar"
 
@@ -333,7 +362,7 @@ class Passer(object):
     def write_to_job_killer(self):
         """
         Writes to a file in launch_dir called job_killer.o that will trigger the job to be canceled
-            if a required parent is not converged (ie errored out) before the child job is launched
+            b/c of the try/except block in main, this will also write the error message to the file if passer fails for some reason
         """
         kill_job = self.kill_job
         fready_to_pass = os.path.join(self.launch_dir, "job_killer.o")
@@ -358,11 +387,18 @@ def main():
     """
     This gets executed from your scripts_dir
     """
+    # get info that pertains to the present calculation
     passer_dict_as_str = sys.argv[1]
+
+    # initialize the Passer for this claculation
     passer = Passer(passer_dict_as_str=passer_dict_as_str)
+
+    # try to write to job_killer and complete pass (copy CONTCAR, WAVECAR and update INCAR)
     try:
         passer.write_to_job_killer
         passer.complete_pass
+
+    # if this fails for some reason, kill the job and populate job_killer.o with python error message that caused failure
     except Exception as e:
         fready_to_pass = os.path.join(passer.launch_dir, "job_killer.o")
         with open(fready_to_pass, "w", encoding="utf-8") as f:

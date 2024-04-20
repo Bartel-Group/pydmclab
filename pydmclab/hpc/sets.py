@@ -7,9 +7,9 @@ from pydmclab.core.struc import StrucTools
 class GetSet(object):
     """
     This is how we're going to determine the VASP input files given the
-        - xc (gga, metagga, etc)
-        - calc (loose, relax, static, lobster, etc)
-        - user specified modifications (configs, modify_incar, modify_kpoints, modify_potcar)
+        xc (gga, metagga, etc)
+        calc (loose, relax, static, lobster, etc)
+        user specified modifications (configs, modify_incar, modify_kpoints, modify_potcar)
 
     """
 
@@ -25,18 +25,44 @@ class GetSet(object):
     ):
         """
         Args:
-            structure (Structure): pymatgen structure object
+            structure (Structure):
+                pymatgen structure object
+
             configs (dict):
-                - xc_to_run (str): xc to run (gga, ggau, metagga, metaggau, hse06)
-                - calc_to_run (str): calculation to run (loose, relax, static, lobster, etc)
-                - standard (str): standard (mp, dmc)
-                - mag (str): magnetic configuration (fm, nm, afm_*)
-                - functional (str): functional to use (PBE, PBE_54, etc)
-            potcar_functional (str): functional to use for POTCAR (PBE, PBE_54, etc)
-            validate_magmom (bool): validate magnetic moments
-            modify_incar (dict): user specified INCAR settings
-            modify_kpoints (dict): user specified KPOINTS settings
-            modify_potcar (dict): user specified POTCAR settings
+                dictionary of configs (only some of these get retrieved in Sets)
+                    xc_to_run (str):
+                        xc to run (gga, ggau, metagga, metaggau, hse06)
+                    calc_to_run (str):
+                        calculation to run (loose, relax, static, lobster, etc)
+                    standard (str):
+                        standard (mp, dmc)
+                    mag (str):
+                        magnetic configuration (fm, nm, afm_*)
+                    functional (str):
+                        functional to use (PE, R2SCAN, etc)
+
+            potcar_functional (str):
+                functional to use for POTCAR (PBE, PBE_54, etc)
+                    None uses defaults (PBE_54 for standard = 'dmc'; PBE for standard = 'mp')
+
+            validate_magmom (bool):
+                validate magnetic moments (I've found no reason to set this True)
+
+            modify_incar (dict):
+                user specified INCAR settings
+                    {incar setting (str) : value for that setting (str, float, int, bool)}
+
+            modify_kpoints (dict):
+                user specified KPOINTS settings
+                    {kpoints setting (str) : value for that setting (float, int, list)}
+                        'reciprocal_density' = N --> # kpts * volume = N
+                        'density' = N --> # kpts * atoms = N
+                        'auto' = N --> Auto N
+                        'grid' = [N, N, N] --> N x N x N grid
+
+            modify_potcar (dict):
+                user specified POTCAR settings
+                    {element (str) : desired potcar (str)}
         """
         standard = configs["standard"]
         mag = configs["mag"]
@@ -61,7 +87,7 @@ class GetSet(object):
         """
         Returns VaspSet (ie which MP set do we want to customize from)
         """
-        xc, calc = self.xc, self.calc
+        xc = self.xc
 
         if xc in ["gga", "ggau"]:
             # start from MP relax for GGA or GGA+U
@@ -79,6 +105,8 @@ class GetSet(object):
     def user_incar_settings(self):
         """
         These are changes we want to make to a given base VaspSet
+
+        Starts from our user settings, then modifies based on our xc, calc, standard, and mag
 
         Returns:
             {incar setting (str) : value for that setting (str, float, int, bool)}
@@ -210,14 +238,14 @@ class GetSet(object):
                 "LREAL": False,
                 "LDAU": False,
             }
-            for key in calc_settings:
-                new_settings[key] = calc_settings[key]
+            for setting, value in calc_settings.items():
+                new_settings[setting] = value
 
         # now we'll customize based on a given standard
 
         # dmc is the only one implemented other than MP. for MP, we leave alone
         if standard == "dmc":
-            dmc_options = {
+            dmc_settings = {
                 "EDIFF": 1e-6,
                 "EDIFFG": -0.03,
                 "ISYM": 0,
@@ -228,9 +256,9 @@ class GetSet(object):
                 "ISMEAR": 0,
                 "SIGMA": 0.05,
             }
-            for key in dmc_options:
-                if key not in new_settings:
-                    new_settings[key] = dmc_options[key]
+            for setting, value in dmc_settings.items():
+                if setting not in new_settings:
+                    new_settings[setting] = value
 
         # now set our functional given our xc
         if xc in ["metagga", "metaggau"]:
@@ -264,11 +292,11 @@ class GetSet(object):
             # note: need to pass U values as eg {'LDAUU' : {'Fe' : 5}}
             new_settings["LDAU"] = True
             new_settings["LDAUTYPE"] = 2
-            LDAUU = user_passed_settings["LDAUU"]
-            LDAUL = {el: 2 for el in LDAUU}
-            LDAUJ = {el: 0 for el in LDAUU}
-            new_settings["LDAUL"] = LDAUL
-            new_settings["LDAUJ"] = LDAUJ
+            ldauu = user_passed_settings["LDAUU"]
+            ldaul = {el: 2 for el in ldauu}
+            ldauj = {el: 0 for el in ldauu}
+            new_settings["LDAUL"] = ldaul
+            new_settings["LDAUJ"] = ldauj
 
         # if we asked for a KPOINTS file (grid, auto, etc), turn off KSPACING
         if user_passed_kpoints_settings:
@@ -296,17 +324,19 @@ class GetSet(object):
         """
         user_passed_settings = self.modify_kpoints
 
-        xc, calc, standard, mag = self.xc, self.calc, self.standard, self.mag
+        calc = self.calc
 
         new_settings = {}
 
         # need a KPOINTS file for lobster, so make sure we set something
         if calc == "lobster":
-            # this is pymatgen lobster default, but seems pretty dense..
-            new_settings["reciprocal_density"] = 100
+            # reciprocal density = 100 is pymatgen default so that's our default
+            new_settings["reciprocal_density"] = self.configs[
+                "reciprocal_kpoints_density_for_lobster"
+            ]
 
-        for k, v in user_passed_settings.items():
-            new_settings[k] = v
+        for setting, value in user_passed_settings.items():
+            new_settings[setting] = value
 
         if "grid" in new_settings:
             return Kpoints.gamma_automatic(kpts=new_settings["grid"])
@@ -329,14 +359,15 @@ class GetSet(object):
         """
         user_passed_settings = self.modify_potcar
 
-        xc, calc, standard, mag = self.xc, self.calc, self.standard, self.mag
+        standard = self.standard
 
         new_settings = {}
         if standard == "dmc":
+            # default MPRelaxSet potcar gives unavailable W POTCAR in PBE_54
             new_settings["W"] = "W"
 
-        for k, v in user_passed_settings.items():
-            new_settings[k] = v
+        for setting, value in user_passed_settings.items():
+            new_settings[setting] = value
         return new_settings.copy()
 
     @property
@@ -349,11 +380,12 @@ class GetSet(object):
         potcar_functional = self.potcar_functional
         validate_magmom = self.validate_magmom
         if not validate_magmom:
+            # I've found no reason to set this True
             validate_magmom = False
         if not potcar_functional:
+            # set where POTCARs get pulled from
             potcar_functional = "PBE" if self.standard == "mp" else "PBE_54"
 
-        print(self.user_incar_settings)
         return self.base_set(
             structure=self.structure,
             user_incar_settings=self.user_incar_settings,

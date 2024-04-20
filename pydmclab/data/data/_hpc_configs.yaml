@@ -14,9 +14,9 @@ mag:  # nm, fm, afm_0, afm_1, ...
 magmom: # you will need to pass this for AFM calcs. eg {'magmom' : [list of magmoms (float)]}
 
 # modifications to the standard calculation protocols. these should be passed as {xc-calc (str) : {mod_key (str) : mod_value (str)}}
-incar_mods: {} # eg {'gga-relax' : {'ISIF' : 2}}. see pydmclab.hpc.sets.GetSet.user_incar_settings for more details
-kpoints_mods: {} # eg {'gga-relax' : {'grid' : [2,2,2]}}. see pydmclab.hpc.sets.GetSet.user_kpoints_settings for more details
-potcar_mods: {} # eg {'gga-relax' : {'W' : 'W_sv'}}. see pydmclab.hpc.sets.GetSet.user_potcar_settings for more details
+incar_mods:  # eg {'gga-relax' : {'ISIF' : 2}}. see pydmclab.hpc.sets.GetSet.user_incar_settings for more details
+kpoints_mods:  # eg {'gga-relax' : {'grid' : [2,2,2]}}. see pydmclab.hpc.sets.GetSet.user_kpoints_settings for more details
+potcar_mods:  # eg {'gga-relax' : {'W' : 'W_sv'}}. see pydmclab.hpc.sets.GetSet.user_potcar_settings for more details
 
 # related to pymatgen VaspSet. rarely need to change
 potcar_functional:  # probably don't change (this will get handled in pydmclab.hpc.sets.GetSet)
@@ -32,9 +32,13 @@ bs_line_density: 20 # kpoint line density for bs calculation
 
 # related to LOBSTER calculations (calc = 'lobster')
 COHPSteps: 2000 # how fine of a LOBSTER DOS do you want (more = more detailed)
+reciprocal_kpoints_density_for_lobster: 100 # KPOINTS density for LOBSTER
 
 # related to error handling
 flexible_convergence_criteria: False # if True, reduce EDIFF or EDIFFG if convergence is taking very many steps
+
+# if you want your statics to be compared to relax to prove convergence
+relax_static_energy_diff_tol: 0.1 # eV/atom difference between relax and static that will force static to be re-executed
 
 
 ###################### SUB_CONFIGS ############################
@@ -46,6 +50,7 @@ relaxation_xcs: ['gga'] # list of xcs you want to at least run relax + static fo
 static_addons: # dictionary of things you want to do after a static is converged. eg {'metagga' : ['lobster', 'bs']}
   gga
     - lobster
+run_static_addons_before_all_relaxes: False # if False, prioritize relaxes finishing; if True, run static addons as soon as possible
 
 # the calc_list gets determined based on relaxation_xcs and static_addons. if you want to do something different than defaults, set custom_calc_list
 custom_calc_list: # eg ['gga-static', 'metagga-static'] would only run those two calcs
@@ -92,7 +97,7 @@ qos: # may not need this ever on MSI
 ###### these are settings that pertain to how you figure out which directories to create a submission script in ######
 n_afm_configs: 0 # how many AFM configurations to run
 override_mag: False # could be ['nm'] if you only want to run nonmagnetic, won't check for whether structure is mag or not mag, it will just do as you say (not sure if this is properly implemented)
-ID_specific_vasp_configs: {} # not sure if this is implemented correctly. {<formula_indicator>_<struc_indicator> : {any_config}}
+ID_specific_vasp_configs:  # not sure if this is implemented correctly. {<formula_indicator>_<struc_indicator> : {any_config}}
 
 
 #################### ANALYSIS_CONFIGS ########################

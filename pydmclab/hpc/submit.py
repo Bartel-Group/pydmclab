@@ -1,34 +1,26 @@
-from pydmclab.core.struc import StrucTools
-from pydmclab.hpc.vasp import VASPSetUp
-from pydmclab.hpc.analyze import AnalyzeVASP
-from pydmclab.utils.handy import read_yaml, write_yaml
-from pydmclab.data.configs import load_base_configs, load_partition_configs
-
-from pymatgen.core.structure import Structure
-from pymatgen.io.lobster import Lobsterin
-
-
-import multiprocessing as multip
 import os
 from shutil import copyfile, rmtree
 import subprocess
-import warnings
 import json
 
-from subprocess import call
+from pydmclab.core.struc import StrucTools
+from pydmclab.hpc.vasp import VASPSetUp
+from pydmclab.hpc.analyze import AnalyzeVASP
+from pydmclab.data.configs import load_base_configs, load_partition_configs
 
-from pymatgen.io.vasp.sets import get_structure_from_prev_run
-
+# this is the directory where this file is located (for path purposes)
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 
 class SubmitTools(object):
     """
     This class is focused on figuring out how to prepare chains of calculations
-        the idea being that the output from this class is some file that you can
+        the idea being that the output from this class is some .sh file that you can
             "submit" to a queueing system
         this class will automatically crawl through the VASP output files and figure out
-            how to edit that submission file to finish the desired calculations
+            how to edit that input and submission files to finish the desired calculations
+
+    This class also makes use of pydmclab.hpc.vasp.VASPSetUp to help with the VASP input files
 
     """
 
@@ -47,112 +39,43 @@ class SubmitTools(object):
                 within this directory, various VASP calculation directories (calc_dirs) will be created
                         gga-loose, gga-relax, gga-static, etc
                             VASP will be run in each of these, but we need to run some sequentially, so we pack them together in one submission script
+                 eg if <blah blah>/SrZrS3/perovskite/fm is launch_dir
+                    then these are calc_dirs <blah blah>/SrZrS3/perovskite/fm/gga-relax, ..../gga-static, ..../metagga-relax, etc
 
-            relaxation_xcs (list)
-                list of xcs we want to do at least relax+static on
-
-            stastic_addons (dict)
-                dictionary of additional calculations to do after static
-
-            magmom (list)
-                list of magnetic moments for each atom in structure (or None if not AFM)
+            initial_magmom (list)
+                if running AFM, list of magnetic moments for each atom in structure
+                    generated using MagTools
                     you should pass this here or let pydmclab.hpc.launch.LaunchTools put it there
-                None if not AFM
-                if AFM, pull it from a dictionary of magmoms you made with MagTools
-
-            fresh_restart (list)
-                list of calculations to start over
+                if not AFM, no need to pass anything. VASPSetUp handles nm and fm
 
             user_configs (dict)
                 any non-default parameters you want to pass
-                these will override the defaults in the yaml files
-                look at pydmc/data/data/*configs*.yaml for the defaults
-                    note: _launch_configs.yaml will be modified using LaunchTools
-                you should be passing stuff here!
-                    VASPSetUp will expect xc_to_run, calc_to_run, standard, and mag
-                        xc_to_run and calc_to_run will be passed based on final_xcs and sub_configs['packing']
-                        standard and mag will get passed to it based on launch_dir
-                you can also pass any settings in _vasp_configs.yaml, _slurm_configs.yaml, or _sub_configs.yaml here
-                    _vasp_configs options:
-                        how to manipulate the VASP inputs
-                        see pydmclab.hpc.vasp or pydmclab.data.data._vasp_configs.yaml for options
-                    _sub_configs options:
-                        how to manipulate the executables in the submission script and packing of calculations
-                        see pydmclab.hpc.submit or pydmclab.data.data._sub_configs.yaml for options
-                    _slurm_configs options:
-                        how to manipulate the slurm tags in the submission script
-                        see pydmclab.data.data._slurm_configs.yaml for options
+                    see pydmclab.data.data._hpc_configs.yaml for defaults
+                        relevant configs are SUB_CONFIGS and SLURM_CONFIGS
 
-            vasp_configs_yaml (os.pathLike)
-                path to yaml file containing baseline vasp configs
-                    there's usually no reason to change this
-                    this holds some default configs for VASP
-                    can always be changed with user_configs
-
-             slurm_configs_yaml (os.pathLike)
-                path to yaml file containing baseline slurm configs
-                    there's usually no reason to change this
-                    this holds some default configs for slurm
-                    can always be changed with user_configs
-
-            sub_configs_yaml (os.pathLike)
-                path to yaml file containing baseline submission file configs
-                    there's usually no reason to change this
-                    this holds some default configs for submission files
-                    can always be changed with user_configs
-
-            refresh_configs (bool)
-                if True, will copy pydmclab baseline configs to your local directory
-                    this is useful if you've made changes to the configs files in the directory you're working in and want to start over
-
-        Returns:
-            self.launch_dir (os.pathLike)
-                directory to launch calculations from
-
-            self.slurm_configs (dict)
-                dictionary of slurm configs (in format similar to yaml)
-
-            self.vasp_configs (dict)
-                dictionary of vasp configs (in format similar to yaml)
-
-            self.sub_configs (dict)
-                dictionary of submission configs (in format similar to yaml)
-
-            self.structure (Structure)
-                pymatgen structure object from launch_dir/POSCAR
-
-            self.partitions (dict)
-                dictionary of info regarding partition configurations on MSI
-
-            self.final_xcs (list)
-                list of exchange correlation methods we want the final energy for
         """
+
+        # where the submission script will be written to
 
         self.launch_dir = launch_dir
 
-        # just a reminder of how a launch directory looks
+        # just a reminder of how a launch directory looks (one calculation is defined as some formula in some structure with some initial magnetic config)
         # NOTE: should be made with LaunchTools
         formula_indicator, struc_indicator, mag = launch_dir.split("/")[-3:]
 
+        # load default configs
         _base_configs = load_base_configs()
-        configs = _base_configs.copy()
 
-        # we're going to modify vasp, slurm, and sub configs using one user_configs dict, so let's keep track of what's been applied
-        user_configs_used = []
+        # merge default configs with user configs
+        configs = {**_base_configs, **user_configs}
 
-        for option in _base_configs:
-            if option in user_configs:
-                if option not in user_configs_used:
-                    new_value = user_configs[option]
-                    configs[option] = new_value
-                    user_configs_used.append(option)
-
-        # determine standard and mag from launch_dir
+        # set mag based on launch_dir
         configs["mag"] = mag
 
-        # include magmom in vasp_configs
+        # set magmom based on what's passed here
         configs["magmom"] = initial_magmom
 
+        # create copy of configs
         self.configs = configs.copy()
 
         # need a POSCAR to initialize setup
@@ -166,19 +89,29 @@ class SubmitTools(object):
                 )
             )
         else:
-            self.structure = Structure.from_file(fpos)
+            self.structure = StrucTools(fpos).structure
 
         # load partition configurations to help with slurm setup
         partitions = load_partition_configs()
         self.partitions = partitions
 
         # these are the xcs we want energies for --> each one of these should have a submission script
-        # i.e., they are the end of individual chains
+        #  i.e., they are the end of individual chains (e.g., ['gga', 'metagga'])
         self.relaxation_xcs = self.configs["relaxation_xcs"]
+
+        # these are addons to each static calculation (e.g., {'gga': ['lobster', 'bs']})
         self.static_addons = self.configs["static_addons"]
+
+        # True if you want to start all your calcs with a loose relaxation
         self.start_with_loose = self.configs["start_with_loose"]
+
+        # list of calculations (eg ['gga-lobster']) you want to re-run even if they've converged
         self.fresh_restart = self.configs["fresh_restart"]
+
+        # where are does your launcher.py file live (where is this code being executed)
         self.scripts_dir = os.getcwd()
+
+        # this is like what "project" are you in (e.g., perovskites if your launcher is /home/my_stuff/perovskites/scripts/launcher.py)
         self.job_dir = self.scripts_dir.split("/")[-2]
 
     @property
@@ -186,8 +119,18 @@ class SubmitTools(object):
         """
         Returns:
             [xc-calc in the order they should be executed]
+
+            e.g., if relaxation_xcs = ['gga', 'metagga'] and static_addons = {'gga': ['lobster']}
+                ['gga-relax', 'gga-static', 'metagga-relax', 'metagga-static', 'gga-lobster']
+
+            if configs['run_static_addons_before_all_relaxes'] = True:
+                would change to ['gga-relax', 'gga-static', 'gga-lobster', 'metagga-relax', 'metagga-static']
+
+
         """
         configs = self.configs
+
+        # if user asks for a custom calc list, return that
         if ("custom_calc_list" in configs) and (
             configs["custom_calc_list"] is not None
         ):
@@ -198,6 +141,7 @@ class SubmitTools(object):
 
         calcs = []
 
+        # figure out if we need to run gga before other functionals (in case not explicitly specifeid in relaxation_xcs)
         if (
             ("gga" in relaxation_xcs)
             or ("metagga" in relaxation_xcs)
@@ -210,21 +154,33 @@ class SubmitTools(object):
         elif len(relaxation_xcs) == 1:
             first_xc = relaxation_xcs[0]
 
+        # if starting with a loose, make sure very first calc is loose
         if self.start_with_loose:
             first_xc_calcs = ["loose", "relax", "static"]
         else:
             first_xc_calcs = ["relax", "static"]
 
         calcs += ["-".join([first_xc, calc]) for calc in first_xc_calcs]
-        if first_xc in static_addons:
-            calcs += ["-".join([first_xc, calc]) for calc in static_addons[first_xc]]
 
-        for xc in relaxation_xcs:
-            if xc == first_xc:
-                continue
-            calcs += ["-".join([xc, calc]) for calc in ["relax", "static"]]
-            if xc in static_addons:
+        # if we preappended some functional to get us started, make sure we don't duplicate
+        if first_xc not in relaxation_xcs:
+            xcs = [first_xc] + relaxation_xcs
+        else:
+            xcs = relaxation_xcs
+
+        # add relaxations, statics, and static addons in the specified order
+        for xc in xcs:
+            if xc != first_xc:
+                # we already added the first xc's calcs
+                calcs += ["-".join([xc, calc]) for calc in ["relax", "static"]]
+            if configs["run_static_addons_before_all_relaxes"]:
+                # if we want to prioritize statics, add them to each functional as we go through
                 calcs += ["-".join([xc, calc]) for calc in static_addons[xc]]
+        if not configs["run_static_addons_before_all_relaxes"]:
+            # if we want to prioritize relaxes, add the static addons to the end
+            for xc in xcs:
+                if xc in static_addons:
+                    calcs += ["-".join([xc, calc]) for calc in static_addons[xc]]
 
         return calcs
 
@@ -238,8 +194,8 @@ class SubmitTools(object):
     @property
     def slurm_options(self):
         """
-        Returns dictionary of slurm options
-            - nodes, ntasks, walltime, etc
+        Returns dictionary of slurm options {option (str) : value (str, float, int, bool}
+            nodes, ntasks, walltime, etc
 
         To be written at the top of submission files
         """
@@ -300,7 +256,7 @@ class SubmitTools(object):
     @property
     def bin_dir(self):
         """
-        Returns bin directory where things (eg LOBSTER) are located
+        Returns bin directory (str) where things (eg LOBSTER) are located
         """
         configs = self.configs.copy()
         machine = configs["machine"]
@@ -316,7 +272,10 @@ class SubmitTools(object):
     @property
     def vasp_dir(self):
         """
-        Returns directory containing vasp executable
+        Returns directory (str) containing vasp executable
+
+        MSI has VASP5 or VASP6 (set by configs['vasp_version'])
+        Bridges has only VASP6
         """
         configs = self.configs.copy()
         machine = configs["machine"]
@@ -338,7 +297,7 @@ class SubmitTools(object):
     @property
     def vasp_command(self):
         """
-        Returns command used to execute vasp
+        Returns command used to execute vasp (str)
             e.g., 'srun -n 24 PATH_TO_VASP/vasp_std > vasp.o' (if mpi_command == 'srun')
             e.g., 'mpirun -np 24 PATH_TO_VASP/vasp_std > vasp.o' (if mpi_command == 'mpirun')
         """
@@ -363,7 +322,7 @@ class SubmitTools(object):
     @property
     def lobster_command(self):
         """
-        Returns command used to execute lobster
+        Returns command used to execute lobster (str)
         """
         lobster_path = os.path.join(
             self.bin_dir, "lobster", "lobster-4.1.0", "lobster-4.1.0"
@@ -373,7 +332,7 @@ class SubmitTools(object):
     @property
     def bader_command(self):
         """
-        Returns command used to execute bader
+        Returns command used to execute bader (str)
         """
         chgsum = "%s/bader/chgsum.pl AECCAR0 AECCAR2" % self.bin_dir
         bader = "%s/bader/bader CHGCAR -ref CHGCAR_sum" % self.bin_dir
@@ -382,20 +341,15 @@ class SubmitTools(object):
     @property
     def job_name(self):
         """
-        Returns job name based on launch_dir
+        Returns job name based on launch_dir (str)
+            eg if launch_dir = /home/my_stuff/perovskites/SrZrS3/perovskite/fm
+                job_name = perovskites.SrZrS3.perovskite.fm
         """
         return ".".join(self.launch_dir.split("/")[-3:]) + "." + self.job_dir
 
     @property
     def is_job_in_queue(self):
         """
-        Args:
-            job_name (str)
-                name of job to check if in queue
-                generated automatically by SubmitTools.prepare_directories using launch_dir
-                    ".".join(launch_dir.split("/")[-4:] + [final_xc])
-
-                beware that having two calculations with the same name will cause problems
 
         Returns:
             True if this job-name is already in the queue, else False
@@ -403,17 +357,18 @@ class SubmitTools(object):
         will prevent you from messing with directories that have running/pending jobs
         """
         job_name = self.job_name
-        # create a file w/ jobs in queue with my username and this job_name
+
+        # create a temporary file w/ jobs in queue with my username and this job_name
         scripts_dir = os.getcwd()
         fqueue = os.path.join(scripts_dir, "_".join(["q", job_name]) + ".o")
-        with open(fqueue, "w") as f:
+        with open(fqueue, "w", encoding="utf-8") as f:
             subprocess.call(
                 ["squeue", "-u", "%s" % os.getlogin(), "--name=%s" % job_name], stdout=f
             )
 
         # get the job names I have in the queue
         names_in_q = []
-        with open(fqueue) as f:
+        with open(fqueue, "r", encoding="utf-8") as f:
             for line in f:
                 if "PARTITION" not in line:
                     names_in_q.append([v for v in line.split(" ") if len(v) > 0][2])
@@ -423,57 +378,36 @@ class SubmitTools(object):
 
         # if this job is in the queue, return True
         if len(names_in_q) > 0:
-            print(" !!! job already in queue, not messing with it")
+            print("  %s already in queue, not messing with it\n" % job_name)
             return True
 
-        print(" not in queue, onward --> ")
+        print("  %s not in queue, onward\n" % job_name)
         return False
 
     @property
     def statuses(self):
         """
-        This gets called by SubmitTools.write_sub, so you should rarely call this on its own
+        Returns dictionary of statuses for each calculation in the chain
+            {xc-calc : status}
 
-        A lot going on here. The objective is to prepare a set of directories for all calculations of interest to a given submission script in a given launch_dir
-            note: 1 submission script --> 1 chain (pack) of VASP calculations
-            note: 1 launch_dir --> can have > 1 submission script (if working towards >1 "final_xc" like ['metagga', 'ggau'])
-
-        1) For each xc-calc pair, create a directory (calc_dir)
-            */launch_dir/xc-calc
-                xc-calc could be gga-loose, metagga-relax, etc.
-
-        2) Check if that calc_dir has a converged VASP job
-            note: also checks "parents" (ie a static is labeled unconverged if its relax is unconverged)
-                parents determined by sub_configs['packing']
-
-            if calc and parents are converged:
-                checks sub_configs['fresh_restart']
-                    if fresh_restart = False --> label calc_dir as status='done' and move on
-                    if fresh_restart = True --> label calc_dir as status='new' and start this calc over
-
-        3) Put */launch_dir/POSCAR into */launch_dir/xc-calc/POSCAR if there's not a POSCAR there already
-
-        4) Check if */calc_dir/CONTCAR exists and has data in it,
-            if it does, copy */calc_dir/CONTCAR to */calc_dir/POSCAR and label status='continue' (ie continuing job)
-            if it doesn't, label status='new' (ie new job)
-
-        5) Initialize VASPSetUp for calc_dir
-            modifies VASPSetUp(calc_dir).get_vasp_input with self.vasp_configs
-
-        6) If status in ['continue', 'new'],
-            check for errors using VASPSetUp(calc_dir).error_msgs
-                may remove WAVECAR/CHGCAR
-                will likely make edits to INCAR
+        statuses:
+            new: this should be treated as a totally new calculation (never been executed)
+            queued: this job is already in the queue
+            continue: this job ran previously, but is not finished
+            done: this job has already been finished
         """
 
         configs = self.configs.copy()
 
         fresh_restart = configs["fresh_restart"]
+        if fresh_restart is None:
+            fresh_restart = []
+
         launch_dir = self.launch_dir
 
         calc_list = self.calc_list
 
-        print("\n\n~~~~~ starting to work on %s ~~~~~\n\n" % launch_dir)
+        print("\n~~~~~~~~~~~~~~~~~~~~~~~\nWORKING ON %s\n" % launch_dir)
 
         job_in_q = self.is_job_in_queue
         if job_in_q:
@@ -481,13 +415,13 @@ class SubmitTools(object):
 
         fpos_src = os.path.join(launch_dir, "POSCAR")
 
-        # loop through all calculations within each chain and collect statuses
-        # statuses = {final_xc : {xc_calc : status}}
+        # loop through all calculations and collect statuses
         statuses = {}
 
-        # looping through each VASP calc in that chain
+        # looping through each VASP calc in list of calculations
         for xc_calc in calc_list:
 
+            # restart if this xc_calc is in your fresh_restart list
             restart_this_one = True if xc_calc in fresh_restart else False
 
             # (0) update vasp configs with the current xc and calc
@@ -504,6 +438,7 @@ class SubmitTools(object):
                 os.mkdir(calc_dir)
 
             if restart_this_one:
+                # if restarting, status = new
                 statuses[xc_calc] = "new"
                 continue
 
@@ -511,37 +446,24 @@ class SubmitTools(object):
             E_per_at = AnalyzeVASP(calc_dir).E_per_at
             convergence = True if E_per_at else False
             if convergence:
+                # if calc looks converged, make sure it is actually clean
                 vsu = VASPSetUp(calc_dir, user_configs=configs)
                 is_calc_clean = vsu.is_clean
                 if not is_calc_clean:
+                    # if there were any errors or false convergences, make as continue
                     statuses[xc_calc] = "continue"
                 else:
-                    if calc_to_run == "relax":
-                        statuses[xc_calc] = "done"
-
-                    elif calc_to_run != "loose":
-                        xc_calc_relax = "%s-relax" % xc_to_run
-                        if xc_calc_relax in statuses:
-                            if statuses[xc_calc_relax] == "done":
-                                statuses[xc_calc] = "done"
-
-                            else:
-                                statuses[xc_calc] = "new"
-
-                        else:
-                            print(
-                                "WARNING: %s not in statuses; did you mean to only run static?"
-                                % xc_calc_relax
-                            )
-                            statuses[xc_calc] = "done"
+                    # if it's converged and clean, then it's done
+                    statuses[xc_calc] = "done"
 
             else:
-                # (4) check for POSCAR
-                # flag to check whether POSCAR is newly copied
+                # now we're dealing with calcs that are not converged
+
+                # (3) check for POSCAR
                 fpos_dst = os.path.join(calc_dir, "POSCAR")
                 if os.path.exists(fpos_dst):
                     # if there is a POSCAR, make sure its not empty
-                    with open(fpos_dst, "r") as f_tmp:
+                    with open(fpos_dst, "r", encoding="utf-8") as f_tmp:
                         contents = f_tmp.readlines()
                     # if its empty, copy the initial structure to calc_dir
                     if len(contents) == 0:
@@ -551,11 +473,11 @@ class SubmitTools(object):
                 if not os.path.exists(fpos_dst):
                     copyfile(fpos_src, fpos_dst)
 
-                # (5) check for CONTCAR. if one exists, if its not empty, and if not fresh_restart, mark this job as one to "continue"
-                # (ie later, we'll copy CONTCAR to POSCAR); otherwise, mark as NEWRUN
+                # (4) check for CONTCAR. if one exists, if its not empty, and if not fresh_restart, mark this job as one to "continue"
+                # (ie later, we'll copy CONTCAR to POSCAR); otherwise, mark as new
                 fcont_dst = os.path.join(calc_dir, "CONTCAR")
                 if os.path.exists(fcont_dst):
-                    with open(fcont_dst, "r") as f_tmp:
+                    with open(fcont_dst, "r", encoding="utf-8") as f_tmp:
                         contents = f_tmp.readlines()
                     if len(contents) > 0:
                         statuses[xc_calc] = "continue"
@@ -567,6 +489,9 @@ class SubmitTools(object):
 
     @property
     def prepare_directories(self):
+        """
+        Given the statuses dictionary, prepare (update) each VASP calculation directory accordingly
+        """
         statuses = self.statuses
         configs = self.configs.copy()
         launch_dir = self.launch_dir
@@ -574,59 +499,51 @@ class SubmitTools(object):
         for xc_calc in calc_list:
             status = statuses[xc_calc]
             if status in ["done", "queued"]:
+                print("  %s is %s\n" % (xc_calc, status))
+                # no work needs to be done for finished or queued calcs
                 continue
 
             xc_to_run, calc_to_run = xc_calc.split("-")
 
-            user_vasp_configs_before_error_handling = configs.copy()
-            user_vasp_configs_before_error_handling["xc_to_run"] = xc_to_run
-            user_vasp_configs_before_error_handling["calc_to_run"] = calc_to_run
+            # get our configs before error handling
+            configs_before_error_handling = configs.copy()
+            configs_before_error_handling["xc_to_run"] = xc_to_run
+            configs_before_error_handling["calc_to_run"] = calc_to_run
 
             calc_dir = os.path.join(launch_dir, xc_calc)
 
-            print("\n~~~~~ working on %s ~~~~~\n" % calc_dir)
-
-            # (6) initialize VASPSetUp with current VASP configs for this calculation
+            # (5) initialize VASPSetUp with current VASP configs for this calculation
             vsu = VASPSetUp(
                 calc_dir=calc_dir,
-                user_configs=user_vasp_configs_before_error_handling,
+                user_configs=configs_before_error_handling,
             )
+            updated_configs = vsu.configs.copy()
 
-            user_vasp_configs = user_vasp_configs_before_error_handling.copy()
-
-            # (7) check for errors in continuing jobs
+            # (6) check for errors in continuing and new jobs
             incar_changes = {}
-            if status in ["continue", "new"]:
-                is_calc_clean = vsu.is_clean
-                if not is_calc_clean:
-                    # change INCAR based on errors and include in calc_configs
-                    incar_changes = vsu.incar_changes_from_errors
+            if status not in ["continue", "new"]:
+                raise ValueError(
+                    "something strange happened. %s status is not done, queued, continue, or new"
+                    % xc_calc
+                )
+            is_calc_clean = vsu.is_clean
+            if not is_calc_clean:
+                # change INCAR based on errors and include in calc_configs
+                incar_changes = vsu.incar_changes_from_errors
 
-                # if there are INCAR updates, add them to calc_configs
-                if incar_changes:
-                    if xc_calc in user_vasp_configs["incar_mods"]:
-                        user_vasp_configs["incar_mods"][xc_calc].update(incar_changes)
-                    else:
-                        user_vasp_configs["incar_mods"][xc_calc] = incar_changes
+            # (7) if there are INCAR updates, add them to calc_configs as incar_mods
+            if incar_changes:
+                if xc_calc in updated_configs["incar_mods"]:
+                    updated_configs["incar_mods"][xc_calc].update(incar_changes)
+                else:
+                    updated_configs["incar_mods"][xc_calc] = incar_changes
 
-                # print("\n\n\n\n\n\n")
-                # print(calc_dir)
-                # print("THESE ARE MY USER_VASP_CONFIGS")
-                # print(user_vasp_configs)
-                # print("\n\n\n\n\n\n")
-                # print(calc_dir)
+            # (8) write revised VASP input files to calc_dir
+            vsu = VASPSetUp(calc_dir=calc_dir, user_configs=updated_configs.copy())
+            vsu.prepare_calc
 
-                # update our vasp_configs with any modifications to the INCAR that we made to fix errors
-                # user_vasp_configs = {**vasp_configs, **calc_configs}
-                print("--------- may be some warnings (POTCAR ones OK) ----------")
-
-                # (8) prepare calc_dir to launch
-                vsu = VASPSetUp(calc_dir=calc_dir, user_configs=user_vasp_configs)
-
-                vsu.prepare_calc
-
-                print("-------------- warnings should be done ---------------")
-                print("\n~~~~~ prepared %s ~~~~~\n" % calc_dir)
+            print("-------------- warnings should be done ---------------")
+            print("  %s is prepared\n" % xc_calc)
         return statuses
 
     @property
@@ -659,24 +576,38 @@ class SubmitTools(object):
 
         7) if lobster_static and calc is static, write LOBSTER and BADER commands
         """
+        # I don't think I need this (seems to double-check queue b/c already checked in statuses)
+        # if self.is_job_in_queue:
+        #     return
 
-        if self.is_job_in_queue:
-            return
-
+        # get configs dict
         configs = self.configs.copy()
-        slurm_options = self.slurm_options.copy()
 
-        launch_dir = self.launch_dir
+        # get slurm-specific configs since these get handled differently
+        slurm_options = self.slurm_options.copy()
+        slurm_options["job-name"] = self.job_name
 
         queue_manager = self.queue_manager
 
+        # get launch_dir (where sub.sh gets written)
+        launch_dir = self.launch_dir
+
+        # get calc_list (what gets populated in sub.sh)
         calc_list = self.calc_list
+
+        # get the statuses and prepare VASP calcs accordingly
         statuses = self.prepare_directories
+
+        # start the submission script
         fsub = os.path.join(launch_dir, "sub.sh")
+
+        # say where we want statuses to be echoed to
         fstatus = os.path.join(launch_dir, "status.o")
-        slurm_options["job-name"] = self.job_name
+
         with open(fsub, "w", encoding="utf-8") as f:
+            # write the bin bash stuff at the top
             f.write("#!/bin/bash -l\n")
+
             # write the SLURM stuff (partition, nodes, time, etc) at the top
             for key in slurm_options:
                 slurm_option = slurm_options[key]
@@ -686,6 +617,7 @@ class SubmitTools(object):
 
             # this is for running MPI jobs that may require large memory
             f.write("ulimit -s unlimited\n")
+
             # load certain modules if needed for MPI command
             if configs["mpi_command"] == "mpirun":
                 if configs["machine"] == "msi":
@@ -710,20 +642,25 @@ class SubmitTools(object):
 
             for xc_calc in calc_list:
                 status = statuses[xc_calc]
+
+                # write status to status.o
                 f.write('\necho "%s is %s" >> %s\n' % (xc_calc, status, fstatus))
 
                 if status in ["done", "queued"]:
+                    # don't do anything for done or queued calcs
                     continue
+
                 # find our calc_dir (where VASP is executed for this xc_calc)
-                xc_to_run, calc_to_run = xc_calc.split("-")
                 calc_dir = os.path.join(launch_dir, xc_calc)
 
-                incar_mods = configs["incar_mods"]
-                if xc_calc in incar_mods:
-                    incar_mods = incar_mods[xc_calc]
-                else:
-                    incar_mods = None
+                # retrieve the incar_mods that pertain to this particular calculation
+                xc_to_run, calc_to_run = xc_calc.split("-")
+                configs["xc_to_run"] = xc_to_run
+                configs["calc_to_run"] = calc_to_run
+                vsu = VASPSetUp(calc_dir=calc_dir, user_configs=configs)
+                incar_mods = vsu.configs["incar_mods"]
 
+                # get the info that must be read by the Passer between calcs
                 passer_dict = {
                     "xc_calc": xc_calc,
                     "calc_list": calc_list,
@@ -731,13 +668,13 @@ class SubmitTools(object):
                     "incar_mods": incar_mods,
                     "launch_dir": launch_dir,
                 }
-
                 passer_dict_as_str = json.dumps(passer_dict)
 
+                # execute the passer
                 f.write("cd %s\n" % self.scripts_dir)
                 f.write("python passer.py '%s' \n" % passer_dict_as_str)
 
-                # before passing data, make sure parent has finished without crashing (using bash..)
+                # based on passer output, decide whether or not we need to cancel this job
                 f.write(
                     "isInFile=$(cat %s | grep -c %s)\n"
                     % (os.path.join(launch_dir, "job_killer.o"), "kill")
@@ -746,15 +683,21 @@ class SubmitTools(object):
                 f.write("   scancel $SLURM_JOB_ID\n")
                 f.write("fi\n")
 
+                # (presuming we didn't cancel the job) go to calc_dir and run VASP
                 f.write("cd %s\n" % calc_dir)
                 f.write(self.vasp_command)
 
+                # run lobster for certain static-addons
                 if calc_to_run in ["lobster", "bs"]:
                     f.write(self.lobster_command)
 
+                # run bader for all static jobs
                 if calc_to_run == "static":
                     f.write(self.bader_command)
+
+            # nothing left to do, so cancel the job (sometimes done jobs will hang)
             f.write("\n\nscancel $SLURM_JOB_ID\n")
+        print("WROTE %s\n" % fsub)
         return True
 
     @property
@@ -766,28 +709,27 @@ class SubmitTools(object):
                 (ie if all calcs are done, dont launch)
         """
         configs = self.configs.copy()
-        if self.is_job_in_queue:
-            return
+        # shouldn't need to check this since it gets checked in statuses
+        # if self.is_job_in_queue:
+        #     return
 
-        print("     now launching sub")
         scripts_dir = self.scripts_dir
         launch_dir = self.launch_dir
 
         # determine what keywords to look for to see if job needs to be launched
         flags_that_need_to_be_executed = configs["execute_flags"]
 
+        # see if there's anything to launch (eg don't launch if the submission script is just gonna echo done)
         fsub = os.path.join(launch_dir, "sub.sh")
-
         needs_to_launch = False
-        # see if there's anything to launch
-        with open(fsub, "r") as f:
+        with open(fsub, "r", encoding="utf-8") as f:
             contents = f.read()
             for flag in flags_that_need_to_be_executed:
                 if flag in contents:
                     needs_to_launch = True
 
         if not needs_to_launch:
-            print(" !!! nothing to launch here, not launching\n\n")
+            print("NOTHING TO LAUNCH in %s\n" % fsub)
             return
 
         # if we made it this far, launch it
@@ -795,8 +737,13 @@ class SubmitTools(object):
         subprocess.call(["sbatch", "sub.sh"])
         os.chdir(scripts_dir)
 
+        print("SUBMITTED %s\n" % fsub)
+
 
 def main():
+    """
+    Execute code here for debugging purposes
+    """
     return
 
 

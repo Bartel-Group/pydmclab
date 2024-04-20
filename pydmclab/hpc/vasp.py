@@ -1,55 +1,64 @@
-from pydmclab.core.mag import MagTools
-from pydmclab.core.struc import StrucTools
-from pydmclab.hpc.analyze import AnalyzeVASP, VASPOutputs
-from pydmclab.data.configs import load_base_configs
-from pydmclab.utils.handy import read_yaml, write_yaml, dotdict
-from pydmclab.hpc.sets import GetSet
-
 import os
 import warnings
 from shutil import copyfile
 
-from pymatgen.io.vasp.sets import BadInputSetWarning
-
 from pymatgen.core.structure import Structure
-from pymatgen.io.vasp.inputs import Kpoints, Incar
+from pymatgen.io.vasp.inputs import Incar
+from pymatgen.io.vasp.sets import BadInputSetWarning
 from pymatgen.io.lobster.inputs import Lobsterin
 
-"""
-Holey Moley, getting pymatgen to find your POTCARs is not trivial...
-Here's the workflow I used:
-    1) Download potpaw_LDA_PBE_52_54_orig.tar.gz from VASP
-    2) Extract the tar into a directory, we'll call it FULL_PATH/bin/pp
-    3) Download potpaw_PBE.tgz from VASP
-    4) Extract the tar INSIDE a directory: FULL_PATH/bin/pp/potpaw_PBE
-    5) $ cd FULL_PATH/bin
-    6) $ pmg config -p FULL_PATH/bin/pp pymatgen_pot
-    7) $ pmg config --add PMG_VASP_PSP_DIR FULL_PATH/bin/pymatgen_pot
-    8) $ pmg config --add PMG_DEFAULT_FUNCTIONAL PBE_54
-    
-Now that this has been done, new users must just do:
-    1) $ pmg config --add PMG_VASP_PSP_DIR FULL_PATH/bin/pymatgen_pot
-    2) $ pmg config --add PMG_DEFAULT_FUNCTIONAL PBE_54
-
-"""
+from pydmclab.core.mag import MagTools
+from pydmclab.hpc.analyze import AnalyzeVASP, VASPOutputs
+from pydmclab.data.configs import load_base_configs
+from pydmclab.hpc.sets import GetSet
 
 
 class VASPSetUp(object):
     """
     Use to write VASP inputs for a single VASP calculation
-        - a calculation here might be defined as the same:
-            - initial structure
-            - initial magnetic configurations
-            - input settings (INCAR, KPOINTS, POTCAR)
-            - etc.
+        a calculation here might be defined as the same:
+            initial structure
+            initial magnetic configurations
+            input settings (INCAR, KPOINTS, POTCAR)
+            etc.
 
     Also changes inputs based on errors that are encountered
 
     Note that we rarely need to call this class directly
-        - instead we'll manage things through pydmclab.hpc.submit.SubmitTools and pydmclab.hpc.launch.LaunchTools
+        instead we'll manage things through pydmclab.hpc.submit.SubmitTools and pydmclab.hpc.launch.LaunchTools
+
+    Using this will require configuring your POTCARs to work with pymatgen.
+        Here's the workflow I used:
+            1) Download potpaw_LDA_PBE_52_54_orig.tar.gz from VASP
+            2) Extract the tar into a directory, we'll call it FULL_PATH/bin/pp
+            3) Download potpaw_PBE.tgz from VASP
+            4) Extract the tar INSIDE a directory: FULL_PATH/bin/pp/potpaw_PBE
+            5) $ cd FULL_PATH/bin
+            6) $ pmg config -p FULL_PATH/bin/pp pymatgen_pot
+            7) $ pmg config --add PMG_VASP_PSP_DIR FULL_PATH/bin/pymatgen_pot
+            8) $ pmg config --add PMG_DEFAULT_FUNCTIONAL PBE_54
+
+        Now that this has been done, new users must just do:
+            1) $ pmg config --add PMG_VASP_PSP_DIR FULL_PATH/bin/pymatgen_pot
+            2) $ pmg config --add PMG_DEFAULT_FUNCTIONAL PBE_54
     """
 
-    def __init__(self, calc_dir, user_configs={}):
+    def __init__(self, calc_dir, user_configs=None):
+        """
+        Args:
+            calc_dir (str):
+                path to directory where VASP calculation will be run
+
+            user_configs (bool or dict):
+                if None, will use default configs
+                if dict, will use user_configs
+                    these will override any default configs
+                    see pydmclab.data.data._hpc_configs for defaults that can be changed
+                        relevant configs to this class are those that affect "VASP_CONFIGS"
+        """
+        # proper handling for default arg that could be dict
+        if user_configs is None:
+            user_configs = {}
 
         # this is where we will execute VASP
         self.calc_dir = calc_dir
@@ -63,22 +72,39 @@ class VASPSetUp(object):
             structure = Structure.from_file(fpos)
             self.structure = structure
 
+        # load base configs from pydmclab.data.data._hpc_configs
         self.default_configs = load_base_configs()
+
+        # load user configs
         self.user_configs = user_configs
 
     @property
     def configs(self):
+        """
+        Blends default configs with user_configs
+            does some work with incar_mods, kpoints_mods, and potcar_mods
+                basically, you will have passed these dicts for many calculation types
+                but your are only setting up VASP for one of those. this will retrieve the mods for this particular calculation
+        """
         user_configs = self.user_configs
+
+        # what kind of xc (gga, metagga, etc.)
         xc_to_run = user_configs["xc_to_run"]
+
+        # what kind of calc (static, relax, dfpt, etc.)
         calc_to_run = user_configs["calc_to_run"]
 
+        # relevant xc-calcs are this particula xc-calc or if all is specified for xc and/or calc
         relevant_mod_keys = [
             "-".join([xc, calc])
             for xc in [xc_to_run, "all"]
             for calc in [calc_to_run, "all"]
         ]
 
+        # loop through incar, kpoints, potcar, and retrieve any relevant mods that should apply on top of defaults
         for input_file in ["incar", "kpoints", "potcar"]:
+            if user_configs["%s_mods" % input_file] is None:
+                user_configs["%s_mods" % input_file] = {}
             user_configs["modify_this_%s" % input_file] = {}
             for xc_calc in relevant_mod_keys:
                 if xc_calc in user_configs["%s_mods" % input_file]:
@@ -86,6 +112,7 @@ class VASPSetUp(object):
                         user_configs["%s_mods" % input_file][xc_calc]
                     )
 
+        # blend default configs with user_configs, giving user_configs priority
         configs = {**self.default_configs, **user_configs}
         return configs.copy()
 
@@ -95,15 +122,13 @@ class VASPSetUp(object):
         Returns:
             vasp_input (pymatgen.io.vasp.sets.VaspInputSet)
 
-        Starting from a pymatgen
-        Uses configs to modify pymatgen's VaspInputSets as required
+        Start from pydmclab.hpc.sets.GetSet and apply user_configs on top
         """
 
         # copy configs to prevent unwanted updates
         configs = self.configs.copy()
 
         # initialize how we're going to modify each vasp input file with configs specs
-
         modify_incar = configs["modify_this_incar"]
         modify_kpoints = configs["modify_this_kpoints"]
         modify_potcar = configs["modify_this_potcar"]
@@ -111,22 +136,21 @@ class VASPSetUp(object):
         # initialize potcar functional
         potcar_functional = configs["potcar_functional"]
 
-        # this should be kept off in general, gives unuseful warnings (I think)
+        # this should be kept off in general, gives unhelpful warnings (I think)
         validate_magmom = configs["validate_magmom"]
 
+        # need the structure to process magnetism
         structure = self.structure
-
-        xc_calc = "-".join([configs["xc_to_run"], configs["calc_to_run"]])
 
         # add MAGMOM to structure
         if configs["mag"] == "nm":
-            # if non-magnetic, MagTools takes care of this
+            # if non-magnetic, MagTools takes care of this (no MAGMOM)
             structure = MagTools(structure).get_nonmagnetic_structure
         elif configs["mag"] == "fm":
-            # if ferromagnetic, MagTools takes care of this
+            # if ferromagnetic, MagTools takes care of this (mag elements get MAGMOM = 5, nonmag get MAGMOM = 0.6 by default)
             structure = MagTools(structure).get_ferromagnetic_structure
         elif "afm" in configs["mag"]:
-            # if antiferromagnetic, we need to aprovide a MAGMOM
+            # if antiferromagnetic, we need to aprovide a MAGMOM (presumably you ran MagTools to generate AFM configurations already)
             magmom = configs["magmom"]
             if not magmom:
                 raise ValueError("you must specify a magmom for an AFM calculation\n")
@@ -134,8 +158,10 @@ class VASPSetUp(object):
                 raise ValueError(
                     "provided magmom that is not AFM, but you are trying to run an AFM calculation\n"
                 )
+            # add this AFM magmom to our Structure
             structure.add_site_property("magmom", magmom)
 
+        # get the VaspInputSet
         vaspset = GetSet(
             structure=structure,
             configs=configs,
@@ -153,77 +179,94 @@ class VASPSetUp(object):
         """
         Write input files (INCAR, KPOINTS, POTCAR)
         """
-
+        # ignore pymatgen warnings about bad input sets. we should be handling the ones that matter to us already
         warnings.filterwarnings("ignore", category=BadInputSetWarning)
 
+        # get our configs dict
         configs = self.configs.copy()
+
+        # where is VASP going to be run
         calc_dir = self.calc_dir
 
+        # get our Vasp input set
         vaspset = self.get_vaspset
+
+        # if something went awry and we don't have a VASP input set, don't set up the calculation
         if not vaspset:
             return None
 
         # write input files
         vaspset.write_input(calc_dir)
 
-        # for LOBSTER, use Janine George's Lobsterin approach (mainly to get NBANDS)
+        # for LOBSTER, use pymatnge io lobseter to get lobsterin
         if configs["calc_to_run"] in ["lobster", "bs"]:
-            INCAR_input = os.path.join(calc_dir, "INCAR_input")
-            INCAR_output = os.path.join(calc_dir, "INCAR")
-            copyfile(INCAR_output, INCAR_input)
-            POSCAR_input = os.path.join(calc_dir, "POSCAR_input")
-            POSCAR_output = os.path.join(calc_dir, "POSCAR")
-            copyfile(POSCAR_output, POSCAR_input)
-            KPOINTS_output = os.path.join(calc_dir, "KPOINTS")
-            POTCAR_input = os.path.join(calc_dir, "POTCAR_input")
-            POTCAR_output = os.path.join(calc_dir, "POTCAR")
-            copyfile(POTCAR_output, POTCAR_input)
 
+            poscar = os.path.join(calc_dir, "POSCAR")
+            incar = os.path.join(calc_dir, "INCAR")
+            potcar = os.path.join(calc_dir, "POTCAR")
+            kpoints = os.path.join(calc_dir, "KPOINTS")
+
+            # if doing regular LOBSTER (ie no bandstructure), just need a Lobsterin file. all other settings get taken care of for us (through Sets or Passer)
             if configs["calc_to_run"] == "lobster":
 
                 lobsterin = Lobsterin.standard_calculations_from_vasp_files(
-                    POSCAR_input=POSCAR_input,
-                    INCAR_input=INCAR_input,
-                    POTCAR_input=POTCAR_input,
+                    POSCAR_input=poscar,
+                    INCAR_input=incar,
+                    POTCAR_input=potcar,
                     option="standard",
                 )
 
                 lobsterin_dict = lobsterin.as_dict()
 
+                # adjust COHPSteps based on how fine of a COHP/DOS user wants
                 lobsterin_dict["COHPSteps"] = configs["COHPSteps"]
                 lobsterin = Lobsterin.from_dict(lobsterin_dict)
 
+            # if getting bandstructure, need Lobsterin to do more work for us
             elif configs["calc_to_run"] == "bs":
                 lobsterin = Lobsterin
+
+                # get a primitive cell but save the original cell as POSCAR_input
+                poscar_input = os.path.join(calc_dir, "POSCAR_input")
+                copyfile(poscar, poscar_input)
                 lobsterin.write_POSCAR_with_standard_primitive(
-                    POSCAR_input=POSCAR_input,
-                    POSCAR_output=POSCAR_output,
+                    POSCAR_input=poscar_input,
+                    POSCAR_output=poscar,
                     symprec=configs["bs_symprec"],
                 )
+
+                # get a KPOINTS path but save original KPOINTS as KPOINTS_input
+                kpoints_input = os.path.join(calc_dir, "KPOINTS_input")
+                copyfile(kpoints, kpoints_input)
                 try:
                     lobsterin.write_KPOINTS(
-                        POSCAR_input=POSCAR_output,
-                        KPOINTS_output=KPOINTS_output,
+                        POSCAR_input=poscar,
+                        KPOINTS_output=kpoints,
                         line_mode=True,
                         symprec=configs["bs_symprec"],
                         kpoints_line_density=configs["bs_line_density"],
                     )
                 except ValueError:
+                    # NOTE: this is not a great fix..
+                    # sometimes we can't find a path with the given symprec
                     print("trying higher symprec")
                     lobsterin.write_KPOINTS(
-                        POSCAR_input=POSCAR_output,
-                        KPOINTS_output=KPOINTS_output,
+                        POSCAR_input=poscar,
+                        KPOINTS_output=kpoints,
                         line_mode=True,
                         symprec=configs["bs_symprec"] * 2,
                         kpoints_line_density=configs["bs_line_density"],
                     )
 
+                # get our lobsterin, specifying that we want a fatband calculation
                 lobsterin = Lobsterin.standard_calculations_from_vasp_files(
-                    POSCAR_input=POSCAR_output,
-                    INCAR_input=INCAR_input,
-                    POTCAR_input=POTCAR_output,
+                    POSCAR_input=poscar,
+                    INCAR_input=incar,
+                    POTCAR_input=potcar,
                     option="standard_with_fatband",
                 )
+
+            # write lobsterin file to calc_dir so LOBSTER can be executed
             flobsterin = os.path.join(calc_dir, "lobsterin")
             lobsterin.write_lobsterin(flobsterin)
 
@@ -232,10 +275,12 @@ class VASPSetUp(object):
     @property
     def error_msgs(self):
         """
-        Dict of {group of errors (str) : [list of error messages (str) in group]}
-            - the error messages are things that VASP will write to fvaspout
-            - we'll crawl fvaspout and assemble what errors made VASP fail,
-                then we'll make edits to VASP calculation to clean them up for re-launch
+        Returns:
+            dict of {group of errors (str) : [list of error messages (str) in group]}
+
+        the error messages are things that VASP will write to fvaspout
+        we'll crawl fvaspout and assemble what errors made VASP fail,
+            then we'll make edits to VASP calculation to clean them up for re-launch
         """
         return {
             "tet": [
@@ -289,25 +334,33 @@ class VASPSetUp(object):
     @property
     def unconverged_log(self):
         """
+        Returns:
+            list of str messages
+
         checks to see if both ionic and electronic convergence have been reached
             if calculation had NELM # electronic steps, electronic convergence may not be met
             if calculation had NSW # ionic steps, ionic convergence may not be met
+            if the final energy is positive, then calculation is definitely not converged
+            if the final energy changes a lot between static and relax, then static calculation is deemed not converged
 
-        returns a list, unconverged, that can have 0, 1, or 2 items
+        NOTE: if calculation hasn't started or errored out, this will return an empty list
+            the purpose of this method is to detect calculations that *look* converged (Elaps in OUTCAR) but aren't actually
 
-            if unconverged = []:
-                the calculation either:
-                    1) didn't finish (vasprun.xml not found or incomplete)
-                    2) both ionic and electronic convergence were met
-            if 'nelm_too_low' in unconverged:
-                the calculation didn't reach electronic convergence
-            if 'nsw_too_low' in unconverged:
-                the calculation didn't reach ionic convergence
+        if 'nelm_too_low' in unconverged:
+            the calculation didn't reach electronic convergence
+        if 'nsw_too_low' in unconverged:
+            the calculation didn't reach ionic convergence
+        if 'Etot_positive' in unconverged:
+            the final energy is positive
+        if 'static_energy_changed_alot' in unconverged:
+            the final energy changed a lot between static and relax (will force static to be recalculated)
         """
         calc_dir = self.calc_dir
         configs = self.configs.copy()
+
         analyzer = AnalyzeVASP(calc_dir)
         outputs = VASPOutputs(calc_dir)
+
         unconverged = []
 
         # if vasprun doesnt exist, return empty list (calc errored out or didnt start yet)
@@ -315,25 +368,36 @@ class VASPSetUp(object):
         if not vr:
             return unconverged
 
+        # get final energy. if it exists (calc looks converged) and is positive, add to unconverged
         Etot = analyzer.E_per_at
         if Etot and (Etot > 0):
             unconverged.append("Etot_positive")
 
-        if ("static" in calc_dir) and os.path.exists(
-            calc_dir.replace("static", "relax")
+        # for static calculations,
+        # if relax calculation exists, compare energies
+        # if they differ by more than specified tolerance (default = 0.1 eV/atom), add to unconverged
+        # if we specified a tolerance for this
+        if (
+            ("static" in calc_dir)
+            and os.path.exists(calc_dir.replace("static", "relax"))
+            and configs["relax_static_energy_diff_tol"]
         ):
             relax_dir = calc_dir.replace("static", "relax")
             E_relax = AnalyzeVASP(relax_dir).E_per_at
+
+            # make sure relax has an energy
             if E_relax:
+                # make sure static has an energy
                 if Etot:
-                    if abs(E_relax - Etot) > 0.1:
+                    # compare the two; if too high, call static unconverged
+                    if abs(E_relax - Etot) > configs["relax_static_energy_diff_tol"]:
                         unconverged.append("static_energy_changed_alot")
 
-        # if calc is fully converged, return empty list (calc is done)
+        # if calc is fully converged (ionically and electronically), return empty list (calc is done)
         if analyzer.is_converged:
             return unconverged
 
-        # make sure last electronic loop converged in calc
+        # make sure last electronic loop is converged
         electronic_convergence = vr.converged_electronic
 
         # if we're relaxing the geometry, make sure last ionic loop converged
@@ -352,47 +416,78 @@ class VASPSetUp(object):
     @property
     def error_log(self):
         """
-        Parse fvaspout for error messages
+        Returns
+            list of errors (str)
 
-        Returns list of errors (str)
+        Parse fvaspout (calc_dir/vasp.o) for error messages
+
         """
         error_msgs = self.error_msgs
         out_file = os.path.join(self.calc_dir, self.configs["fvaspout"])
+
+        # if no vasp.o file, return empty list
         if not os.path.exists(out_file):
             return []
+
+        # accumulate list of errors found in vasp.o
         errors = []
-        with open(out_file) as f:
+        with open(out_file, "r", encoding="utf-8") as f:
             contents = f.read()
-        for e in error_msgs:
-            for t in error_msgs[e]:
-                if t in contents:
-                    errors.append(e)
+        for error_tag, error_text_list in error_msgs.items():
+            for error_text in error_text_list:
+                if error_text in contents:
+                    errors.append(error_tag)
         return errors
+
+    @property
+    def all_errors(self):
+        """
+        Returns:
+            list of str messages
+
+        combines error_log and unconverged_log
+        """
+        return self.error_log + self.unconverged_log
 
     @property
     def is_clean(self):
         """
-        True if no errors found and calc is fully converged, else False
+        Returns:
+            True if no errors found and calc is fully converged, else False
         """
         configs = self.configs.copy()
         calc_dir = self.calc_dir
+
+        # start by assuming calc is not clean
         clean = False
-        error_log = self.error_log
-        unconverged_log = self.unconverged_log
-        errors = error_log + unconverged_log
+
+        # combine error lists (from vasp.o and false convergence)
+        errors = self.all_errors
+
+        # if calc is converged and no errors, then it's clean
         if AnalyzeVASP(calc_dir).is_converged and (len(errors) == 0):
             clean = True
+
+        # if calc hasn't been executed yet, it's clean
         elif not os.path.exists(os.path.join(calc_dir, configs["fvaspout"])):
             clean = True
+
+        # otherwise, it's not clean
         else:
             clean = False
 
-        if clean == True:
-            with open(os.path.join(calc_dir, configs["fvasperrors"]), "w") as f:
+        if clean is True:
+            # write empty errors.o file
+            with open(
+                os.path.join(calc_dir, configs["fvasperrors"]), "w", encoding="utf-8"
+            ) as f:
                 f.write("")
             return clean
-        elif clean == False:
-            with open(os.path.join(calc_dir, configs["fvasperrors"]), "w") as f:
+        elif clean is False:
+            # populate errors.o file with errors so they can be corrected
+            with open(
+                os.path.join(calc_dir, configs["fvasperrors"]), "w", encoding="utf-8"
+            ) as f:
                 for e in errors:
                     f.write(e + "\n")
             return clean
@@ -401,31 +496,34 @@ class VASPSetUp(object):
     @property
     def incar_changes_from_errors(self):
         """
-        Automatic INCAR changes based on errors
-            - note: also may remove WAVECAR and/or CHGCAR as needed
+        Returns
+            {INCAR key (str) : INCAR value (str)}
 
-        Returns {INCAR key (str) : INCAR value (str)}
+        Automatic INCAR changes based on errors
+            note: also may remove WAVECAR and/or CHGCAR as needed
 
         This will get passed to VASPSetUp the next time we launch (using SubmitTools)
 
         These error fixes are mostly taken from custodian (https://github.com/materialsproject/custodian/blob/809d8047845ee95cbf0c9ba45f65c3a94840f168/custodian/vasp/handlers.py)
             + a few of my own fixes I've added over the years
+
+        NOTE: not clear if the order I apply these has the wrong effect in some circumstances
         """
 
         configs = self.configs.copy()
-
         calc_dir = self.calc_dir
-        errors = self.error_log
-        unconverged_log = self.unconverged_log
+        errors = self.all_errors
+
         chgcar = os.path.join(calc_dir, "CHGCAR")
         wavecar = os.path.join(calc_dir, "WAVECAR")
 
+        # get current settings so that fix is not redundant
         curr_incar = Incar.from_file(os.path.join(calc_dir, "INCAR")).as_dict()
 
         incar_changes = {}
-        if "Etot_positive" in unconverged_log:
+        if "Etot_positive" in errors:
             incar_changes["ALGO"] = "All"
-        if "static_energy_changed_alot" in unconverged_log:
+        if "static_energy_changed_alot" in errors:
             incar_changes["ALGO"] = "All"
         if "grad_not_orth" in errors:
             incar_changes["SIGMA"] = 0.05
@@ -464,7 +562,9 @@ class VASPSetUp(object):
             incar_changes["SYMPREC"] = 1e-5
             incar_changes["ISMEAR"] = 0
             incar_changes["ISYM"] = -1
-        if "nelm_too_low" in unconverged_log:
+        if "nelm_too_low" in errors:
+            # default behavior is to add 100 to NELM
+            # you can specify flexible convergence criteria, in which case we'll change EDIFF
             if "NELM" in curr_incar:
                 prev_nelm = curr_incar["NELM"]
             else:
@@ -475,7 +575,9 @@ class VASPSetUp(object):
                 incar_changes["EDIFF"] = prev_ediff * 10
             incar_changes["NELM"] = prev_nelm + 100
             incar_changes["ALGO"] = "All"
-        if "nsw_too_low" in unconverged_log:
+        if "nsw_too_low" in errors:
+            # default behavior is to add 100 to NSW
+            # you can specify flexible convergence criteria, in which case we'll change EDIFFG
             if "NSW" in curr_incar:
                 prev_nsw = curr_incar["NSW"]
             else:
@@ -507,7 +609,6 @@ class VASPSetUp(object):
                 prev_symprec = 1e-6
             new_symprec = prev_symprec / 10
             incar_changes["SYMPREC"] = new_symprec
-            # incar_changes["SYMPREC"] = 1e-3
         if "coef" in errors:
             if os.path.exists(wavecar):
                 os.remove(wavecar)
@@ -515,6 +616,9 @@ class VASPSetUp(object):
 
 
 def main():
+    """
+    Execute code here if debugging this file
+    """
     return
 
 

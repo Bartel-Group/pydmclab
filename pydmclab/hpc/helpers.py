@@ -22,30 +22,61 @@ def get_vasp_configs(
     lobster_configs={"COHPSteps": 2000},
     bs_configs={"bs_symprec": 0.1, "bs_line_density": 20},
     flexible_convergence_criteria=False,
+    compare_static_and_relax_energies=0.1,
 ):
     """
     configs related to particular VASP calculations
 
     Args:
-        standard (str) : dmc for group standard, mp for Materials Project standard
-        dont_relax_cell (bool): if True, sets ISIF = 2 for all calculations
-        special_functional (str): if you're not using r2SCAN, PBE, or HSE06
-        incar_mods (dict): modifications to INCAR
-            {xc-calc (str) : {INCAR tag : value}}
-                use xc = 'all' or calc = 'all' to apply to all xcs or all calcs
-        kpoints_mods (dict): modifications to KPOINTS
-            {xc-calc (str) : {KPOINTS generator tag ('grid', 'auto', 'density', 'reciprocal_density') : value}}
-        potcar_mods (dict): modifications to POTCAR
-            {xc-calc (str) : {element : potcar symbol}}
-        lobster_configs (dict): modifications to LOBSTER
-            {'COHPSteps' : int}
-                how fine a grid do you want for DOS (larger means finer energy discretization)
-        bs_configs (dict): modifications to band structure calculations
-            {'bs_symprec' : float, 'bs_line_density' : int}
-                symprec for finding primitive cell for band structure calculations, line density for band structure kpoints
+        standard (str):
+            "dmc" for group standard, "mp" for Materials Project standard
+
+        dont_relax_cell (bool)
+            if True, sets ISIF = 2 for all calculations
+
+        special_functional (str)
+            if you're not using r2SCAN, PBE, or HSE06, specify here as str (must be acceptable value for GGA, METAGGA, etc in INCAR)
+
+        incar_mods (dict):
+            modifications to INCAR
+                {xc-calc (str) : {INCAR tag (str) : value (str, bool, float, int)}}
+                    use xc = 'all' or calc = 'all' to apply to all xcs or all calcs
+
+            e.g., {'metagga-all' : {'LMAXMIX' : 0.1,
+                                    'EDIFF' : 1e-7},
+                    'gga-relax' : {'EDIFFG' : 1e-4}}
+
+        kpoints_mods (dict):
+            modifications to KPOINTS
+                {xc-calc (str) : {KPOINTS generator tag ('grid', 'auto', 'density', 'reciprocal_density') : value (float, list)}}
+
+            e.g., {'gga-all' : {'grid' : [8, 8, 8]},
+
+        potcar_mods (dict):
+            modifications to POTCAR
+                {xc-calc (str) : {element (str) : potcar symbol (str)}}
+
+            e.g.,
+                {'all-all' : {'W' : 'W_pv'}}
+
+        lobster_configs (dict):
+            modifications to LOBSTER (only affects 'all-lobster' xc-calcs)
+                {'COHPSteps' : int}
+                    how fine a grid do you want for DOS (larger means finer energy discretization)
+
+        bs_configs (dict):
+            modifications to band structure calculations (only affects 'all-bs' xc-calcs)
+                {'bs_symprec' : float, 'bs_line_density' : int}
+                    symprec for finding primitive cell for band structure calculations, line density for band structure kpoints
 
         flexible_convergence_criteria (bool):
             if True, reduce EDIFF/EDIFFG if convergence is taking very many steps
+            if False, only update NELM and NSW if convergence is taking very many steps
+
+        compare_static_and_relax_energies (float):
+            if the difference between static and relax energies is greater than this, rerun the static calculation
+                if False, don't compare the energies
+
     """
     vasp_configs = {}
     if dont_relax_cell:
@@ -59,6 +90,7 @@ def get_vasp_configs(
     vasp_configs["bs_line_density"] = bs_configs["bs_line_density"]
     vasp_configs["COHPSteps"] = lobster_configs["COHPSteps"]
     vasp_configs["flexible_convergence_criteria"] = flexible_convergence_criteria
+    vasp_configs["relax_static_energy_diff_tol"] = compare_static_and_relax_energies
 
     return vasp_configs
 
