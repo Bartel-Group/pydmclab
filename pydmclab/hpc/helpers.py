@@ -480,7 +480,7 @@ def get_query(
                     < any other data you want to keep track of >}}
     """
 
-    if len(api_key) < 32:
+    if api_key and len(api_key) < 32:
         raise ValueError("API key should be 32 characters")
 
     fjson = os.path.join(data_dir, savename)
