@@ -855,11 +855,14 @@ def submit_one_calc(submit_args):
     # what magmoms apply to that launch_dir
     initial_magmom = launch_dirs[launch_dir]["magmom"]
 
+    ID_specific_vasp_configs = launch_dirs[launch_dir]["ID_specific_vasp_configs"]
+
     if running_in_parallel:
         try:
             sub = SubmitTools(
                 launch_dir=launch_dir,
                 initial_magmom=initial_magmom,
+                ID_specific_vasp_configs=ID_specific_vasp_configs,
                 user_configs=curr_user_configs,
             )
 
@@ -879,6 +882,7 @@ def submit_one_calc(submit_args):
         sub = SubmitTools(
             launch_dir=launch_dir,
             initial_magmom=initial_magmom,
+            ID_specific_vasp_configs=ID_specific_vasp_configs,
             user_configs=curr_user_configs,
         )
 

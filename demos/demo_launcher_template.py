@@ -52,7 +52,8 @@ if not CUSTOM_PASSER:
     )
 
 # if you need data from MP as a starting point (often the case), you need your API key
-API_KEY = "__YOUR API KEY__"
+# if API_KEY = None, it will expect you've configured your API KEY using pmg config --add PMG_MAPI_KEY <USER_API_KEY>
+API_KEY = None
 
 # what to query MP for (if you need MP data)
 ## e.g., 'MnO2', ['MnO2', 'TiO2'], 'Ca-Ti-O, etc
@@ -234,7 +235,7 @@ def main():
             launch_dirs=launch_dirs,
             user_configs=CONFIGS,
             ready_to_launch=ready_to_launch,
-            n_procs=CONFIGS["submit_calculations_in_parallel"],
+            n_procs=CONFIGS["n_procs_for_submission"],
         )
 
     results = get_results(

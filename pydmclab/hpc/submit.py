@@ -421,7 +421,7 @@ class SubmitTools(object):
 
         calc_list = self.calc_list
 
-        print("\n~~~~~~~~~~~~~~~~~~~~~~~\nWORKING ON %s\n" % launch_dir)
+        print("\n~~~~~~~~~~~~~~~~~~~~~~~\n\nWORKING ON %s\n" % launch_dir)
 
         job_in_q = self.is_job_in_queue
         if job_in_q:
