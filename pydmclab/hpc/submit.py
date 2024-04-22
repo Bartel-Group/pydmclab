@@ -511,9 +511,12 @@ class SubmitTools(object):
 
         for xc_calc in calc_list:
             status = statuses[xc_calc]
-            if status in ["done", "queued"]:
+            if status in ["done"]:
                 print("  %s is %s\n" % (xc_calc, status))
                 # no work needs to be done for finished or queued calcs
+                continue
+
+            if status in ["queued"]:
                 continue
 
             xc_to_run, calc_to_run = xc_calc.split("-")
@@ -594,6 +597,7 @@ class SubmitTools(object):
         print("\n~~~~~~~~~~~~~~~~~~~~~~~\n\npreparing %s\n" % launch_dir)
         if self.is_job_in_queue:
             print("\nqueued as %s\n" % self.job_name)
+            return
 
         # get configs dict
         configs = self.configs.copy()
