@@ -670,7 +670,7 @@ class SubmitTools(object):
                     # execute the collector
                     f.write("cd %s\n" % self.scripts_dir)
                     f.write(
-                        "python collector.py '%s %s' \n"
+                        "\npython collector.py %s %s \n"
                         % (calc_dir, os.path.join(self.scripts_dir, "configs.json"))
                     )
                     continue
@@ -693,7 +693,7 @@ class SubmitTools(object):
                 passer_dict_as_str = json.dumps(passer_dict)
 
                 # execute the passer
-                f.write("cd %s\n" % self.scripts_dir)
+                f.write("\ncd %s\n" % self.scripts_dir)
                 f.write("python passer.py '%s' \n" % passer_dict_as_str)
 
                 # based on passer output, decide whether or not we need to cancel this job
@@ -720,7 +720,7 @@ class SubmitTools(object):
                 # execute the collector
                 f.write("cd %s\n" % self.scripts_dir)
                 f.write(
-                    "python collector.py '%s %s' \n"
+                    "\npython collector.py %s %s \n"
                     % (calc_dir, os.path.join(self.scripts_dir, "configs.json"))
                 )
 
