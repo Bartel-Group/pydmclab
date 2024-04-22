@@ -421,8 +421,6 @@ class SubmitTools(object):
 
         calc_list = self.calc_list
 
-        print("\n~~~~~~~~~~~~~~~~~~~~~~~\n\nWORKING ON %s\n" % launch_dir)
-
         job_in_q = self.is_job_in_queue
         if job_in_q:
             return {xc_calc: "queued" for xc_calc in calc_list}
@@ -506,10 +504,14 @@ class SubmitTools(object):
         """
         Given the statuses dictionary, prepare (update) each VASP calculation directory accordingly
         """
+
         statuses = self.statuses
         configs = self.configs.copy()
         launch_dir = self.launch_dir
         calc_list = self.calc_list
+
+        print("\n~~~~~~~~~~~~~~~~~~~~~~~\n\nWORKING ON %s\n" % launch_dir)
+
         for xc_calc in calc_list:
             status = statuses[xc_calc]
             if status in ["done", "queued"]:
