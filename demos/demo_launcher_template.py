@@ -126,6 +126,7 @@ ANALYSIS_CONFIGS = get_analysis_configs(
     analyze_bonding=False,
     exclude=[],
     remake_results=False,
+    verbose=False,
 )
 
 CONFIGS = ANALYSIS_CONFIGS.copy()
