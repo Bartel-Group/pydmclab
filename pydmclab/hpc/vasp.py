@@ -103,14 +103,16 @@ class VASPSetUp(object):
 
         # loop through incar, kpoints, potcar, and retrieve any relevant mods that should apply on top of defaults
         for input_file in ["incar", "kpoints", "potcar"]:
-            if user_configs["%s_mods" % input_file] is None:
-                user_configs["%s_mods" % input_file] = {}
-            user_configs["modify_this_%s" % input_file] = {}
+            old_key = "%s_mods" % input_file
+            new_key = "modify_this_%s" % input_file
+            if old_key not in user_configs:
+                user_configs[old_key] = {}
+            if user_configs[old_key] is None:
+                user_configs[old_key] = {}
+            user_configs[new_key] = {}
             for xc_calc in relevant_mod_keys:
-                if xc_calc in user_configs["%s_mods" % input_file]:
-                    user_configs["modify_this_%s" % input_file].update(
-                        user_configs["%s_mods" % input_file][xc_calc]
-                    )
+                if xc_calc in user_configs[old_key]:
+                    user_configs[new_key].update(user_configs[old_key][xc_calc])
 
         # blend default configs with user_configs, giving user_configs priority
         configs = {**self.default_configs, **user_configs}

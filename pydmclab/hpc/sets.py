@@ -268,7 +268,7 @@ class GetSet(object):
             if not functional:
                 new_settings["METAGGA"] = "R2SCAN"
             else:
-                new_settings["METAGGA"] = functional
+                new_settings["METAGGA"] = functional[xc]
 
         if xc in ["gga", "ggau"]:
             functional = self.configs["functional"]
@@ -276,7 +276,7 @@ class GetSet(object):
             if not functional:
                 new_settings["GGA"] = "PE"
             else:
-                new_settings["GGA"] = functional
+                new_settings["GGA"] = functional[xc]
 
         if xc == "gga":
             # turn off +U b/c our base set wants to use it

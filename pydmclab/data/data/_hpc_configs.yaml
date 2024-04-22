@@ -3,7 +3,7 @@
 
 # specify how you would like your calculations to run
 standard: dmc # make mp if comparing to MP data
-functional: # None --> gga = pbe; metagga = r2SCAN; feel free to pass your own
+functional: # None --> gga = PBE (GGA = PE); metagga = r2SCAN (METAGGA = R2SCAN); feel free to pass your own. eg. {'metagga' : 'SCAN'}
 
 # specific calculation being executed (usually passed through SubmitTools)
 xc_to_run:  # gga, ggau, metagga, metaggau, hse06 
