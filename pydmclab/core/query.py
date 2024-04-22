@@ -33,7 +33,7 @@ class MPQuery(object):
                 Materials Project REST interface
         """
 
-        api_key = api_key if api_key else "YOUR_API_KEY"
+        # api_key = api_key if api_key else "YOUR_API_KEY"
 
         self.api_key = api_key
         if not api_key:
