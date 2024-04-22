@@ -560,6 +560,14 @@ class SubmitTools(object):
         return statuses
 
     @property
+    def is_queued(self):
+        statuses = self.statuses
+        is_queued = (
+            True if len([v for v in statuses.values() if v == "queued"]) > 0 else False
+        )
+        return is_queued
+
+    @property
     def write_sub(self):
         """
         A lot going on here. The objective is to write a submission script for each pack of VASP calculations
@@ -617,6 +625,9 @@ class SubmitTools(object):
         # say where we want statuses to be echoed to
         fstatus = os.path.join(launch_dir, "status.o")
 
+        if self.is_queued:
+            print("QUEUED ALREADY\n")
+            return
         with open(fsub, "w", encoding="utf-8") as f:
             # write the bin bash stuff at the top
             f.write("#!/bin/bash -l\n")
@@ -737,6 +748,10 @@ class SubmitTools(object):
             if there's something to launch
                 (ie if all calcs are done, dont launch)
         """
+
+        if self.is_queued:
+            return
+
         configs = self.configs.copy()
         # shouldn't need to check this since it gets checked in statuses
         # if self.is_job_in_queue:

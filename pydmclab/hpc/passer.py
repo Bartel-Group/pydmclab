@@ -131,13 +131,25 @@ class Passer(object):
         """
         kill_job = self.kill_job
         if kill_job:
-            return None
+            src_dir = self.calc_dir
+            dst_dir = src_dir
+            fpos = os.path.join(src_dir, "POSCAR")
+            fcont = os.path.join(src_dir, "CONTCAR")
+            if not os.path.exists(fcont):
+                return None
+            with open(fcont, "r", encoding="utf-8") as f:
+                contents = f.read()
+                if len(contents) > 0:
+                    copyfile(fcont, fpos)
+                    return "copied contcar from current calc"
+                else:
+                    return None
         src_dir = self.prev_calc_dir
         dst_dir = self.calc_dir
         fsrc = os.path.join(src_dir, "CONTCAR")
         if os.path.exists(fsrc):
             copyfile(fsrc, os.path.join(dst_dir, "POSCAR"))
-        return "copied contcar"
+        return "copied contcar from prev calc"
 
     @property
     def copy_wavecar(self):
