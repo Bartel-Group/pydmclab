@@ -509,9 +509,9 @@ class SubmitTools(object):
         launch_dir = self.launch_dir
         calc_list = self.calc_list
 
-        print("\n~~~~~~~~~~~~~~~~~~~~~~~\n\nWORKING ON %s\n" % launch_dir)
+        print("\n~~~~~~~~~~~~~~~~~~~~~~~\n\npreparing %s\n" % launch_dir)
         if self.is_job_in_queue:
-            print("\nQUEUED as %s\n" % self.job_name)
+            print("\queued as %s\n" % self.job_name)
 
         for xc_calc in calc_list:
             status = statuses[xc_calc]
@@ -728,7 +728,7 @@ class SubmitTools(object):
 
             # nothing left to do, so cancel the job (sometimes done jobs will hang)
             f.write("\n\nscancel $SLURM_JOB_ID\n")
-        print("WROTE %s\n" % fsub)
+        print("wrote %s\n" % fsub)
         return True
 
     @property
@@ -772,7 +772,7 @@ class SubmitTools(object):
         subprocess.call(["sbatch", "sub.sh"])
         os.chdir(scripts_dir)
 
-        print("SUBMITTED %s\n" % fsub)
+        print("submitted %s\n" % fsub)
 
 
 def main():
