@@ -659,12 +659,21 @@ class SubmitTools(object):
                 # write status to status.o
                 f.write('\necho "%s is %s" >> %s\n' % (xc_calc, status, fstatus))
 
-                if status in ["done", "queued"]:
-                    # don't do anything for done or queued calcs
+                if status == "queued":
+                    # don't do anything for queued calcs
                     continue
 
                 # find our calc_dir (where VASP is executed for this xc_calc)
                 calc_dir = os.path.join(launch_dir, xc_calc)
+
+                if status == "done":
+                    # execute the collector
+                    f.write("cd %s\n" % self.scripts_dir)
+                    f.write(
+                        "python collector.py '%s %s' \n"
+                        % (calc_dir, os.path.join(self.scripts_dir, "configs.json"))
+                    )
+                    continue
 
                 # retrieve the incar_mods that pertain to this particular calculation
                 xc_to_run, calc_to_run = xc_calc.split("-")
@@ -707,6 +716,13 @@ class SubmitTools(object):
                 # run bader for all static jobs
                 if calc_to_run == "static":
                     f.write(self.bader_command)
+
+                # execute the collector
+                f.write("cd %s\n" % self.scripts_dir)
+                f.write(
+                    "python collector.py '%s %s' \n"
+                    % (calc_dir, os.path.join(self.scripts_dir, "configs.json"))
+                )
 
             # nothing left to do, so cancel the job (sometimes done jobs will hang)
             f.write("\n\nscancel $SLURM_JOB_ID\n")

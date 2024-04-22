@@ -51,6 +51,13 @@ if not CUSTOM_PASSER:
         "/home/cbartel/%s/bin/pydmclab/pydmclab/hpc/passer.py" % USER_NAME, "passer.py"
     )
 
+CUSTOM_COLLECTOR = False
+if not CUSTOM_COLLECTOR:
+    copyfile(
+        "/home/cbartel/%s/bin/pydmclab/pydmclab/hpc/collector.py" % USER_NAME,
+        "collector.py",
+    )
+
 # if you need data from MP as a starting point (often the case), you need your API key
 # if API_KEY = None, it will expect you've configured your API KEY using pmg config --add PMG_MAPI_KEY <USER_API_KEY>
 API_KEY = None
@@ -118,6 +125,7 @@ ANALYSIS_CONFIGS = get_analysis_configs(
     analyze_dos=False,
     analyze_bonding=False,
     exclude=[],
+    remake_results=False,
 )
 
 CONFIGS = ANALYSIS_CONFIGS.copy()

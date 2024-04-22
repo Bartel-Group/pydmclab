@@ -319,6 +319,7 @@ def get_analysis_configs(
     analyze_dos=False,
     analyze_bonding=False,
     exclude=[],
+    remake_results=False,
 ):
     """
 
@@ -405,6 +406,7 @@ def get_analysis_configs(
 
     analysis_configs["only_calc"] = only_calc
     analysis_configs["only_xc"] = only_xc
+    analysis_configs["remake_results"] = remake_results
 
     return analysis_configs
 
