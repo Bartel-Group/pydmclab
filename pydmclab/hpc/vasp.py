@@ -612,7 +612,7 @@ class VASPSetUp(object):
                 prev_symprec = curr_incar["SYMPREC"]
             else:
                 prev_symprec = 1e-6
-            new_symprec = prev_symprec / 10
+            new_symprec = prev_symprec * 10
             incar_changes["SYMPREC"] = new_symprec
         if "coef" in errors:
             if os.path.exists(wavecar):
