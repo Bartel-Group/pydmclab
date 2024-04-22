@@ -588,6 +588,9 @@ class SubmitTools(object):
 
         7) if lobster_static and calc is static, write LOBSTER and BADER commands
         """
+        # get launch_dir (where sub.sh gets written)
+        launch_dir = self.launch_dir
+
         print("\n~~~~~~~~~~~~~~~~~~~~~~~\n\npreparing %s\n" % launch_dir)
         if self.is_job_in_queue:
             print("\nqueued as %s\n" % self.job_name)
@@ -600,9 +603,6 @@ class SubmitTools(object):
         slurm_options["job-name"] = self.job_name
 
         queue_manager = self.queue_manager
-
-        # get launch_dir (where sub.sh gets written)
-        launch_dir = self.launch_dir
 
         # get calc_list (what gets populated in sub.sh)
         calc_list = self.calc_list
