@@ -16,9 +16,9 @@ def get_vasp_configs(
     standard="dmc",
     dont_relax_cell=False,
     special_functional=None,
-    incar_mods={},
-    kpoints_mods={},
-    potcar_mods={},
+    incar_mods=None,
+    kpoints_mods=None,
+    potcar_mods=None,
     lobster_configs={"COHPSteps": 2000, "reciprocal_kpoints_density_for_lobster": 100},
     bs_configs={"bs_symprec": 0.1, "bs_line_density": 20},
     flexible_convergence_criteria=False,
@@ -76,6 +76,13 @@ def get_vasp_configs(
                 if False, don't compare the energies
 
     """
+    if incar_mods is None:
+        incar_mods = {}
+    if kpoints_mods is None:
+        kpoints_mods = {}
+    if potcar_mods is None:
+        potcar_mods = {}
+
     vasp_configs = {}
     if dont_relax_cell:
         incar_mods.update({"all-all": {"ISIF": 2}})
@@ -186,7 +193,7 @@ def get_sub_configs(
     static_addons={"gga": ["lobster"]},
     prioritize_relaxes=True,
     custom_calc_list=None,
-    restart_these_calcs=[],
+    restart_these_calcs=None,
     start_with_loose=False,
     machine="msi",
     mpi_command="mpirun",
@@ -243,6 +250,9 @@ def get_sub_configs(
 
     """
     sub_configs = {}
+
+    if restart_these_calcs is None:
+        restart_these_calcs = []
 
     if not submit_calculations_in_parallel:
         n_procs = 1
@@ -318,7 +328,7 @@ def get_analysis_configs(
     analyze_charge=False,
     analyze_dos=False,
     analyze_bonding=False,
-    exclude=[],
+    exclude=None,
     remake_results=False,
     verbose=False,
 ):
@@ -364,6 +374,9 @@ def get_analysis_configs(
         dictionary of ANALYSIS_CONFIGS
             {'include_*' : True or False}
     """
+
+    if exclude is None:
+        exclude = []
 
     analysis_configs = {}
 
@@ -904,7 +917,7 @@ def submit_one_calc(submit_args):
 
 def submit_calcs(
     launch_dirs,
-    user_configs={},
+    user_configs=None,
     ready_to_launch=True,
     n_procs=1,
 ):
@@ -928,6 +941,9 @@ def submit_calcs(
         None
 
     """
+
+    if user_configs is None:
+        user_configs = {}
 
     submit_args = {
         "launch_dirs": launch_dirs,
@@ -1324,7 +1340,7 @@ def get_dos_results(
     thermo_results,
     only_gs=True,
     only_xc="metagga",
-    only_formulas=[],
+    only_formulas=None,
     dos_to_store=["tdos", "tcohp"],
     regenerate_dos=False,
     regenerate_cohp=False,
@@ -1370,6 +1386,9 @@ def get_dos_results(
         remake (bool)
             if True, remake the json file
     """
+    if only_formulas is None:
+        only_formulas = []
+
     fjson = os.path.join(data_dir, savename)
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)

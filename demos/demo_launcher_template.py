@@ -23,6 +23,8 @@ from pydmclab.hpc.helpers import (
     make_sub_for_launcher,
 )
 
+from pydmclab.data.configs import load_base_configs
+
 from pydmclab.utils.handy import read_json, write_json
 from pydmclab.core.comp import CompTools
 from pydmclab.core.struc import StrucTools
@@ -58,6 +60,8 @@ if not CUSTOM_COLLECTOR:
         "collector.py",
     )
 
+CONFIGS = load_base_configs()
+
 # if you need data from MP as a starting point (often the case), you need your API key
 # if API_KEY = None, it will expect you've configured your API KEY using pmg config --add PMG_MAPI_KEY <USER_API_KEY>
 API_KEY = None
@@ -79,7 +83,7 @@ SUB_CONFIGS = get_sub_configs(
     static_addons={"gga": ["lobster"]},
     prioritize_relaxes=True,
     custom_calc_list=None,
-    restart_these_calcs=[],
+    restart_these_calcs=None,
     start_with_loose=False,
     machine="msi",
     mpi_command="mpirun",
@@ -104,9 +108,9 @@ VASP_CONFIGS = get_vasp_configs(
     standard="dmc",
     dont_relax_cell=False,
     special_functional=None,
-    incar_mods={},
-    kpoints_mods={},
-    potcar_mods={},
+    incar_mods=None,
+    kpoints_mods=None,
+    potcar_mods=None,
     lobster_configs={"COHPSteps": 2000, "reciprocal_kpoints_density_for_lobster": 100},
     bs_configs={"bs_symprec": 0.1, "bs_line_density": 20},
     flexible_convergence_criteria=False,
@@ -124,12 +128,11 @@ ANALYSIS_CONFIGS = get_analysis_configs(
     analyze_charge=False,
     analyze_dos=False,
     analyze_bonding=False,
-    exclude=[],
+    exclude=None,
     remake_results=False,
     verbose=False,
 )
 
-CONFIGS = ANALYSIS_CONFIGS.copy()
 CONFIGS.update(VASP_CONFIGS)
 CONFIGS.update(SLURM_CONFIGS)
 CONFIGS.update(SUB_CONFIGS)
