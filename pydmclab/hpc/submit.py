@@ -509,10 +509,6 @@ class SubmitTools(object):
         launch_dir = self.launch_dir
         calc_list = self.calc_list
 
-        print("\n~~~~~~~~~~~~~~~~~~~~~~~\n\npreparing %s\n" % launch_dir)
-        if self.is_job_in_queue:
-            print("\queued as %s\n" % self.job_name)
-
         for xc_calc in calc_list:
             status = statuses[xc_calc]
             if status in ["done", "queued"]:
@@ -592,8 +588,9 @@ class SubmitTools(object):
 
         7) if lobster_static and calc is static, write LOBSTER and BADER commands
         """
+        print("\n~~~~~~~~~~~~~~~~~~~~~~~\n\npreparing %s\n" % launch_dir)
         if self.is_job_in_queue:
-            return
+            print("\nqueued as %s\n" % self.job_name)
 
         # get configs dict
         configs = self.configs.copy()
