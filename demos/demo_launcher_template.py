@@ -46,6 +46,7 @@ for d in [CALCS_DIR, DATA_DIR]:
         os.makedirs(d)
 
 # copy our passer.py file to your scripts_dir. if you want to use a custom passer, just set this = True and put your passer.py in the scripts dir
+#  this file handles passing data between calculations after they finish (eg WAVECAR, dynamic INCAR changes)
 USER_NAME = "cbartel"
 CUSTOM_PASSER = False
 if not CUSTOM_PASSER:
@@ -53,6 +54,8 @@ if not CUSTOM_PASSER:
         "/home/cbartel/%s/bin/pydmclab/pydmclab/hpc/passer.py" % USER_NAME, "passer.py"
     )
 
+# copy our collector.py file to your scripts_dir
+#  this file handles collecting data from calculations after they finish (writes results.json file to each calc_dir to aggregate during analysis phase)
 CUSTOM_COLLECTOR = False
 if not CUSTOM_COLLECTOR:
     copyfile(
@@ -60,6 +63,7 @@ if not CUSTOM_COLLECTOR:
         "collector.py",
     )
 
+# load our configs
 CONFIGS = load_base_configs()
 
 # if you need data from MP as a starting point (often the case), you need your API key

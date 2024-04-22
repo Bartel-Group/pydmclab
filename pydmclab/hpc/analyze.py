@@ -1424,11 +1424,12 @@ def _results_for_calc_dir(calc_dir, configs):
             - format varies based on self.configs
             - see AnalyzeVASP.summary() for more info
     """
+    key = "--".join(calc_dir.split("/")[-4:])
     fjson = os.path.join(calc_dir, "results.json")
     if os.path.exists(fjson):
-        return read_json(fjson)
+        result = read_json(fjson)
+        return {key: result}
 
-    key = "--".join(calc_dir.split("/")[-4:])
     xc_calc = key.split("--")[-1]
     xc, calc = xc_calc.split("-")
 

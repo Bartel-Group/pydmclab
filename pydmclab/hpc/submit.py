@@ -667,10 +667,10 @@ class SubmitTools(object):
                 calc_dir = os.path.join(launch_dir, xc_calc)
 
                 if status == "done":
-                    # execute the collector
-                    f.write("cd %s\n" % self.scripts_dir)
+                    # execute the collector (writes)
+                    f.write("\ncd %s\n" % self.scripts_dir)
                     f.write(
-                        "\npython collector.py %s %s \n"
+                        "python collector.py %s %s \n"
                         % (calc_dir, os.path.join(self.scripts_dir, "configs.json"))
                     )
                     continue
@@ -718,9 +718,9 @@ class SubmitTools(object):
                     f.write(self.bader_command)
 
                 # execute the collector
-                f.write("cd %s\n" % self.scripts_dir)
+                f.write("\ncd %s\n" % self.scripts_dir)
                 f.write(
-                    "\npython collector.py %s %s \n"
+                    "python collector.py %s %s \n"
                     % (calc_dir, os.path.join(self.scripts_dir, "configs.json"))
                 )
 

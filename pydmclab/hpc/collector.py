@@ -7,7 +7,23 @@ from pydmclab.utils.handy import read_json, write_json
 
 
 class Collector(object):
+    """
+    Executed on the cluster after calculations run to collect results
+    """
+
     def __init__(self, calc_dir, path_to_configs):
+        """
+        Args:
+            calc_dir (str):
+                path to the calculation directory
+
+            path_to_configs (str):
+                path to the json file that contains the configuration for the analysis
+
+        Returns:
+            configs (dict)
+                dictionary of configs
+        """
         self.calc_dir = calc_dir
         self.path_to_configs = path_to_configs
         configs = read_json(path_to_configs)
@@ -15,6 +31,11 @@ class Collector(object):
 
     @property
     def key(self):
+        """
+        Returns:
+            key to be stored in the results dictionary
+                formula_indicator--struc_indicator--mag--xc-calc
+        """
         calc_dir = self.calc_dir
         key = "--".join(calc_dir.split("/")[-4:])
         return key
@@ -22,12 +43,10 @@ class Collector(object):
     @property
     def results(self):
         """
-        Args:
-
         Returns:
             a dictionary of results for that calculation directory
-                - format varies based on self.configs
-                - see AnalyzeVASP.summary() for more info
+                format varies based on self.configs
+                see AnalyzeVASP.summary() for more info
         """
         calc_dir = self.calc_dir
         key = self.key
@@ -103,10 +122,21 @@ class Collector(object):
                 s.to(fmt="cif", filename=os.path.join(calc_dir, key + ".cif"))
             else:
                 print("no structure, cant make cif")
-        return {key: summary}
+        return summary
 
     @property
     def to_dict(self):
+        """
+        Returns:
+            writes the results dictionary to a file.
+            also includes logic on when to repeat the results generation process.
+                repeat if:
+                    asked to remake_results (configs)
+                    results.json does not exist
+                    OUTCAR has been touched since results.json was last written
+                otherwise:
+                    just read the results.json file
+        """
         savename = "results.json"
         fjson = os.path.join(self.calc_dir, savename)
         if os.path.exists(fjson) and not self.configs["remake_results"]:
@@ -125,6 +155,9 @@ class Collector(object):
 
 
 def debug():
+    """
+    Execute this to avoid try/except to see error messages
+    """
     calc_dir, path_to_configs = sys.argv[1], sys.argv[2]
     collector = Collector(calc_dir=calc_dir, path_to_configs=path_to_configs)
     results = collector.to_dict
@@ -135,14 +168,14 @@ def main():
     # get info that pertains to the present calculation
     calc_dir, path_to_configs = sys.argv[1], sys.argv[2]
 
-    # initialize the Passer for this claculation
+    # initialize the Collector for this claculation
     collector = Collector(calc_dir=calc_dir, path_to_configs=path_to_configs)
 
-    # try to write to job_killer and complete pass (copy CONTCAR, WAVECAR and update INCAR)
+    # try to collect results and read or write results.json
     try:
         results = collector.to_dict
 
-    # if this fails for some reason, kill the job and populate job_killer.o with python error message that caused failure
+    # if this fails for some reason, populate collection.o with python error message that caused failure
     except Exception as e:
         fcollection = os.path.join(calc_dir, "collection.o")
         with open(fcollection, "w", encoding="utf-8") as f:
