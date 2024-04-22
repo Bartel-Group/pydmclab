@@ -740,7 +740,7 @@ class SubmitTools(object):
                 (ie if all calcs are done, dont launch)
         """
 
-        if self.is_queued:
+        if self.is_job_in_queue:
             return
 
         configs = self.configs.copy()
