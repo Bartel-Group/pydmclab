@@ -392,10 +392,10 @@ class SubmitTools(object):
 
         # if this job is in the queue, return True
         if len(names_in_q) > 0:
-            print("  %s already in queue, not messing with it\n" % job_name)
+            # print("  %s already in queue, not messing with it\n" % job_name)
             return True
 
-        print("  %s not in queue, onward\n" % job_name)
+        # print("  %s not in queue, onward\n" % job_name)
         return False
 
     @property
@@ -504,13 +504,14 @@ class SubmitTools(object):
         """
         Given the statuses dictionary, prepare (update) each VASP calculation directory accordingly
         """
-
         statuses = self.statuses
         configs = self.configs.copy()
         launch_dir = self.launch_dir
         calc_list = self.calc_list
 
         print("\n~~~~~~~~~~~~~~~~~~~~~~~\n\nWORKING ON %s\n" % launch_dir)
+        if self.is_job_in_queue:
+            print("\nQUEUED as %s\n" % self.job_name)
 
         for xc_calc in calc_list:
             status = statuses[xc_calc]
@@ -562,14 +563,6 @@ class SubmitTools(object):
         return statuses
 
     @property
-    def is_queued(self):
-        statuses = self.statuses
-        is_queued = (
-            True if len([v for v in statuses.values() if v == "queued"]) > 0 else False
-        )
-        return is_queued
-
-    @property
     def write_sub(self):
         """
         A lot going on here. The objective is to write a submission script for each pack of VASP calculations
@@ -599,9 +592,8 @@ class SubmitTools(object):
 
         7) if lobster_static and calc is static, write LOBSTER and BADER commands
         """
-        # I don't think I need this (seems to double-check queue b/c already checked in statuses)
-        # if self.is_job_in_queue:
-        #     return
+        if self.is_job_in_queue:
+            return
 
         # get configs dict
         configs = self.configs.copy()
@@ -627,9 +619,6 @@ class SubmitTools(object):
         # say where we want statuses to be echoed to
         fstatus = os.path.join(launch_dir, "status.o")
 
-        if self.is_queued:
-            print("QUEUED ALREADY\n")
-            return
         with open(fsub, "w", encoding="utf-8") as f:
             # write the bin bash stuff at the top
             f.write("#!/bin/bash -l\n")
