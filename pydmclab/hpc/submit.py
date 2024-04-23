@@ -782,7 +782,7 @@ class SubmitTools(object):
                     needs_to_launch = True
 
         if not needs_to_launch:
-            print("NOTHING TO LAUNCH in %s\n" % fsub)
+            print("nothing to launch in %s\n" % fsub)
             return
 
         # if we made it this far, launch it
