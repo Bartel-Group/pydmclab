@@ -194,22 +194,23 @@ class LaunchTools(object):
                 if True, make the launch_dir and populate each with the relevant POSCAR
 
         Returns:
-            a dictionary of:
-                {launch_dir (str) : {'xcs': [list of final_xcs to submit w/ SubmitTools],
-                                     'magmom' : [list of magmoms for the structure in launch_dir to pass to SubmitTools],
-                                     'ID_specific_vasp_configs' : {'incar_mods' : {<incar_key> : <incar_val>}, 'kpoints_mods' : {<kpoints_key> : <kpoints_val>}, 'potcar_mods' : {<potcar_key> : <potcar_val>}}
+            {launch_dir (str) :
+                {'magmom' : [list of magmoms for the structure in that launch_dir (list)],
+                 'ID_specific_vasp_configs' : {<formula_indicator>_<struc_indicator> : {desired configs for this entry}}}
 
-        Returns the minimal list of directories that will house submission files (each of which launch a chain of calcs)
-            note a chain of calcs must have the same structure and magnetic information, otherwise, there's no reason to chain them
-                so the launch_dir defines: structure, magmom
+            Returns the minimal list of directories that will house submission files (each of which launch a chain of calcs)
+                note a chain of calcs must have the same structure and magnetic information, otherwise, there's no reason to chain them
+                    so the launch_dir defines: structure, magmom, ID-specific configs
 
-        These launch_dirs have a very prescribed structure:
-            calcs_dir / formula_indicator / struc_indicator / mag
+            These launch_dirs have a very prescribed structure:
+                calcs_dir / formula_indicator / struc_indicator / mag
 
-            e.g.,
-                ../calcs/Nd2O7Ru2/mp-19930/fm
-                ../calcs/2/3/afm_4
-                    (if (2) was a unique compositional indicator and (3) was a unique structural indicator)
+                e.g.,
+                    ../calcs/Nd2O7Ru2/mp-19930/fm
+                    ../calcs/LiMn2O4_1/3/afm_4
+                        (if LiMn2O4_1 was a unique compositional indicator and 3 was a unique structural indicator)
+
+        also makes launch_dir and populates with POSCAR using strucs if make_dirs=True
         """
         structure = self.structure
         magmoms = self.initial_magmoms

@@ -73,60 +73,62 @@ class MPQuery(object):
     def get_data(
         self,
         search_for,
-        properties=None,
-        max_Ehull=0.1,
-        max_sites_per_structure=100,
+        max_Ehull=0.05,
         max_polymorph_energy=0.1,
-        only_gs=False,
-        include_structure=True,
-        max_strucs_per_cmpd=5,
+        max_strucs_per_cmpd=1,
+        max_sites_per_structure=41,
         include_sub_phase_diagrams=False,
+        include_structure=True,
+        properties=None,
     ):
         """
         Args:
-            search_for (str or list)
-                can either be:
-                    - a chemical system (str) of elements joined by "-"
-                    - a chemical formula (str)
-                    - an MP ID (str)
-                can either be a list of:
-                    - chemical systems (str) of elements joined by "-"
-                    - chemical formulas (str)
-                    - MP IDs (str)
+        search_for (str or list)
+            can either be:
+                a chemical system (str) of elements joined by "-"
+                    eg 'Ca-Ti-O' for all ternary calcium titanium oxides
+                a chemical formula (str)
+                    eg 'CaTiO3' for this formula
+                an MP ID (str)
+                    eg 'mp-1234' for this ID
+            or a list of:
+                chemical systems (str) of elements joined by "-"
+                    eg ['Ca-Ti-O', 'Sr-Ti-O']
+                chemical formulas (str)
+                    eg ['CaO', 'CaTiO3']
+                MP IDs (str)
+                    eg ['mp-1', 'mp-2']
 
-            properties (list or None)
-                list of properties to query
-                    - if None, then use typical_properties
-                    - if 'all', then use all properties
-                    - if a string, then add that property to typical_properties
-                    - if a list, then add those properties to typical_properties
+        max_Ehull (float)
+            upper bound on energy above hull for retrieved entries
 
-            band_gap (tuple)
-                band gap range to query
+        max_polymorph_energy (float)
+            upper bound on polymorph energy for retrieved entries
+                set to 0 to only retrieve ground-state structures for all compositions
 
-            max_Ehull (float)
-                upper bound on energy above hull to query
+        max_strucs_per_cmpd (int)
+            upper bound on number of polymorphs to retrieve for each queried composition
+                retains the lowest energy ones
 
-            max_sites_per_structure (int)
-                upper bound on number of sites to query
+        max_sites_per_structure (int)
+            upper bound on number of sites in retrieved structures
 
-            max_polymorph_energy (float)
-                upper bound on polymorph energy to query
+        include_sub_phase_diagrams (bool)
+            if True, include all sub-phase diagrams for a given composition
+                e.g., if search_for = "Sr-Zr-S", then also include "Sr-S" and "Zr-S" in the query
 
-            only_gs (bool)
-                if True, remove non-ground state polymorphs for each unique composition
+        include_structure (bool)
+            if True, include the structure (as a dictionary) for each entry
 
-            include_structure (bool)
-                if True, include the structure (as a dictionary) for each entry
+        properties (list or None)
+            list of properties to query
+                if None, then use pydmclab.core.query.MPQuery.typical_properties
+                if 'all', then use all properties
+                if a string, then add that property to typical_properties
+                if a list, then add those properties to typical_properties
 
-            max_strucs_per_cmpd (int)
-                if not None, only retain the lowest energy structures for each composition until you reach max_strucs_per_cmpd
-
-            include_sub_phase_diagrams (bool)
-                if True, include all sub-phase diagrams for a given composition
-                    e.g., if comp = "Sr-Zr-S", then also include "Sr-S" and "Zr-S" in the query
         Returns:
-            {mpid : {DATA}}
+            {mpid : {property (str) : value (mixed type)}}
 
 
         """
@@ -226,14 +228,14 @@ class MPQuery(object):
             mpid = d_doc["material_id"]
             # mpid will be the front key in this dict since it's unique
             tmp = {}
-            for k in d_doc:
+            for k, v in d_doc.items():
                 if k == "material_id":
                     continue
                 # map notable keys to shorter names
                 if k in long_to_short_keys:
-                    tmp[long_to_short_keys[k]] = d_doc[k]
+                    tmp[long_to_short_keys[k]] = v
                 elif k in properties:
-                    tmp[k] = d_doc[k]
+                    tmp[k] = v
             # include a clean formula
             tmp["cmpd"] = CompTools(tmp["formula_pretty"]).clean
             d[mpid] = tmp
@@ -251,17 +253,15 @@ class MPQuery(object):
                 gs[c] = gs_mpid
 
             # add a flag for whether each entry is the ground state
-            for mpid in d:
-                d[mpid]["is_gs"] = True if mpid == gs[d[mpid]["cmpd"]] else False
+            for mpid, data in d.items():
+                d[mpid]["is_gs"] = True if mpid == gs[data["cmpd"]] else False
                 energy_key = (
-                    "E_mp" if len(CompTools(d[mpid]["cmpd"]).els) == 1 else "Ef_mp"
+                    "E_mp" if len(CompTools(data["cmpd"]).els) == 1 else "Ef_mp"
                 )
-                d[mpid]["dE_gs"] = (
-                    d[mpid][energy_key] - d[gs[d[mpid]["cmpd"]]][energy_key]
-                )
+                d[mpid]["dE_gs"] = data[energy_key] - d[gs[data["cmpd"]]][energy_key]
 
             # if you ask only for ground-states, remove other polymorphs
-            if only_gs:
+            if max_polymorph_energy == 0:
                 d = {mpid: d[mpid] for mpid in d if d[mpid]["is_gs"]}
 
             # remove certain higher energy polymorphs based on a max polymorphs per formula criterion
@@ -290,7 +290,7 @@ class MPQuery(object):
                 d = {
                     mpid: d[mpid]
                     for mpid in d
-                    if d[mpid]["dE_gs"] <= max_polymorph_energy
+                    if np.round(d[mpid]["dE_gs"], 5) <= max_polymorph_energy
                 }
         return d
 

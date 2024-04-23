@@ -1,4 +1,7 @@
 import os
+from shutil import copyfile
+from pydmclab.data.configs import load_base_configs
+
 from pydmclab.hpc.helpers import (
     get_query,
     check_query,
@@ -23,14 +26,10 @@ from pydmclab.hpc.helpers import (
     make_sub_for_launcher,
 )
 
-from pydmclab.data.configs import load_base_configs
-
 from pydmclab.utils.handy import read_json, write_json
 from pydmclab.core.comp import CompTools
 from pydmclab.core.struc import StrucTools
 from pydmclab.hpc.analyze import AnalyzeVASP
-
-from shutil import copyfile
 
 # where is this file
 SCRIPTS_DIR = os.getcwd()
@@ -67,7 +66,6 @@ if not CUSTOM_COLLECTOR:
 CONFIGS = load_base_configs()
 
 # if you need data from MP as a starting point (often the case), you need your API key
-# if API_KEY = None, it will expect you've configured your API KEY using pmg config --add PMG_MAPI_KEY <USER_API_KEY>
 API_KEY = None
 
 # what to query MP for (if you need MP data)

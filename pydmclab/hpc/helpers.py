@@ -1,5 +1,7 @@
 import multiprocessing as multip
 import os
+import warnings
+
 from pydmclab.hpc.launch import LaunchTools
 from pydmclab.hpc.submit import SubmitTools
 from pydmclab.hpc.analyze import AnalyzeVASP, AnalyzeBatch
@@ -15,65 +17,90 @@ from pydmclab.data.configs import load_partition_configs
 def get_vasp_configs(
     standard="dmc",
     dont_relax_cell=False,
-    special_functional=None,
     incar_mods=None,
     kpoints_mods=None,
     potcar_mods=None,
-    lobster_configs={"COHPSteps": 2000, "reciprocal_kpoints_density_for_lobster": 100},
-    bs_configs={"bs_symprec": 0.1, "bs_line_density": 20},
     flexible_convergence_criteria=False,
     compare_static_and_relax_energies=0.1,
+    special_functional=False,
+    COHPSteps=2000,
+    reciprocal_kpoints_density_for_lobster=100,
+    bandstructure_symprec=0.1,
+    bandstructure_kpoints_line_density=20,
 ):
     """
-    configs related to particular VASP calculations
+    configs related to VASP calculations
 
     Args:
         standard (str):
             "dmc" for group standard, "mp" for Materials Project standard
+                This affects how pymatgen VaspSets get modified
+                See pydmclab.hpc.sets.GetSet.user_*_settings for more details
 
         dont_relax_cell (bool)
             if True, sets ISIF = 2 for all calculations
+            if False, do nothing
 
-        special_functional (str)
-            if you're not using r2SCAN, PBE, or HSE06, specify here as str (must be acceptable value for GGA, METAGGA, etc in INCAR)
+        <input_file>_mods (dict)
+            <input_file> in [incar, kpoints, potcar]
+            all of these mods expect a dictionary of the format
+                {xc-calc (str) : {setting (str) : value (str, bool, float, int, list)}}
+                    xc can be 'gga', 'ggau', 'metagga', 'metaggau', 'hse06', etc
+                    calc can be 'loose', 'relax', 'static', 'lobster', 'dfpt', etc
+                use xc-calc = 'all-<calc>' to apply modification to all xcs for a given <calc>
+                use xc-calc = '<xc>-all' to apply modifications to all calcs for a given <xc>
+                use xc-calc = 'all-all' to apply modifications to all xcs and all calcs
 
-        incar_mods (dict):
-            modifications to INCAR
-                {xc-calc (str) : {INCAR tag (str) : value (str, bool, float, int)}}
-                    use xc = 'all' or calc = 'all' to apply to all xcs or all calcs
-
-            e.g., {'metagga-all' : {'LMAXMIX' : 0.1,
-                                    'EDIFF' : 1e-7},
-                    'gga-relax' : {'EDIFFG' : 1e-4}}
+        incar_mods (dict)
+            modifications to INCAR (on top of the VaspSet determined by pydmclab.hpc.sets.GetSet)
+                e.g., to modify INCAR settings for all of your metagga calculations:
+                    {'metagga-all' : {'LMAXMIX' : 0.1,
+                                    'EDIFF' : 1e-7}}
+                e.g., to modify only your gga-relax calculations
+                    {'gga-relax' : {'EDIFFG' : -0.05}}
 
         kpoints_mods (dict):
-            modifications to KPOINTS
-                {xc-calc (str) : {KPOINTS generator tag ('grid', 'auto', 'density', 'reciprocal_density') : value (float, list)}}
-
-            e.g., {'gga-all' : {'grid' : [8, 8, 8]},
+            modifications to KPOINTS (see pydmclab.hpc.sets.GetSet.user_kpoints_settings for options)
+                e.g., to set an 8x8x8 grid for all gga calculations
+                    {'gga-all' : {'grid' : [8, 8, 8]}}
 
         potcar_mods (dict):
             modifications to POTCAR
-                {xc-calc (str) : {element (str) : potcar symbol (str)}}
-
-            e.g.,
-                {'all-all' : {'W' : 'W_pv'}}
-
-        lobster_configs (dict):
-            modifications to LOBSTER (only affects 'all-lobster' xc-calcs)
-
-        bs_configs (dict):
-            modifications to band structure calculations (only affects 'all-bs' xc-calcs)
-                {'bs_symprec' : float, 'bs_line_density' : int}
-                    symprec for finding primitive cell for band structure calculations, line density for band structure kpoints
+                e.g., to change your W pseudopotential for all calculations
+                    {'all-all' : {'W' : 'W_pv'}}
 
         flexible_convergence_criteria (bool):
             if True, reduce EDIFF/EDIFFG if convergence is taking very many steps
             if False, only update NELM and NSW if convergence is taking very many steps
 
         compare_static_and_relax_energies (float):
-            if the difference between static and relax energies is greater than this, rerun the static calculation
-                if False, don't compare the energies
+            if True, if the difference between static and relax energies is greater than this, rerun the static calculation
+            if False, don't compare the energies
+
+        special_functional (dict or bool)
+            if you're not using r2SCAN, PBE, or HSE06, specify here
+                e.g., {'gga' : 'PS'} would use PBESol for gga calculations
+                e.g., {'metagga' : 'SCAN'} would use SCAN for metagga calculations
+            if False, do nothing
+
+        COHPSteps (int):
+            how many (E, DOS) points do you want in LOBSTER outputs
+                only applies to xc-calc='all-lobster'
+
+        reciprocal_kpoints_density_for_lobster (int):
+            kppra for LOBSTER calculations (higher is denser grid)
+                only applies to xc-calc='all-lobster'
+
+        bandstructure_symprec (float):
+            symmetry precision for finding primitive cell before bandstructure calculation
+                only applies to xc-calc='all-bs'
+
+        bandstructure_kpoints_line_density (int):
+            number of KPOINTS between each high-symmetry k-point for bandstructure calculation
+                only applies to xc-calc='all-bs'
+
+    Returns:
+        dictionary of configs relevant to running VASP
 
     """
     if incar_mods is None:
@@ -91,9 +118,12 @@ def get_vasp_configs(
     vasp_configs["kpoints_mods"] = kpoints_mods
     vasp_configs["potcar_mods"] = potcar_mods
     vasp_configs["functional"] = special_functional
-    vasp_configs["bs_symprec"] = bs_configs["bs_symprec"]
-    vasp_configs["bs_line_density"] = bs_configs["bs_line_density"]
-    vasp_configs["COHPSteps"] = lobster_configs["COHPSteps"]
+    vasp_configs["bs_symprec"] = bandstructure_symprec
+    vasp_configs["bs_line_density"] = bandstructure_kpoints_line_density
+    vasp_configs["COHPSteps"] = COHPSteps
+    vasp_configs["reciprocal_kpoints_density_for_lobster"] = (
+        reciprocal_kpoints_density_for_lobster
+    )
     vasp_configs["flexible_convergence_criteria"] = flexible_convergence_criteria
     vasp_configs["relax_static_energy_diff_tol"] = compare_static_and_relax_energies
 
@@ -113,7 +143,6 @@ def get_slurm_configs(
     """
 
     configs related to HPC settings for each submission script
-
 
     Args:
         total_nodes (int):
@@ -192,13 +221,13 @@ def get_sub_configs(
     relaxation_xcs=["gga"],
     static_addons={"gga": ["lobster"]},
     prioritize_relaxes=True,
+    start_with_loose=False,
     custom_calc_list=None,
     restart_these_calcs=None,
-    start_with_loose=False,
+    submit_calculations_in_parallel=False,
     machine="msi",
     mpi_command="mpirun",
     vasp_version=6,
-    submit_calculations_in_parallel=False,
 ):
     """
 
@@ -206,33 +235,45 @@ def get_sub_configs(
 
     Args:
         relaxation_xcs (list):
-            list of xcs you want to at least run relax + static for
-                e.g., ['gga', 'metaggau']
+            list of xcs you want to run relax + static for
+                e.g., ['gga', 'metaggau'] if you want to run PBE and R2SCAN+U calculations
+
         static_addons (dict):
             {xc : [list of additional calculations to run after static]}
-                e.g., {'gga' : ['lobster', 'parchg']}
-
-        relaxation_xcs and static_addons generate a calc_list (order of xc-calcs to be executed)
-            e.g., ['gga-relax', 'gga-static', 'metagga-relax', 'metagga-static', 'metagga-lobster', 'metagga-parchg']
+                e.g., {'gga' : ['lobster', 'parchg']} if you want to run LOBSTER and PARCHG analysis after your PBE calculation
 
         prioritize_relaxes (bool):
-            if True, run relaxes before static addons
+            the combination of relaxation_xcs and static_addons generates a calc_list (the order of calculations to be executed)
+                if True, run relax+static for all relaxation_xcs first, then run static_addons
+                if False, run xc by xc, so once a relax+static finishes for an xc, run all of that xc's static_addons next
+
+            e.g.,
+                if relaxation_xcs = ['gga', 'metagga']
+                and static_addons = {'gga' : ['lobster'], 'metagga' : ['bs']}
+
+                if prioritize_relaxes = True,
+                    calc_list = ['gga-relax', 'gga-static', 'metagga-relax', 'metagga-static', 'gga-lobster', 'metagga-bs']
+
+                if prioritize_relaxes = False,
+                    calc_list = ['gga-relax', 'gga-static', 'gga-lobster', 'metagga-relax', 'metagga-static', 'metagga-lobster']
+
+        start_with_loose (bool):
+            if True, your first relaxation_xc will start with a loose calc before relax --> static
+            if False, no loose calculations will be performed
 
         custom_calc_list (list):
             if you don't want to autogenerate a calc_list, you can specify the full list you want to run here
+                e.g., ['metagga-static'] would only run this single xc-calc
 
         restart_these_calcs (list):
             list of xc-calcs you want to start over (e.g., ['gga-lobster'])
-
-        start_with_loose (bool):
-            prepend your calc_list with a loose calc if True
 
         submit_calculations_in_parallel (bool or int):
             whether to prepare submission scripts in parallel or not
                 False: use 1 processor
                 True: use all available processors - 1
                 int: use that many processors
-            if this is not False, you should not run this on a login node
+            you should only execute this function on a login node if submit_calculations_in_parallel = False
 
         machine (str):
             name of supercomputer
@@ -242,8 +283,6 @@ def get_sub_configs(
 
         vasp_version (int):
             5 for 5.4.4 or 6 for 6.4.1
-
-
 
     Returns:
         {config_name : config_value}
@@ -293,16 +332,23 @@ def get_launch_configs(
     configs related to launching chains of calculations
 
     Args:
-
         n_afm_configs (int):
             number of antiferromagnetic configurations to run for each structure (0 if you don't want to run AFM)
+                these are generated using pydmclab.core.mag.MagTools
+                each configuration will be its own calculation directory (afm_0, afm_1, ...)
 
-        override_mag (bool):
-            if True, let user decide mag completely (rather than auto figuring out whether magnetic)
+        override_mag (str or bool):
+            if False, do nothing
+            if str, set mag to override_mag (rather than letting pydmclab.core.mag.MagTools figure out if it might be magnetic)
                 NOTE: not sure if this is working
 
         ID_specific_vasp_configs (dict):
-            {<formula_indicator>_<struc_indicator> : {'incar_mods' : {<INCAR tag> : <value>}, {'kpoints' : <kpoints value>}, {'potcar' : <potcar value>}}
+            use this to modify VASP configs for a subset of the structures you're calculating
+                {<formula_indicator>_<struc_indicator> : {'incar_mods' : {<INCAR tag> : <value>}, {'kpoints' : <kpoints value>}, {'potcar' : <potcar value>}}
+
+            e.g.,
+                to change EDIFF for the perovskite polymorph of SrZrS3
+                    {'SrZrS3_perovskite' : {'incar_mods' : {'EDIFF' : 1e-5}}}
 
     Returns:
         dictionary of launch configurations
@@ -321,7 +367,6 @@ def get_launch_configs(
 def get_analysis_configs(
     only_calc="static",
     only_xc=None,
-    analyze_calculations_in_parallel=False,
     analyze_structure=True,
     analyze_trajectory=False,
     analyze_mag=False,
@@ -344,53 +389,43 @@ def get_analysis_configs(
         only_xc (bool or str):
             if str, only analyze this xc (eg 'gga')
 
-        analyze_calculations_in_parallel (bool or int): whether to analyze calculation results in parallel or not
-            - False: use 1 processor
-            - True: use all available processors
-            - int: use that many processors
-
-        analyze_structure (bool, optional):
+        analyze_structure (bool):
             True to include structure in your results
 
-        analyze_trajectory (bool, optional):
-            True to include trajectory in your results
+        analyze_trajectory (bool):
+            True to include ionic relaxation trajectory in your results
 
-        analyze_mag (bool, optional):
+        analyze_mag (bool):
             True to include magnetization in your results
 
-        analyze_charge (bool, optional):
+        analyze_charge (bool):
             True to include bader charge + lobster charges + madelung in your results
 
-        analyze_dos (bool, optional):
+        analyze_dos (bool):
             True to include pdos, tdos in your results
 
-        analyze_bonding (bool, optional):
+        analyze_bonding (bool):
             True to include tcohp, pcohp, tcoop, pcoop, tcobi, pcobi in your results
 
-        exclude (list, optional):
-            list of strings to exclude from analysis. Defaults to [].
-                - overwrites other options
+        exclude (list):
+            list of strings to exclude from analysis
+                overwrites other options
+
+        remake_results (bool):
+            if True, regeneration calc_dir/results.json file even if it exists and calc hasn't re-started
+
+        verbose (bool):
+            print ('analyzing %s' % calc_dir) whenever one is being analyzed
+
     Returns:
-        dictionary of ANALYSIS_CONFIGS
-            {'include_*' : True or False}
+        dictionary of configs related to analysis
+            {config param (str) : config value (str, bool)}
     """
 
     if exclude is None:
         exclude = []
 
     analysis_configs = {}
-
-    if not analyze_calculations_in_parallel:
-        n_procs = 1
-    else:
-        if analyze_calculations_in_parallel == True:
-            n_procs = multip.cpu_count() - 1
-        elif analyze_calculations_in_parallel == False:
-            n_procs = 1
-        else:
-            n_procs = analyze_calculations_in_parallel
-
-    analysis_configs["n_procs_for_analysis"] = n_procs
 
     includes = []
     if analyze_structure:
@@ -429,76 +464,95 @@ def get_analysis_configs(
 def get_query(
     api_key,
     search_for,
-    properties=None,
     max_Ehull=0.05,
-    max_sites_per_structure=41,
     max_polymorph_energy=0.1,
-    only_gs=False,
-    include_structure=True,
     max_strucs_per_cmpd=1,
+    max_sites_per_structure=41,
     include_sub_phase_diagrams=False,
+    include_structure=True,
+    properties=None,
     data_dir=os.getcwd().replace("scripts", "data"),
     savename="query.json",
     remake=False,
 ):
     """
+    Use this to retrieve data + structures from the Materials Project (next-gen)
+
     Args:
-        api_key (str)
-            your API key (should be 32 characters)
+        api_key (str or None)
+            your API key (should be 32 characters for next-gen database)
+                can be None, but you need to configure pymatgen w/ your MP API key
+                     `pmg config --add PMG_MAPI_KEY <USER_API_KEY>`
+
         search_for (str or list)
             can either be:
-                - a chemical system (str) of elements joined by "-"
-                - a chemical formula (str)
-                - an MP ID (str)
-            can either be a list of:
-                - chemical systems (str) of elements joined by "-"
-                - chemical formulas (str)
-                - MP IDs (str)
-
-        properties (list or None)
-            list of properties to query
-                - if None, then use typical_properties
-                - if 'all', then use all properties
-                - if a string, then add that property to typical_properties
-                - if a list, then add those properties to typical_properties
-
-        band_gap (tuple)
-            band gap range to query
+                a chemical system (str) of elements joined by "-"
+                    eg 'Ca-Ti-O' for all ternary calcium titanium oxides
+                a chemical formula (str)
+                    eg 'CaTiO3' for this formula
+                an MP ID (str)
+                    eg 'mp-1234' for this ID
+            or a list of:
+                chemical systems (str) of elements joined by "-"
+                    eg ['Ca-Ti-O', 'Sr-Ti-O']
+                chemical formulas (str)
+                    eg ['CaO', 'CaTiO3']
+                MP IDs (str)
+                    eg ['mp-1', 'mp-2']
 
         max_Ehull (float)
-            upper bound on energy above hull to query
-
-        max_sites_per_structure (int)
-            upper bound on number of sites to query
+            upper bound on energy above hull for retrieved entries
 
         max_polymorph_energy (float)
-            upper bound on polymorph energy to query
+            upper bound on polymorph energy for retrieved entries
+                set to 0 to only retrieve ground-state structures for all compositions
 
-        only_gs (bool)
-            if True, remove non-ground state polymorphs for each unique composition
+        max_strucs_per_cmpd (int)
+            upper bound on number of polymorphs to retrieve for each queried composition
+                retains the lowest energy ones
+
+        max_sites_per_structure (int)
+            upper bound on number of sites in retrieved structures
+
+        include_sub_phase_diagrams (bool)
+            if True, include all sub-phase diagrams for a given composition
+                e.g., if search_for = "Sr-Zr-S", then also include "Sr-S" and "Zr-S" in the query
 
         include_structure (bool)
             if True, include the structure (as a dictionary) for each entry
 
-        max_strucs_per_cmpd (int)
-            if not None, only retain the lowest energy structures for each composition until you reach max_strucs_per_cmpd
+        properties (list or None)
+            list of properties to query
+                if None, then use pydmclab.core.query.MPQuery.typical_properties
+                if 'all', then use all properties
+                if a string, then add that property to typical_properties
+                if a list, then add those properties to typical_properties
 
-        include_sub_phase_diagrams (bool)
-            if True, include all sub-phase diagrams for a given composition
-                e.g., if comp = "Sr-Zr-S", then also include "Sr-S" and "Zr-S" in the query
         data_dir (str)
             directory to save fjson
+
         savename (str)
             filename for fjson in data_dir
+
         remake (bool)
             write (True) or just read (False) fjson
+
     Returns:
         {ID (str) : {'structure' : Pymatgen Structure as dict,
-                    < any other data you want to keep track of >}}
+                    '<other property>' : whatever you queried for}}
+
+        e.g.,
+            {'mp-1234' : {'structure' : Structure.as_dict,
+                          'E_mp' : -5.4321}}
+
+        Note: if you don't want to use MP data, you can create your own `get_query` function that gets whatever data you want
+            e.g., it might return
+            {'SrZrS3_perovskite' : {'structure' : Structure.as_dict,
+                                    'E_per_at' : -6.54}}
     """
 
     if api_key and len(api_key) < 32:
-        raise ValueError("API key should be 32 characters")
+        raise ValueError("API key should be 32 characters or NoneType")
 
     fjson = os.path.join(data_dir, savename)
     if os.path.exists(fjson) and not remake:
@@ -514,7 +568,6 @@ def get_query(
         max_Ehull=max_Ehull,
         max_sites_per_structure=max_sites_per_structure,
         max_polymorph_energy=max_polymorph_energy,
-        only_gs=only_gs,
         include_structure=include_structure,
         max_strucs_per_cmpd=max_strucs_per_cmpd,
         include_sub_phase_diagrams=include_sub_phase_diagrams,
@@ -540,6 +593,8 @@ def get_legacy_query(
     remake=False,
 ):
     """
+    NOTE: this is deprecated for get_query
+
     Args:
         comp (list or str)
             can either be:
@@ -594,6 +649,9 @@ def get_legacy_query(
         {ID (str) : {'structure' : Pymatgen Structure as dict,
                     < any other data you want to keep track of >}}
     """
+    warnings.warn(
+        "DeprecationWarning: Are you sure you want to use the legacy MP database? The next-gen MP database is preferred. Use pydmclab.hpc.helpers.get_query"
+    )
 
     fjson = os.path.join(data_dir, savename)
     if os.path.exists(fjson) and not remake:
@@ -633,9 +691,15 @@ def get_strucs(
     remake=False,
 ):
     """
+    You should rarely use this default function, but it should give you an idea how to make your own structures
+
     Args:
         query (dict)
-            {mpid : {DATA}}
+            {<unique structure indicator> (e.g., MP ID) :
+                {'structure' : Pymatgen Structure as dict,
+                 '<any other info>' : ...}}
+
+            usually generated with get_query (or similar custom function)
 
         data_dir (str)
             directory to save fjson
@@ -647,9 +711,18 @@ def get_strucs(
             write (True) or just read (False) fjson
 
     Returns:
-        {formula identifier (str) :
-            {structure identifier for that formula (str) :
+        {formula_indicator (str) :
+            {struc_indicator (str) :
                 Pymatgen Structure object as dict}}
+
+        e.g., if you got some MP data, this might return something like:
+            {'Cl3Cs1Pb1' : {'mp-1234' : Structure.as_dict}}
+
+        e.g., if you made this yourself, it might look like:
+            {'Li2FeP2S6' : {'ordering_0' : Structure.as_dict}}
+
+        All structures within a formula_indicator should have the same composition
+        It's fine if the struc_indicator alone does not define a material, but formula_indicator + struc_indicator should
     """
 
     fjson = os.path.join(data_dir, savename)
@@ -689,13 +762,17 @@ def get_magmoms(
     """
     Args:
         strucs (dict)
-            {formula : {ID : structure}}
+            {formula_indicator :
+                {struc_indicator : structure}}
+
+            usually generated with get_strucs (or similar custom function)
 
         max_afm_combos (int)
-            maximum number of AFM spin configurations to generate
+            maximum number of AFM configurations to generate
 
         treat_as_nm (list)
             any normally mag els you'd like to treat as nonmagnetic for AFM enumeration
+                e.g., if you know Ti won't be magnetic, you could set to ['Ti']
 
         data_dir (str)
             directory to save fjson
@@ -710,7 +787,13 @@ def get_magmoms(
         {formula identifier (str) :
             {structure identifier for that formula (str) :
                 {AFM ordering identifier (str) :
-                    [list of magmoms (floats) for each site in the structure]}}}"""
+                    [list of magmoms (floats) for each site in the structure]}}}
+
+        e.g.,
+        {'Cr2O3' :
+            {'mp-4321' :
+                {'0' : [-5, 5, -5, 5, -5, 5, 0, 0, 0, 0, 0, 0, 0, 0]}}}
+    """
 
     fjson = os.path.join(data_dir, savename)
     if not remake and os.path.exists(fjson):
@@ -748,7 +831,7 @@ def check_magmoms(strucs, magmoms):
 def get_launch_dirs(
     strucs,
     magmoms,
-    user_configs,
+    user_configs=None,
     make_launch_dirs=True,
     data_dir=os.getcwd().replace("scripts", "data"),
     calcs_dir=os.getcwd().replace("scripts", "calcs"),
@@ -758,25 +841,49 @@ def get_launch_dirs(
     """
     Args:
         strucs (dict)
-            {formula : {ID : structure}}
+            {formula_indicator
+                : {struc_indicator
+                    : structure}}
+
+            usually generated w/ get_strucs (or similar custom function)
 
         magmoms (dict)
-            {formula : {ID : {AFM configuration index : [list of magmoms on each site]}}
+            {formula_indicator :
+                {struc_indicator :
+                    {AFM configuration index :
+                        [list of magmoms on each site]}}
+
+            usually generated w/ get_magmoms (or similar custom function)
 
         user_configs (dict)
-            optional launch configurations
+            optional configs that apply to launch directories
+                these usually get generated using get_launch_configs
+
+                n_afm_configs = 0 by default
+                    how many AFM configurations to run
+
+                override_mag = False by default
+                    could be 'nm' if you only want to run nonmagnetic,
+                    won't check for whether structure is mag or not mag,
+                    it will just do as you say
+                    (not sure if this is properly implemented)
+
+                ID_specific_vasp_configs: None by default
+                    {<formula_indicator>_<struc_indicator> :
+                        {'incar_mods' : {<incar_key> : <incar_val>},
+                        {'kpoints_mods' : {<kpoints_key> : <kpoints_val>},
+                        {'potcar_mods' : {<potcar_key> : <potcar_val>}}
 
         make_launch_dirs (bool)
             make launch directories (True) or just return launch dict (False)
 
-        refresh_configs (bool)
-            refresh configs (True) or just use existing configs (False)
-
         data_dir (str)
             directory to save fjson
+                usually is this ../data
 
         calcs_dir (str)
-            directory above all your calculations
+            directory that holds all your calculations
+                usually this is ../calcs or /scratch/..../calcs
 
         savename (str)
             filename for fjson in data_dir
@@ -785,19 +892,31 @@ def get_launch_dirs(
             write (True) or just read (False) fjson
 
     Returns:
+        {launch_dir (str) :
+            {'magmom' : [list of magmoms for the structure in that launch_dir (list)],
+             'ID_specific_vasp_configs' : {<formula_indicator>_<struc_indicator> : {desired configs for this entry}}}
 
-        {launch_dir (str) : {'magmom' : [list of magmoms for the structure in that launch_dir (list)],
-                             'ID_specific_vasp_configs' : {<formula_indicator>_<struc_indicator> : {}}}
+        Returns the minimal list of directories that will house submission files (each of which launch a chain of calcs)
+            note a chain of calcs must have the same structure and magnetic information, otherwise, there's no reason to chain them
+                so the launch_dir defines: structure, magmom, ID-specific configs
+
+        These launch_dirs have a very prescribed structure:
+            calcs_dir / formula_indicator / struc_indicator / mag
+
+            e.g.,
+                ../calcs/Nd2O7Ru2/mp-19930/fm
+                ../calcs/LiMn2O4_1/3/afm_4
+                    (if LiMn2O4_1 was a unique compositional indicator and 3 was a unique structural indicator)
 
         also makes launch_dir and populates with POSCAR using strucs if make_dirs=True
-
-        NOTE: ID_specific_vasp_configs is not working as intended
-
     """
 
     fjson = os.path.join(data_dir, savename)
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
+
+    if user_configs is None:
+        user_configs = {}
 
     all_launch_dirs = {}
     for formula in strucs:
@@ -820,8 +939,8 @@ def get_launch_dirs(
 
             launch_dirs = launch.launch_dirs(make_dirs=make_launch_dirs)
 
-            for launch_dir in launch_dirs:
-                all_launch_dirs[launch_dir] = launch_dirs[launch_dir]
+            for launch_dir, params in launch_dirs.items():
+                all_launch_dirs[launch_dir] = params
 
     write_json(all_launch_dirs, fjson)
     return read_json(fjson)
@@ -841,17 +960,16 @@ def submit_one_calc(submit_args):
         submit_args (dict) should contain:
             {'launch_dir' :
                 launch_dir (str)
-                    (formula/ID/standard/mag) to write and launch submission script in,
+                    (calcs_dir/formula/ID/mag) to write and launch submission script in,
             'launch_dirs' :
                 launch_dirs (dict)
-                    {launch_dir (formula/ID/standard/mag) : {'xcs' : [list of final_xcs], 'magmoms' : [list of magmoms for each site in structure in launch_dir], 'ID_specific_vasp_configs' : {options}}},
+                    {launch_dir (calcs_dir/formula/ID/mag) : {'magmoms' : [list of magmoms for each site in structure in launch_dir], 'ID_specific_vasp_configs' : {options}}},
             'user_configs' :
                 user_configs (dict)
-                    optional sub, slurm, or VASP configurations,
+                    optional sub or slurm configs
             'ready_to_launch':
                 ready_to_launch (bool)
                     write and launch (True) or just write submission scripts (False)
-
             'parallel':
                 running_in_parallel (bool)
                     whether to run in parallel (True) or not (False)
@@ -883,7 +1001,6 @@ def submit_one_calc(submit_args):
                 user_configs=curr_user_configs,
             )
 
-            print(sub.calc_list)
             # prepare VASP directories and write submission script
             sub.write_sub
 
@@ -893,7 +1010,7 @@ def submit_one_calc(submit_args):
 
             success = True
         except TypeError:
-            print("\nERROR: %s\n   will submit without multiprocessing" % launch_dir)
+            # print("\nERROR: %s\n   will submit without multiprocessing" % launch_dir)
             success = False
     else:
         sub = SubmitTools(
@@ -926,10 +1043,94 @@ def submit_calcs(
 
     Args:
         launch_dirs (dict)
-            {launch_dir (formula/ID/standard/mag) : {'xcs' : [list of final_xcs], 'magmoms' : [list of magmoms for each site in structure in launch_dir]}}
+            {launch_dir (str) :
+                {'magmom' : [list of magmoms for the structure in that launch_dir (list)],
+                 'ID_specific_vasp_configs' : {<formula_indicator>_<struc_indicator> : {desired configs for this entry}}}
+
+             usually generated with get_launch_dirs
 
         user_configs (dict)
-            optional sub, slurm, or VASP configurations
+            optional sub or slurm configs
+                these normally get generated using get_sub_configs and get_slurm_configs
+
+                relaxation_xcs: default is ['gga']
+                    list of xcs you want to at least run relax + static for
+
+                static_addons: default is {'gga' : ['lobster']}
+                    dictionary of things you want to do after a static is converged. eg {'metagga' : ['lobster', 'bs']}
+
+                run_static_addons_before_all_relaxes: default is False
+                    if False, prioritize relaxes finishing; if True, run static addons as soon as possible
+
+                custom_calc_list: default is None
+                    complete list of calcs in the order you want to run (if you don't want these generated automatically)
+
+                start_with_loose: default is False
+                    if True, add gga-loose or ggau-loose as your very first calc in the list to calculate
+
+                fresh_restart: default is None
+                    if you want to start certain calcs over set them in a list here. eg ['metaggau-lobster', 'metagga-bs']
+
+                vasp: default is vasp_std
+                    which vasp do you want to use
+                        use vasp_gam for "loose" calcs (havent implemented yet)
+
+                vasp_version: default is 6
+                    version of VASP (can be 5 for 5.4.4 or 6 for 6.4.1)
+
+                mpi_command: default is mpirun
+                    how to launch on multicore/multinode (may be mpirun depending on compilation)
+
+                manager: default is '#SBATCH'
+                    how to manage interactions with the queue (some machines dont use slurm)
+
+                machine: default is msi
+                    which supercomputer
+
+                execute_flags: default is ['srun', 'python', 'bin/lobster', 'bin/vasp', 'bader', 'mpirun']
+                    how to figure out if a submission script needs to be launched
+
+                n_procs_for_submission: default is 1
+                    how many cores to parallelize the submission part of the launcher on
+                        note: this has nothing to do w/ how many cores each VASP calc runs on
+                        only affects how many cores this function gets executed on
+
+                nodes: default is 1
+                    how many nodes
+
+                ntasks: default is 8
+                    how many total cores
+
+                time: default is 1440
+                    how long in minutes before hitting walltime
+
+                error: default is log.e
+                    where to write slurm errors to in launch_dir
+
+                output: default is log.o
+                    where to write slurm output to in launch_dir
+
+                account: default is cbartel
+                    account to charge
+
+                partition: default is agsmall,msismall,msidmc
+                    partition to use
+
+                job-name: default is None
+                    unique job name; if none provided, will default to formula_indicator.struc_indicator.mag.project_dir
+                        e.g., default might be SrZrS3.mp-1234.afm_0.perovskite_chalcs
+
+                mem-per-cpu: default is None
+                    specify mem per core
+
+                mem-per-gpu: default is None
+                    specify mem per gpu core
+
+                constraint: default is None
+                    may not need this ever on MSI
+
+                qos: default is None
+                    may not need this ever on MSI
 
         ready_to_launch (bool)
             write and launch (True) or just write submission scripts (False)
@@ -953,7 +1154,7 @@ def submit_calcs(
     }
 
     if n_procs == 1:
-        print("\n\n submitting calculations in serial\n\n")
+        # print("\n\n submitting calculations in serial\n\n")
         for launch_dir in launch_dirs:
             curr_submit_args = submit_args.copy()
             curr_submit_args["launch_dir"] = launch_dir
@@ -962,8 +1163,7 @@ def submit_calcs(
     elif n_procs == "all":
         n_procs = multip.cpu_count() - 1
 
-    print("\n\n submitting calculations in parallel\n\n")
-    print("not refreshing configs for parallel --> causes trouble")
+    # print("\n\n submitting calculations in parallel\n\n")
     list_of_submit_args = []
     for launch_dir in launch_dirs:
         curr_submit_args = submit_args.copy()
@@ -976,10 +1176,10 @@ def submit_calcs(
     submitted_w_multiprorcessing = [status for status in statuses if status["success"]]
     failed_w_multiprocessing = [status for status in statuses if not status["success"]]
 
-    print(
-        "%i/%i calculations submitted with multiprocessing"
-        % (len(submitted_w_multiprorcessing), len(statuses))
-    )
+    # print(
+    #     "%i/%i calculations submitted with multiprocessing"
+    #     % (len(submitted_w_multiprorcessing), len(statuses))
+    # )
     for status in failed_w_multiprocessing:
         launch_dir = status["launch_dir"]
         curr_submit_args = submit_args.copy()
@@ -991,7 +1191,7 @@ def submit_calcs(
 
 def get_results(
     launch_dirs,
-    user_configs,
+    user_configs=None,
     data_dir=os.getcwd().replace("scripts", "data"),
     savename="results.json",
     remake=False,
@@ -999,10 +1199,79 @@ def get_results(
     """
     Args:
         launch_dirs (dict)
-            {launch_dir (formula_indicator/struc_indicator/mag) : {'magmoms' : [list of magmoms for each site in structure in launch_dir], 'ID_specific_vasp_configs' : {}}}
+            {launch_dir (str) :
+                {'magmom' : [list of magmoms for the structure in that launch_dir (list)],
+                 'ID_specific_vasp_configs' : {<formula_indicator>_<struc_indicator> : {desired configs for this entry}}}
 
         user_configs (dict)
             optional analysis configurations
+                usually generated using get_analysis_configs
+
+                only_calc: default is 'static'
+                    only retrieve data from the static calculations
+
+                only_xc: default is None
+                    if None, retrieve all xcs, else retrieve only the one specified
+
+                check_relax_energy: default is True
+                    make sure the relax calculation and the static have similar energies
+
+                include_metadata: default is True
+                    include metadata like INCAR, KPOINTS, POTCAR settings
+
+                include_calc_setup: default is True
+                    include things related to the calculation setup -- mag, xc, etc
+
+                include_structure: default is True
+                    include the relaxed crystal structure as a dict
+
+                include_trajectory: default is False
+                    include the compact trajectory from the vasprun.xml
+
+                include_mag: default is False
+                    include the relaxed magnetization info as as dict
+
+                include_tdos: default is False
+                    include the light version of the density of states
+
+                include_pdos: default is False
+                    include heavy dos
+
+                include_charge: default is False
+                    include partial chage info
+
+                include_madelung: default is False
+                    include Madelung energies
+
+                include_tcohp: default is False
+                    include light COHPCAR data
+
+                include_pcohp: default is False
+                    include heavy COHPCAR data
+
+                include_tcoop: default is False
+                    include light COOPCAR data
+
+                include_pcoop: default is False
+                    include heavy COOPCAR data
+
+                include_tcobi: default is False
+                    include light COBICAR data
+
+                include_pcobi: default is False
+                    include heavy COBICAR data
+
+                include_entry: default is False
+                    include pymatgen computed structure entry
+
+                create_cif: default is True
+                    create a .cif file for each CONTCAR
+
+                verbose: default is True
+                    print stuff as things get analyzed
+
+                remake_results: default is False
+                    whether or not to rerun analyzer in each calculation directory
 
         data_dir (str)
             directory to save fjson
@@ -1014,13 +1283,16 @@ def get_results(
             write (True) or just read (False) fjson
 
     Returns:
-        {formula--ID--standard--mag--xc-calc (str) :
+        {formula--ID--mag--xc-calc (str) :
             {scraped results from VASP calculation}}
     """
 
     fjson = os.path.join(data_dir, savename)
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
+
+    if user_configs is None:
+        user_configs = {}
 
     analyzer = AnalyzeBatch(launch_dirs, user_configs=user_configs)
 
@@ -1074,7 +1346,8 @@ def get_gs(
     """
     Args:
         results (dict)
-            {formula--ID--standard--mag--xc-calc (str) : {scraped results from VASP calculation}}
+            {formula--ID--mag--xc-calc (str) : {scraped results from VASP calculation}}
+            usually generated with get_results
 
         include_structure (bool)
             include the structure or not
@@ -1098,7 +1371,7 @@ def get_gs(
         {xc (str, the exchange-correlation method) :
             {formula (str) :
                 {'E' : energy of the ground-structure,
-                'key' : formula.ID.standard.mag.xc_calc for the ground-state structure,
+                'key' : formula--ID--mag--xc-calc for the ground-state structure,
                 'structure' : structure of the ground-state structure,
                 'n_started' : how many polymorphs you tried to calculate,
                 'n_converged' : how many polymorphs are converged,
@@ -1181,9 +1454,6 @@ def check_gs(gs):
     """
     checks that this dictionary is generated properly
 
-    Args:
-        gs (_type_): _description_
-
     """
 
     print("\nchecking ground-states")
@@ -1200,7 +1470,7 @@ def check_gs(gs):
         for formula in gs[xc]:
             if "Ef" in gs[xc][formula]:
                 if gs[xc][formula]["Ef"]:
-                    print("%s : %.2f eV/at" % (formula, gs[xc][formula]["Ef"]))
+                    print("%s : Ef = %.2f eV/at" % (formula, gs[xc][formula]["Ef"]))
 
 
 def get_thermo_results(
@@ -1214,10 +1484,20 @@ def get_thermo_results(
 
     Args:
         results (dict):
-            full results dictionary
+            {formula--ID--mag--xc-calc (str) : {scraped results from VASP calculation}}
+            usually generated with get_results
 
         gs (dict):
-            dictionary of ground-state data
+            {xc (str, the exchange-correlation method) :
+                {formula (str) :
+                    {'E' : energy of the ground-structure,
+                    'key' : formula--ID--mag--xc-calc for the ground-state structure,
+                    'structure' : structure of the ground-state structure,
+                    'n_started' : how many polymorphs you tried to calculate,
+                    'n_converged' : how many polymorphs are converged,
+                    'complete' : True if n_converged = n_started (i.e., all structures for this formula at this xc are done),
+                    'Ef' : formation enthalpy at 0 K}
+            usually generated with get_gs
 
         data_dir (str)
             directory to save fjson
@@ -1732,14 +2012,14 @@ def make_sub_for_launcher():
     with open(flauncher_sub, "w") as f:
         f.write("#!/bin/bash -l\n")
         f.write("#SBATCH --nodes=1\n")
-        f.write("#SBATCH --ntasks=8\n")
+        f.write("#SBATCH --ntasks=32\n")
         f.write("#SBATCH --time=4:00:00\n")
         f.write("#SBATCH --mem=8G\n")
         f.write("#SBATCH --error=_log_launcher.e\n")
         f.write("#SBATCH --output=_log_launcher.o\n")
         f.write("#SBATCH --account=cbartel\n")
         f.write("#SBATCH --job-name=%s\n" % launch_job_name)
-        f.write("#SBATCH --partition=msismall\n")
+        f.write("#SBATCH --partition=agsmall,msidmc\n")
         f.write("\npython launcher.py\n")
 
 

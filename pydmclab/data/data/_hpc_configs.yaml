@@ -125,5 +125,4 @@ include_pcobi: False # include heavy COBICAR data
 include_entry: False # include pymatgen computed structure entry
 create_cif: True # create a .cif file for each CONTCAR
 verbose: True # print stuff as things get analyzed
-n_procs_for_analysis: 1 # how many cores to parallelize the analysis part of the launcher on
 remake_results: False # whether or not to rerun analyzer in each calculation directory
