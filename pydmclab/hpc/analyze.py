@@ -1367,8 +1367,6 @@ class AnalyzeBatch(object):
 
         configs = self.configs.copy()
 
-        n_procs = configs["n_procs_for_analysis"]
-
         calc_dirs = self.calc_dirs
 
         only_xc = configs["only_xc"]
@@ -1388,21 +1386,7 @@ class AnalyzeBatch(object):
                 if self._key_for_calc_dir(c).split("--")[-1].split("-")[1] == only_calc
             ]
 
-        # run serial if only one processor
-        if n_procs == 1:
-            data = [_results_for_calc_dir(calc_dir, configs) for calc_dir in calc_dirs]
-
-        # otherwise, run parallel
-        if n_procs > 1:
-            pool = multip.Pool(processes=n_procs)
-            data = [
-                r
-                for r in pool.starmap(
-                    _results_for_calc_dir,
-                    [(calc_dir, configs) for calc_dir in calc_dirs],
-                )
-            ]
-            pool.close()
+        data = [_results_for_calc_dir(calc_dir, configs) for calc_dir in calc_dirs]
 
         # each item in data is a dictionary that looks like {key : data for that key}
         # we'll map to a dictionary of {key : data for that key} for all keys
