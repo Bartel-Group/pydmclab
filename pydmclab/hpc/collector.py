@@ -33,17 +33,6 @@ class Collector(object):
             self.configs = configs
 
     @property
-    def key(self):
-        """
-        Returns:
-            key to be stored in the results dictionary
-                formula_indicator--struc_indicator--mag--xc-calc
-        """
-        calc_dir = self.calc_dir
-        key = "--".join(calc_dir.split("/")[-4:])
-        return key
-
-    @property
     def results(self):
         """
         Returns:
@@ -52,8 +41,7 @@ class Collector(object):
                 see AnalyzeVASP.summary() for more info
         """
         calc_dir = self.calc_dir
-        key = self.key
-        xc_calc = key.split("--")[-1]
+        xc_calc = calc_dir.split("/")[-1]
         xc, calc = xc_calc.split("-")
 
         configs = self.configs.copy()
@@ -149,14 +137,11 @@ class Collector(object):
         if not os.path.exists(fjson):
             return False
         results = read_json(fjson)
-        key = self.key
-        if key not in results:
+        if "results" not in results:
             return False
-        if "results" not in results[key]:
+        if "convergence" not in results["results"]:
             return False
-        if "convergence" not in results[key]["results"]:
-            return False
-        if not results[key]["results"]["convergence"]:
+        if not results["results"]["convergence"]:
             return False
 
         foutcar = os.path.join(self.calc_dir, "OUTCAR")
