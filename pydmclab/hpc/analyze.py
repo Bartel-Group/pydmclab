@@ -1316,10 +1316,6 @@ class AnalyzeBatch(object):
         # update configs with any user_configs
         configs = {**_base_configs, **user_configs}
 
-        # figure out how many processors to use
-        if configs["n_procs_for_analysis"] == "all":
-            configs["n_procs_for_analysis"] = multip.cpu_count() - 1
-
         # copy configs to prevent unwanted changes
         self.configs = configs.copy()
 
