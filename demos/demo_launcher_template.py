@@ -74,7 +74,7 @@ if not CUSTOM_COLLECTOR:
 
 # load our baseline configs
 #  see pydmclab.data.data._hpc_configs.yaml
-CONFIGS = load_base_configs()
+BASE_CONFIGS = load_base_configs()
 
 # if you need data from MP as a starting point (often the case), you need your API key
 #  see pydmclab.core.query.MPQuery
@@ -167,10 +167,12 @@ ANALYSIS_CONFIGS = get_analysis_configs(
 )
 
 # update our configs based on the specific configs we've nust created
+CONFIGS = BASE_CONFIGS.copy()
 CONFIGS.update(VASP_CONFIGS)
 CONFIGS.update(SLURM_CONFIGS)
 CONFIGS.update(SUB_CONFIGS)
 CONFIGS.update(LAUNCH_CONFIGS)
+CONFIGS.update(ANALYSIS_CONFIGS)
 
 # write our configs to a file
 CONFIGS = write_json(CONFIGS, os.path.join(SCRIPTS_DIR, "configs.json"))

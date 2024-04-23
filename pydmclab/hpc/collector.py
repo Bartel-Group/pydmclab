@@ -110,7 +110,7 @@ class Collector(object):
         if create_cif and summary["results"]["convergence"] and include_structure:
             if summary["structure"]:
                 s = StrucTools(summary["structure"]).structure
-                s.to(fmt="cif", filename=os.path.join(calc_dir, key + ".cif"))
+                s.to(fmt="cif", filename=os.path.join(calc_dir, "contcar.cif"))
             else:
                 print("no structure, cant make cif")
         return summary
