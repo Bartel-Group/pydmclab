@@ -27,6 +27,9 @@ from pydmclab.hpc.helpers import (
 )
 
 from pydmclab.utils.handy import read_json, write_json
+
+# importing these b/c they're often useful for custom functions
+#  (ie non-default helpers)
 from pydmclab.core.comp import CompTools
 from pydmclab.core.struc import StrucTools
 from pydmclab.hpc.analyze import AnalyzeVASP
@@ -40,12 +43,16 @@ CALCS_DIR = SCRIPTS_DIR.replace("scripts", "calcs")
 # where is my data going to live
 DATA_DIR = SCRIPTS_DIR.replace("scripts", "data")
 
+# make our calcs dir and data dir
 for d in [CALCS_DIR, DATA_DIR]:
     if not os.path.exists(d):
         os.makedirs(d)
 
-# copy our passer.py file to your scripts_dir. if you want to use a custom passer, just set this = True and put your passer.py in the scripts dir
-#  this file handles passing data between calculations after they finish (eg WAVECAR, dynamic INCAR changes)
+# copy our passer.py file to your scripts_dir
+#  if you want to use a custom passer, just set CUSTOM_PASSER = True and put your passer.py in the scripts dir
+#  this file handles passing data between calculations after they finish
+#  eg copying WAVECAR/CONTCAR, making INCAR changes based on magmoms, etc
+#  see pydmclab.hpc.passer
 USER_NAME = "cbartel"
 CUSTOM_PASSER = False
 if not CUSTOM_PASSER:
@@ -54,7 +61,10 @@ if not CUSTOM_PASSER:
     )
 
 # copy our collector.py file to your scripts_dir
-#  this file handles collecting data from calculations after they finish (writes results.json file to each calc_dir to aggregate during analysis phase)
+#  if you want to use a custom collector, just set CUSTOM_COLLECTOR = True and put your collector.py in the scripts dir
+#  this file handles collecting data from calculations after they finish
+#  writes results.json file to each calc_dir to aggregate during analysis phase
+#  see pydmclab.hpc.collector
 CUSTOM_COLLECTOR = False
 if not CUSTOM_COLLECTOR:
     copyfile(
@@ -62,17 +72,23 @@ if not CUSTOM_COLLECTOR:
         "collector.py",
     )
 
-# load our configs
+# load our baseline configs
+#  see pydmclab.data.data._hpc_configs.yaml
 CONFIGS = load_base_configs()
 
 # if you need data from MP as a starting point (often the case), you need your API key
+#  see pydmclab.core.query.MPQuery
 API_KEY = None
 
 # what to query MP for (if you need MP data)
-## e.g., 'MnO2', ['MnO2', 'TiO2'], 'Ca-Ti-O, etc
+#  e.g., 'MnO2', ['MnO2', 'TiO2'], 'Ca-Ti-O, etc
+#  see pydmclab.hpc.helpers.get_query
 COMPOSITIONS = None
 
 # any configurations related to LaunchTools
+#  see pydmclab.hpc.helpers.get_launch_configs
+#  see pydmclab.data.data._hpc_configs.yaml (LAUNCH_CONFIGS)
+#  see pydmclab.hpc.launch.LaunchTools
 LAUNCH_CONFIGS = get_launch_configs(
     n_afm_configs=0,
     override_mag=False,
@@ -80,20 +96,26 @@ LAUNCH_CONFIGS = get_launch_configs(
 )
 
 # any configurations related to SubmitTools
+#  see pydmclab.hpc.helpers.get_sub_configs
+#  see pydmclab.data.data._hpc_configs.yaml (SUB_CONFIGS)
+#  see pydmclab.hpc.submit.SubmitTools
 SUB_CONFIGS = get_sub_configs(
     relaxation_xcs=["gga"],
     static_addons={"gga": ["lobster"]},
     prioritize_relaxes=True,
+    start_with_loose=False,
     custom_calc_list=None,
     restart_these_calcs=None,
-    start_with_loose=False,
+    submit_calculations_in_parallel=False,
     machine="msi",
     mpi_command="mpirun",
     vasp_version=6,
-    submit_calculations_in_parallel=False,
 )
 
-# any configurations related to Slurm
+# any configurations related to SLURM (job execution on compute nodes)
+#  see pydmclab.hpc.helpers.get_slurm_configs
+#  see pydmclab.data.data._hpc_configs.yaml (SLURM_CONFIGS)
+#  see pydmclab.hpc.submit.SubmitTools
 SLURM_CONFIGS = get_slurm_configs(
     total_nodes=1,
     cores_per_node=8,
@@ -106,24 +128,33 @@ SLURM_CONFIGS = get_slurm_configs(
 )
 
 # any configurations related to VASPSetUp
+#  see pydmclab.hpc.helpers.get_vasp_configs
+#  see pydmclab.data.data._hpc_configs.yaml (VASP_CONFIGS)
+#  see pydmclab.hpc.vasp.VASPSetUp
+#  see pydmclab.hpc.sets.GetSet
 VASP_CONFIGS = get_vasp_configs(
     standard="dmc",
     dont_relax_cell=False,
-    special_functional=None,
     incar_mods=None,
     kpoints_mods=None,
     potcar_mods=None,
-    lobster_configs={"COHPSteps": 2000, "reciprocal_kpoints_density_for_lobster": 100},
-    bs_configs={"bs_symprec": 0.1, "bs_line_density": 20},
     flexible_convergence_criteria=False,
     compare_static_and_relax_energies=0.1,
+    special_functional=False,
+    COHPSteps=2000,
+    reciprocal_kpoints_density_for_lobster=100,
+    bandstructure_symprec=0.1,
+    bandstructure_kpoints_line_density=20,
 )
 
-# any configurations related to AnalyzeBatch
+# any configurations related to AnalyzeVASP, AnalyzeBatch
+#  see pydmclab.hpc.helpers.get_analysis_configs
+#  see pydmclab.data.data._hpc_configs.yaml (ANALYSIS_CONFIGS)
+#  see pydmclab.hpc.analyze.AnalyzeVASP
+#  see pydmclab.hpc.analyze.AnalyzeBatch
 ANALYSIS_CONFIGS = get_analysis_configs(
-    only_xc=None,
     only_calc="static",
-    analyze_calculations_in_parallel=False,
+    only_xc=None,
     analyze_structure=True,
     analyze_trajectory=False,
     analyze_mag=False,
@@ -135,22 +166,29 @@ ANALYSIS_CONFIGS = get_analysis_configs(
     verbose=False,
 )
 
+# update our configs based on the specific configs we've nust created
 CONFIGS.update(VASP_CONFIGS)
 CONFIGS.update(SLURM_CONFIGS)
 CONFIGS.update(SUB_CONFIGS)
 CONFIGS.update(LAUNCH_CONFIGS)
 
+# write our configs to a file
 CONFIGS = write_json(CONFIGS, os.path.join(SCRIPTS_DIR, "configs.json"))
 
 # whether or not you want to generate MAGMOMs (only if you're running AFM)
 GEN_MAGMOMS = True if LAUNCH_CONFIGS["n_afm_configs"] else False
 
 # NOTE: the default is to use the imported functions from pydmclab.hpc.helpers
-# You will often want to write your own "get_query" and/or "get_strucs" functions instead
+# You will often want to write your own "get_query", "get_strucs", "get_modified_results" functions instead
 # See below (or within pydmclab.hpc.helpers) for some more detailed docs
+# It is usually not necessary to modify submit_calcs, get_launch_dirs, get_results
 
 
 def get_custom_data(savename="custom.json", remake=False):
+    """
+    This is what a custom function might look like
+        eg if you want to grab data from your own calcs instead of MP
+    """
     fjson = os.path.join(DATA_DIR, savename)
     if not remake and os.path.exists(fjson):
         return read_json(fjson)
@@ -161,46 +199,58 @@ def get_custom_data(savename="custom.json", remake=False):
 
 
 def main():
+    # make a submission script so you can execute launcher.py on the cluster
     remake_sub_for_launcher = False
 
+    # remake query? print query summary?
     remake_query = False
     print_query_check = True
 
+    # remake strucs? print strucs summary?
     remake_strucs = False
     print_strucs_check = True
 
+    # remake magmoms? print magmoms summary?
     remake_magmoms = False
     print_magmoms_check = True
 
+    # remake launch directories? print launch_dirs summary?
     remake_launch_dirs = False
     print_launch_dirs_check = True
 
+    # remake submission scripts? ready to launch them?
     remake_subs = True
     ready_to_launch = True
 
+    # remake compiled results? print results summary?
     remake_results = True
     print_results_check = True
 
+    # remake ground-state data? print gs summary?
     remake_gs = True
     print_gs_check = True
 
+    # remake thermo results? print thermo summary?
     remake_thermo_results = True
     print_thermo_results_check = True
 
+    # make submission script for launcher?
     if remake_sub_for_launcher:
         make_sub_for_launcher()
 
+    # get data from Materials Project
+    #  or replace with your own data retrieval function
+    #  pay attention to arguments here. are these the right filters?
     query = get_query(
         api_key=API_KEY,
         search_for=COMPOSITIONS,
-        properties=None,
         max_Ehull=0.05,
-        max_sites_per_structure=41,
         max_polymorph_energy=0.1,
-        only_gs=False,
-        include_structure=True,
         max_strucs_per_cmpd=1,
+        max_sites_per_structure=41,
         include_sub_phase_diagrams=False,
+        include_structure=True,
+        properties=None,
         data_dir=DATA_DIR,
         savename="query.json",
         remake=remake_query,
@@ -208,6 +258,10 @@ def main():
     if print_query_check:
         check_query(query)
 
+    # retrieve the structures from your query
+    #  replace with your own function for making structures
+    #  if you don't want to just use the structures as is from the query
+    #  eg make substitutions, create defects, make supercells, etc
     strucs = get_strucs(
         query=query,
         data_dir=DATA_DIR,
@@ -217,6 +271,8 @@ def main():
     if print_strucs_check:
         check_strucs(strucs)
 
+    # make magmoms if you're running AFM calcs
+    #  replace with your own function for making magmoms if you'd like
     if GEN_MAGMOMS:
         magmoms = get_magmoms(
             strucs=strucs,
@@ -231,6 +287,11 @@ def main():
     else:
         magmoms = None
 
+    # get launch directories dictionary
+    #  and make the launch directories
+    #  this rarely gets replaced with a custom function
+    #  we're setting up our directory tree here
+    #  convenient to do this the pydmclab way
     launch_dirs = get_launch_dirs(
         strucs=strucs,
         magmoms=magmoms,
@@ -244,6 +305,8 @@ def main():
     if print_launch_dirs_check:
         check_launch_dirs(launch_dirs)
 
+    # write/update submission scripts in each launch directory
+    #  submit them if you're ready
     if remake_subs:
         submit_calcs(
             launch_dirs=launch_dirs,
@@ -252,6 +315,10 @@ def main():
             n_procs=CONFIGS["n_procs_for_submission"],
         )
 
+    # analyze calculations
+    #  see if they're done
+    #  compile their results
+    #  note: a lot of the analysis happens within each submission script, so this should be fast
     results = get_results(
         launch_dirs=launch_dirs,
         user_configs=CONFIGS,
@@ -261,11 +328,13 @@ def main():
     if print_results_check:
         check_results(results)
 
+    # get smaller dataset just for your calculated ground-state entries at each composition
     gs = get_gs(results=results, data_dir=DATA_DIR, remake=remake_gs)
 
     if print_gs_check:
         check_gs(gs)
 
+    # get thermo results for all entries (smaller than results, bigger than gs)
     thermo = get_thermo_results(
         results=results, gs=gs, data_dir=DATA_DIR, remake=remake_thermo_results
     )

@@ -2009,7 +2009,7 @@ def make_sub_for_launcher():
     """
     flauncher_sub = os.path.join(os.getcwd(), "sub_launcher.sh")
     launch_job_name = "-".join([os.getcwd().split("/")[-2], "launcher"])
-    with open(flauncher_sub, "w") as f:
+    with open(flauncher_sub, "w", encoding='utf-8') as f:
         f.write("#!/bin/bash -l\n")
         f.write("#SBATCH --nodes=1\n")
         f.write("#SBATCH --ntasks=32\n")
