@@ -6,6 +6,7 @@ import json
 from pydmclab.core.struc import StrucTools
 from pydmclab.hpc.vasp import VASPSetUp
 from pydmclab.hpc.analyze import AnalyzeVASP
+from pydmclab.hpc.collector import Collector
 from pydmclab.data.configs import load_base_configs, load_partition_configs
 
 # this is the directory where this file is located (for path purposes)
@@ -561,6 +562,21 @@ class SubmitTools(object):
             print("  %s is prepared\n" % xc_calc)
         return statuses
 
+    def collection_status(self, xc_calc):
+        """
+        Returns:
+            True if no need to run collector
+            False if need to run collector
+        """
+        configs = self.configs.copy()
+        launch_dir = self.launch_dir
+        calc_dir = os.path.join(launch_dir, xc_calc)
+        collector = Collector(calc_dir, configs)
+        if collector.already_collected:
+            return True
+        else:
+            return False
+
     @property
     def write_sub(self):
         """
@@ -670,12 +686,13 @@ class SubmitTools(object):
                 calc_dir = os.path.join(launch_dir, xc_calc)
 
                 if status == "done":
-                    # execute the collector (writes)
-                    f.write("\ncd %s\n" % self.scripts_dir)
-                    f.write(
-                        "python collector.py %s %s \n"
-                        % (calc_dir, os.path.join(self.scripts_dir, "configs.json"))
-                    )
+                    if not self.collection_status(xc_calc):
+                        # execute the collector (writes)
+                        f.write("\ncd %s\n" % self.scripts_dir)
+                        f.write(
+                            "python collector.py %s %s \n"
+                            % (calc_dir, os.path.join(self.scripts_dir, "configs.json"))
+                        )
                     continue
 
                 # retrieve the incar_mods that pertain to this particular calculation

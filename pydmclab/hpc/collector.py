@@ -25,9 +25,12 @@ class Collector(object):
                 dictionary of configs
         """
         self.calc_dir = calc_dir
-        self.path_to_configs = path_to_configs
-        configs = read_json(path_to_configs)
-        self.configs = configs
+        if isinstance(path_to_configs, dict):
+            self.configs = path_to_configs
+        else:
+            self.path_to_configs = path_to_configs
+            configs = read_json(path_to_configs)
+            self.configs = configs
 
     @property
     def key(self):
@@ -125,6 +128,48 @@ class Collector(object):
         return summary
 
     @property
+    def fjson(self):
+        """
+        Returns:
+            path to file where you want to save results dict
+        """
+        savename = "results.json"
+        return os.path.join(self.calc_dir, savename)
+
+    @property
+    def already_collected(self):
+        """
+        Returns:
+            True if no need to run collector to generate results
+            Otherwise, False
+        """
+        fjson = self.fjson
+        if self.configs["remake_results"]:
+            return False
+        if not os.path.exists(fjson):
+            return False
+        results = read_json(fjson)
+        key = self.key
+        if key not in results:
+            return False
+        if "results" not in results[key]:
+            return False
+        if "convergence" not in results[key]["results"]:
+            return False
+        if not results[key]["results"]["convergence"]:
+            return False
+
+        foutcar = os.path.join(self.calc_dir, "OUTCAR")
+        if not os.path.exists(foutcar):
+            return True
+
+        results_gen_time = os.path.getmtime(fjson)
+        outcar_gen_time = os.path.getmtime(foutcar)
+        if outcar_gen_time < results_gen_time:
+            return True
+        return False
+
+    @property
     def to_dict(self):
         """
         Returns:
@@ -137,18 +182,9 @@ class Collector(object):
                 otherwise:
                     just read the results.json file
         """
-        savename = "results.json"
-        fjson = os.path.join(self.calc_dir, savename)
-        if os.path.exists(fjson) and not self.configs["remake_results"]:
-            results = read_json(fjson)
-            foutcar = os.path.join(self.calc_dir, "OUTCAR")
-            if results[self.key]["results"]["convergence"]:
-                if not os.path.exists(foutcar):
-                    return results
-                results_gen_time = os.path.getmtime(fjson)
-                outcar_gen_time = os.path.getmtime(foutcar)
-                if outcar_gen_time < results_gen_time:
-                    return results
+        fjson = self.fjson
+        if self.already_collected:
+            return read_json(fjson)
         results = self.results
         write_json(results, fjson)
         return read_json(fjson)
