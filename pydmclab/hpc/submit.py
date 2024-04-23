@@ -553,10 +553,10 @@ class SubmitTools(object):
                 if xc_calc in updated_configs["incar_mods"]:
                     updated_configs["incar_mods"][xc_calc].update(incar_changes)
                 else:
-                    updated_configs["incar_mods"][xc_calc] = incar_changes
+                    updated_configs["incar_mods"][xc_calc] = incar_changes.copy()
 
             # (8) write revised VASP input files to calc_dir
-            vsu = VASPSetUp(calc_dir=calc_dir, user_configs=updated_configs.copy())
+            vsu = VASPSetUp(calc_dir=calc_dir, user_configs=updated_configs)
             vsu.prepare_calc
 
             print("  %s is prepared\n" % xc_calc)
