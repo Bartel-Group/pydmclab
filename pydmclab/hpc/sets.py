@@ -292,11 +292,14 @@ class GetSet(object):
             # note: need to pass U values as eg {'LDAUU' : {'Fe' : 5}}
             new_settings["LDAU"] = True
             new_settings["LDAUTYPE"] = 2
-            ldauu = user_passed_settings["LDAUU"]
-            ldaul = {el: 2 for el in ldauu}
-            ldauj = {el: 0 for el in ldauu}
-            new_settings["LDAUL"] = ldaul
-            new_settings["LDAUJ"] = ldauj
+            if "LDAUU" in user_passed_settings and (
+                isinstance(user_passed_settings["LDAUU"], dict)
+            ):
+                ldauu = user_passed_settings["LDAUU"]
+                ldaul = {el: 2 for el in ldauu}  # assumes d electrons
+                ldauj = {el: 0 for el in ldauu}
+                new_settings["LDAUL"] = ldaul
+                new_settings["LDAUJ"] = ldauj
 
         # if we asked for a KPOINTS file (grid, auto, etc), turn off KSPACING
         if user_passed_kpoints_settings:
