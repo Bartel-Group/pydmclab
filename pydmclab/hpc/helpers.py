@@ -689,6 +689,7 @@ def get_strucs(
     data_dir=os.getcwd().replace("scripts", "data"),
     savename="strucs.json",
     remake=False,
+    force_supercell=False
 ):
     """
     You should rarely use this default function, but it should give you an idea how to make your own structures
@@ -709,6 +710,9 @@ def get_strucs(
 
         remake (bool)
             write (True) or just read (False) fjson
+
+        force_supercell (bool)
+            whether to create a 2x2x2 supercell for structures with only 1 atom
 
     Returns:
         {formula_indicator (str) :
@@ -732,11 +736,23 @@ def get_strucs(
     # get all unique chemical formulas in the query
     formulas_in_query = sorted(list(set([query[mpid]["cmpd"] for mpid in query])))
 
+    # make a 2x2x2 supercell if < 2 atoms in the basis
+    def query_supercell(mpid):
+        struc = query[mpid]["structure"]
+        if len(struc) < 2:
+            struc.make_supercell(2)
+        return struc
+
     data = {}
     for formula in formulas_in_query:
         # get all MP IDs in your query having that formula
         mpids = [mpid for mpid in query if query[mpid]["cmpd"] == formula]
-        data[formula] = {mpid: query[mpid]["structure"] for mpid in mpids}
+
+        if force_supercell:
+            data[formula] = {mpid: query_supercell(mpid) for mpid in mpids}
+
+        else:
+            data[formula] = {mpid: query[mpid]["structure"] for mpid in mpids}
 
     write_json(data, fjson)
     return read_json(fjson)
