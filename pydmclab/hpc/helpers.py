@@ -689,7 +689,7 @@ def get_strucs(
     data_dir=os.getcwd().replace("scripts", "data"),
     savename="strucs.json",
     remake=False,
-    force_supercell=False
+    force_supercell=False,
 ):
     """
     You should rarely use this default function, but it should give you an idea how to make your own structures
@@ -736,23 +736,20 @@ def get_strucs(
     # get all unique chemical formulas in the query
     formulas_in_query = sorted(list(set([query[mpid]["cmpd"] for mpid in query])))
 
-    # make a 2x2x2 supercell if < 2 atoms in the basis
-    def query_supercell(mpid):
-        struc = query[mpid]["structure"]
-        if len(struc) < 2:
-            struc.make_supercell(2)
-        return struc
-
     data = {}
     for formula in formulas_in_query:
         # get all MP IDs in your query having that formula
         mpids = [mpid for mpid in query if query[mpid]["cmpd"] == formula]
+        data[formula] = {mpid: query[mpid]["structure"] for mpid in mpids}
 
-        if force_supercell:
-            data[formula] = {mpid: query_supercell(mpid) for mpid in mpids}
-
-        else:
-            data[formula] = {mpid: query[mpid]["structure"] for mpid in mpids}
+    if force_supercell:
+        # if this is True, make a 2x2x2 if input structure is a 1 atom unit cell
+        for formula, formula_data in data.items():
+            for mpid, struc_dict in formula_data.items():
+                struc = StrucTools(struc_dict).structure
+                if len(struc) < 2:
+                    supercell = StrucTools(struc).make_supercell([2, 2, 2])
+                    data[formula][mpid] = supercell.as_dict()
 
     write_json(data, fjson)
     return read_json(fjson)
@@ -2025,7 +2022,7 @@ def make_sub_for_launcher():
     """
     flauncher_sub = os.path.join(os.getcwd(), "sub_launcher.sh")
     launch_job_name = "-".join([os.getcwd().split("/")[-2], "launcher"])
-    with open(flauncher_sub, "w", encoding='utf-8') as f:
+    with open(flauncher_sub, "w", encoding="utf-8") as f:
         f.write("#!/bin/bash -l\n")
         f.write("#SBATCH --nodes=1\n")
         f.write("#SBATCH --ntasks=32\n")
