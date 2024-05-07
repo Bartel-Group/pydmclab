@@ -115,7 +115,8 @@ class VASPSetUp(object):
                     user_configs[new_key].update(user_configs[old_key][xc_calc])
 
         # blend default configs with user_configs, giving user_configs priority
-        configs = {**self.default_configs, **user_configs}
+        default_configs = self.default_configs.copy()
+        configs = {**default_configs, **user_configs}
         return configs.copy()
 
     @property
