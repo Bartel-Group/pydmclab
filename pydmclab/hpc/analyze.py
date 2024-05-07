@@ -1406,7 +1406,7 @@ def _results_for_calc_dir(calc_dir, configs):
     """
     key = "--".join(calc_dir.split("/")[-4:])
     fjson = os.path.join(calc_dir, "results.json")
-    if os.path.exists(fjson):
+    if os.path.exists(fjson) and not configs["remake_results"]:
         result = read_json(fjson)
         return {key: result}
 
