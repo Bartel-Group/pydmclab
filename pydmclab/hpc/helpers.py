@@ -385,9 +385,13 @@ def get_analysis_configs(
 
         only_calc (bool or str):
             if str, only analyze this calc (eg 'static')
+            if list, only analyze these calculations (eg ['static','lobster'])
+            if None, analyze all calculations
 
         only_xc (bool or str):
             if str, only analyze this xc (eg 'gga')
+            if list, only analyze these xcs (eg ['gga','ggau'])
+            if None, analyze all xcs
 
         analyze_structure (bool):
             True to include structure in your results
