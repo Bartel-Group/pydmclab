@@ -243,7 +243,8 @@ class VASPSetUp(object):
 
                 # get a KPOINTS path but save original KPOINTS as KPOINTS_input
                 kpoints_input = os.path.join(calc_dir, "KPOINTS_input")
-                copyfile(kpoints, kpoints_input)
+                if os.path.exists(kpoints):
+                    copyfile(kpoints, kpoints_input)
                 try:
                     lobsterin.write_KPOINTS(
                         POSCAR_input=poscar,
