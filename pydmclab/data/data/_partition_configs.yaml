@@ -58,14 +58,14 @@ amdsmall:
   cores_per_node: 128
   sharing: True
   max_wall: 96:00:00
-  mem_per_core: 1GB
+  mem_per_core: 1.9GB
   max_nodes: 1
   proc: cpu
 amdlarge:
   cores_per_node: 128
   sharing: False
   max_wall: 96:00:00
-  mem_per_core: 1GB
+  mem_per_core: 1.9GB
   max_nodes: 32
   proc: cpu
 small:
@@ -100,14 +100,14 @@ msismall:
   cores_per_node: 128
   sharing: True
   max_wall: 96:00:00
-  mem_per_core: 1GB
+  mem_per_core: 1.9GB
   max_nodes: 1
   proc: cpu
 msilarge:
   cores_per_node: 128
   sharing: True
   max_wall: 24:00:00
-  mem_per_core: 1GB
+  mem_per_core: 1.9GB
   max_nodes: 32
   proc: cpu
 msigpu:
