@@ -58,7 +58,7 @@ class Passer(object):
         Returns:
             the structure of the current calculation
         """
-        return Poscar.from_file(self.calc_dir, "POSCAR")
+        return Poscar.from_file(os.path.join(self.calc_dir, "POSCAR"))
 
     @property
     def prev_xc_calc(self):
