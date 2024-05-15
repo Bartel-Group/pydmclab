@@ -303,7 +303,7 @@ class SubmitTools(object):
                 return "%s/vasp.6.4.1" % preamble
         elif machine == "bridges2":
             if version == 6:
-                return "/opt/packages/VASP/VASP6/6.3+VTST"
+                return "/opt/packages/VASP/VASP6/6.4.1/INTEL/vasp_std"
             else:
                 raise NotImplementedError("VASP < 6 not on Bridges?")
         else:
