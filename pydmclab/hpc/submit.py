@@ -670,7 +670,9 @@ class SubmitTools(object):
                         for module in load:
                             f.write("module load %s\n" % module)
                 elif configs["machine"] == "bridges2":
-                    f.write("module load intelmpi\nexport OMP_NUM_THREADS=1\n")
+                    f.write(
+                        "module load intelmpi/2021.3.0-intel2021.3.0\nexport OMP_NUM_THREADS=1\n"
+                    )
 
             for xc_calc in calc_list:
                 status = statuses[xc_calc]
