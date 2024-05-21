@@ -599,8 +599,6 @@ class VASPSetUp(object):
             incar_changes["NSW"] = prev_nsw + 100
         if "real_optlay" in errors:
             incar_changes["LREAL"] = False
-        if "bad_sym" in errors:
-            incar_changes["ISYM"] = -1
         if "amin" in errors:
             incar_changes["AMIN"] = 0.01
         if "pricel" in errors:
@@ -608,7 +606,7 @@ class VASPSetUp(object):
             incar_changes["ISYM"] = 0
         if "num_prob" in errors:
             incar_changes["ISMEAR"] = -1
-        if "sym_too_tight" in errors:
+        if ("sym_too_tight" in errors) or ("bad_sym" in errors):
             incar_changes["ISYM"] = -1
             if "SYMPREC" in curr_incar:
                 prev_symprec = curr_incar["SYMPREC"]
