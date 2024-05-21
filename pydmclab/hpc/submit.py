@@ -494,6 +494,7 @@ class SubmitTools(object):
                         contents = f_tmp.readlines()
                     if len(contents) > 0:
                         statuses[xc_calc] = "continue"
+                        copyfile(fcont_dst, fpos_dst)
                     else:
                         statuses[xc_calc] = "new"
                 else:
