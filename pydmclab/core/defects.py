@@ -63,7 +63,7 @@ class DefectStructures(object):
         self.how_many = how_many
         self.n_strucs = n_strucs
 
-    def vacancies(self, el_to_remove):
+    def vacancies(self, el_to_remove, algo_to_use=0):
         """
         Args:
             el_to_remove (str): element to remove
@@ -82,7 +82,7 @@ class DefectStructures(object):
         vacancy = st.change_occ_for_el(el_to_remove, {el_to_remove: x_el_defect})
         st = StrucTools(vacancy, ox_states=self.ox_states)
 
-        strucs = st.get_ordered_structures(n_strucs=self.n_strucs)
+        strucs = st.get_ordered_structures(algo=algo_to_use, n_strucs=self.n_strucs)
 
         return strucs
 
