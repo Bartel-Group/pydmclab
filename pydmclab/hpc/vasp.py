@@ -115,7 +115,8 @@ class VASPSetUp(object):
                     user_configs[new_key].update(user_configs[old_key][xc_calc])
 
         # blend default configs with user_configs, giving user_configs priority
-        configs = {**self.default_configs, **user_configs}
+        default_configs = self.default_configs.copy()
+        configs = {**default_configs, **user_configs}
         return configs.copy()
 
     @property
@@ -242,7 +243,8 @@ class VASPSetUp(object):
 
                 # get a KPOINTS path but save original KPOINTS as KPOINTS_input
                 kpoints_input = os.path.join(calc_dir, "KPOINTS_input")
-                copyfile(kpoints, kpoints_input)
+                if os.path.exists(kpoints):
+                    copyfile(kpoints, kpoints_input)
                 try:
                     lobsterin.write_KPOINTS(
                         POSCAR_input=poscar,
@@ -597,8 +599,6 @@ class VASPSetUp(object):
             incar_changes["NSW"] = prev_nsw + 100
         if "real_optlay" in errors:
             incar_changes["LREAL"] = False
-        if "bad_sym" in errors:
-            incar_changes["ISYM"] = -1
         if "amin" in errors:
             incar_changes["AMIN"] = 0.01
         if "pricel" in errors:
@@ -606,7 +606,7 @@ class VASPSetUp(object):
             incar_changes["ISYM"] = 0
         if "num_prob" in errors:
             incar_changes["ISMEAR"] = -1
-        if "sym_too_tight" in errors:
+        if ("sym_too_tight" in errors) or ("bad_sym" in errors):
             incar_changes["ISYM"] = -1
             if "SYMPREC" in curr_incar:
                 prev_symprec = curr_incar["SYMPREC"]

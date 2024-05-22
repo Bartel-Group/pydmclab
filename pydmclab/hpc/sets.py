@@ -148,11 +148,11 @@ class GetSet(object):
             new_settings["NELM"] = 40
 
         # relax --> need NSW
-        elif calc == "relax":
+        if calc == "relax":
             new_settings["NSW"] = 199
 
         # these three calcs are static --> turn off relaxation things
-        elif calc in [
+        if calc in [
             "static",
             "lobster",
             "parchg",
@@ -168,7 +168,7 @@ class GetSet(object):
             new_settings["LAECHG"] = True
 
         # for DFPT --> set explicit requirements
-        elif calc == "dfpt":
+        if calc == "dfpt":
             new_settings["IBRION"] = 7
             new_settings["ISYM"] = 2
             new_settings["ALGO"] = "Normal"
@@ -179,7 +179,7 @@ class GetSet(object):
             new_settings["NSW"] = 1
 
         # for finite displacements --> set explicit requirements
-        elif calc == "finite_displacements":
+        if calc == "finite_displacements":
             new_settings["IBRION"] = 2
             new_settings["ENCUT"] = 700
             new_settings["EDIFF"] = 1e-7
@@ -190,18 +190,18 @@ class GetSet(object):
             new_settings["LCHARG"] = False
 
         # for dielectric --> set explicit requirements
-        elif calc == "dielectric":
+        if calc == "dielectric":
             new_settings["LVTOT"] = True
             new_settings["LEPSILON"] = True
             new_settings["LOPTICS"] = True
             new_settings["IBRION"] = 8
 
         # make sure we have a WAVECAR to pass from relax --> static and from static --> other stuff (like PARCHG)
-        elif calc in ["relax", "static"]:
+        if calc in ["relax", "static"]:
             new_settings["LWAVE"] = True
 
         # for PARCHG --> set explicit requirements
-        elif calc == "parchg":
+        if calc == "parchg":
             new_settings["ISTART"] = 1
             new_settings["LPARD"] = True
             new_settings["LSEPB"] = False
@@ -213,7 +213,7 @@ class GetSet(object):
                 new_settings["EINT"] = "".join([str(v) for v in [-2.0, 0]])
 
         # for LOBSTER --> set explicit requirements
-        elif calc == "lobster":
+        if calc == "lobster":
             new_settings["ISTART"] = 0
             new_settings["LAECHG"] = True
             new_settings["ISYM"] = -1
@@ -223,7 +223,7 @@ class GetSet(object):
             new_settings["LWAVE"] = True
 
         # for HSE06 single point (static) --> set explicit requirements
-        elif calc == "sphse06":
+        if calc == "sphse06":
             calc_settings = {
                 "NSW": 0,
                 "ALGO": "Normal",
@@ -282,9 +282,9 @@ class GetSet(object):
             # turn off +U b/c our base set wants to use it
             if standard != "mp":
                 new_settings["LDAU"] = False
-        elif xc in ["metagga", "hse06"]:
+        if xc in ["metagga", "hse06"]:
             new_settings["LDAU"] = False
-        elif xc in ["ggau", "metaggau"]:
+        if xc in ["ggau", "metaggau"]:
             new_settings["LDAU"] = True
 
         # set +U related things; NOTE: assumes d electrons (ie doesn't work for f systems)
@@ -292,11 +292,14 @@ class GetSet(object):
             # note: need to pass U values as eg {'LDAUU' : {'Fe' : 5}}
             new_settings["LDAU"] = True
             new_settings["LDAUTYPE"] = 2
-            ldauu = user_passed_settings["LDAUU"]
-            ldaul = {el: 2 for el in ldauu}
-            ldauj = {el: 0 for el in ldauu}
-            new_settings["LDAUL"] = ldaul
-            new_settings["LDAUJ"] = ldauj
+            if "LDAUU" in user_passed_settings and (
+                isinstance(user_passed_settings["LDAUU"], dict)
+            ):
+                ldauu = user_passed_settings["LDAUU"]
+                ldaul = {el: 2 for el in ldauu}  # assumes d electrons
+                ldauj = {el: 0 for el in ldauu}
+                new_settings["LDAUL"] = ldaul
+                new_settings["LDAUJ"] = ldauj
 
         # if we asked for a KPOINTS file (grid, auto, etc), turn off KSPACING
         if user_passed_kpoints_settings:

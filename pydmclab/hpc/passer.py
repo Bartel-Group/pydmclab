@@ -4,7 +4,7 @@ import json
 from shutil import copyfile
 import numpy as np
 
-from pymatgen.io.vasp.inputs import Incar
+from pymatgen.io.vasp.inputs import Incar, Poscar
 from pymatgen.io.vasp.sets import get_structure_from_prev_run
 
 from pydmclab.hpc.analyze import AnalyzeVASP
@@ -51,6 +51,14 @@ class Passer(object):
         self.calc_dir = passer_dict["calc_dir"]
         self.incar_mods = passer_dict["incar_mods"]
         self.launch_dir = passer_dict["launch_dir"]
+
+    @property
+    def poscar(self):
+        """
+        Returns:
+            the structure of the current calculation
+        """
+        return Poscar.from_file(os.path.join(self.calc_dir, "POSCAR"))
 
     @property
     def prev_xc_calc(self):
@@ -363,8 +371,27 @@ class Passer(object):
                 incar[key] = value
 
         # apply our user-defined mods last to give them precedence
+        hubbard_keys = ["LDAUU", "LDAUJ", "LDAUL"]
         for key, value in user_incar_mods.items():
+            if key in hubbard_keys:
+                continue
             incar[key] = value
+
+        poscar = self.poscar
+        for key in hubbard_keys:
+            if key in user_incar_mods:
+                el_to_value = user_incar_mods[key]
+                if not el_to_value:
+                    continue
+
+                incar[key] = [
+                    (
+                        el_to_value.get(sym, 0)
+                        if isinstance(el_to_value.get(sym, 0), (float, int))
+                        else 0
+                    )
+                    for sym in poscar.site_symbols
+                ]
 
         # write to INCAR
         incar.write_file(os.path.join(self.calc_dir, "INCAR"))

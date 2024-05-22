@@ -1369,18 +1369,32 @@ class AnalyzeBatch(object):
         only_calc = configs["only_calc"]
 
         if only_xc:
-            calc_dirs = [
-                c
-                for c in calc_dirs
-                if self._key_for_calc_dir(c).split("--")[-1].split("-")[0] == only_xc
-            ]
+            if isinstance(only_xc, list):
+                calc_dirs = [
+                    c
+                    for c in calc_dirs
+                    if self._key_for_calc_dir(c).split("--")[-1].split("-")[0] in only_xc
+                ]
+            elif isinstance(only_xc, str):
+                calc_dirs = [
+                    c
+                    for c in calc_dirs
+                    if self._key_for_calc_dir(c).split("--")[-1].split("-")[0] == only_xc
+                ]
 
         if only_calc:
-            calc_dirs = [
-                c
-                for c in calc_dirs
-                if self._key_for_calc_dir(c).split("--")[-1].split("-")[1] == only_calc
-            ]
+            if isinstance(only_calc, list):
+                calc_dirs = [
+                    c
+                    for c in calc_dirs
+                    if self._key_for_calc_dir(c).split("--")[-1].split("-")[1] in only_calc
+                ]
+            elif isinstance(only_calc, str):
+                calc_dirs = [
+                    c
+                    for c in calc_dirs
+                    if self._key_for_calc_dir(c).split("--")[-1].split("-")[1] == only_calc
+                ]
 
         data = [_results_for_calc_dir(calc_dir, configs) for calc_dir in calc_dirs]
 
@@ -1406,7 +1420,7 @@ def _results_for_calc_dir(calc_dir, configs):
     """
     key = "--".join(calc_dir.split("/")[-4:])
     fjson = os.path.join(calc_dir, "results.json")
-    if os.path.exists(fjson):
+    if os.path.exists(fjson) and not configs["remake_results"]:
         result = read_json(fjson)
         return {key: result}
 

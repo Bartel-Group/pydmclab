@@ -303,7 +303,7 @@ class SubmitTools(object):
                 return "%s/vasp.6.4.1" % preamble
         elif machine == "bridges2":
             if version == 6:
-                return "/opt/packages/VASP/VASP6/6.3+VTST"
+                return "/opt/packages/VASP/VASP6/6.4.1/INTEL"
             else:
                 raise NotImplementedError("VASP < 6 not on Bridges?")
         else:
@@ -494,6 +494,7 @@ class SubmitTools(object):
                         contents = f_tmp.readlines()
                     if len(contents) > 0:
                         statuses[xc_calc] = "continue"
+                        copyfile(fcont_dst, fpos_dst)
                     else:
                         statuses[xc_calc] = "new"
                 else:
@@ -670,7 +671,9 @@ class SubmitTools(object):
                         for module in load:
                             f.write("module load %s\n" % module)
                 elif configs["machine"] == "bridges2":
-                    f.write("module load intelmpi\nexport OMP_NUM_THREADS=1\n")
+                    f.write(
+                        "module load intelmpi/2021.3.0-intel2021.3.0\nsource ~/.bashrc\nexport OMP_NUM_THREADS=1\n"
+                    )
 
             for xc_calc in calc_list:
                 status = statuses[xc_calc]
@@ -700,7 +703,7 @@ class SubmitTools(object):
                 configs["xc_to_run"] = xc_to_run
                 configs["calc_to_run"] = calc_to_run
                 vsu = VASPSetUp(calc_dir=calc_dir, user_configs=configs)
-                incar_mods = vsu.configs["incar_mods"]
+                incar_mods = vsu.configs["modify_this_incar"]
 
                 # get the info that must be read by the Passer between calcs
                 passer_dict = {

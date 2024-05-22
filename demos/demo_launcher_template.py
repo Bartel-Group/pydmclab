@@ -48,12 +48,16 @@ for d in [CALCS_DIR, DATA_DIR]:
     if not os.path.exists(d):
         os.makedirs(d)
 
+# set your username -- this will just be used to point to your local copies of the pydmclab repo
+#   assumed to be in /home/cbartel/<USER_NAME>/bin/
+USER_NAME = "cbartel"
+
+
 # copy our passer.py file to your scripts_dir
 #  if you want to use a custom passer, just set CUSTOM_PASSER = True and put your passer.py in the scripts dir
 #  this file handles passing data between calculations after they finish
 #  eg copying WAVECAR/CONTCAR, making INCAR changes based on magmoms, etc
 #  see pydmclab.hpc.passer
-USER_NAME = "cbartel"
 CUSTOM_PASSER = False
 if not CUSTOM_PASSER:
     copyfile(
