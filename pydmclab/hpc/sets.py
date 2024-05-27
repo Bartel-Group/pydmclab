@@ -235,6 +235,7 @@ class GetSet(object):
             #  note 6: ICORELEVEL setting is needed for Kumagai finite size correction scheme
             if "charged" in calc:
                 new_settings["NSW"] = 199
+                new_settings["LWAVE"] = True
                 new_settings["ISIF"] = 2
                 new_settings["ISYM"] = 0
                 new_settings["IBRION"] = 2
@@ -244,6 +245,7 @@ class GetSet(object):
                 # new_settings["ICORELEVEL"] = 0
             elif "neutral" in calc:
                 new_settings["NSW"] = 199
+                new_settings["LWAVE"] = True
                 new_settings["ISIF"] = 2
                 new_settings["ISYM"] = 0
                 new_settings["IBRION"] = 2
