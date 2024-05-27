@@ -222,6 +222,38 @@ class GetSet(object):
             new_settings["NSW"] = 0
             new_settings["LWAVE"] = True
 
+        # for charged defect calculations --> set explicit requirements
+        if "defect" in calc:
+            # notes for future reference/ potential changes
+            #  note 1: Doped recommends IBRION = 1 as an inital step and then switching to = 2 as...
+            #  needed, this could be implemented in vasp.py as an error correction if nsw_too_low occurs
+            #  note 2: if calculations run too slow, can set LREAL = Auto and ROPT = 1E-03 * n where...
+            #  n is the number of unique species present (i.e. unique species in the POSCAR)
+            #  note 3: Unsure at this time if NUPDOWN needs to be set
+            #  note 4: NELECT is set in passer.py
+            #  note 5: LVHAR setting is needed for Freysoldt finite size correction scheme
+            #  note 6: ICORELEVEL setting is needed for Kumagai finite size correction scheme
+            if "charged" in calc:
+                new_settings["NSW"] = 199
+                new_settings["ISIF"] = 2
+                new_settings["ISYM"] = 0
+                new_settings["IBRION"] = 2
+                new_settings["POTIM"] = 0.2
+                new_settings["LREAL"] = False
+                new_settings["LVHAR"] = True
+                # new_settings["ICORELEVEL"] = 0
+            elif "neutral" in calc:
+                new_settings["NSW"] = 199
+                new_settings["ISIF"] = 2
+                new_settings["ISYM"] = 0
+                new_settings["IBRION"] = 2
+                new_settings["POTIM"] = 0.2
+                new_settings["LREAL"] = False
+                new_settings["LVHAR"] = True
+                # new_settings["ICORELEVEL"] = 0
+            else:
+                raise ValueError("defect type not recognized")
+
         # for HSE06 single point (static) --> set explicit requirements
         if calc == "sphse06":
             calc_settings = {

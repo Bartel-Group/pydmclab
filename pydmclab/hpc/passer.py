@@ -7,7 +7,7 @@ import numpy as np
 from pymatgen.io.vasp.inputs import Incar, Poscar
 from pymatgen.io.vasp.sets import get_structure_from_prev_run
 
-from pydmclab.hpc.analyze import AnalyzeVASP
+from pydmclab.hpc.analyze import AnalyzeVASP, VASPOutputs
 from pydmclab.core.struc import StrucTools
 
 
@@ -85,6 +85,23 @@ class Passer(object):
         if curr_calc == "static":
             # static calcs inherit from relax
             prev_xc_calc = curr_xc_calc.replace(curr_calc, "relax")
+            return prev_xc_calc
+
+        if "defect_neutral" in curr_calc:
+            if curr_xc in ["gga", "ggau"]:
+                # setting dummy reference b/c nothing should come before gga-defect_neutral
+                prev_xc_calc = curr_xc_calc.replace(curr_calc, "pre_defect_neutral")
+            elif curr_xc == "metaggau":
+                # for metaggau, inherit from ggau
+                prev_xc_calc = curr_xc_calc.replace(curr_xc, "ggau")
+            else:
+                # for metagga or otherwise, inherit from gga if it exists
+                prev_xc_calc = curr_xc_calc.replace(curr_xc, "gga")
+            return prev_xc_calc
+
+        if "defect_charged" in curr_calc:
+            # charged defect calcs inherits from neutral defect
+            prev_xc_calc = curr_xc_calc.replace(curr_calc, "defect_neutral")
             return prev_xc_calc
 
         # everything else inherits from static
@@ -323,6 +340,40 @@ class Passer(object):
         return new_nbands
 
     @property
+    def charged_defects_based_incar_adjustments(self):
+        """ "
+        Returns:
+            a dictionary of INCAR adjustments based on relative charge state of defect
+                NELECT = NELECT of neutral defect structure - relative charge state
+        """
+
+        curr_xc_calc = self.xc_calc
+        neutral_calc_dir = self.prev_calc_dir
+
+        if "defect_charged" not in curr_xc_calc:
+            return
+
+        # get the charge state from xc-calculation name
+        charge_state = curr_xc_calc.split("-")[1].split("_")[-1]
+        sign, value = charge_state[0], charge_state[1]
+
+        # adjustment nelect based on charge state (p and m reference relative charge)
+        if sign == "p":
+            nelect_adj = -1 * value
+        elif sign == "m":
+            nelect_adj = value
+        else:
+            raise ValueError("Charge state must be designated by p or m")
+
+        # find number of electrons in parent neutral defect structure
+        neutral_nelect = VASPOutputs(neutral_calc_dir).all_input_settings["NELECT"]
+
+        # adjust number of electorn to create charged defect structure
+        charged_nelect = neutral_nelect + nelect_adj
+
+        return {"NELECT": charged_nelect}
+
+    @property
     def update_incar(self):
         """
         Returns: Nothing
@@ -353,6 +404,13 @@ class Passer(object):
             # update NBANDS if doing lobster
             nbands_based_incar_adjustments = self.nbands_based_incar_adjustments
             incar_adjustments.update(nbands_based_incar_adjustments)
+
+        if "defect_charged" in curr_xc_calc:
+            # update NELECT based on relative charge of defect
+            charged_defects_based_incar_adjustments = (
+                self.charged_defects_based_incar_adjustments
+            )
+            incar_adjustments.update(charged_defects_based_incar_adjustments)
 
         # make sure we don't override user-defined INCAR modifications
         user_incar_mods = self.incar_mods
