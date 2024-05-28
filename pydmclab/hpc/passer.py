@@ -95,12 +95,12 @@ class Passer(object):
                 # for metaggau, inherit from ggau
                 prev_xc_calc = curr_xc_calc.replace(curr_xc, "ggau")
             else:
-                # for metagga or otherwise, inherit from gga if it exists
+                # for metagga or otherwise, inherit from gga
                 prev_xc_calc = curr_xc_calc.replace(curr_xc, "gga")
             return prev_xc_calc
 
         if "defect_charged" in curr_calc:
-            # charged defect calcs inherits from neutral defect
+            # charged defect calc inherits from neutral defect
             prev_xc_calc = curr_xc_calc.replace(curr_calc, "defect_neutral")
             return prev_xc_calc
 
@@ -341,7 +341,7 @@ class Passer(object):
 
     @property
     def charged_defects_based_incar_adjustments(self):
-        """ "
+        """
         Returns:
             a dictionary of INCAR adjustments based on relative charge state of defect
                 NELECT = NELECT of neutral defect structure - relative charge state
@@ -359,9 +359,9 @@ class Passer(object):
 
         # adjustment nelect based on charge state (p and m reference relative charge)
         if sign == "p":
-            nelect_adj = -1 * value
+            nelect_adj = -1 * int(value)
         elif sign == "m":
-            nelect_adj = value
+            nelect_adj = int(value)
         else:
             raise ValueError("Charge state must be designated by p or m")
 
