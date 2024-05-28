@@ -91,17 +91,18 @@ class Passer(object):
             if curr_xc in ["gga", "ggau"]:
                 # setting dummy reference b/c nothing should come before gga-defect_neutral
                 prev_xc_calc = curr_xc_calc.replace(curr_calc, "pre_defect_neutral")
-            elif curr_xc == "metaggau":
-                # for metaggau, inherit from ggau
-                prev_xc_calc = curr_xc_calc.replace(curr_xc, "ggau")
             else:
-                # for metagga or otherwise, inherit from gga
+                # for metagga or otherwise, inherit from neutral gga
                 prev_xc_calc = curr_xc_calc.replace(curr_xc, "gga")
             return prev_xc_calc
 
         if "defect_charged" in curr_calc:
-            # charged defect calc inherits from neutral defect
-            prev_xc_calc = curr_xc_calc.replace(curr_calc, "defect_neutral")
+            if curr_xc in ["gga", "ggau"]:
+                # for gga/gga+u, inherit from neutral gga/gga+u
+                prev_xc_calc = curr_xc_calc.replace(curr_calc, "defect_neutral")
+            else:
+                # for metagga or otherwise, inherit from charged gga calculation
+                prev_xc_calc = curr_xc_calc.replace(curr_xc, "gga")
             return prev_xc_calc
 
         # everything else inherits from static
@@ -340,6 +341,24 @@ class Passer(object):
         return new_nbands
 
     @property
+    def neutral_calc_dir(self):
+        """
+        Returns:
+            calc_dir (str) for neutral defect calculation
+                take the current calc_dir and replace the current xc_calc with the neutral xc_calc
+        """
+
+        calc_dir = self.calc_dir
+        curr_xc_calc = self.xc_calc
+
+        if "ggau" in curr_xc_calc and "metaggau" not in curr_xc_calc:
+            neutral_xc_calc = "ggau-defect_neutral"
+        else:
+            neutral_xc_calc = "gga-defect_neutral"
+
+        return calc_dir.replace(curr_xc_calc, neutral_xc_calc)
+
+    @property
     def charged_defects_based_incar_adjustments(self):
         """
         Returns:
@@ -348,10 +367,10 @@ class Passer(object):
         """
 
         curr_xc_calc = self.xc_calc
-        neutral_calc_dir = self.prev_calc_dir
+        neutral_calc_dir = self.neutral_calc_dir
 
         if "defect_charged" not in curr_xc_calc:
-            return
+            return {}
 
         # get the charge state from xc-calculation name
         charge_state = curr_xc_calc.split("-")[1].split("_")[-1]

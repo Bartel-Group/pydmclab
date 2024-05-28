@@ -224,35 +224,30 @@ class GetSet(object):
 
         # for charged defect calculations --> set explicit requirements
         if "defect" in calc:
+
             # notes for future reference/ potential changes
             #  note 1: Doped recommends IBRION = 1 as an inital step and then switching to = 2 as...
-            #  needed, this could be implemented in vasp.py as an error correction if nsw_too_low occurs
-            #  note 2: if calculations run too slow, can set LREAL = Auto and ROPT = 1E-03 * n where...
-            #  n is the number of unique species present (i.e. unique species in the POSCAR)
+            #    needed, this could be implemented in vasp.py as an error correction if nsw_too_low occurs
+            #  note 2: NELECT is set in passer.py
             #  note 3: Unsure at this time if NUPDOWN needs to be set
-            #  note 4: NELECT is set in passer.py
-            #  note 5: LVHAR setting is needed for Freysoldt finite size correction scheme
-            #  note 6: ICORELEVEL setting is needed for Kumagai finite size correction scheme
+            #  note 4: LVHAR setting is needed for Freysoldt finite size correction scheme
+            #  note 5: ICORELEVEL setting is needed for Kumagai finite size correction scheme (= 0 is default...
+            #    saw = 0 is recommended in Doped video tutorial, but need to check Doped to see if correct)
+
+            new_settings["NSW"] = 199
+            new_settings["LWAVE"] = True
+            new_settings["ISIF"] = 2
+            new_settings["ISYM"] = 0
+            new_settings["IBRION"] = 2
+            new_settings["POTIM"] = 0.2
+            new_settings["LREAL"] = False
+            new_settings["LVHAR"] = True
+            # new_settings["ICORELEVEL"] = 0
+
             if "charged" in calc:
-                new_settings["NSW"] = 199
-                new_settings["LWAVE"] = True
-                new_settings["ISIF"] = 2
-                new_settings["ISYM"] = 0
-                new_settings["IBRION"] = 2
-                new_settings["POTIM"] = 0.2
-                new_settings["LREAL"] = False
-                new_settings["LVHAR"] = True
-                # new_settings["ICORELEVEL"] = 0
+                pass
             elif "neutral" in calc:
-                new_settings["NSW"] = 199
-                new_settings["LWAVE"] = True
-                new_settings["ISIF"] = 2
-                new_settings["ISYM"] = 0
-                new_settings["IBRION"] = 2
-                new_settings["POTIM"] = 0.2
-                new_settings["LREAL"] = False
-                new_settings["LVHAR"] = True
-                # new_settings["ICORELEVEL"] = 0
+                pass
             else:
                 raise ValueError("defect type not recognized")
 
