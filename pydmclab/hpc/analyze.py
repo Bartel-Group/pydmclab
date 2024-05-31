@@ -1373,13 +1373,15 @@ class AnalyzeBatch(object):
                 calc_dirs = [
                     c
                     for c in calc_dirs
-                    if self._key_for_calc_dir(c).split("--")[-1].split("-")[0] in only_xc
+                    if self._key_for_calc_dir(c).split("--")[-1].split("-")[0]
+                    in only_xc
                 ]
             elif isinstance(only_xc, str):
                 calc_dirs = [
                     c
                     for c in calc_dirs
-                    if self._key_for_calc_dir(c).split("--")[-1].split("-")[0] == only_xc
+                    if self._key_for_calc_dir(c).split("--")[-1].split("-")[0]
+                    == only_xc
                 ]
 
         if only_calc:
@@ -1387,13 +1389,15 @@ class AnalyzeBatch(object):
                 calc_dirs = [
                     c
                     for c in calc_dirs
-                    if self._key_for_calc_dir(c).split("--")[-1].split("-")[1] in only_calc
+                    if self._key_for_calc_dir(c).split("--")[-1].split("-")[1]
+                    in only_calc
                 ]
             elif isinstance(only_calc, str):
                 calc_dirs = [
                     c
                     for c in calc_dirs
-                    if self._key_for_calc_dir(c).split("--")[-1].split("-")[1] == only_calc
+                    if self._key_for_calc_dir(c).split("--")[-1].split("-")[1]
+                    == only_calc
                 ]
 
         data = [_results_for_calc_dir(calc_dir, configs) for calc_dir in calc_dirs]
@@ -1440,10 +1444,10 @@ def _results_for_calc_dir(calc_dir, configs):
         configs["include_pcobi"] = False
         configs["include_tdos"] = False
         configs["include_pdos"] = False
-    if calc != "static":
-        configs["include_mag"] = False
-        configs["include_entry"] = False
-        configs["include_structure"] = False
+    # if calc != "static":
+    #     configs["include_mag"] = False
+    #     configs["include_entry"] = False
+    #     configs["include_structure"] = False
 
     verbose = configs["verbose"]
     include_meta = configs["include_metadata"]
