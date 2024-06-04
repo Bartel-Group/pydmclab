@@ -390,7 +390,7 @@ class Passer(object):
         # adjust number of electorn to create charged defect structure
         charged_nelect = neutral_nelect + nelect_adj
 
-        return {"NELECT": charged_nelect}
+        return {"NELECT": int(charged_nelect)}
 
     @property
     def update_incar(self):
