@@ -1696,6 +1696,8 @@ def get_dos_results(
         calc = results[key]["meta"]["setup"]["calc"]
         if calc not in ["lobster", "bs"]:
             continue
+        if not results[key]["results"]["convergence"]:
+            continue
         ID = "__".join(
             [
                 results[key]["meta"]["setup"]["formula_indicator"],
