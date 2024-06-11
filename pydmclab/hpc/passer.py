@@ -183,7 +183,8 @@ class Passer(object):
         fsrc = os.path.join(src_dir, "WAVECAR")
         if os.path.exists(fsrc):
             copyfile(fsrc, os.path.join(dst_dir, "WAVECAR"))
-        return "copied wavecar"
+            return "copied wavecar"
+        return None
 
     @property
     def prev_gap(self):
@@ -349,6 +350,7 @@ class Passer(object):
 
             Writes new INCAR to file
         """
+
         # get bandgap related adjustments if relevant (ISMEAR, SIGMA, KSPACING)
         bandgap_based_incar_adjustments = self.bandgap_based_incar_adjustments
 
@@ -372,6 +374,10 @@ class Passer(object):
             # update NBANDS if doing lobster
             nbands_based_incar_adjustments = self.nbands_based_incar_adjustments
             incar_adjustments.update(nbands_based_incar_adjustments)
+
+        was_wavecar_copied = self.copy_wavecar
+        if was_wavecar_copied:
+            incar_adjustments["ISTART"] = 1
 
         # make sure we don't override user-defined INCAR modifications
         user_incar_mods = self.incar_mods
@@ -436,7 +442,7 @@ class Passer(object):
         copy files + update INCAR
         """
         self.copy_contcar_to_poscar
-        self.copy_wavecar
+        # self.copy_wavecar
         self.update_incar
         self.pass_kpoints_for_lobster
         return "completed pass"
