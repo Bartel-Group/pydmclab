@@ -124,6 +124,7 @@ class ChemPots(object):
             if (standard == "dmc") or (functional in ["scan", "r2scan"]):
                 # use DMC data
                 all_mus = mus_at_0K()
+                all_mus = all_mus["standard"]
                 els = sorted(list(all_mus[functional].keys()))
                 mus = {el: all_mus[functional][el]["mu"] for el in els}
             else:
