@@ -438,6 +438,7 @@ class Passer(object):
         self.copy_contcar_to_poscar
         self.copy_wavecar
         self.update_incar
+        self.pass_kpoints_for_lobster
         return "completed pass"
 
 
