@@ -237,9 +237,14 @@ class Passer(object):
             a dictionary of INCAR adjustments based on band gap
                 KSPACING, ISMEAR, SIGMA
         """
+        curr_xc_calc = self.xc_calc
+
         # if no parent bandgap can't be found, just stick to defaults
         bandgap_label = self.bandgap_label
         if not bandgap_label:
+            return {}
+
+        if "lobster" in curr_xc_calc:
             return {}
 
         adjustments = {}
