@@ -581,6 +581,9 @@ class SubmitTools(object):
             True if no need to run collector
             False if need to run collector
         """
+        xc, calc = xc_calc.split("-")
+        if calc in ["prelobster"]:
+            return True
         configs = self.configs.copy()
         launch_dir = self.launch_dir
         calc_dir = os.path.join(launch_dir, xc_calc)
