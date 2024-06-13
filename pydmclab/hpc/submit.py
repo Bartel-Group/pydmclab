@@ -202,8 +202,7 @@ class SubmitTools(object):
             xc, calc = xc_calc.split("-")
             if calc in ["lobster", "bs"]:
                 final_calcs.append("-".join([xc, "prelobster"]))
-            else:
-                final_calcs.append(xc_calc)
+            final_calcs.append(xc_calc)
 
         return final_calcs
 
