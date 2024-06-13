@@ -15,6 +15,7 @@ from doped.utils.symmetry import (
     get_clean_structure,
 )
 from pydmclab.core.struc import StrucTools
+from shakenbreak.input import Distortions
 
 
 class GenerateMostDefects(object):
@@ -135,9 +136,23 @@ class GenerateMostDefects(object):
         for defect_name, defect_struc in all_defects_as_dict["defect_entries"].items():
             all_defective_strucs[defect_name] = StrucTools(
                 defect_struc.defect_supercell
-            ).structure_as_dict
+            ).structure
 
         return all_defective_strucs
+
+    @property
+    def get_bulk_supercell(self):
+        """
+        Returns:
+            bulk_supercell (pymatgen Structure object)
+                supercell of the pristine structure
+        """
+
+        all_defects_as_dict = self.to_dict
+
+        bulk_supercell = StrucTools(all_defects_as_dict["bulk_supercell"]).structure
+
+        return bulk_supercell
 
     def add_charge_states(self, defect_entry_name, charge_states):
         """
@@ -241,7 +256,7 @@ class SupercellForDefects(object):
     def make_supercell(self):
         """
         Returns:
-            supercell (pymargen Structure object)
+            supercell (pymatgen Structure object)
             saves supercell as .cif if savename given (defaults to saving in current directory)
         """
 
@@ -255,11 +270,11 @@ class SupercellForDefects(object):
             ideal_threshold=self.ideal_threshold,
             pbar=self.pbar,
         )
-        self.sc_structure = unitcell * ideal_supercell_grid
+        new_sc_structure = unitcell * ideal_supercell_grid
 
         print(
             "The minimum image distance of the generated supercell structure is: %.2f Å \n"
-            % (self.curr_min_image_distance)
+            % (self.curr_min_image_distance(new_sc_structure))
         )
 
         print("The supercell grid in terms of the input structure is:")
@@ -268,18 +283,19 @@ class SupercellForDefects(object):
         print(
             "\nThe supercell grid generated in terms of the deterministic primitive structure is:"
         )
-        rot_prim_struc, prim_supercell_grid = self.find_primitive_structure_grid
+        rot_prim_struc, prim_supercell_grid = self.find_primitive_structure_grid(
+            new_sc_structure
+        )
         print(prim_supercell_grid)
 
         if self.savename:
-            StrucTools(self.sc_structure).structure_to_cif(
+            StrucTools(new_sc_structure).structure_to_cif(
                 filename=self.savename, data_dir=self.data_dir
             )
 
-        return self.sc_structure
+        return new_sc_structure
 
-    @property
-    def curr_min_image_distance(self):
+    def curr_min_image_distance(self, sc_structure=None):
         """
         Returns:
             minimum image distance for the current structure (float)
@@ -287,10 +303,12 @@ class SupercellForDefects(object):
                 or if make_supercell has been run, it will be the supercell structure
         """
 
-        return get_min_image_distance(self.sc_structure)
+        if not sc_structure:
+            sc_structure = self.sc_structure
 
-    @property
-    def find_primitive_structure(self):
+        return get_min_image_distance(sc_structure)
+
+    def find_primitive_structure(self, sc_structure=None):
         """
         Returns:
             primitive structure associated with input and/ or supercell (pymatgen Structure object)
@@ -298,8 +316,11 @@ class SupercellForDefects(object):
                 chosen when there are multiple primitive structures possible (see https://github.com/SMTG-Bham/doped/blob/main/doped/utils/symmetry.py)
         """
 
+        if not sc_structure:
+            sc_structure = self.sc_structure
+
         # initializes SpacegroupAnalyzer object
-        struc_as_sga = SpacegroupAnalyzer(self.sc_structure, symprec=0.01)
+        struc_as_sga = SpacegroupAnalyzer(sc_structure, symprec=0.01)
 
         # find deterministic primitive structure
         try:
@@ -311,20 +332,22 @@ class SupercellForDefects(object):
 
         return primitive_struc
 
-    @property
-    def find_primitive_structure_grid(self):
+    def find_primitive_structure_grid(self, sc_structure=None):
         """
         Returns:
             rotated primitive structure (pymatgen Structure object)
-                note: it may or may not rotate to to find the transformation
+                note: it may or may not rotate the initial input structure to to find the transformation
             find supercell transformation in terms of the primitive structure (np array)
         """
+
+        if not sc_structure:
+            sc_structure = self.sc_structure
 
         # the following directly follows from doped (see init for DefectsGenerator)
 
         rotated_primitive_structure, primitive_supercell_matrix = (
             _get_supercell_matrix_and_possibly_rotate_prim(
-                self.find_primitive_structure, self.sc_structure
+                self.find_primitive_structure(sc_structure), sc_structure
             )
         )
 
@@ -343,19 +366,110 @@ class SupercellForDefects(object):
 
 class ShakeStrucs(object):
     """
-    Purpose: wrapper for ShakeNBreak
+    Purpose: wrapper for ShakeNBreak NEED TO ADD MORE HERE
     """
 
-    def __init__(self):
+    def __init__(
+        self,
+        defect_strucs,
+        bulk_struc,
+        oxidation_states=None,
+        padding=0,
+        num_of_electrons=None,
+        distortion_increment=0.1,
+        bond_distortions=None,
+        local_rattle=False,
+        distorted_elements=None,
+        distorted_atoms=None,
+        mc_rattle_kwargs=None,
+    ):
+        """
+        need to add
+        """
+        if mc_rattle_kwargs is None:
+            mc_rattle_kwargs = {}
 
-        return None
+        distortions = Distortions.from_structures(
+            defect_strucs,
+            bulk_struc,
+            oxidation_states=oxidation_states,
+            padding=padding,
+            dict_number_electrons_user=num_of_electrons,
+            distortion_increment=distortion_increment,
+            bond_distortions=bond_distortions,
+            local_rattle=local_rattle,
+            distorted_elements=distorted_elements,
+            distorted_atoms=distorted_atoms,
+            **mc_rattle_kwargs,
+        )
+
+        self.distortions = distortions
+
+        self.defects_dict = {}
+        self.distortion_metadata = {}
+
+    @property
+    def shake_n_break(self):
+        """
+        need to add
+        """
+
+        defects_dict, distortion_metadata = self.distortions.apply_distortions()
+
+        return defects_dict, distortion_metadata
+
+    @property
+    def get_shaken_strucs_info_as_dict(self):
+        """
+        need to add
+        """
+
+        shake_n_break_results = self.shake_n_break
+
+        return shake_n_break_results[0]
+
+    @property
+    def get_shaken_struc_metadata_as_dict(self):
+        """
+        need to add
+        """
+
+        shake_n_break_results = self.shake_n_break
+
+        return shake_n_break_results[1]
+
+    @property
+    def get_shaken_strucs(self):
+        """
+        need to add
+        """
+
+        shaken_strucs_as_dict = self.get_shaken_strucs_info_as_dict
+
+        shaken_strucs_summary = {}
+        for defect_struc_name, all_shaken_struc_info in shaken_strucs_as_dict.items():
+            for defect_struc_charge, charged_struc in all_shaken_struc_info[
+                "charges"
+            ].items():
+                for perturbed_struc_name, perturbed_struc in charged_struc[
+                    "structures"
+                ]["distortions"].items():
+                    shaken_strucs_summary[
+                        defect_struc_name
+                        + "_"
+                        + str(defect_struc_charge)
+                        + "_"
+                        + perturbed_struc_name
+                    ] = perturbed_struc
+
+        return shaken_strucs_summary
 
 
 def main():
 
-    # from pydmclab.utils.handy import read_json
+    from pydmclab.utils.handy import read_json
 
-    # testing GenerateMostDefects
+    # testing GenerateMostDefects --> need to check still
     # data_dir = "/Users/lanne056/Documents/AJ-Research/local-scripts/MOx-redox-local/data/AlN_testing"
     # strucs = read_json(os.path.join(data_dir, "struc.json"))
     # AlN_struc_dict = strucs["Al1N1"]["mp-661"]
@@ -364,19 +478,33 @@ def main():
     # AlN_defects.remove_charge_states("Al_N", [6, 5])
     # AlN_defect_strucs = AlN_defects.get_all_defective_supercells
 
-    # testing SupercellForDefects
+    # testing SupercellForDefects --> need to edit slightly
     # data_dir = "/Users/lanne056/Documents/AJ-Research/local-scripts/MOx-redox-local/data/AlN_testing"
     # strucs = read_json(os.path.join(data_dir, "struc.json"))
     # AlN_struc_dict = strucs["Al1N1"]["mp-661"]
     # AlN_supercell = SupercellForDefects(AlN_struc_dict)
-    # print(AlN_supercell.curr_min_image_distance)
+    # print(AlN_supercell.curr_min_image_distance())
     # AlN_supercell_struc = AlN_supercell.make_supercell
-    # print(AlN_supercell.curr_min_image_distance)
+    # print(AlN_supercell.curr_min_image_distance())
     # StrucTools(AlN_supercell_struc).amts
     # AlN_primitive = AlN_supercell.find_primitive_structure
     # StrucTools(AlN_primitive).amts
     # rot_prim, prim_grid = SupercellForDefects(AlN_primitive).find_primitive_structure_grid
     # print(prim_grid)
+
+    # testing ShakeStrucs --> code below should execute without issue
+    # data_dir = "/Users/lanne056/Documents/AJ-Research/local-scripts/MOx-redox-local/data/AlN_testing"
+    # strucs = read_json(os.path.join(data_dir, "struc.json"))
+    # AlN_struc_dict = strucs["Al1N1"]["mp-661"]
+    # AlN_defects = GenerateMostDefects(AlN_struc_dict)
+    # AlN_defect_strucs = AlN_defects.get_all_defective_supercells
+    # AlN_pristine = AlN_defects.get_bulk_supercell
+    # AlN_defect_v_Al_m3 = AlN_defect_strucs["v_Al_-3"]
+    # AlN_shaking_v_Al = ShakeStrucs(AlN_defect_v_Al_m3,AlN_pristine)
+    # AlN_shaken_strucs_v_Al = AlN_shaking_v_Al.get_shaken_strucs
+    # AlN_defect_v_N_p3 = AlN_defect_strucs["v_N_+3"]
+    # AlN_shaking_v_N = ShakeStrucs(AlN_defect_v_N_p3,AlN_pristine)
+    # AlN_shaken_strucs_v_N = AlN_shaking_v_N.get_shaken_strucs
 
     return
 

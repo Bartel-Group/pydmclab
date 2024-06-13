@@ -309,15 +309,18 @@ class SubmitTools(object):
         else:
             raise NotImplementedError('dont have VASP path for machine "%s"' % machine)
 
-    @property
-    def vasp_command(self):
+    def vasp_command(self, calc_to_run):
         """
         Returns command used to execute vasp (str)
             e.g., 'srun -n 24 PATH_TO_VASP/vasp_std > vasp.o' (if mpi_command == 'srun')
             e.g., 'mpirun -np 24 PATH_TO_VASP/vasp_std > vasp.o' (if mpi_command == 'mpirun')
         """
         configs = self.configs.copy()
-        vasp_exec = os.path.join(self.vasp_dir, configs["vasp"])
+
+        if "1kpt" in calc_to_run:
+            vasp_exec = os.path.join(self.vasp_dir, "vasp_gam")
+        else:
+            vasp_exec = os.path.join(self.vasp_dir, configs["vasp"])
 
         if configs["mpi_command"] == "srun":
             return "\n%s --ntasks=%s --mpi=pmi2 %s > %s\n" % (
@@ -730,7 +733,7 @@ class SubmitTools(object):
 
                 # (presuming we didn't cancel the job) go to calc_dir and run VASP
                 f.write("cd %s\n" % calc_dir)
-                f.write(self.vasp_command)
+                f.write(self.vasp_command(calc_to_run))
 
                 # run lobster for certain static-addons
                 if calc_to_run in ["lobster", "bs"]:

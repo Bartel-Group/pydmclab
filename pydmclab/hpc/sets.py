@@ -140,12 +140,16 @@ class GetSet(object):
         # work on the calc type
 
         # loose --> choose light settings
-        if calc == "loose":
+        if "loose" in calc:
             new_settings["ENCUT"] = 400
             new_settings["ENAUG"] = 800
             new_settings["ISIF"] = 3
             new_settings["EDIFF"] = 1e-5
             new_settings["NELM"] = 40
+
+        # PLACEHOLDER for gamma point calcs (any reason for loose vs 1kpt distinction?)
+        if "1kpt" in calc:
+            pass
 
         # relax --> need NSW
         if calc == "relax":
@@ -231,8 +235,7 @@ class GetSet(object):
             #  note 2: NELECT is set in passer.py
             #  note 3: Unsure at this time if NUPDOWN needs to be set
             #  note 4: LVHAR setting is needed for Freysoldt finite size correction scheme
-            #  note 5: ICORELEVEL setting is needed for Kumagai finite size correction scheme (= 0 is default...
-            #    saw = 0 is recommended in Doped video tutorial, but need to check Doped to see if correct)
+            #  note 5: ICORELEVEL setting is needed for Kumagai finite size correction scheme
 
             new_settings["NSW"] = 199
             new_settings["LWAVE"] = True
@@ -242,7 +245,7 @@ class GetSet(object):
             new_settings["POTIM"] = 0.2
             new_settings["LREAL"] = False
             new_settings["LVHAR"] = True
-            # new_settings["ICORELEVEL"] = 0
+            new_settings["ICORELEVEL"] = 0
 
             if "charged" in calc:
                 pass
@@ -366,6 +369,12 @@ class GetSet(object):
             new_settings["reciprocal_density"] = self.configs[
                 "reciprocal_kpoints_density_for_lobster"
             ]
+
+        if "loose" in calc:
+            new_settings["grid"] = [1, 1, 1]
+
+        if "1kpt" in calc:
+            new_settings["grid"] = [1, 1, 1]
 
         for setting, value in user_passed_settings.items():
             new_settings[setting] = value

@@ -341,22 +341,39 @@ class Passer(object):
         return new_nbands
 
     @property
-    def neutral_calc_dir(self):
+    def nelect_from_neutral_calc_dir(self):
         """
         Returns:
-            calc_dir (str) for neutral defect calculation
-                take the current calc_dir and replace the current xc_calc with the neutral xc_calc
+            number of electrons in neutral defect structure
         """
 
-        calc_dir = self.calc_dir
-        curr_xc_calc = self.xc_calc
+        # get list of neutral defect directories
+        neutral_calc_dirs = [
+            c for c in self.calc_list if c.split("-")[1] == "defect_neutral"
+        ]
 
-        if "ggau" in curr_xc_calc and "metaggau" not in curr_xc_calc:
-            neutral_xc_calc = "ggau-defect_neutral"
+        # if there is at least one neutral defect directory, use the first one
+        # otherwise, raise an error
+        if neutral_calc_dirs[0]:
+            neutral_calc_dir = neutral_calc_dirs[0]
         else:
-            neutral_xc_calc = "gga-defect_neutral"
+            raise ValueError("No defect_neutral directory found in calc_list")
 
-        return calc_dir.replace(curr_xc_calc, neutral_xc_calc)
+        # check if the neutral defect directory exists
+        if not os.path.exists(neutral_calc_dir):
+            raise ValueError(
+                "Referenced neutral defect calculation directory not found"
+            )
+
+        # get all input settings from neutral defect directory
+        all_input_settings = VASPOutputs(neutral_calc_dir).all_input_settings
+
+        # if NELECT is not found in the input settings, raise an error
+        if "NELECT" not in all_input_settings:
+            raise ValueError("NELECT not found in neutral defect directory")
+
+        # return the number of electrons in the neutral defect structure
+        return all_input_settings["NELECT"]
 
     @property
     def charged_defects_based_incar_adjustments(self):
@@ -367,13 +384,12 @@ class Passer(object):
         """
 
         curr_xc_calc = self.xc_calc
-        neutral_calc_dir = self.neutral_calc_dir
 
         if "defect_charged" not in curr_xc_calc:
             return {}
 
         # get the charge state from xc-calculation name
-        charge_state = curr_xc_calc.split("-")[1].split("_")[-1]
+        charge_state = curr_xc_calc.split("-")[1].split("_")[2]
         sign, value = charge_state[0], charge_state[1]
 
         # adjustment nelect based on charge state (p and m reference relative charge)
@@ -385,7 +401,7 @@ class Passer(object):
             raise ValueError("Charge state must be designated by p or m")
 
         # find number of electrons in parent neutral defect structure
-        neutral_nelect = VASPOutputs(neutral_calc_dir).all_input_settings["NELECT"]
+        neutral_nelect = self.nelect_from_neutral_calc_dir
 
         # adjust number of electorn to create charged defect structure
         charged_nelect = neutral_nelect + nelect_adj

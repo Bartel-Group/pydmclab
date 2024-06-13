@@ -228,6 +228,7 @@ def get_sub_configs(
     machine="msi",
     mpi_command="mpirun",
     vasp_version=6,
+    vasp_type="vasp_std",
 ):
     """
 
@@ -284,6 +285,9 @@ def get_sub_configs(
         vasp_version (int):
             5 for 5.4.4 or 6 for 6.4.1
 
+        vasp_type (str):
+            vasp_std for all but gamma point calc (vasp_gam)
+
     Returns:
         {config_name : config_value}
 
@@ -313,6 +317,7 @@ def get_sub_configs(
     sub_configs["static_addons"] = static_addons
     sub_configs["machine"] = machine
     sub_configs["vasp_version"] = vasp_version
+    sub_configs["vasp"] = vasp_type
 
     if prioritize_relaxes:
         sub_configs["run_static_addons_before_all_relaxes"] = False
@@ -1354,7 +1359,7 @@ def get_gs(
     results,
     include_structure=False,
     non_default_functional=None,
-    calc_type=("static",),
+    calc_types=("static",),
     compute_Ef=True,
     standard="dmc",
     data_dir=os.getcwd().replace("scripts", "data"),
@@ -1403,33 +1408,15 @@ def get_gs(
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
 
-    calc_types_to_search = calc_type
-
     results = {
         key: results[key]
         for key in results
-        if results[key]["meta"]["setup"]["calc"] in calc_type
+        if results[key]["meta"]["setup"]["calc"] in calc_types
     }
 
-    gs = {
-        calc_type: {
-            xc: {}
-            for xc in sorted(
-                list(
-                    set(
-                        [
-                            results[key]["meta"]["setup"]["xc"]
-                            for key in results
-                            if results[key]["meta"]["setup"]["calc"] == calc_type
-                        ]
-                    )
-                )
-            )
-        }
-        for calc_type in sorted(
-            list(set([results[key]["meta"]["setup"]["calc"] for key in results]))
-        )
-    }
+    xcs = sorted(list(set([results[key]["meta"]["setup"]["xc"] for key in results])))
+
+    gs = {calc_type: {xc: {} for xc in xcs} for calc_type in calc_types}
 
     for calc_type in gs:
         for xc in gs[calc_type]:
@@ -1491,7 +1478,7 @@ def get_gs(
                         Ef = None
                     gs[calc_type][xc][formula]["Ef"] = Ef
 
-    if calc_types_to_search in (("static",), "static", ["static"]):
+    if calc_types in (("static",), "static", ["static"]):
         gs = gs["static"]
 
     write_json(gs, fjson)
@@ -1525,21 +1512,21 @@ def check_gs(gs):
         xcs = list(gs[calc_type].keys())
         print("  calc_type = %s" % calc_type)
         for xc in xcs:
-            print("  xc = %s" % xc)
+            print("    xc = %s" % xc)
             formulas = list(gs[calc_type][xc].keys())
             n_formulas = len(formulas)
             n_formulas_complete = len(
                 [k for k in formulas if gs[calc_type][xc][k]["complete"]]
             )
             print(
-                "    %i/%i formulas with all calculations completed"
+                "      %i/%i formulas with all calculations completed"
                 % (n_formulas_complete, n_formulas)
             )
             for formula in gs[calc_type][xc]:
                 if "Ef" in gs[calc_type][xc][formula]:
                     if gs[calc_type][xc][formula]["Ef"]:
                         print(
-                            "    %s : Ef = %.2f eV/at"
+                            "      %s : Ef = %.2f eV/at"
                             % (formula, gs[calc_type][xc][formula]["Ef"])
                         )
 
