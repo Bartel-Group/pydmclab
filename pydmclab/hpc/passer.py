@@ -331,7 +331,8 @@ class Passer(object):
         if "lobster" not in self.xc_calc:
             return None
 
-        prev_calc_dir = self.prev_calc_dir
+        calc_dir = self.calc_dir
+        prev_calc_dir = calc_dir.replace("-lobster", "-prelobster")
         if not os.path.exists(prev_calc_dir):
             return None
 
@@ -442,8 +443,7 @@ class Passer(object):
         copy files + update INCAR
         """
         self.copy_contcar_to_poscar
-        # self.copy_wavecar
-        self.update_incar
+        self.update_incar  # this also copies wavecar
         self.pass_kpoints_for_lobster
         return "completed pass"
 
