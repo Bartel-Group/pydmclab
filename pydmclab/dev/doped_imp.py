@@ -5,16 +5,17 @@ pip install doped
 import os
 import numpy as np
 
+from pydmclab.core.struc import StrucTools
+from pydmclab.core.comp import CompTools
+
 from doped.generation import DefectsGenerator, get_ideal_supercell_matrix
 from doped.utils.supercells import get_min_image_distance
-from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from doped.utils.symmetry import (
     get_primitive_structure,
     _get_supercell_matrix_and_possibly_rotate_prim,
     get_clean_structure,
 )
-from pydmclab.core.struc import StrucTools
-from pydmclab.core.comp import CompTools
+from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from shakenbreak.input import Distortions
 
 
