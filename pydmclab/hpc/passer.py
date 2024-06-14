@@ -105,6 +105,13 @@ class Passer(object):
                 prev_xc_calc = curr_xc_calc.replace(curr_xc, "gga")
             return prev_xc_calc
 
+        if "1kpt" in curr_calc:
+            if curr_xc in ["gga", "ggau"]:
+                # dummy reference b/c nothing should come before gga-1kpt
+                prev_xc_calc = curr_xc_calc.replace(curr_calc, "pre_1kpt")
+            # for metagga or otherwise, inherit from 1kpt gga
+            prev_xc_calc = curr_xc_calc.replace(curr_xc, "gga")
+
         # everything else inherits from static
         return curr_xc_calc.replace(curr_calc, "static")
 
@@ -347,14 +354,16 @@ class Passer(object):
             number of electrons in neutral defect structure
         """
 
+        calc_list = self.calc_list
+
         # get list of neutral defect directories
         neutral_calc_dirs = [
-            c for c in self.calc_list if c.split("-")[1] == "defect_neutral"
+            c for c in calc_list if c.split("-")[1] == "defect_neutral"
         ]
 
         # if there is at least one neutral defect directory, use the first one
         # otherwise, raise an error
-        if neutral_calc_dirs[0]:
+        if neutral_calc_dirs:
             neutral_calc_dir = neutral_calc_dirs[0]
         else:
             raise ValueError("No defect_neutral directory found in calc_list")
@@ -378,6 +387,13 @@ class Passer(object):
     @property
     def charged_defects_based_incar_adjustments(self):
         """
+        Method will be called when the calc name include "defect_charged"
+
+        A calc name of the form "xc-calculation_modifiers" is expected where
+        the charge state of the defect is the first modifier
+
+        For example, "gga-defect_charged_p1_1kpt_loose" is acceptable
+
         Returns:
             a dictionary of INCAR adjustments based on relative charge state of defect
                 NELECT = NELECT of neutral defect structure - relative charge state
@@ -442,10 +458,7 @@ class Passer(object):
 
         if "defect_charged" in curr_xc_calc:
             # update NELECT based on relative charge of defect
-            charged_defects_based_incar_adjustments = (
-                self.charged_defects_based_incar_adjustments
-            )
-            incar_adjustments.update(charged_defects_based_incar_adjustments)
+            incar_adjustments.update(self.charged_defects_based_incar_adjustments)
 
         # make sure we don't override user-defined INCAR modifications
         user_incar_mods = self.incar_mods

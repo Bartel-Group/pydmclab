@@ -228,7 +228,6 @@ def get_sub_configs(
     machine="msi",
     mpi_command="mpirun",
     vasp_version=6,
-    vasp_type="vasp_std",
 ):
     """
 
@@ -285,9 +284,6 @@ def get_sub_configs(
         vasp_version (int):
             5 for 5.4.4 or 6 for 6.4.1
 
-        vasp_type (str):
-            vasp_std for all but gamma point calc (vasp_gam)
-
     Returns:
         {config_name : config_value}
 
@@ -317,7 +313,6 @@ def get_sub_configs(
     sub_configs["static_addons"] = static_addons
     sub_configs["machine"] = machine
     sub_configs["vasp_version"] = vasp_version
-    sub_configs["vasp"] = vasp_type
 
     if prioritize_relaxes:
         sub_configs["run_static_addons_before_all_relaxes"] = False
@@ -1359,11 +1354,11 @@ def get_gs(
     results,
     include_structure=False,
     non_default_functional=None,
-    calc_types=("static",),
+    calc_types_to_search=("static",),
     compute_Ef=True,
     standard="dmc",
     data_dir=os.getcwd().replace("scripts", "data"),
-    savename="gs.json",
+    savename="new_gs.json",
     remake=False,
 ):
     """
@@ -1378,7 +1373,7 @@ def get_gs(
         non_default_functional (str)
             if you're not using r2SCAN or PBE
 
-        calc_type (tuple)
+        calc_types_to_search (tuple)
             tuple of calculation types to include, e.g., ("static", "defect_neutral, "defect_charged_p1")
 
         compute_Ef (bool)
@@ -1394,15 +1389,27 @@ def get_gs(
             write (True) or just read (False) fjson
 
     Returns:
-        {xc (str, the exchange-correlation method) :
-            {formula (str) :
-                {'E' : energy of the ground-structure,
-                'key' : formula--ID--mag--xc-calc for the ground-state structure,
-                'structure' : structure of the ground-state structure,
-                'n_started' : how many polymorphs you tried to calculate,
-                'n_converged' : how many polymorphs are converged,
-                'complete' : True if n_converged = n_started (i.e., all structures for this formula at this xc are done),
-                'Ef' : formation enthalpy at 0 K}
+        for "static" only:
+            {xc (str, the exchange-correlation method) :
+                {formula (str) :
+                    {'E' : energy of the ground-structure,
+                    'key' : formula--ID--mag--xc-calc for the ground-state structure,
+                    'structure' : structure of the ground-state structure,
+                    'n_started' : how many polymorphs you tried to calculate,
+                    'n_converged' : how many polymorphs are converged,
+                    'complete' : True if n_converged = n_started (i.e., all structures for this formula at this xc are done),
+                    'Ef' : formation enthalpy at 0 K}}}
+        otherwise:
+            {calc_type (str, [static, defect_neutral, ...]) :
+                {xc (str, the exchange-correlation method) :
+                    {formula (str) :
+                        {'E' : energy of the ground-structure,
+                        'key' : formula--ID--mag--xc-calc for the ground-state structure,
+                        'structure' : structure of the ground-state structure,
+                        'n_started' : how many polymorphs you tried to calculate,
+                        'n_converged' : how many polymorphs are converged,
+                        'complete' : True if n_converged = n_started (i.e., all structures for this formula at this xc are done),
+                        'Ef' : formation enthalpy at 0 K}}}}
     """
     fjson = os.path.join(data_dir, savename)
     if os.path.exists(fjson) and not remake:
@@ -1411,12 +1418,29 @@ def get_gs(
     results = {
         key: results[key]
         for key in results
-        if results[key]["meta"]["setup"]["calc"] in calc_types
+        if results[key]["meta"]["setup"]["calc"] in calc_types_to_search
     }
 
-    xcs = sorted(list(set([results[key]["meta"]["setup"]["xc"] for key in results])))
+    calc_types = sorted(
+        list(set([results[key]["meta"]["setup"]["calc"] for key in results]))
+    )
 
-    gs = {calc_type: {xc: {} for xc in xcs} for calc_type in calc_types}
+    gs = {}
+    for calc_type in calc_types:
+        gs[calc_type] = {
+            xc: {}
+            for xc in sorted(
+                list(
+                    set(
+                        [
+                            results[key]["meta"]["setup"]["xc"]
+                            for key in results
+                            if results[key]["meta"]["setup"]["calc"] == calc_type
+                        ]
+                    )
+                )
+            )
+        }
 
     for calc_type in gs:
         for xc in gs[calc_type]:
@@ -1478,7 +1502,7 @@ def get_gs(
                         Ef = None
                     gs[calc_type][xc][formula]["Ef"] = Ef
 
-    if calc_types in (("static",), "static", ["static"]):
+    if calc_types_to_search in (("static",), "static", ["static"]):
         gs = gs["static"]
 
     write_json(gs, fjson)

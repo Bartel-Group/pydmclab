@@ -147,10 +147,6 @@ class GetSet(object):
             new_settings["EDIFF"] = 1e-5
             new_settings["NELM"] = 40
 
-        # PLACEHOLDER for gamma point calcs (any reason for loose vs 1kpt distinction?)
-        if "1kpt" in calc:
-            pass
-
         # relax --> need NSW
         if calc == "relax":
             new_settings["NSW"] = 199
@@ -369,9 +365,6 @@ class GetSet(object):
             new_settings["reciprocal_density"] = self.configs[
                 "reciprocal_kpoints_density_for_lobster"
             ]
-
-        if "loose" in calc:
-            new_settings["grid"] = [1, 1, 1]
 
         if "1kpt" in calc:
             new_settings["grid"] = [1, 1, 1]

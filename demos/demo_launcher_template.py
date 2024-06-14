@@ -114,7 +114,6 @@ SUB_CONFIGS = get_sub_configs(
     machine="msi",
     mpi_command="mpirun",
     vasp_version=6,
-    vasp_type="vasp_std",
 )
 
 # any configurations related to SLURM (job execution on compute nodes)
