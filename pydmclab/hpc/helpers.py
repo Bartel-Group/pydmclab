@@ -228,6 +228,7 @@ def get_sub_configs(
     machine="msi",
     mpi_command="mpirun",
     vasp_version=6,
+    struc_src_for_hse="metagga-relax",
 ):
     """
 
