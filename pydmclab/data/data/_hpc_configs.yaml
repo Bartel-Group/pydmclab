@@ -73,6 +73,8 @@ execute_flags: ['srun', 'python', 'bin/lobster', 'bin/vasp', 'bader', 'mpirun']
 
 n_procs_for_submission: 1 # how many cores to parallelize the submission part of the launcher on
 
+struc_src_for_hse: # which structure to use for hse06 calculations. eg 'metagga-relax' 
+
 
 
 ###################### SLURM_CONFIGS ############################

@@ -43,6 +43,8 @@ class Passer(object):
                 a dictionary of user-defined INCAR modifications that apply to the recipient of the passing
             launch_dir (str):
                 the directory from which the job was launched
+            struc_src_for_hse (str):
+                the source of the structure for hse calculations (eg "metagga-relax")
         """
         passer_dict = json.loads(passer_dict_as_str)
 
@@ -51,6 +53,7 @@ class Passer(object):
         self.calc_dir = passer_dict["calc_dir"]
         self.incar_mods = passer_dict["incar_mods"]
         self.launch_dir = passer_dict["launch_dir"]
+        self.struc_src_for_hse = passer_dict["struc_src_for_hse"]
 
     @property
     def poscar(self):
@@ -67,6 +70,7 @@ class Passer(object):
             the parent xc_calc (eg 'gga-relax') that should pass stuff to the present xc_calc (eg 'gga-static)
         """
         curr_xc_calc = self.xc_calc
+        struc_src_for_hse = self.struc_src_for_hse
         curr_xc, curr_calc = curr_xc_calc.split("-")
         if curr_calc == "loose":
             # just setting some dummy thing b/c nothing should come before loose
@@ -85,6 +89,14 @@ class Passer(object):
         if curr_calc == "static":
             # static calcs inherit from relax
             prev_xc_calc = curr_xc_calc.replace(curr_calc, "relax")
+            return prev_xc_calc
+        
+        if curr_xc_calc in ["hse06-preggastatic"]:
+            prev_xc_calc = struc_src_for_hse
+            return prev_xc_calc
+        
+        if curr_xc_calc in ["hse06-prelobster", "hse06-lobster"]:
+            prev_xc_calc = curr_xc_calc.replace(curr_calc, "preggastatic")
             return prev_xc_calc
 
         # everything else inherits from static
@@ -152,6 +164,7 @@ class Passer(object):
                     return "copied contcar from current calc"
                 else:
                     return None
+                
         src_dir = self.prev_calc_dir
         dst_dir = self.calc_dir
         fsrc = os.path.join(src_dir, "CONTCAR")
@@ -176,10 +189,10 @@ class Passer(object):
         # don't pass WAVECAR for these calcs
         # if curr_calc in ["relax"]:
         #    return None
-
+        
         src_dir = self.prev_calc_dir
         dst_dir = self.calc_dir
-
+        
         fsrc = os.path.join(src_dir, "WAVECAR")
         if os.path.exists(fsrc):
             copyfile(fsrc, os.path.join(dst_dir, "WAVECAR"))

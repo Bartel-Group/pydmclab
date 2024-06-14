@@ -196,7 +196,10 @@ class SubmitTools(object):
             for xc in xcs:
                 if xc in static_addons:
                     calcs += ["-".join([xc, calc]) for calc in static_addons[xc]]
-
+        if "hse06" not in relaxation_xcs and "hse06" in static_addons[xc]:
+            # if we're running hse06 addons but not hse06 relaxations and statics
+            calcs += ["-".join(["hse06", "preggastatic"])]
+        
         final_calcs = []
         for xc_calc in calcs:
             xc, calc = xc_calc.split("-")
@@ -727,6 +730,7 @@ class SubmitTools(object):
                     "calc_dir": calc_dir,
                     "incar_mods": incar_mods,
                     "launch_dir": launch_dir,
+                    "struc_src_for_hse": configs["struc_src_for_hse"],
                 }
                 passer_dict_as_str = json.dumps(passer_dict)
 
