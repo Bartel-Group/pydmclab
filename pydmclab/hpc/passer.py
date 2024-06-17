@@ -460,6 +460,10 @@ class Passer(object):
             # update NELECT based on relative charge of defect
             incar_adjustments.update(self.charged_defects_based_incar_adjustments)
 
+        if "1kpt" in curr_xc_calc:
+            # use ISMEAR = 0 to avoid NKPT < 4 error associated with ISMEAR = -5
+            incar_adjustments["ISMEAR"] = 0
+
         # make sure we don't override user-defined INCAR modifications
         user_incar_mods = self.incar_mods
         if user_incar_mods is None:
