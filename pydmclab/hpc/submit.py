@@ -730,7 +730,7 @@ class SubmitTools(object):
 
                 # (presuming we didn't cancel the job) go to calc_dir and run VASP
                 f.write("cd %s\n" % calc_dir)
-                f.write(self.vasp_command(calc_to_run))
+                f.write(self.vasp_command)
 
                 # run lobster for certain static-addons
                 if calc_to_run in ["lobster", "bs"]:

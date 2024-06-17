@@ -98,19 +98,18 @@ class Passer(object):
 
         if "defect_charged" in curr_calc:
             if curr_xc in ["gga", "ggau"]:
-                # for gga/gga+u, inherit from neutral gga/gga+u
-                prev_xc_calc = curr_xc_calc.replace(curr_calc, "defect_neutral")
+                if "1kpt" in curr_calc:
+                    # for gga/gga_u, inherit from 1kpt gga/gga+u
+                    prev_xc_calc = curr_xc_calc.replace(
+                        curr_calc, "defect_neutral_1kpt"
+                    )
+                else:
+                    # for gga/gga+u, inherit from neutral gga/gga+u
+                    prev_xc_calc = curr_xc_calc.replace(curr_calc, "defect_neutral")
             else:
                 # for metagga or otherwise, inherit from charged gga calculation
                 prev_xc_calc = curr_xc_calc.replace(curr_xc, "gga")
             return prev_xc_calc
-
-        if "1kpt" in curr_calc:
-            if curr_xc in ["gga", "ggau"]:
-                # dummy reference b/c nothing should come before gga-1kpt
-                prev_xc_calc = curr_xc_calc.replace(curr_calc, "pre_1kpt")
-            # for metagga or otherwise, inherit from 1kpt gga
-            prev_xc_calc = curr_xc_calc.replace(curr_xc, "gga")
 
         # everything else inherits from static
         return curr_xc_calc.replace(curr_calc, "static")
