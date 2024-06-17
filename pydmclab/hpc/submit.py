@@ -196,7 +196,7 @@ class SubmitTools(object):
             for xc in xcs:
                 if xc in static_addons:
                     calcs += ["-".join([xc, calc]) for calc in static_addons[xc]]
-        if "hse06" not in relaxation_xcs and "hse06" in static_addons[xc]:
+        if ("hse06" not in relaxation_xcs) and ("hse06" in static_addons):
             # if we're running hse06 addons but not hse06 relaxations and statics
             calcs += ["-".join(["hse06", "preggastatic"])]
         
