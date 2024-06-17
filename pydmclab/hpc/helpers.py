@@ -1517,6 +1517,9 @@ def check_gs(gs):
 
     print("\nchecking ground-states")
 
+    if gs == {}:
+        return
+
     calc_types_or_xcs = list(gs.keys())
 
     static_gs_only = not any(

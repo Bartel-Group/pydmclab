@@ -335,7 +335,12 @@ def main():
         check_results(results)
 
     # get smaller dataset just for your calculated ground-state entries at each composition
-    gs = get_gs(results=results, data_dir=DATA_DIR, remake=remake_gs)
+    gs = get_gs(
+        results=results,
+        calc_types_to_search=("static",),
+        data_dir=DATA_DIR,
+        remake=remake_gs,
+    )
 
     if print_gs_check:
         check_gs(gs)
