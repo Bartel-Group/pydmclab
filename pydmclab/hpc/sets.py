@@ -88,6 +88,7 @@ class GetSet(object):
         Returns VaspSet (ie which MP set do we want to customize from)
         """
         xc = self.xc
+        calc = self.calc
 
         if xc in ["gga", "ggau"]:
             # start from MP relax for GGA or GGA+U
@@ -96,8 +97,12 @@ class GetSet(object):
             # start from MP Scan for metaGGA or metaGGA+U
             return MPScanRelaxSet
         elif xc in ["hse06"]:
-            # start fom MP HSE for HSE06
-            return MPHSERelaxSet
+            if calc in ["preggastatic"]:
+                # start fom MP HSE for HSE06
+                return MPRelaxSet
+            else: 
+                # start fom MP HSE for HSE06
+                return MPHSERelaxSet
         else:
             raise NotImplementedError(f"xc: {xc} not implemented")
 
