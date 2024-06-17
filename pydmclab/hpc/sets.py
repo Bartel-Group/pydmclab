@@ -282,7 +282,7 @@ class GetSet(object):
             else:
                 new_settings["METAGGA"] = functional[xc]
 
-        if xc in ["gga", "ggau"]:
+        if xc in ["gga", "ggau"] or calc == "preggastatic":
             functional = self.configs["functional"]
             # PBE is default
             if not functional:
@@ -290,7 +290,7 @@ class GetSet(object):
             else:
                 new_settings["GGA"] = functional[xc]
 
-        if xc == "gga":
+        if xc == "gga" or calc == "preggastatic":
             # turn off +U b/c our base set wants to use it
             if standard != "mp":
                 new_settings["LDAU"] = False
