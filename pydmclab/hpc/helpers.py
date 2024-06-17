@@ -314,6 +314,7 @@ def get_sub_configs(
     sub_configs["static_addons"] = static_addons
     sub_configs["machine"] = machine
     sub_configs["vasp_version"] = vasp_version
+    sub_configs["struc_src_for_hse"] = struc_src_for_hse
 
     if prioritize_relaxes:
         sub_configs["run_static_addons_before_all_relaxes"] = False
