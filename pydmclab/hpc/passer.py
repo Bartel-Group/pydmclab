@@ -353,28 +353,29 @@ class Passer(object):
             number of electrons in neutral defect structure
         """
 
+        calc_dir = self.calc_dir
+        curr_xc_calc = self.xc_calc
         calc_list = self.calc_list
 
         # get list of neutral defect directories
-        neutral_calc_dirs = [
-            c for c in calc_list if c.split("-")[1] == "defect_neutral"
-        ]
+        neutral_xc_calcs = [c for c in calc_list if "defect_neutral" in c.split("-")[1]]
 
         # if there is at least one neutral defect directory, use the first one
         # otherwise, raise an error
-        if neutral_calc_dirs:
-            neutral_calc_dir = neutral_calc_dirs[0]
+        if neutral_xc_calcs:
+            neutral_xc_calc = neutral_xc_calcs[0]
+            neutral_dir = calc_dir.replace(curr_xc_calc, neutral_xc_calc)
         else:
             raise ValueError("No defect_neutral directory found in calc_list")
 
         # check if the neutral defect directory exists
-        if not os.path.exists(neutral_calc_dir):
+        if not os.path.exists(neutral_dir):
             raise ValueError(
                 "Referenced neutral defect calculation directory not found"
             )
 
         # get all input settings from neutral defect directory
-        all_input_settings = VASPOutputs(neutral_calc_dir).all_input_settings
+        all_input_settings = VASPOutputs(neutral_dir).all_input_settings
 
         # if NELECT is not found in the input settings, raise an error
         if "NELECT" not in all_input_settings:
