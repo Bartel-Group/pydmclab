@@ -209,7 +209,7 @@ class GetSet(object):
             new_settings["IBRION"] = 8
 
         # make sure we have a WAVECAR to pass from relax --> static and from static --> other stuff (like PARCHG)
-        if calc in ["relax", "static"]:
+        if calc in ["relax", "static", "preggastatic"]:
             new_settings["LWAVE"] = True
 
         # for PARCHG --> set explicit requirements
