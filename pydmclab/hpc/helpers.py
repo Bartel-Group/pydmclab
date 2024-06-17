@@ -1358,7 +1358,7 @@ def get_gs(
     compute_Ef=True,
     standard="dmc",
     data_dir=os.getcwd().replace("scripts", "data"),
-    savename="new_gs.json",
+    savename="gs.json",
     remake=False,
 ):
     """
