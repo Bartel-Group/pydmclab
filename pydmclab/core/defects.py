@@ -92,9 +92,9 @@ class SupercellForDefects(object):
             saves supercell as .cif if savename given (defaults to saving in current directory)
         """
 
-        unitcell = self.sc_structure
+        primitive_cell = self.find_primitive_structure()
         ideal_supercell_grid = get_ideal_supercell_matrix(
-            unitcell,
+            primitive_cell,
             min_image_distance=self.min_image_distance,
             min_atoms=self.min_atoms,
             force_cubic=self.force_cubic,
@@ -102,23 +102,17 @@ class SupercellForDefects(object):
             ideal_threshold=self.ideal_threshold,
             pbar=self.pbar,
         )
-        new_sc_structure = unitcell * ideal_supercell_grid
+        new_sc_structure = primitive_cell * ideal_supercell_grid
 
         print(
             "The minimum image distance of the generated supercell structure is: %.2f Å \n"
             % (self.curr_min_image_distance(new_sc_structure))
         )
 
-        print("The supercell grid in terms of the input structure is:")
-        print(ideal_supercell_grid)
-
         print(
-            "\nThe supercell grid generated in terms of the deterministic primitive structure is:"
+            "The supercell grid in terms of the deterministic primitive structure is:"
         )
-        rot_prim_struc, prim_supercell_grid = self.find_primitive_structure_grid(
-            new_sc_structure
-        )
-        print(prim_supercell_grid)
+        print(ideal_supercell_grid)
 
         if self.savename:
             StrucTools(new_sc_structure).structure_to_cif(
