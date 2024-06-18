@@ -1354,6 +1354,7 @@ def get_gs(
     results,
     include_structure=False,
     non_default_functional=None,
+    calc_types_to_search=("static",),
     compute_Ef=True,
     standard="dmc",
     data_dir=os.getcwd().replace("scripts", "data"),
@@ -1372,6 +1373,9 @@ def get_gs(
         non_default_functional (str)
             if you're not using r2SCAN or PBE
 
+        calc_types_to_search (tuple)
+            tuple of calculation types to include, e.g., ("static", "defect_neutral, "defect_charged_p1")
+
         compute_Ef (bool)
             if True, compute formation enthalpy
 
@@ -1385,15 +1389,27 @@ def get_gs(
             write (True) or just read (False) fjson
 
     Returns:
-        {xc (str, the exchange-correlation method) :
-            {formula (str) :
-                {'E' : energy of the ground-structure,
-                'key' : formula--ID--mag--xc-calc for the ground-state structure,
-                'structure' : structure of the ground-state structure,
-                'n_started' : how many polymorphs you tried to calculate,
-                'n_converged' : how many polymorphs are converged,
-                'complete' : True if n_converged = n_started (i.e., all structures for this formula at this xc are done),
-                'Ef' : formation enthalpy at 0 K}
+        for "static" only:
+            {xc (str, the exchange-correlation method) :
+                {formula (str) :
+                    {'E' : energy of the ground-structure,
+                    'key' : formula--ID--mag--xc-calc for the ground-state structure,
+                    'structure' : structure of the ground-state structure,
+                    'n_started' : how many polymorphs you tried to calculate,
+                    'n_converged' : how many polymorphs are converged,
+                    'complete' : True if n_converged = n_started (i.e., all structures for this formula at this xc are done),
+                    'Ef' : formation enthalpy at 0 K}}}
+        otherwise:
+            {calc_type (str, [static, defect_neutral, ...]) :
+                {xc (str, the exchange-correlation method) :
+                    {formula (str) :
+                        {'E' : energy of the ground-structure,
+                        'key' : formula--ID--mag--xc-calc for the ground-state structure,
+                        'structure' : structure of the ground-state structure,
+                        'n_started' : how many polymorphs you tried to calculate,
+                        'n_converged' : how many polymorphs are converged,
+                        'complete' : True if n_converged = n_started (i.e., all structures for this formula at this xc are done),
+                        'Ef' : formation enthalpy at 0 K}}}}
     """
     fjson = os.path.join(data_dir, savename)
     if os.path.exists(fjson) and not remake:
@@ -1402,67 +1418,93 @@ def get_gs(
     results = {
         key: results[key]
         for key in results
-        if results[key]["meta"]["setup"]["calc"] == "static"
+        if results[key]["meta"]["setup"]["calc"] in calc_types_to_search
     }
 
-    gs = {
-        xc: {}
-        for xc in sorted(
-            list(set([results[key]["meta"]["setup"]["xc"] for key in results]))
-        )
-    }
+    calc_types = sorted(
+        list(set([results[key]["meta"]["setup"]["calc"] for key in results]))
+    )
 
-    for xc in gs:
-        keys = [
-            k
-            for k in results
-            if results[k]["meta"]["setup"]["xc"] == xc
-            if results[k]["results"]["formula"]
-        ]
+    gs = {}
+    for calc_type in calc_types:
+        gs[calc_type] = {
+            xc: {}
+            for xc in sorted(
+                list(
+                    set(
+                        [
+                            results[key]["meta"]["setup"]["xc"]
+                            for key in results
+                            if results[key]["meta"]["setup"]["calc"] == calc_type
+                        ]
+                    )
+                )
+            )
+        }
 
-        unique_formulas = sorted(
-            list(set([results[key]["results"]["formula"] for key in keys]))
-        )
-        for formula in unique_formulas:
-            gs[xc][formula] = {}
-            formula_keys = [
-                k for k in keys if results[k]["results"]["formula"] == formula
+    for calc_type in gs:
+        for xc in gs[calc_type]:
+            keys = [
+                k
+                for k in results
+                if results[k]["meta"]["setup"]["calc"] == calc_type
+                if results[k]["meta"]["setup"]["xc"] == xc
+                if results[k]["results"]["formula"]
             ]
-            converged_keys = [
-                k for k in formula_keys if results[k]["results"]["convergence"]
-            ]
-            if not converged_keys:
-                gs_energy, gs_structure, gs_key = None, None, None
-            else:
-                energies = [results[k]["results"]["E_per_at"] for k in converged_keys]
-                gs_energy = min(energies)
-                gs_key = converged_keys[energies.index(gs_energy)]
-                gs_structure = results[gs_key]["structure"]
-            complete = True if len(formula_keys) == len(converged_keys) else False
-            gs[xc][formula] = {
-                "E": gs_energy,
-                "key": gs_key,
-                "n_started": len(formula_keys),
-                "n_converged": len(converged_keys),
-                "complete": complete,
-            }
-            if include_structure:
-                gs[xc][formula]["structure"] = gs_structure
+
+            unique_formulas = sorted(
+                list(set([results[key]["results"]["formula"] for key in keys]))
+            )
+            for formula in unique_formulas:
+                gs[calc_type][xc][formula] = {}
+                formula_keys = [
+                    k for k in keys if results[k]["results"]["formula"] == formula
+                ]
+                converged_keys = [
+                    k for k in formula_keys if results[k]["results"]["convergence"]
+                ]
+                if not converged_keys:
+                    gs_energy, gs_structure, gs_key = None, None, None
+                else:
+                    energies = [
+                        results[k]["results"]["E_per_at"] for k in converged_keys
+                    ]
+                    gs_energy = min(energies)
+                    gs_key = converged_keys[energies.index(gs_energy)]
+                    if include_structure:
+                        gs_structure = results[gs_key]["structure"]
+                complete = True if len(formula_keys) == len(converged_keys) else False
+                gs[calc_type][xc][formula] = {
+                    "E": gs_energy,
+                    "key": gs_key,
+                    "n_started": len(formula_keys),
+                    "n_converged": len(converged_keys),
+                    "complete": complete,
+                }
+                if include_structure:
+                    gs[calc_type][xc][formula]["structure"] = gs_structure
 
     if compute_Ef:
-        for xc in gs:
-            if not non_default_functional:
-                functional = "r2scan" if xc == "metagga" else "pbe"
-            else:
-                functional = non_default_functional
-            mus = ChemPots(functional=functional, standard=standard).chempots
-            for formula in gs[xc]:
-                E = gs[xc][formula]["E"]
-                if E:
-                    Ef = FormationEnthalpy(formula=formula, E_DFT=E, chempots=mus).Ef
+        for calc_type in gs:
+            for xc in gs[calc_type]:
+                if not non_default_functional:
+                    functional = "r2scan" if xc == "metagga" else "pbe"
                 else:
-                    Ef = None
-                gs[xc][formula]["Ef"] = Ef
+                    functional = non_default_functional
+                mus = ChemPots(functional=functional, standard=standard).chempots
+                for formula in gs[calc_type][xc]:
+                    E = gs[calc_type][xc][formula]["E"]
+                    if E:
+                        Ef = FormationEnthalpy(
+                            formula=formula, E_DFT=E, chempots=mus
+                        ).Ef
+                    else:
+                        Ef = None
+                    gs[calc_type][xc][formula]["Ef"] = Ef
+
+    if calc_types_to_search in (("static",), "static", ["static"]):
+        gs = gs["static"]
+
     write_json(gs, fjson)
     return read_json(fjson)
 
@@ -1474,20 +1516,46 @@ def check_gs(gs):
     """
 
     print("\nchecking ground-states")
-    xcs = list(gs.keys())
-    for xc in xcs:
-        print("  xc = %s" % xc)
-        formulas = list(gs[xc].keys())
-        n_formulas = len(formulas)
-        n_formulas_complete = len([k for k in formulas if gs[xc][k]["complete"]])
-        print(
-            "%i/%i formulas with all calculations completed"
-            % (n_formulas_complete, n_formulas)
-        )
-        for formula in gs[xc]:
-            if "Ef" in gs[xc][formula]:
-                if gs[xc][formula]["Ef"]:
-                    print("%s : Ef = %.2f eV/at" % (formula, gs[xc][formula]["Ef"]))
+
+    if gs == {}:
+        return
+
+    calc_types_or_xcs = list(gs.keys())
+
+    static_gs_only = not any(
+        isinstance(gs[calc_type_or_xc][xc_or_formula][formula_or_info], dict)
+        for calc_type_or_xc in calc_types_or_xcs
+        for xc_or_formula in gs[calc_type_or_xc]
+        for formula_or_info in gs[calc_type_or_xc][xc_or_formula]
+    )
+
+    if static_gs_only:
+        gs = {"static": gs}
+        calc_types = ["static"]
+    else:
+        calc_types = calc_types_or_xcs
+
+    for calc_type in calc_types:
+        xcs = list(gs[calc_type].keys())
+        print("  calc_type = %s" % calc_type)
+        for xc in xcs:
+            print("    xc = %s" % xc)
+            formulas = list(gs[calc_type][xc].keys())
+            n_formulas = len(formulas)
+            n_formulas_complete = len(
+                [k for k in formulas if gs[calc_type][xc][k]["complete"]]
+            )
+            print(
+                "      %i/%i formulas with all calculations completed"
+                % (n_formulas_complete, n_formulas)
+            )
+            for formula in gs[calc_type][xc]:
+                if "Ef" in gs[calc_type][xc][formula]:
+                    if gs[calc_type][xc][formula]["Ef"]:
+                        print(
+                            "      %s : Ef = %.2f eV/at"
+                            % (formula, gs[calc_type][xc][formula]["Ef"])
+                        )
 
 
 def get_thermo_results(
