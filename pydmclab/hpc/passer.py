@@ -360,7 +360,29 @@ class Passer(object):
         if os.path.exists(prev_ibz):
             copyfile(prev_ibz, curr_kpt)
             return "copied IBZKPT from prev calc"
+    
+    ##### NEW STUFF 6/18 #####
+    @property
+    def pass_kpoints_from_preggastatic_to_prelobster(self):
+        """
+        Passes preggastatic's IBZKPT to prelobster's KPOINTS
+        """
+        if "preggastatic" not in self.xc_calc:
+            return None
+        if "prelobster" not in self.xc_calc:
+            return None
 
+        calc_dir = self.calc_dir
+        prev_calc_dir = self.prev_calc_dir
+
+        prev_ibz = os.path.join(prev_calc_dir, "IBZKPT")
+        curr_kpt = os.path.join(calc_dir, "KPOINTS")
+
+        if os.path.exists(prev_ibz):
+            copyfile(prev_ibz, curr_kpt)
+            return "copied IBZKPT from prev calc"
+    ##### NEW STUFF 6/18 #####
+    
     @property
     def update_incar(self):
         """
@@ -463,6 +485,12 @@ class Passer(object):
         self.copy_contcar_to_poscar
         self.update_incar  # this also copies wavecar
         self.pass_kpoints_for_lobster
+        
+        ##### NEW STUFF 6/18 #####
+        xc_calc = self.xc_calc
+        if xc_calc == "hse06-prelobster":
+            self.pass_kpoints_from_preggastatic_to_prelobster
+        ##### NEW STUFF 6/18 #####
         return "completed pass"
 
 

@@ -159,7 +159,6 @@ class GetSet(object):
         # these three calcs are static --> turn off relaxation things
         if calc in [
             "static",
-            "preggastatic",
             "prelobster",
             "lobster",
             "parchg",
@@ -209,7 +208,7 @@ class GetSet(object):
             new_settings["IBRION"] = 8
 
         # make sure we have a WAVECAR to pass from relax --> static and from static --> other stuff (like PARCHG)
-        if calc in ["relax", "static", "preggastatic"]:
+        if calc in ["relax", "static"]:
             new_settings["LWAVE"] = True
 
         # for PARCHG --> set explicit requirements
@@ -253,6 +252,20 @@ class GetSet(object):
             for setting, value in calc_settings.items():
                 new_settings[setting] = value
 
+        # for preggastatic --> set explicit requirements
+        if calc == "preggastatic":
+            new_settings["LWAVE"] = True
+            new_settings["LDAU"] = False
+            new_settings["NSW"] = 0
+            new_settings["ISIF"] = None
+            new_settings["IBRION"] = None
+            new_settings["POTIM"] = None
+            new_settings["LCHARG"] = True
+            new_settings["LORBIT"] = 0
+            new_settings["LVHAR"] = True
+            new_settings["ICHARG"] = 0
+            new_settings["LAECHG"] = True 
+        
         # now we'll customize based on a given standard
 
         # dmc is the only one implemented other than MP. for MP, we leave alone
@@ -282,7 +295,7 @@ class GetSet(object):
             else:
                 new_settings["METAGGA"] = functional[xc]
 
-        if xc in ["gga", "ggau"] or calc == "preggastatic":
+        if xc in ["gga", "ggau", "hse06"]:
             functional = self.configs["functional"]
             # PBE is default
             if not functional:
@@ -290,7 +303,7 @@ class GetSet(object):
             else:
                 new_settings["GGA"] = functional[xc]
 
-        if xc == "gga" or calc == "preggastatic":
+        if xc == "gga":
             # turn off +U b/c our base set wants to use it
             if standard != "mp":
                 new_settings["LDAU"] = False
@@ -313,6 +326,10 @@ class GetSet(object):
                 new_settings["LDAUL"] = ldaul
                 new_settings["LDAUJ"] = ldauj
 
+        if xc == "hse06":
+            # speeding up the calculation by treating KPAR (number) of k-points in parallel
+            new_settings["KPAR"] = 4
+        
         # if we asked for a KPOINTS file (grid, auto, etc), turn off KSPACING
         if user_passed_kpoints_settings:
             new_settings["KSPACING"] = None
