@@ -410,15 +410,18 @@ class Passer(object):
                 return adjustments
         
     @property
-    def pass_kpoints_for_lobster(self):
+    def pass_kpoints_for_lobster_or_parchg(self):
         """
-        Passes static's IBZKPT to lobster's KPOINTS
+        Passes static's IBZKPT to lobster's or parchg's KPOINTS
         """
-        if "lobster" not in self.xc_calc:
+        if "lobster" not in self.xc_calc and "parchg" not in self.xc_calc:
             return None
-
+        
+        xc_calc = self.xc_calc
+        xc, calc = xc_calc.split("-")
         calc_dir = self.calc_dir
-        prev_calc_dir = calc_dir.replace("-lobster", "-prelobster")
+        
+        prev_calc_dir = calc_dir.replace(calc, "-prelobster")
         if not os.path.exists(prev_calc_dir):
             return None
 
@@ -494,7 +497,7 @@ class Passer(object):
         incar_adjustments.update(kpoints_based_incar_adjustments_for_preggastatic_to_prelobster)
 
         curr_xc_calc = self.xc_calc
-        if curr_xc_calc.split("-")[1] == "lobster":
+        if curr_xc_calc.split("-")[1] in ["lobster", "parchg"]:
             # for lobster calcs, we can't use KSPACING
             if "KSPACING" in incar_adjustments:
                 del incar_adjustments["KSPACING"]
