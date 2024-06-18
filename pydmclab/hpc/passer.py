@@ -435,7 +435,7 @@ class Passer(object):
         """
         Passes preggastatic's IBZKPT to prelobster's KPOINTS
         """
-        if "preggastatic" not in self.xc_calc:
+        if "preggastatic" not in self.prev_xc_calc:
             return None
         if "prelobster" not in self.xc_calc:
             return None
