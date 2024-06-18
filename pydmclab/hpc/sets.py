@@ -356,7 +356,8 @@ class GetSet(object):
         """
         user_passed_settings = self.modify_kpoints
 
-        calc = self.calc
+        xc, calc = self.xc, self.calc
+        user_passed_kpoints_settings = self.modify_kpoints
 
         new_settings = {}
 
@@ -367,6 +368,11 @@ class GetSet(object):
                 "reciprocal_kpoints_density_for_lobster"
             ]
 
+        user_passed_kpoints_settings_hse06 = user_passed_kpoints_settings["hse06-lobster"]
+        if (xc == "hse06") and ((calc == "preggastatic") or (calc == "prelobster")):
+            user_passed_kpoints_settings["hse-preggastatic"] = user_passed_kpoints_settings_hse06
+            user_passed_kpoints_settings["hse-prelobster"] = user_passed_kpoints_settings_hse06
+        
         for setting, value in user_passed_settings.items():
             new_settings[setting] = value
 
