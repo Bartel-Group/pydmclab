@@ -173,6 +173,32 @@ class Passer(object):
         return "copied contcar from prev calc"
 
     @property
+    def copy_chgcar(self):
+        """
+        Copies CHGCAR from parent to child
+            ohly pass if current calculation is parchg
+        """
+        kill_job = self.kill_job
+        if kill_job:
+            return None
+
+        curr_xc_calc = self.xc_calc
+        curr_calc = curr_xc_calc.split("-")[1]
+
+        # only pass WAVECAR for parchg
+        if not curr_calc in ["parchg"]:
+            return None
+        
+        src_dir = self.prev_calc_dir
+        dst_dir = self.calc_dir
+        
+        fsrc = os.path.join(src_dir, "CHGCAR")
+        if os.path.exists(fsrc):
+            copyfile(fsrc, os.path.join(dst_dir, "CHGCAR"))
+            return "copied chgcar"
+        return None
+    
+    @property
     def copy_wavecar(self):
         """
         Copies WAVECAR from parent to child
