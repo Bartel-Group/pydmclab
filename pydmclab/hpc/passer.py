@@ -486,13 +486,12 @@ class Passer(object):
         self.update_incar  # this also copies wavecar
         self.pass_kpoints_for_lobster
         
-        """
         ##### NEW STUFF 6/18 #####
         xc_calc = self.xc_calc
         if xc_calc == "hse06-prelobster":
             self.pass_kpoints_from_preggastatic_to_prelobster
         ##### NEW STUFF 6/18 #####
-        """
+        
         return "completed pass"
 
 
