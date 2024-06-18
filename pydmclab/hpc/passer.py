@@ -4,7 +4,7 @@ import json
 from shutil import copyfile
 import numpy as np
 
-from pymatgen.io.vasp.inputs import Incar, Poscar
+from pymatgen.io.vasp.inputs import Incar, Poscar, Kpoints
 from pymatgen.io.vasp.sets import get_structure_from_prev_run
 
 from pydmclab.hpc.analyze import AnalyzeVASP
@@ -342,6 +342,48 @@ class Passer(object):
         return new_nbands
 
     @property
+    def prev_number_of_kpoints(self):
+        """
+        Returns:
+            parent's number_of_kpoints (float) if parent is ready to pass else None
+        """
+        kill_job = self.kill_job
+        if kill_job:
+            return None
+
+        # try to get the number of k-points
+        prev_calc_dir = self.prev_calc_dir
+        prev_ibz = os.path.join(prev_calc_dir, "IBZKPT")
+        kpoints = Kpoints.from_file(prev_ibz)
+        num_kpoints = len(kpoints.kpts)
+        
+        if num_kpoints:
+            return num_kpoints
+        return None
+    
+    @property
+    def kpoints_based_incar_adjustments(self):
+        """
+        Returns:
+            a dictionary of INCAR adjustments based on kpoints
+                KPAR
+        """
+        curr_xc_calc = self.xc_calc
+        prev_number_of_kpoints = self.prev_number_of_kpoints
+        
+        if not "hse06" in curr_xc_calc:
+            return {}
+        
+        if "preggastatic" in curr_xc_calc:
+            return {}
+        
+        adjustments = {}
+        for KPAR in range(2, 9):
+            if prev_number_of_kpoints % KPAR == 0:
+                adjustments["KPAR"] = KPAR
+                return adjustments
+        
+    @property
     def pass_kpoints_for_lobster(self):
         """
         Passes static's IBZKPT to lobster's KPOINTS
@@ -356,7 +398,7 @@ class Passer(object):
 
         prev_ibz = os.path.join(prev_calc_dir, "IBZKPT")
         curr_kpt = os.path.join(self.calc_dir, "KPOINTS")
-
+        
         if os.path.exists(prev_ibz):
             copyfile(prev_ibz, curr_kpt)
             return "copied IBZKPT from prev calc"
@@ -398,9 +440,13 @@ class Passer(object):
         # get new magmom if relevant (MAGMOM)
         magmom_based_incar_adjustments = self.magmom_based_incar_adjustments
 
+        # get kpoints related adjustments if relevant
+        kpoints_based_incar_adjustments = self.kpoints_based_incar_adjustments
+        
         # merge bandgap and magmom
         incar_adjustments = magmom_based_incar_adjustments.copy()
         incar_adjustments.update(bandgap_based_incar_adjustments)
+        incar_adjustments.update(kpoints_based_incar_adjustments)
 
         curr_xc_calc = self.xc_calc
         if curr_xc_calc.split("-")[1] == "lobster":
