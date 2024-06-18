@@ -198,8 +198,8 @@ class Passer(object):
         curr_calc = curr_xc_calc.split("-")[1]
 
         # don't pass WAVECAR for these calcs
-        if curr_calc in ["relax", "lobster"]:
-            return None
+        # if curr_calc in ["relax"]:
+        #    return None
 
         src_dir = self.prev_calc_dir
         dst_dir = self.calc_dir
@@ -207,7 +207,8 @@ class Passer(object):
         fsrc = os.path.join(src_dir, "WAVECAR")
         if os.path.exists(fsrc):
             copyfile(fsrc, os.path.join(dst_dir, "WAVECAR"))
-        return "copied wavecar"
+            return "copied wavecar"
+        return None
 
     @property
     def prev_gap(self):
@@ -260,9 +261,14 @@ class Passer(object):
             a dictionary of INCAR adjustments based on band gap
                 KSPACING, ISMEAR, SIGMA
         """
+        curr_xc_calc = self.xc_calc
+
         # if no parent bandgap can't be found, just stick to defaults
         bandgap_label = self.bandgap_label
         if not bandgap_label:
+            return {}
+
+        if "lobster" in curr_xc_calc:
             return {}
 
         adjustments = {}
@@ -424,6 +430,26 @@ class Passer(object):
 
         return {"NELECT": int(charged_nelect)}
 
+    def pass_kpoints_for_lobster(self):
+        """
+        Passes static's IBZKPT to lobster's KPOINTS
+        """
+        if "lobster" not in self.xc_calc:
+            return None
+
+        calc_dir = self.calc_dir
+        prev_calc_dir = calc_dir.replace("-lobster", "-prelobster")
+        if not os.path.exists(prev_calc_dir):
+            return None
+
+        prev_ibz = os.path.join(prev_calc_dir, "IBZKPT")
+        curr_kpt = os.path.join(self.calc_dir, "KPOINTS")
+
+        if os.path.exists(prev_ibz):
+            copyfile(prev_ibz, curr_kpt)
+            return "copied IBZKPT from prev calc"
+
+
     @property
     def update_incar(self):
         """
@@ -432,6 +458,7 @@ class Passer(object):
 
             Writes new INCAR to file
         """
+
         # get bandgap related adjustments if relevant (ISMEAR, SIGMA, KSPACING)
         bandgap_based_incar_adjustments = self.bandgap_based_incar_adjustments
 
@@ -449,12 +476,13 @@ class Passer(object):
                 del incar_adjustments["KSPACING"]
 
             # lobster calcs should have ISMEAR = 0 and SIGMA = 0.05 (I think there are issues with other ISMEAR values)
-            incar_adjustments["ISMEAR"] = 0
-            incar_adjustments["SIGMA"] = 0.05
+            incar_adjustments["ISMEAR"] = -5
+            # incar_adjustments["SIGMA"] = 0.05
 
             # update NBANDS if doing lobster
             nbands_based_incar_adjustments = self.nbands_based_incar_adjustments
             incar_adjustments.update(nbands_based_incar_adjustments)
+
 
         if "defect_charged" in curr_xc_calc:
             # update NELECT based on relative charge of defect
@@ -463,6 +491,11 @@ class Passer(object):
         if "1kpt" in curr_xc_calc:
             # use ISMEAR = 0 to avoid NKPT < 4 error associated with ISMEAR = -5
             incar_adjustments["ISMEAR"] = 0
+
+        was_wavecar_copied = self.copy_wavecar
+        if was_wavecar_copied:
+            incar_adjustments["ISTART"] = 1
+
 
         # make sure we don't override user-defined INCAR modifications
         user_incar_mods = self.incar_mods
@@ -527,8 +560,8 @@ class Passer(object):
         copy files + update INCAR
         """
         self.copy_contcar_to_poscar
-        self.copy_wavecar
-        self.update_incar
+        self.update_incar  # this also copies wavecar
+        self.pass_kpoints_for_lobster
         return "completed pass"
 
 

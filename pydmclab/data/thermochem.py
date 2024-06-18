@@ -11,13 +11,13 @@ DATA_PATH = os.path.join(this_dir, "data")
 
 def mus_at_0K():
     """
-    These were run by Bartel in January 20223
+    These were run by Szymanski in May 2024
     """
     fjson = os.path.join(DATA_PATH, "mus_from_dmc_no_corrections.json")
     if os.path.exists(fjson):
         return read_json(fjson)
     mus = {}
-    mus = read_json(os.path.join(DATA_PATH, "231002_dmc-mus.json"))
+    mus = read_json(os.path.join(DATA_PATH, "240528_dmc-mus.json"))
 #    for xc in d:
 #        if xc == "gga":
 #            functional = "pbe"

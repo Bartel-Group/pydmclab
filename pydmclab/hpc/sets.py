@@ -154,6 +154,7 @@ class GetSet(object):
         # these three calcs are static --> turn off relaxation things
         if calc in [
             "static",
+            "prelobster",
             "lobster",
             "parchg",
         ]:
@@ -166,6 +167,11 @@ class GetSet(object):
             new_settings["LVHAR"] = True
             new_settings["ICHARG"] = 0
             new_settings["LAECHG"] = True
+
+        if calc == "prelobster":
+            new_settings["ISMEAR"] = -5
+            new_settings["NELM"] = 0
+            new_settings["NSW"] = 0
 
         # for DFPT --> set explicit requirements
         if calc == "dfpt":
@@ -218,9 +224,9 @@ class GetSet(object):
             new_settings["LAECHG"] = True
             new_settings["ISYM"] = -1
             new_settings["KSPACING"] = None
-            new_settings["ISMEAR"] = 0
             new_settings["NSW"] = 0
             new_settings["LWAVE"] = True
+            new_settings["ISMEAR"] = -5
 
         # for charged defect calculations --> set explicit requirements
         if "defect" in calc:
