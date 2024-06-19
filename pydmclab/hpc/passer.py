@@ -422,7 +422,6 @@ class Passer(object):
         """
         curr_xc_calc = self.xc_calc
         xc, calc = curr_xc_calc.split("-")
-        prev_number_of_kpoints = self.prev_number_of_kpoints
         
         if not "hse06" in xc:
             return {}
@@ -430,6 +429,7 @@ class Passer(object):
         if "preggastatic" in calc:
             return {}
         
+        prev_number_of_kpoints = self.prev_number_of_kpoints
         adjustments = {}
         for KPAR in range(2, 9):
             if prev_number_of_kpoints % KPAR == 0:
