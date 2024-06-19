@@ -441,12 +441,12 @@ class Passer(object):
         """
         Passes static's IBZKPT to lobster's KPOINTS
         """
-        if ("lobster" not in self.xc_calc):
-            return None
-        
         xc_calc = self.xc_calc
         xc, calc = xc_calc.split("-")
         calc_dir = self.calc_dir
+        
+        if ("lobster" not in calc):
+            return None
         
         prev_calc_dir = calc_dir.replace(calc, "-prelobster")
         if not os.path.exists(prev_calc_dir):
@@ -465,9 +465,9 @@ class Passer(object):
         """
         Passes preggastatic's IBZKPT to prelobster's KPOINTS
         """
-        if "preggastatic" not in self.prev_xc_calc:
+        if "hse06-preggastatic" not in self.prev_xc_calc:
             return None
-        if "prelobster" not in self.xc_calc:
+        if "hse06-prelobster" not in self.xc_calc:
             return None
 
         calc_dir = self.calc_dir
