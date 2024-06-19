@@ -410,11 +410,11 @@ class Passer(object):
                 return adjustments
         
     @property
-    def pass_kpoints_for_lobster_or_parchg(self):
+    def pass_kpoints_for_lobster(self):
         """
         Passes static's IBZKPT to lobster's or parchg's KPOINTS
         """
-        if ("lobster" not in self.xc_calc) and ("parchg" not in self.xc_calc):
+        if ("lobster" not in self.xc_calc):
             return None
         
         xc_calc = self.xc_calc
@@ -478,7 +478,7 @@ class Passer(object):
         incar_adjustments.update(kpoints_based_incar_adjustments)
         
         curr_xc_calc = self.xc_calc
-        if curr_xc_calc.split("-")[1] in ["lobster", "parchg"]:
+        if curr_xc_calc.split("-")[1] in ["lobster"]:
             # for lobster calcs, we can't use KSPACING
             if "KSPACING" in incar_adjustments:
                 del incar_adjustments["KSPACING"]
@@ -495,7 +495,9 @@ class Passer(object):
         if was_wavecar_copied:
             incar_adjustments["ISTART"] = 1
             
-        #copy_chgcar = self.copy_chgcar
+        was_chgcar_copied = self.copy_chgcar
+        if was_chgcar_copied:
+            incar_adjustments["ICHARG"] = 1
 
         # make sure we don't override user-defined INCAR modifications
         user_incar_mods = self.incar_mods
@@ -561,7 +563,7 @@ class Passer(object):
         """
         self.copy_contcar_to_poscar
         self.update_incar  # this also copies wavecar
-        self.pass_kpoints_for_lobster_or_parchg
+        self.pass_kpoints_for_lobster
         
         ##### NEW STUFF 6/18 #####
         xc_calc = self.xc_calc
