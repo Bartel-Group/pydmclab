@@ -185,7 +185,7 @@ class Passer(object):
         curr_xc_calc = self.xc_calc
         curr_calc = curr_xc_calc.split("-")[1]
 
-        # only pass WAVECAR for parchg
+        # only pass CHGCAR for parchg
         if not curr_calc in ["parchg"]:
             return None
         
@@ -414,7 +414,7 @@ class Passer(object):
         """
         Passes static's IBZKPT to lobster's or parchg's KPOINTS
         """
-        if "lobster" not in self.xc_calc and "parchg" not in self.xc_calc:
+        if ("lobster" not in self.xc_calc) and ("parchg" not in self.xc_calc):
             return None
         
         xc_calc = self.xc_calc
@@ -515,7 +515,7 @@ class Passer(object):
         if was_wavecar_copied:
             incar_adjustments["ISTART"] = 1
             
-        copy_chgcar = self.copy_chgcar
+        #copy_chgcar = self.copy_chgcar
 
         # make sure we don't override user-defined INCAR modifications
         user_incar_mods = self.incar_mods
