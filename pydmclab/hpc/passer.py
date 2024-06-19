@@ -467,7 +467,8 @@ class Passer(object):
             return None
         
         adjustments = {}
-        adjustments["KSPACING"] = None
+        if "KSPACING" in adjustments:
+                del adjustments["KSPACING"]
         return adjustments
     
     @property
@@ -513,6 +514,8 @@ class Passer(object):
         was_wavecar_copied = self.copy_wavecar
         if was_wavecar_copied:
             incar_adjustments["ISTART"] = 1
+            
+        copy_chgcar = self.copy_chgcar
 
         # make sure we don't override user-defined INCAR modifications
         user_incar_mods = self.incar_mods
@@ -578,7 +581,7 @@ class Passer(object):
         """
         self.copy_contcar_to_poscar
         self.update_incar  # this also copies wavecar
-        self.pass_kpoints_for_lobster
+        self.pass_kpoints_for_lobster_or_parchg
         
         ##### NEW STUFF 6/18 #####
         xc_calc = self.xc_calc
