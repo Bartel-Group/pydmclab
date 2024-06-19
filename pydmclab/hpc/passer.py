@@ -421,12 +421,13 @@ class Passer(object):
                 KPAR
         """
         curr_xc_calc = self.xc_calc
+        xc, calc = curr_xc_calc.split("-")
         prev_number_of_kpoints = self.prev_number_of_kpoints
         
-        if not "hse06" in curr_xc_calc:
+        if not "hse06" in xc:
             return {}
         
-        if "preggastatic" in curr_xc_calc:
+        if "preggastatic" in calc:
             return {}
         
         adjustments = {}
@@ -438,7 +439,7 @@ class Passer(object):
     @property
     def pass_kpoints_for_lobster(self):
         """
-        Passes static's IBZKPT to lobster's or parchg's KPOINTS
+        Passes static's IBZKPT to lobster's KPOINTS
         """
         if ("lobster" not in self.xc_calc):
             return None
