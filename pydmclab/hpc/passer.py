@@ -173,7 +173,7 @@ class Passer(object):
         return "copied contcar from prev calc"
 
     @property
-    def copy_chgcar(self):
+    def copy_chgcar_for_parchg(self):
         """
         Copies CHGCAR from parent to child
             ohly pass if current calculation is parchg
@@ -196,6 +196,32 @@ class Passer(object):
         if os.path.exists(fsrc):
             copyfile(fsrc, os.path.join(dst_dir, "CHGCAR"))
             return "copied chgcar"
+        return None
+    
+    @property
+    def copy_kpoints_for_parchg(self):
+        """
+        Copies KPOINTS from parent to child
+            ohly pass if current calculation is parchg
+        """
+        kill_job = self.kill_job
+        if kill_job:
+            return None
+
+        curr_xc_calc = self.xc_calc
+        curr_calc = curr_xc_calc.split("-")[1]
+
+        # only pass KPOINTS for parchg
+        if not curr_calc in ["parchg"]:
+            return None
+        
+        src_dir = self.prev_calc_dir
+        dst_dir = self.calc_dir
+        
+        fsrc = os.path.join(src_dir, "KPOINTS")
+        if os.path.exists(fsrc):
+            copyfile(fsrc, os.path.join(dst_dir, "KPOINTS"))
+            return "copied kpoints"
         return None
     
     @property
@@ -495,9 +521,13 @@ class Passer(object):
         if was_wavecar_copied:
             incar_adjustments["ISTART"] = 1
             
-        was_chgcar_copied = self.copy_chgcar
+        was_chgcar_copied = self.copy_chgcar_for_parchg
         if was_chgcar_copied:
             incar_adjustments["ICHARG"] = 1
+            
+        was_kpoints_copied = self.copy_kpoints_for_parchg
+        if was_kpoints_copied:
+            del incar_adjustments["KSPACING"]
 
         # make sure we don't override user-defined INCAR modifications
         user_incar_mods = self.incar_mods
