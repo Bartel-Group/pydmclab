@@ -455,23 +455,6 @@ class Passer(object):
     ##### NEW STUFF 6/18 #####
     
     @property
-    def kpoints_based_incar_adjustments_for_preggastatic_to_prelobster(self):
-        """
-        Returns:
-            a dictionary of INCAR adjustments based on kpoints
-                KSPACING
-        """
-        if "preggastatic" not in self.prev_xc_calc:
-            return None
-        if "prelobster" not in self.xc_calc:
-            return None
-        
-        adjustments = {}
-        if "KSPACING" in adjustments:
-                del adjustments["KSPACING"]
-        return adjustments
-    
-    @property
     def update_incar(self):
         """
         Returns: Nothing
@@ -489,14 +472,11 @@ class Passer(object):
         # get kpoints related adjustments if relevant
         kpoints_based_incar_adjustments = self.kpoints_based_incar_adjustments
         
-        kpoints_based_incar_adjustments_for_preggastatic_to_prelobster = self.kpoints_based_incar_adjustments_for_preggastatic_to_prelobster
-        
         # merge bandgap and magmom
         incar_adjustments = magmom_based_incar_adjustments.copy()
         incar_adjustments.update(bandgap_based_incar_adjustments)
         incar_adjustments.update(kpoints_based_incar_adjustments)
-        incar_adjustments.update(kpoints_based_incar_adjustments_for_preggastatic_to_prelobster)
-
+        
         curr_xc_calc = self.xc_calc
         if curr_xc_calc.split("-")[1] in ["lobster", "parchg"]:
             # for lobster calcs, we can't use KSPACING
