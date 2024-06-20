@@ -17,7 +17,7 @@ VERSION = "1.3.0"
 REQUIRED = ["numpy>=1.25.0", "mp-api>=0.39", "pymatgen>=2023.0.0"]
 EXTRAS = {
     "mlp": ["chgnet"],
-    "defects": ["pymatgen-analysis-defects"],
+    "defects": ["doped"],
     "phonons": ["phonopy"],
 }
 here = os.path.abspath(os.path.dirname(__file__))
