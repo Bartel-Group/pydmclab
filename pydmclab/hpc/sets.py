@@ -366,11 +366,6 @@ class GetSet(object):
             new_settings["reciprocal_density"] = self.configs[
                 "reciprocal_kpoints_density_for_lobster"
             ]
-
-        if (xc == "hse06") and (calc == "preggastatic"):
-            print(user_passed_settings)
-            user_passed_kpoints_settings_hse06 = user_passed_settings["hse06-lobster"]
-            new_settings = user_passed_kpoints_settings_hse06
         
         for setting, value in user_passed_settings.items():
             new_settings[setting] = value

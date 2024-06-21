@@ -434,7 +434,7 @@ class Passer(object):
         for KPAR in range(2, 9):
             if prev_number_of_kpoints % KPAR == 0:
                 adjustments["KPAR"] = KPAR
-                return adjustments
+        return adjustments
         
     @property
     def pass_kpoints_for_lobster(self):
