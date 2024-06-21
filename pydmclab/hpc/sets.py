@@ -368,6 +368,7 @@ class GetSet(object):
             ]
 
         if (xc == "hse06") and (calc == "preggastatic"):
+            print(user_passed_settings)
             user_passed_kpoints_settings_hse06 = user_passed_settings["hse06-lobster"]
             new_settings = user_passed_kpoints_settings_hse06
         
