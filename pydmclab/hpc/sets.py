@@ -357,7 +357,6 @@ class GetSet(object):
         user_passed_settings = self.modify_kpoints
 
         xc, calc = self.xc, self.calc
-        user_passed_kpoints_settings = self.modify_kpoints
 
         new_settings = {}
 
@@ -369,8 +368,8 @@ class GetSet(object):
             ]
 
         if (xc == "hse06") and (calc == "preggastatic"):
-            user_passed_kpoints_settings_hse06 = user_passed_kpoints_settings["hse06-lobster"]
-            user_passed_kpoints_settings["hse-preggastatic"] = user_passed_kpoints_settings_hse06
+            user_passed_kpoints_settings_hse06 = user_passed_settings["hse06-lobster"]
+            new_settings = user_passed_kpoints_settings_hse06
         
         for setting, value in user_passed_settings.items():
             new_settings[setting] = value
