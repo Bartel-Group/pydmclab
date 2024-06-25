@@ -212,6 +212,22 @@ class Passer(object):
         return None
 
     @property
+    def clean_poscar(self):
+        """
+        Returns:
+            For any near zero values in lattice (e.g. 0.00000#####...), round to 0
+                to avoid potential symprec related errors
+        """
+        poscar = self.poscar
+
+        struc = poscar.structure
+        lattice = np.copy(struc.lattice.matrix)
+        lattice[np.abs(lattice) < 1e-5] = 0.0
+        struc.lattice = lattice
+
+        struc.to(filename=os.path.join(self.calc_dir, "POSCAR"), fmt="poscar")
+
+    @property
     def copy_wavecar(self):
         """
         Copies WAVECAR from parent to child
@@ -593,6 +609,7 @@ class Passer(object):
         copy files + update INCAR
         """
         self.copy_contcar_to_poscar
+        self.clean_poscar
         self.update_incar  # this also copies wavecar
         self.pass_kpoints_for_lobster
         return "completed pass"
