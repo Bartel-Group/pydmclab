@@ -173,19 +173,7 @@ class Passer(object):
 
     @property
     def is_curr_calc_being_restarted(self):
-        calc_dir = self.calc_dir
-        curr_contcar = os.path.join(calc_dir, "CONTCAR")
-        if not os.path.exists(curr_contcar):
-            return False
-        with open(curr_contcar, "r", encoding="utf-8") as f:
-            contents = f.read()
-            if len(contents) > 0:
-                return True
-            else:
-                return False
 
-    @property
-    def is_curr_calc_being_restarted(self):
         calc_dir = self.calc_dir
         curr_contcar = os.path.join(calc_dir, "CONTCAR")
         if not os.path.exists(curr_contcar):
@@ -236,6 +224,7 @@ class Passer(object):
 
         if self.is_curr_calc_being_restarted:
             return None
+
         errors_to_avoid_wavecar_passing = [
             "grad_not_orth",
             "eddrmm",
@@ -248,13 +237,6 @@ class Passer(object):
 
         if set(errors_to_avoid_wavecar_passing) and errors_in_curr_calc:
             return None
-
-        curr_xc_calc = self.xc_calc
-        curr_calc = curr_xc_calc.split("-")[1]
-
-        # don't pass WAVECAR for these calcs
-        # if curr_calc in ["relax"]:
-        #    return None
 
         prev_wavecar = os.path.join(self.prev_calc_dir, "WAVECAR")
         curr_wavecar = os.path.join(self.calc_dir, "WAVECAR")
