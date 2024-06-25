@@ -172,31 +172,56 @@ class Passer(object):
         return False
 
     @property
+    def is_curr_calc_being_restarted(self):
+        calc_dir = self.calc_dir
+        curr_contcar = os.path.join(calc_dir, "CONTCAR")
+        if not os.path.exists(curr_contcar):
+            return False
+        with open(curr_contcar, "r", encoding="utf-8") as f:
+            contents = f.read()
+            if len(contents) > 0:
+                return True
+            else:
+                return False
+
+    @property
+    def is_curr_calc_being_restarted(self):
+        calc_dir = self.calc_dir
+        curr_contcar = os.path.join(calc_dir, "CONTCAR")
+        if not os.path.exists(curr_contcar):
+            return False
+        with open(curr_contcar, "r", encoding="utf-8") as f:
+            contents = f.read()
+            if len(contents) > 0:
+                return True
+            else:
+                return False
+
+    @property
     def copy_contcar_to_poscar(self):
         """
         Copies CONTCAR from parent to POSCAR of child
         """
         kill_job = self.kill_job
         if kill_job:
-            src_dir = self.calc_dir
-            dst_dir = src_dir
-            fpos = os.path.join(src_dir, "POSCAR")
-            fcont = os.path.join(src_dir, "CONTCAR")
-            if not os.path.exists(fcont):
-                return None
-            with open(fcont, "r", encoding="utf-8") as f:
+            return None
+
+        curr_contcar = os.path.join(self.calc_dir, "CONTCAR")
+        prev_contcar = os.path.join(self.prev_calc_dir, "CONTCAR")
+        curr_poscar = os.path.join(self.calc_dir, "POSCAR")
+        if self.is_curr_calc_being_restarted:
+            copyfile(curr_contcar, curr_poscar)
+            return "copied contcar from current calc"
+
+        if os.path.exists(prev_contcar):
+            with open(prev_contcar, "r", encoding="utf-8") as f:
                 contents = f.read()
                 if len(contents) > 0:
-                    copyfile(fcont, fpos)
-                    return "copied contcar from current calc"
+                    copyfile(prev_contcar, curr_poscar)
+                    return "copied contcar from prev calc"
                 else:
                     return None
-        src_dir = self.prev_calc_dir
-        dst_dir = self.calc_dir
-        fsrc = os.path.join(src_dir, "CONTCAR")
-        if os.path.exists(fsrc):
-            copyfile(fsrc, os.path.join(dst_dir, "POSCAR"))
-        return "copied contcar from prev calc"
+        return None
 
     @property
     def copy_wavecar(self):
@@ -209,6 +234,8 @@ class Passer(object):
         if kill_job:
             return None
 
+        if self.is_curr_calc_being_restarted:
+            return None
         errors_to_avoid_wavecar_passing = [
             "grad_not_orth",
             "eddrmm",
@@ -229,12 +256,11 @@ class Passer(object):
         # if curr_calc in ["relax"]:
         #    return None
 
-        src_dir = self.prev_calc_dir
-        dst_dir = self.calc_dir
+        prev_wavecar = os.path.join(self.prev_calc_dir, "WAVECAR")
+        curr_wavecar = os.path.join(self.calc_dir, "WAVECAR")
 
-        fsrc = os.path.join(src_dir, "WAVECAR")
-        if os.path.exists(fsrc):
-            copyfile(fsrc, os.path.join(dst_dir, "WAVECAR"))
+        if os.path.exists(prev_wavecar):
+            copyfile(prev_wavecar, curr_wavecar)
             return "copied wavecar"
         return None
 
@@ -519,7 +545,7 @@ class Passer(object):
             incar_adjustments["ISMEAR"] = 0
 
         was_wavecar_copied = self.copy_wavecar
-        if was_wavecar_copied:
+        if was_wavecar_copied or os.path.exists(os.path.join(self.calc_dir, "WAVECAR")):
             incar_adjustments["ISTART"] = 1
 
         # make sure we don't override user-defined INCAR modifications
