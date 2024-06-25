@@ -69,6 +69,9 @@ class Passer(object):
         Returns:
             the parent xc_calc (eg 'gga-relax') that should pass stuff to the present xc_calc (eg 'gga-static)
         """
+
+        calc_list = self.calc_list
+
         curr_xc_calc = self.xc_calc
         struc_src_for_hse = self.struc_src_for_hse
         curr_xc, curr_calc = curr_xc_calc.split("-")
@@ -88,15 +91,19 @@ class Passer(object):
 
         if curr_calc == "static":
             # static calcs inherit from relax
+
+            if curr_xc == "hse06":
+                if "hse06-relax" not in calc_list:
+                    return curr_xc_calc.replace(curr_calc, "preggastatic")
             prev_xc_calc = curr_xc_calc.replace(curr_calc, "relax")
             return prev_xc_calc
-        
-        if curr_xc_calc in ["hse06-preggastatic"]:
-            prev_xc_calc = struc_src_for_hse
-            return prev_xc_calc
-        
-        if curr_xc_calc in ["hse06-prelobster", "hse06-lobster"]:
-            prev_xc_calc = curr_xc_calc.replace(curr_calc, "preggastatic")
+
+        if curr_xc == "hse06":
+            if curr_calc == "preggastatic":
+                prev_xc_calc = struc_src_for_hse
+                return prev_xc_calc
+            if curr_calc != "parchg":
+                prev_xc_calc = curr_xc_calc.replace(curr_calc, "preggastatic")
             return prev_xc_calc
 
         # everything else inherits from static
@@ -164,7 +171,7 @@ class Passer(object):
                     return "copied contcar from current calc"
                 else:
                     return None
-                
+
         src_dir = self.prev_calc_dir
         dst_dir = self.calc_dir
         fsrc = os.path.join(src_dir, "CONTCAR")
@@ -186,18 +193,18 @@ class Passer(object):
         curr_calc = curr_xc_calc.split("-")[1]
 
         # only pass CHGCAR for parchg
-        if not curr_calc in ["parchg"]:
+        if "parchg" not in curr_calc:
             return None
-        
+
         src_dir = self.prev_calc_dir
         dst_dir = self.calc_dir
-        
+
         fsrc = os.path.join(src_dir, "CHGCAR")
         if os.path.exists(fsrc):
             copyfile(fsrc, os.path.join(dst_dir, "CHGCAR"))
             return "copied chgcar"
         return None
-    
+
     @property
     def copy_kpoints_for_parchg(self):
         """
@@ -212,18 +219,18 @@ class Passer(object):
         curr_calc = curr_xc_calc.split("-")[1]
 
         # only pass KPOINTS for parchg
-        if not curr_calc in ["parchg"]:
+        if "parchg" not in curr_calc:
             return None
-        
+
         src_dir = self.prev_calc_dir
         dst_dir = self.calc_dir
-        
+
         fsrc = os.path.join(src_dir, "IBZKPT")
         if os.path.exists(fsrc):
             copyfile(fsrc, os.path.join(dst_dir, "KPOINTS"))
             return "copied kpoints"
         return None
-    
+
     @property
     def copy_wavecar(self):
         """
@@ -241,10 +248,10 @@ class Passer(object):
         # don't pass WAVECAR for these calcs
         # if curr_calc in ["relax"]:
         #    return None
-        
+
         src_dir = self.prev_calc_dir
         dst_dir = self.calc_dir
-        
+
         fsrc = os.path.join(src_dir, "WAVECAR")
         if os.path.exists(fsrc):
             copyfile(fsrc, os.path.join(dst_dir, "WAVECAR"))
@@ -406,15 +413,23 @@ class Passer(object):
         # try to get the number of k-points
         prev_calc_dir = self.prev_calc_dir
         prev_ibz = os.path.join(prev_calc_dir, "IBZKPT")
-        kpoints = Kpoints.from_file(prev_ibz)
+
+        try:
+            kpoints = Kpoints.from_file(prev_ibz)
+        except:
+            return None
+
+        kpts = kpoints.kpts
+        if not kpts:
+            return None
+
         num_kpoints = len(kpoints.kpts)
-        
+
         if num_kpoints:
             return num_kpoints
         return None
-    
-    @property
-    def kpoints_based_incar_adjustments(self):
+
+    def kpoints_based_incar_adjustments(self, ncore, min_total_tasks=32):
         """
         Returns:
             a dictionary of INCAR adjustments based on kpoints
@@ -422,20 +437,32 @@ class Passer(object):
         """
         curr_xc_calc = self.xc_calc
         xc, calc = curr_xc_calc.split("-")
-        
-        if not "hse06" in xc:
+
+        if xc != "hse06":
             return {}
-        
+
         if "preggastatic" in calc:
             return {}
-        
+
         prev_number_of_kpoints = self.prev_number_of_kpoints
+        if not prev_number_of_kpoints:
+            return {}
+
         adjustments = {}
-        for KPAR in range(2, 9):
-            if prev_number_of_kpoints % KPAR == 0:
-                adjustments["KPAR"] = KPAR
+
+        cores_for_kpoints = min_total_tasks / ncore
+
+        kpar = max(
+            [
+                v
+                for v in range(1, 9)
+                if (prev_number_of_kpoints % v == 0) and (cores_for_kpoints % v == 0)
+            ]
+        )
+
+        adjustments["KPAR"] = kpar
         return adjustments
-        
+
     @property
     def pass_kpoints_for_lobster(self):
         """
@@ -444,43 +471,43 @@ class Passer(object):
         xc_calc = self.xc_calc
         xc, calc = xc_calc.split("-")
         calc_dir = self.calc_dir
-        
-        if ("lobster" not in calc):
+
+        if "lobster" not in calc:
             return None
-        
+
         prev_calc_dir = calc_dir.replace(calc, "-prelobster")
         if not os.path.exists(prev_calc_dir):
             return None
 
         prev_ibz = os.path.join(prev_calc_dir, "IBZKPT")
         curr_kpt = os.path.join(self.calc_dir, "KPOINTS")
-        
-        if os.path.exists(prev_ibz):
-            copyfile(prev_ibz, curr_kpt)
-            return "copied IBZKPT from prev calc"
-    
-    ##### NEW STUFF 6/18 #####
-    @property
-    def pass_kpoints_from_preggastatic_to_prelobster(self):
-        """
-        Passes preggastatic's IBZKPT to prelobster's KPOINTS
-        """
-        if "hse06-preggastatic" not in self.prev_xc_calc:
-            return None
-        if "hse06-prelobster" not in self.xc_calc:
-            return None
-
-        calc_dir = self.calc_dir
-        prev_calc_dir = self.prev_calc_dir
-
-        prev_ibz = os.path.join(prev_calc_dir, "IBZKPT")
-        curr_kpt = os.path.join(calc_dir, "KPOINTS")
 
         if os.path.exists(prev_ibz):
             copyfile(prev_ibz, curr_kpt)
             return "copied IBZKPT from prev calc"
+
     ##### NEW STUFF 6/18 #####
-    
+    # @property
+    # def pass_kpoints_from_preggastatic_to_prelobster(self):
+    #     """
+    #     Passes preggastatic's IBZKPT to prelobster's KPOINTS
+    #     """
+    #     if "hse06-preggastatic" not in self.prev_xc_calc:
+    #         return None
+    #     if "hse06-prelobster" not in self.xc_calc:
+    #         return None
+
+    #     calc_dir = self.calc_dir
+    #     prev_calc_dir = self.prev_calc_dir
+
+    #     prev_ibz = os.path.join(prev_calc_dir, "IBZKPT")
+    #     curr_kpt = os.path.join(calc_dir, "KPOINTS")
+
+    #     if os.path.exists(prev_ibz):
+    #         copyfile(prev_ibz, curr_kpt)
+    #         return "copied IBZKPT from prev calc"
+    ##### NEW STUFF 6/18 #####
+
     @property
     def update_incar(self):
         """
@@ -497,13 +524,13 @@ class Passer(object):
         magmom_based_incar_adjustments = self.magmom_based_incar_adjustments
 
         # get kpoints related adjustments if relevant
-        kpoints_based_incar_adjustments = self.kpoints_based_incar_adjustments
-        
+        # kpoints_based_incar_adjustments = self.kpoints_based_incar_adjustments
+
         # merge bandgap and magmom
         incar_adjustments = magmom_based_incar_adjustments.copy()
         incar_adjustments.update(bandgap_based_incar_adjustments)
-        incar_adjustments.update(kpoints_based_incar_adjustments)
-        
+        # incar_adjustments.update(kpoints_based_incar_adjustments)
+
         curr_xc_calc = self.xc_calc
         if curr_xc_calc.split("-")[1] in ["lobster"]:
             # for lobster calcs, we can't use KSPACING
@@ -521,11 +548,11 @@ class Passer(object):
         was_wavecar_copied = self.copy_wavecar
         if was_wavecar_copied:
             incar_adjustments["ISTART"] = 1
-            
+
         was_chgcar_copied = self.copy_chgcar_for_parchg
         if was_chgcar_copied:
             incar_adjustments["ICHARG"] = 1
-            
+
         was_kpoints_copied = self.copy_kpoints_for_parchg
         if was_kpoints_copied:
             del incar_adjustments["KSPACING"]
@@ -537,6 +564,8 @@ class Passer(object):
         if incar_adjustments is None:
             incar_adjustments = {}
         incar = Incar.from_file(os.path.join(self.calc_dir, "INCAR"))
+        ncore = incar["NCORE"] if "NCORE" in incar else 1
+        self.kpoints_based_incar_adjustments(ncore)
 
         # loop through adjustments and apply them
         for key, value in incar_adjustments.items():
@@ -595,13 +624,13 @@ class Passer(object):
         self.copy_contcar_to_poscar
         self.update_incar  # this also copies wavecar
         self.pass_kpoints_for_lobster
-        
+
         ##### NEW STUFF 6/18 #####
-        xc_calc = self.xc_calc
-        if xc_calc == "hse06-prelobster":
-            self.pass_kpoints_from_preggastatic_to_prelobster
+        # xc_calc = self.xc_calc
+        # if xc_calc == "hse06-prelobster":
+        #     self.pass_kpoints_from_preggastatic_to_prelobster
         ##### NEW STUFF 6/18 #####
-        
+
         return "completed pass"
 
 

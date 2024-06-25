@@ -100,7 +100,7 @@ class GetSet(object):
             if calc in ["preggastatic"]:
                 # start fom MP HSE for HSE06
                 return MPRelaxSet
-            else: 
+            else:
                 # start fom MP HSE for HSE06
                 return MPHSERelaxSet
         else:
@@ -172,7 +172,7 @@ class GetSet(object):
             new_settings["LVHAR"] = True
             new_settings["ICHARG"] = 0
             new_settings["LAECHG"] = True
-        
+
         if calc == "prelobster":
             new_settings["ISMEAR"] = -5
             new_settings["NELM"] = 0
@@ -264,8 +264,8 @@ class GetSet(object):
             new_settings["LORBIT"] = 0
             new_settings["LVHAR"] = True
             new_settings["ICHARG"] = 0
-            new_settings["LAECHG"] = True 
-        
+            new_settings["LAECHG"] = True
+
         # now we'll customize based on a given standard
 
         # dmc is the only one implemented other than MP. for MP, we leave alone
@@ -329,7 +329,7 @@ class GetSet(object):
         if xc == "hse06":
             # speeding up the calculation by treating KPAR (number) of k-points in parallel
             new_settings["KPAR"] = 4
-        
+
         # if we asked for a KPOINTS file (grid, auto, etc), turn off KSPACING
         if user_passed_kpoints_settings:
             new_settings["KSPACING"] = None
@@ -366,7 +366,11 @@ class GetSet(object):
             new_settings["reciprocal_density"] = self.configs[
                 "reciprocal_kpoints_density_for_lobster"
             ]
-        
+
+        # default (light) grid for HSE06 calcs (including preggastatic); user can changes this with modify_kpoints = {'hse06-all' : [X, Y, Z]}
+        if xc == "hse06":
+            new_settings["grid"] = [2, 2, 2]
+
         for setting, value in user_passed_settings.items():
             new_settings[setting] = value
 
