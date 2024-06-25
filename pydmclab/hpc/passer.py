@@ -61,6 +61,21 @@ class Passer(object):
         return Poscar.from_file(os.path.join(self.calc_dir, "POSCAR"))
 
     @property
+    def errors_encountered_in_curr_calc(self):
+        """
+        Returns:
+            get all errors present in errors.o file so can augment passer behavior as needed
+        """
+
+        errors_o = os.path.join(self.calc_dir, "errors.o")
+
+        if not os.path.exists(errors_o):
+            return None
+
+        with open(errors_o, "r", encoding="utf-8") as f:
+            return [line.strip() for line in f]
+
+    @property
     def prev_xc_calc(self):
         """
         Returns:
@@ -192,6 +207,19 @@ class Passer(object):
         """
         kill_job = self.kill_job
         if kill_job:
+            return None
+
+        errors_to_avoid_wavecar_passing = [
+            "grad_not_orth",
+            "eddrmm",
+            "sym_too_tight",
+            "bad_sym",
+            "coef",
+        ]
+
+        errors_in_curr_calc = self.errors_encountered_in_curr_calc
+
+        if set(errors_to_avoid_wavecar_passing) and errors_in_curr_calc:
             return None
 
         curr_xc_calc = self.xc_calc
@@ -449,7 +477,6 @@ class Passer(object):
             copyfile(prev_ibz, curr_kpt)
             return "copied IBZKPT from prev calc"
 
-
     @property
     def update_incar(self):
         """
@@ -483,7 +510,6 @@ class Passer(object):
             nbands_based_incar_adjustments = self.nbands_based_incar_adjustments
             incar_adjustments.update(nbands_based_incar_adjustments)
 
-
         if "defect_charged" in curr_xc_calc:
             # update NELECT based on relative charge of defect
             incar_adjustments.update(self.charged_defects_based_incar_adjustments)
@@ -495,7 +521,6 @@ class Passer(object):
         was_wavecar_copied = self.copy_wavecar
         if was_wavecar_copied:
             incar_adjustments["ISTART"] = 1
-
 
         # make sure we don't override user-defined INCAR modifications
         user_incar_mods = self.incar_mods
