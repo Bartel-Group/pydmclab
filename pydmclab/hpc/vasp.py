@@ -607,13 +607,13 @@ class VASPSetUp(object):
         if "num_prob" in errors:
             incar_changes["ISMEAR"] = -1
         if ("sym_too_tight" in errors) or ("bad_sym" in errors):
-            incar_changes["ISYM"] = -1
+            # incar_changes["ISYM"] = -1
             if "SYMPREC" in curr_incar:
                 prev_symprec = curr_incar["SYMPREC"]
             else:
                 prev_symprec = 1e-6
             if prev_symprec >= 1e-3:
-                incar_changes["SYMPREC"] = 1e-6
+                incar_changes["SYMPREC"] = 1e-8
                 if os.path.exists(wavecar):
                     os.remove(wavecar)
             else:
