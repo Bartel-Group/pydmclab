@@ -479,7 +479,7 @@ class Passer(object):
         if "lobster" not in curr_calc:
             return None
 
-        prev_calc_dir = curr_calc_dir.replace(curr_calc, "-prelobster")
+        prev_calc_dir = curr_calc_dir.replace(curr_xc_calc, curr_xc_calc.replace(curr_calc, 'prelobster'))
         if not os.path.exists(prev_calc_dir):
             return None
 
