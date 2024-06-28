@@ -126,14 +126,6 @@ class GetSet(object):
 
         new_settings = {}
 
-        # turn magnetism on or off
-        if mag == "nm":
-            new_settings["ISPIN"] = 1
-            new_settings["MAGMOM"] = None
-        else:
-            new_settings["ISPIN"] = 2
-            new_settings["LORBIT"] = 11
-
         # set parallelization if not set explicitly
         if (
             ("NPAR" not in user_passed_settings)
@@ -326,6 +318,14 @@ class GetSet(object):
                 new_settings["LDAUL"] = ldaul
                 new_settings["LDAUJ"] = ldauj
 
+        # turn magnetism on or off
+        if mag == "nm":
+            new_settings["ISPIN"] = 1
+            new_settings["MAGMOM"] = None
+        else:
+            new_settings["ISPIN"] = 2
+            new_settings["LORBIT"] = 11
+    
         if xc == "hse06":
             # speeding up the calculation by treating KPAR (number) of k-points in parallel
             new_settings["KPAR"] = 4
