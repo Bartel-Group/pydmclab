@@ -468,14 +468,18 @@ class Passer(object):
         """
         Passes static's IBZKPT to lobster's KPOINTS
         """
-        xc_calc = self.xc_calc
-        xc, calc = xc_calc.split("-")
-        calc_dir = self.calc_dir
+        kill_job = self.kill_job
+        if kill_job:
+            return None
+        
+        curr_xc_calc = self.xc_calc
+        curr_xc, curr_calc = curr_xc_calc.split("-")
+        curr_calc_dir = self.calc_dir
 
-        if "lobster" not in calc:
+        if "lobster" not in curr_calc:
             return None
 
-        prev_calc_dir = calc_dir.replace(calc, "-prelobster")
+        prev_calc_dir = curr_calc_dir.replace(curr_calc, "-prelobster")
         if not os.path.exists(prev_calc_dir):
             return None
 
@@ -485,6 +489,7 @@ class Passer(object):
         if os.path.exists(prev_ibz):
             copyfile(prev_ibz, curr_kpt)
             return "copied IBZKPT from prev calc"
+        return None
 
     ##### NEW STUFF 6/18 #####
     # @property
