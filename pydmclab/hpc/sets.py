@@ -151,7 +151,7 @@ class GetSet(object):
         # these three calcs are static --> turn off relaxation things
         if calc in [
             "static",
-            "prelobster",
+        #    "prelobster",
             "lobster",
             "parchg",
         ]:
@@ -165,10 +165,10 @@ class GetSet(object):
             new_settings["ICHARG"] = 0
             new_settings["LAECHG"] = True
 
-        if calc == "prelobster":
-            new_settings["ISMEAR"] = -5
-            new_settings["NELM"] = 0
-            new_settings["NSW"] = 0
+        #if calc == "prelobster":
+        #    new_settings["ISMEAR"] = -5
+        #    new_settings["NELM"] = 0
+        #    new_settings["NSW"] = 0
 
         # for DFPT --> set explicit requirements
         if calc == "dfpt":
