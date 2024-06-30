@@ -108,7 +108,27 @@ class Passer(object):
 
         # everything else inherits from static
         return curr_xc_calc.replace(curr_calc, "static")
-
+    
+    @property
+    def prev_xc(self):
+        prev_xc_calc = self.prev_xc_calc
+        return prev_xc_calc.split('-')[0]
+    
+    @property
+    def prev_calc(self):
+        prev_xc_calc = self.prev_xc_calc
+        return prev_xc_calc.split('-')[1]
+    
+    @property
+    def curr_xc(self):
+        curr_xc_calc = self.xc_calc
+        return curr_xc_calc.split('-')[0]
+    
+    @property
+    def curr_calc(self):
+        curr_xc_calc = self.xc_calc
+        return curr_xc_calc.split('-')[1]
+    
     @property
     def prev_calc_dir(self):
         """
@@ -179,6 +199,56 @@ class Passer(object):
             copyfile(fsrc, os.path.join(dst_dir, "POSCAR"))
         return "copied contcar from prev calc"
 
+    @property
+    def copy_incar_for_prelobster(self):
+        """
+        Copies INCAR from parent to child
+            ohly pass if current calculation is prelobster
+        """
+        kill_job = self.kill_job
+        if kill_job:
+            return None
+
+        curr_calc = self.curr_calc
+
+        # only pass INCAR for prelobster
+        if "prelobster" not in curr_calc:
+            return None
+
+        src_dir = self.prev_calc_dir
+        dst_dir = self.calc_dir
+
+        fsrc = os.path.join(src_dir, "INCAR")
+        if os.path.exists(fsrc):
+            copyfile(fsrc, os.path.join(dst_dir, "INCAR"))
+            return "copied incar"
+        return None
+    
+    @property
+    def copy_kpoints_for_prelobster(self):
+        """
+        Copies KPOINTS from parent to child
+            ohly pass if current calculation is prelobster
+        """
+        kill_job = self.kill_job
+        if kill_job:
+            return None
+
+        curr_calc = self.curr_calc
+
+        # only pass KPOINTS for prelobster
+        if "prelobster" not in curr_calc:
+            return None
+
+        src_dir = self.prev_calc_dir
+        dst_dir = self.calc_dir
+
+        fsrc = os.path.join(src_dir, "IBZKPT")
+        if os.path.exists(fsrc):
+            copyfile(fsrc, os.path.join(dst_dir, "KPOINTS"))
+            return "copied kpoints"
+        return None
+    
     @property
     def copy_chgcar_for_parchg(self):
         """
@@ -309,14 +379,14 @@ class Passer(object):
             a dictionary of INCAR adjustments based on band gap
                 KSPACING, ISMEAR, SIGMA
         """
-        curr_xc_calc = self.xc_calc
+        curr_calc = self.curr_calc
 
         # if no parent bandgap can't be found, just stick to defaults
         bandgap_label = self.bandgap_label
         if not bandgap_label:
             return {}
 
-        if "lobster" in curr_xc_calc:
+        if (curr_calc == "lobster") or (curr_calc == "prelobster"):
             return {}
 
         adjustments = {}
@@ -553,13 +623,23 @@ class Passer(object):
         was_wavecar_copied = self.copy_wavecar
         if was_wavecar_copied:
             incar_adjustments["ISTART"] = 1
-
+            
+        was_incar_copied = self.copy_incar_for_prelobster
+        if was_incar_copied:
+            incar_adjustments["NELM"] = 0
+            incar_adjustments["NSW"] = 0
+            incar_adjustments["ISMEAR"] = -5
+            
+        was_kpoints_copied_prelobster = self.copy_kpoints_for_prelobster
+        if was_kpoints_copied_prelobster:
+            del incar_adjustments["KSPACING"]
+        
         was_chgcar_copied = self.copy_chgcar_for_parchg
         if was_chgcar_copied:
             incar_adjustments["ICHARG"] = 1
 
-        was_kpoints_copied = self.copy_kpoints_for_parchg
-        if was_kpoints_copied:
+        was_kpoints_copied_parchg = self.copy_kpoints_for_parchg
+        if was_kpoints_copied_parchg:
             del incar_adjustments["KSPACING"]
 
         # make sure we don't override user-defined INCAR modifications
