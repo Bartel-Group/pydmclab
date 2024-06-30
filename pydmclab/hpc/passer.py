@@ -633,7 +633,8 @@ class Passer(object):
             
         was_kpoints_copied_prelobster = self.copy_kpoints_for_prelobster
         if was_kpoints_copied_prelobster:
-            del incar_adjustments["KSPACING"]
+            if "KSPACING" in incar_adjustments:
+                del incar_adjustments["KSPACING"]
         
         was_chgcar_copied = self.copy_chgcar_for_parchg
         if was_chgcar_copied:
@@ -641,7 +642,8 @@ class Passer(object):
 
         was_kpoints_copied_parchg = self.copy_kpoints_for_parchg
         if was_kpoints_copied_parchg:
-            del incar_adjustments["KSPACING"]
+            if "KSPACING" in incar_adjustments:
+                del incar_adjustments["KSPACING"]
 
         # make sure we don't override user-defined INCAR modifications
         user_incar_mods = self.incar_mods
@@ -755,7 +757,7 @@ def main():
         with open(fready_to_pass, "w", encoding="utf-8") as f:
             f.write("kill this job\n\n\n")
             f.write(str(e))
-        traceback.print_exc()
+        f.write(traceback.print_exc())
 
 
 if __name__ == "__main__":
