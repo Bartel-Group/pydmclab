@@ -544,7 +544,7 @@ class Passer(object):
             return None
         
         curr_xc_calc = self.xc_calc
-        curr_xc, curr_calc = curr_xc_calc.split("-")
+        curr_calc = self.curr_calc
         curr_calc_dir = self.calc_dir
 
         if "lobster" not in curr_calc:
@@ -555,11 +555,15 @@ class Passer(object):
             return None
 
         prev_ibz = os.path.join(prev_calc_dir, "IBZKPT")
+        prev_kpt = os.path.join(prev_calc_dir, "KPOINTS")
         curr_kpt = os.path.join(self.calc_dir, "KPOINTS")
 
         if os.path.exists(prev_ibz):
             copyfile(prev_ibz, curr_kpt)
             return "copied IBZKPT from prev calc"
+        elif os.path.exists(prev_ibz):
+            copyfile(prev_kpt, curr_kpt)
+            return "copied KPOINTS from prev calc"
         return None
 
     ##### NEW STUFF 6/18 #####
