@@ -3,6 +3,7 @@ import os
 import json
 from shutil import copyfile
 import numpy as np
+import traceback
 
 from pymatgen.io.vasp.inputs import Incar, Poscar, Kpoints
 from pymatgen.io.vasp.sets import get_structure_from_prev_run
@@ -753,7 +754,7 @@ def main():
         fready_to_pass = os.path.join(passer.launch_dir, "job_killer.o")
         with open(fready_to_pass, "w", encoding="utf-8") as f:
             f.write("kill this job\n\n\n")
-            f.write(str(e))
+            f.write(str(e.__traceback__))
 
 
 if __name__ == "__main__":
