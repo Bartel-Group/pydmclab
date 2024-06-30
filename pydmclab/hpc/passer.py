@@ -754,7 +754,8 @@ def main():
         fready_to_pass = os.path.join(passer.launch_dir, "job_killer.o")
         with open(fready_to_pass, "w", encoding="utf-8") as f:
             f.write("kill this job\n\n\n")
-            f.write(str(e.__traceback__))
+            f.write(str(e))
+        traceback.print_exc()
 
 
 if __name__ == "__main__":
