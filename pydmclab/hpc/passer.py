@@ -543,20 +543,19 @@ class Passer(object):
         if kill_job:
             return None
         
-        curr_xc_calc = self.xc_calc
         curr_calc = self.curr_calc
         curr_calc_dir = self.calc_dir
 
-        if "lobster" not in curr_calc:
+        if curr_calc != "lobster":
             return None
 
-        prev_calc_dir = curr_calc_dir.replace(curr_xc_calc, curr_xc_calc.replace(curr_calc, 'prelobster'))
+        prev_calc_dir = curr_calc_dir.replace(curr_calc, 'prelobster')
         if not os.path.exists(prev_calc_dir):
             return None
 
         prev_ibz = os.path.join(prev_calc_dir, "IBZKPT")
         prev_kpt = os.path.join(prev_calc_dir, "KPOINTS")
-        curr_kpt = os.path.join(self.calc_dir, "KPOINTS")
+        curr_kpt = os.path.join(curr_calc_dir, "KPOINTS")
 
         if os.path.exists(prev_ibz):
             copyfile(prev_ibz, curr_kpt)
