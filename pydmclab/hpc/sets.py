@@ -368,8 +368,8 @@ class GetSet(object):
             ]
 
         # default (light) grid for HSE06 calcs (including preggastatic); user can changes this with modify_kpoints = {'hse06-all' : [X, Y, Z]}
-        if xc == "hse06":
-            new_settings["grid"] = [2, 2, 2]
+        # if xc == "hse06":
+        #     new_settings["grid"] = [2, 2, 2]
 
         for setting, value in user_passed_settings.items():
             new_settings[setting] = value
