@@ -225,30 +225,30 @@ class Passer(object):
             return "copied incar"
         return None
     
-    @property
-    def copy_kpoints_for_prelobster(self):
-        """
-        Copies KPOINTS from parent to child
-            ohly pass if current calculation is prelobster
-        """
-        kill_job = self.kill_job
-        if kill_job:
-            return None
+    # @property
+    # def copy_kpoints_for_prelobster(self):
+    #     """
+    #     Copies KPOINTS from parent to child
+    #         ohly pass if current calculation is prelobster
+    #     """
+    #     kill_job = self.kill_job
+    #     if kill_job:
+    #         return None
 
-        curr_calc = self.curr_calc
+    #     curr_calc = self.curr_calc
 
-        # only pass KPOINTS for prelobster
-        if "prelobster" not in curr_calc:
-            return None
+    #     # only pass KPOINTS for prelobster
+    #     if "prelobster" not in curr_calc:
+    #         return None
 
-        src_dir = self.prev_calc_dir
-        dst_dir = self.calc_dir
+    #     src_dir = self.prev_calc_dir
+    #     dst_dir = self.calc_dir
 
-        fsrc = os.path.join(src_dir, "IBZKPT")
-        if os.path.exists(fsrc):
-            copyfile(fsrc, os.path.join(dst_dir, "KPOINTS"))
-            return "copied kpoints"
-        return None
+    #     fsrc = os.path.join(src_dir, "IBZKPT")
+    #     if os.path.exists(fsrc):
+    #         copyfile(fsrc, os.path.join(dst_dir, "KPOINTS"))
+    #         return "copied kpoints"
+    #     return None
     
     @property
     def copy_chgcar_for_parchg(self):
@@ -635,10 +635,10 @@ class Passer(object):
             incar_adjustments["NSW"] = 0
             incar_adjustments["ISMEAR"] = -5
             
-        was_kpoints_copied_prelobster = self.copy_kpoints_for_prelobster
-        if was_kpoints_copied_prelobster:
-            if "KSPACING" in incar_adjustments:
-                del incar_adjustments["KSPACING"]
+        # was_kpoints_copied_prelobster = self.copy_kpoints_for_prelobster
+        # if was_kpoints_copied_prelobster:
+        #     if "KSPACING" in incar_adjustments:
+        #         del incar_adjustments["KSPACING"]
         
         was_chgcar_copied = self.copy_chgcar_for_parchg
         if was_chgcar_copied:
