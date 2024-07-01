@@ -561,7 +561,7 @@ class Passer(object):
         if os.path.exists(prev_ibz):
             copyfile(prev_ibz, curr_kpt)
             return "copied IBZKPT from prev calc"
-        elif os.path.exists(prev_ibz):
+        elif os.path.exists(prev_kpt):
             copyfile(prev_kpt, curr_kpt)
             return "copied KPOINTS from prev calc"
         return None
