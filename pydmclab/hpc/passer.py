@@ -295,7 +295,7 @@ class Passer(object):
     def copy_kpoints_for_prelobster(self):
         """
         Copies KPOINTS from parent to child
-            only pass if current calculation is prelobsterto keep the same KPOINTS settings
+            only pass if current calculation is prelobster to keep the same KPOINTS settings
         """
         kill_job = self.kill_job
         if kill_job:
