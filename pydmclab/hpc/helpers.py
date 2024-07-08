@@ -1406,7 +1406,10 @@ def get_thermo_results(
     fjson = os.path.join(data_dir, savename)
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
-        
+    
+    if "static" in gs:
+        thermo_results = {calc: {xc: {formula: {} for formula in gs[calc][xc]} for xc in gs[calc]} for calc in gs}
+    
     thermo_results = {xc: {formula: {} for formula in gs[xc]} for xc in gs}
 
     for key in results:
@@ -1563,7 +1566,7 @@ def get_dos_results(
             ]
         )
         formula = results[key]["results"]["formula"]
-        thermo_result = thermo_results[xc][formula][ID]
+        thermo_result =thermo_results[calc][xc][formula][ID]
         if only_gs:
             if not thermo_result["is_gs"]:
                 continue
