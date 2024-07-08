@@ -1417,6 +1417,8 @@ def get_thermo_results(
 
         xc = results[key]["meta"]["setup"]["xc"]
         formula = results[key]["results"]["formula"]
+        calc = results[key]["meta"]["setup"]["calc"]
+        
         ID = "__".join(
             [
                 results[key]["meta"]["setup"]["formula_indicator"],
@@ -1436,6 +1438,9 @@ def get_thermo_results(
         tmp_thermo["calculated_formula"] = calcd_formula
 
         if E:
+            if "static" in gs:
+                gs = gs[calc]
+                
             gs_key = gs[xc][formula]["key"]
             if "Ef" in gs[xc][formula]:
                 gs_Ef = gs[xc][formula]["Ef"]
