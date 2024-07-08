@@ -124,6 +124,10 @@ class Passer(object):
                 # for hse06-parchg, inherit from hse06-static; for other addons in hse06, inherit from preggastatic
                 prev_xc_calc = curr_xc_calc.replace(curr_calc, "preggastatic")
             return prev_xc_calc
+        
+        if curr_calc == "parchg":
+            # for parchg, inherit from lobster
+            return curr_xc_calc.replace(curr_calc, "lobster")
 
         # everything else inherits from static
         return curr_xc_calc.replace(curr_calc, "static")
