@@ -1409,8 +1409,8 @@ def get_thermo_results(
     
     if "lobster" in gs:
         thermo_results = {calc: {xc: {formula: {} for formula in gs[calc][xc]} for xc in gs[calc]} for calc in gs}
-    
-    thermo_results = {xc: {formula: {} for formula in gs[xc]} for xc in gs}
+    else:
+        thermo_results = {xc: {formula: {} for formula in gs[xc]} for xc in gs}
 
     for key in results:
         tmp_thermo = {}
@@ -1472,8 +1472,9 @@ def get_thermo_results(
         
         print(calc, xc , formula, ID, tmp_thermo, thermo_results)
         if "lobster" in thermo_results:
-                thermo_results[calc][xc][formula][ID] = tmp_thermo
-        thermo_results[xc][formula][ID] = tmp_thermo
+            thermo_results[calc][xc][formula][ID] = tmp_thermo
+        else:
+            thermo_results[xc][formula][ID] = tmp_thermo
 
     write_json(thermo_results, fjson)
     return read_json(fjson)
