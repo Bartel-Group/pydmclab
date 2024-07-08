@@ -1606,14 +1606,14 @@ def get_dos_results(
         )
         formula = results[key]["results"]["formula"]
         if "lobster" in thermo_results:
-            thermo_result = thermo_results[calc][xc][formula][ID]
+            tmp_thermo = thermo_results[calc][xc][formula][ID]
         else:
-            thermo_result = thermo_results[xc][formula][ID]
+            tmp_thermo = thermo_results[xc][formula][ID]
         if only_gs:
-            if not thermo_result["is_gs"]:
+            if not tmp_thermo["is_gs"]:
                 continue
         if only_formulas:
-            if thermo_result["formula"] not in only_formulas:
+            if tmp_thermo["formula"] not in only_formulas:
                 continue
         if only_xc:
             if xc != only_xc:
