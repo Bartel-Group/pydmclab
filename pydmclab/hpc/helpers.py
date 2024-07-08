@@ -1406,13 +1406,6 @@ def get_thermo_results(
     fjson = os.path.join(data_dir, savename)
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
-    
-    if "static" in gs:
-        gs = gs["static"]
-        print(gs.keys())
-    else:
-        print("no static")
-        print(gs.keys())
         
     thermo_results = {xc: {formula: {} for formula in gs[xc]} for xc in gs}
 
