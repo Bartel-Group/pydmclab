@@ -1470,7 +1470,7 @@ def get_thermo_results(
             tmp_thermo["is_gs"] = False
             tmp_thermo["all_polymorphs_converged"] = False
         
-        print(calc, xc , formula, ID, tmp_thermo)
+        print(calc, xc , formula, ID, tmp_thermo, thermo_results)
         if "lobster" in thermo_results:
                 thermo_results[calc][xc][formula][ID] = tmp_thermo
         thermo_results[xc][formula][ID] = tmp_thermo
