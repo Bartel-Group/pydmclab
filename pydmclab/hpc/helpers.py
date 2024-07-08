@@ -1645,7 +1645,6 @@ def get_dos_results(
                 thermo_results[calc][xc][formula][ID]["tcobi"] = tcohp
             if "pcobi" in dos_to_store:
                 thermo_results[calc][xc][formula][ID]["pcobi"] = pcohp
-            print("lobster in thermo_results", thermo_results)
         else:
             if "tdos" in dos_to_store:
                 pdos = av.pdos(remake=regenerate_dos)
