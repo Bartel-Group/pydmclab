@@ -1470,7 +1470,6 @@ def get_thermo_results(
             tmp_thermo["is_gs"] = False
             tmp_thermo["all_polymorphs_converged"] = False
         
-        print(calc, xc , formula, ID, tmp_thermo, thermo_results)
         if "lobster" in thermo_results:
             thermo_results[calc][xc][formula][ID] = tmp_thermo
         else:
@@ -1511,7 +1510,7 @@ def check_thermo_results(thermo):
                 converged_formulas = list(set(converged_formulas))
                 print(
                     "%i/%i formulas have all polymorphs converged"
-                    % (len(converged_formulas), len(thermo[xc].keys()))
+                    % (len(converged_formulas), len(thermo[calc][xc].keys()))
                 )
     else:
         for xc in thermo:
