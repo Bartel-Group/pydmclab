@@ -1407,7 +1407,7 @@ def get_thermo_results(
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
 
-    thermo_results = {xc: {formula: {} for formula in gs[xc]} for xc in gs}
+    thermo_results = {xc: {formula: {} for formula in gs["static"][xc]} for xc in gs["static"]}
 
     for key in results:
         tmp_thermo = {}
@@ -1433,12 +1433,12 @@ def get_thermo_results(
         tmp_thermo["calculated_formula"] = calcd_formula
 
         if E:
-            gs_key = gs[xc][formula]["key"]
-            if "Ef" in gs[xc][formula]:
-                gs_Ef = gs[xc][formula]["Ef"]
+            gs_key = gs["static"][xc][formula]["key"]
+            if "Ef" in gs["static"][xc][formula]:
+                gs_Ef = gs["static"][xc][formula]["Ef"]
             else:
                 gs_Ef = None
-            gs_E = gs[xc][formula]["E"]
+            gs_E = gs[xc]["static"][formula]["E"]
             if gs_E:
                 delta_E_gs = E - gs_E
             else:
