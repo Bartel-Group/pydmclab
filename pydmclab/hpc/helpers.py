@@ -1483,33 +1483,64 @@ def get_thermo_results(
 def check_thermo_results(thermo):
     print("\nchecking thermo results")
 
-    for xc in thermo:
-        print("\nxc = %s" % xc)
-        for formula in thermo[xc]:
-            print("formula = %s" % formula)
+    if "lobster" in thermo:
+        for calc in thermo:
+            for xc in thermo[calc]:
+                print("\nxc = %s" % xc)
+                for formula in thermo[calc][xc]:
+                    print("formula = %s" % formula)
+                    print(
+                        "%i polymorphs converged"
+                        % len([k for k in thermo[calc][xc][formula] if thermo[calc][xc][formula][k]["E"]])
+                    )
+                    gs_ID = [k for k in thermo[calc][xc][formula] if thermo[calc][xc][formula][k]["is_gs"]]
+                    if gs_ID:
+                        gs_ID = gs_ID[0]
+                        print("%s is the ground-state structure" % gs_ID)
+
+        print("\n\n  SUMMARY  ")
+        for calc in thermo:
+            for xc in thermo[calc]:
+                print("~~%s~~" % xc)
+                converged_formulas = []
+                for formula in thermo[calc][xc]:
+                    for ID in thermo[calc][xc][formula]:
+                        if thermo[calc][xc][formula][ID]["all_polymorphs_converged"]:
+                            converged_formulas.append(formula)
+
+                converged_formulas = list(set(converged_formulas))
+                print(
+                    "%i/%i formulas have all polymorphs converged"
+                    % (len(converged_formulas), len(thermo[xc].keys()))
+                )
+    else:
+        for xc in thermo:
+            print("\nxc = %s" % xc)
+            for formula in thermo[xc]:
+                print("formula = %s" % formula)
+                print(
+                    "%i polymorphs converged"
+                    % len([k for k in thermo[xc][formula] if thermo[xc][formula][k]["E"]])
+                )
+                gs_ID = [k for k in thermo[xc][formula] if thermo[xc][formula][k]["is_gs"]]
+                if gs_ID:
+                    gs_ID = gs_ID[0]
+                    print("%s is the ground-state structure" % gs_ID)
+
+        print("\n\n  SUMMARY  ")
+        for xc in thermo:
+            print("~~%s~~" % xc)
+            converged_formulas = []
+            for formula in thermo[xc]:
+                for ID in thermo[xc][formula]:
+                    if thermo[xc][formula][ID]["all_polymorphs_converged"]:
+                        converged_formulas.append(formula)
+
+            converged_formulas = list(set(converged_formulas))
             print(
-                "%i polymorphs converged"
-                % len([k for k in thermo[xc][formula] if thermo[xc][formula][k]["E"]])
+                "%i/%i formulas have all polymorphs converged"
+                % (len(converged_formulas), len(thermo[xc].keys()))
             )
-            gs_ID = [k for k in thermo[xc][formula] if thermo[xc][formula][k]["is_gs"]]
-            if gs_ID:
-                gs_ID = gs_ID[0]
-                print("%s is the ground-state structure" % gs_ID)
-
-    print("\n\n  SUMMARY  ")
-    for xc in thermo:
-        print("~~%s~~" % xc)
-        converged_formulas = []
-        for formula in thermo[xc]:
-            for ID in thermo[xc][formula]:
-                if thermo[xc][formula][ID]["all_polymorphs_converged"]:
-                    converged_formulas.append(formula)
-
-        converged_formulas = list(set(converged_formulas))
-        print(
-            "%i/%i formulas have all polymorphs converged"
-            % (len(converged_formulas), len(thermo[xc].keys()))
-        )
 
 
 def get_dos_results(
@@ -1575,7 +1606,10 @@ def get_dos_results(
             ]
         )
         formula = results[key]["results"]["formula"]
-        thermo_result =thermo_results[calc][xc][formula][ID]
+        if "lobster" in thermo_results:
+            thermo_result = thermo_results[calc][xc][formula][ID]
+        else:
+            thermo_result = thermo_results[xc][formula][ID]
         if only_gs:
             if not thermo_result["is_gs"]:
                 continue
@@ -1586,30 +1620,57 @@ def get_dos_results(
             if xc != only_xc:
                 continue
         av = AnalyzeVASP(calc_dir)
-        if "tdos" in dos_to_store:
-            pdos = av.pdos(remake=regenerate_dos)
-            tdos = av.tdos(pdos=pdos, remake=regenerate_dos)
-            thermo_results[xc][formula][ID]["tdos"] = tdos
-        if "pdos" in dos_to_store:
-            thermo_results[xc][formula][ID]["pdos"] = pdos
-        if "tcohp" in dos_to_store:
-            pcohp = av.pcohp(remake=regenerate_cohp)
-            tcohp = av.tcohp(pcohp=pcohp, remake=regenerate_cohp)
-            thermo_results[xc][formula][ID]["tcohp"] = tcohp
-        if "pcohp" in dos_to_store:
-            thermo_results[xc][formula][ID]["pcohp"] = pcohp
-        if "tcoop" in dos_to_store:
-            pcohp = av.pcohp(are_coops=True, remake=regenerate_cohp)
-            tcohp = av.tcohp(pcohp=pcohp, remake=regenerate_cohp)
-            thermo_results[xc][formula][ID]["tcoop"] = tcohp
-        if "pcoop" in dos_to_store:
-            thermo_results[xc][formula][ID]["pcoop"] = pcohp
-        if "tcobi" in dos_to_store:
-            pcohp = av.pcohp(are_cobis=True, remake=regenerate_cohp)
-            tcohp = av.tcohp(pcohp=pcohp, remake=regenerate_cohp)
-            thermo_results[xc][formula][ID]["tcobi"] = tcohp
-        if "pcobi" in dos_to_store:
-            thermo_results[xc][formula][ID]["pcobi"] = pcohp
+        
+        if "lobster" in thermo_results:
+            if "tdos" in dos_to_store:
+                pdos = av.pdos(remake=regenerate_dos)
+                tdos = av.tdos(pdos=pdos, remake=regenerate_dos)
+                thermo_results[calc][xc][formula][ID]["tdos"] = tdos
+            if "pdos" in dos_to_store:
+                thermo_results[calc][xc][formula][ID]["pdos"] = pdos
+            if "tcohp" in dos_to_store:
+                pcohp = av.pcohp(remake=regenerate_cohp)
+                tcohp = av.tcohp(pcohp=pcohp, remake=regenerate_cohp)
+                thermo_results[calc][xc][formula][ID]["tcohp"] = tcohp
+            if "pcohp" in dos_to_store:
+                thermo_results[calc][xc][formula][ID]["pcohp"] = pcohp
+            if "tcoop" in dos_to_store:
+                pcohp = av.pcohp(are_coops=True, remake=regenerate_cohp)
+                tcohp = av.tcohp(pcohp=pcohp, remake=regenerate_cohp)
+                thermo_results[calc][xc][formula][ID]["tcoop"] = tcohp
+            if "pcoop" in dos_to_store:
+                thermo_results[calc][xc][formula][ID]["pcoop"] = pcohp
+            if "tcobi" in dos_to_store:
+                pcohp = av.pcohp(are_cobis=True, remake=regenerate_cohp)
+                tcohp = av.tcohp(pcohp=pcohp, remake=regenerate_cohp)
+                thermo_results[calc][xc][formula][ID]["tcobi"] = tcohp
+            if "pcobi" in dos_to_store:
+                thermo_results[calc][xc][formula][ID]["pcobi"] = pcohp
+        else:
+            if "tdos" in dos_to_store:
+                pdos = av.pdos(remake=regenerate_dos)
+                tdos = av.tdos(pdos=pdos, remake=regenerate_dos)
+                thermo_results[xc][formula][ID]["tdos"] = tdos
+            if "pdos" in dos_to_store:
+                thermo_results[xc][formula][ID]["pdos"] = pdos
+            if "tcohp" in dos_to_store:
+                pcohp = av.pcohp(remake=regenerate_cohp)
+                tcohp = av.tcohp(pcohp=pcohp, remake=regenerate_cohp)
+                thermo_results[xc][formula][ID]["tcohp"] = tcohp
+            if "pcohp" in dos_to_store:
+                thermo_results[xc][formula][ID]["pcohp"] = pcohp
+            if "tcoop" in dos_to_store:
+                pcohp = av.pcohp(are_coops=True, remake=regenerate_cohp)
+                tcohp = av.tcohp(pcohp=pcohp, remake=regenerate_cohp)
+                thermo_results[xc][formula][ID]["tcoop"] = tcohp
+            if "pcoop" in dos_to_store:
+                thermo_results[xc][formula][ID]["pcoop"] = pcohp
+            if "tcobi" in dos_to_store:
+                pcohp = av.pcohp(are_cobis=True, remake=regenerate_cohp)
+                tcohp = av.tcohp(pcohp=pcohp, remake=regenerate_cohp)
+                thermo_results[xc][formula][ID]["tcobi"] = tcohp
+            if "pcobi" in dos_to_store:
+                thermo_results[xc][formula][ID]["pcobi"] = pcohp
 
     write_json(thermo_results, fjson)
     return read_json(fjson)
