@@ -1410,6 +1410,9 @@ def get_thermo_results(
     if "static" in gs:
         gs = gs["static"]
         print(gs.keys())
+    else:
+        print("no static")
+        print(gs.keys())
         
     thermo_results = {xc: {formula: {} for formula in gs[xc]} for xc in gs}
 
