@@ -1407,7 +1407,7 @@ def get_thermo_results(
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
     
-    if "static" in gs:
+    if "lobster" in gs:
         thermo_results = {calc: {xc: {formula: {} for formula in gs[calc][xc]} for xc in gs[calc]} for calc in gs}
     
     thermo_results = {xc: {formula: {} for formula in gs[xc]} for xc in gs}
@@ -1438,7 +1438,7 @@ def get_thermo_results(
         tmp_thermo["calculated_formula"] = calcd_formula
 
         if E:
-            if "static" in gs:
+            if "lobster" in gs:
                 gs = gs[calc]
                 
             gs_key = gs[xc][formula]["key"]
@@ -1469,7 +1469,9 @@ def get_thermo_results(
             tmp_thermo["Ef"] = None
             tmp_thermo["is_gs"] = False
             tmp_thermo["all_polymorphs_converged"] = False
-
+        
+        if "lobster" in thermo_results:
+                thermo_results[calc][xc][formula][ID] = tmp_thermo
         thermo_results[xc][formula][ID] = tmp_thermo
 
     write_json(thermo_results, fjson)
