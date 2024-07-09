@@ -1,6 +1,7 @@
 # Contents
 
-- [Installation](#installation)
+- [Local Installation](#local-installation)
+- [MSI Installation](#msi-installation)
 - [General best practices](#general-best-practices)
 - [VASP](#for-vasp)
   - [general setup](#general-setup)
@@ -15,7 +16,7 @@
 - [Maintenance](#maintenance)
 - [FAQ](#faq)
 
-# Installation
+# Local Installation
 
 ## Installation instructions
 
@@ -90,11 +91,18 @@ pip install . --prefix=/home/cbartel/cbartel/bin/anaconda3
 ```
 
 - note:
-  - to use the `mlp` capabilities, you will need to install an "extra" version
+  - pydmclab currently has three extra versions which require additional dependencies not needed for the base functionality
+    - `mlp` - for machine learning potentials such as CHGNet and/or M3Gnet
+    - `defects` - for defect calculations such as oxygen vacancy formation energies
+    - `phonons` - for phonon calculations such as computing the vibrational entropy
+
+- to install these extra versions, you can do the following:
 
 ```bash
-pip install -e ".[mlp]"
+pip install . -e ".[{extra_version}]"
 ```
+
+- where `{extra_version}` is one of `mlp`, `defects`, or `phonons`
 
 ### Configuring your pseudopotentials with pymatgen
 
@@ -106,6 +114,97 @@ pmg config --add PMG_DEFAULT_FUNCTIONAL PBE_54
 ```
 
 - you should only have to do this one time, not for each successive installation of `pydmclab`
+
+# MSI Installation
+
+## Installation instructions
+
+### Conda access and environment set-up
+
+- we use an MSI maintained anaconda installation to limit the groups file usage, so you will need to load the anaconda module and create a new environment where pydmclab will be installed
+
+- from your home directory on the login node, load the anaconda module
+
+```bash
+module load conda
+```
+
+- check that you have access to the `base` environment provided by MSI
+  
+```bash
+source activate base
+```
+
+- On MSI we need to use `source` instead of `conda` to activate the environment since conda has not been initialized. MSI recommended not to initialize conda.
+
+- if this is working, you can create and activate a new environment for pydmclab
+
+```bash
+conda create -n dmc python=3.9
+source activate dmc
+```
+
+- the new environment automatically lives in `~/.conda/envs/`
+
+- install `numpy` prior to attempting to install `pydmclab`
+
+```bash
+conda install numpy
+```
+
+- if you have not already, make a `bin` in your home directory and clone the repository
+
+```bash
+mkdir ~/bin
+cd ~/bin
+git clone https://github.umn.edu/bartel-group/pydmclab.git
+```
+
+- navigate to the repository (always pull the latest version before installing)
+
+```bash
+cd pydmclab
+git pull
+```
+
+- install `pydmclab`
+
+```bash
+pip install .
+```
+
+- install `ipython`
+
+```bash
+conda install ipython
+```
+
+- test the installation by loading and manipulating a sample structure
+
+```bash
+cd ~/bin/pydmclab/demos/outputs/mlp-relaxation/chgnet
+ipython
+```
+
+```python
+from pydmclab.utils.handy import read_json
+from pydmclab.core.struc.StrucTools import StrucTools
+
+strucs = read_json('chgnet-relax-strucs.json')
+```
+
+- the specific structure(s) in this file may vary, you can view them with `strucs.keys()` and continue with any structure of interest
+- for example...
+
+```python
+st = StrucTools(strucs[`Ir1O2`][`mp-2723`])
+supercell_struc = st.make_supercell([2, 2, 2])
+perturbed_supercell = supercell_struc.perturb(0.1)
+```
+
+- if you are able to load and manipulate structures, the installation was successful and you should add the following to your the end of your `.bashrc` file.
+- `module load conda` - to prevent the need to load the module each time you log in
+- `source activate dmc` - to automatically activate the environment each time you log in
 
 # General best practices
 
@@ -705,6 +804,7 @@ launch_dirs = {<composition>/<unique ID for that composition>/<standard>/<unique
   - thorough unit tests
 
 ## Miscellaneous (including non-python)
+
 - alloys
   - SQS (ATAT)
   - alloy phase diagrams

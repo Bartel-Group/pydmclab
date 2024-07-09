@@ -54,8 +54,8 @@ def main():
             print(f"Initial energy: {chgnet_observer.energies[0]:.4f} eV/atom")
             print(f"Final energy: {chgnet_observer.energies[-1]:.4f} eV/atom")
 
-    return strucs
+    return None
 
 
 if __name__ == "__main__":
-    strucs = main()
+    main()
