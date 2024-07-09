@@ -99,7 +99,7 @@ pip install . --prefix=/home/cbartel/cbartel/bin/anaconda3
 - to install these extra versions, you can do the following:
 
 ```bash
-pip install . -e ".[{extra_version}]"
+pip install -e ".[{extra_version}]"
 ```
 
 - where `{extra_version}` is one of `mlp`, `defects`, or `phonons`
