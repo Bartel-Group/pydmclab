@@ -2,7 +2,7 @@ import os
 import numpy as np
 from pydmclab.core.struc import StrucTools
 from pydmclab.mlp.chgnet_md import CHGNetRelaxer, CHGNetObserver
-from pydmclab.hpc.helpers import get_query, get_strucs
+from pydmclab.hpc.helpers import get_legacy_query, get_strucs
 
 API_KEY = "azRTXUxQ8u2qcyfl"
 
@@ -14,7 +14,7 @@ COMPS = ["IrO2"]
 
 
 def main():
-    query = get_query(
+    query = get_legacy_query(
         comp=COMPS,
         api_key=API_KEY,
         only_gs=True,
@@ -25,13 +25,13 @@ def main():
         max_strucs_per_cmpd=4,
         data_dir=DATA_DIR,
         savename="chgnet-relax-query.json",
-        remake=True,
+        remake=False,
     )
     strucs = get_strucs(
         query=query,
         data_dir=DATA_DIR,
         savename="chgnet-relax-strucs.json",
-        remake=True,
+        remake=False,
     )
 
     for cmpd in strucs:
