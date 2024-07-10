@@ -30,17 +30,14 @@ def get_vasp_configs(
 ):
     """
     configs related to VASP calculations
-
     Args:
         standard (str):
             "dmc" for group standard, "mp" for Materials Project standard
                 This affects how pymatgen VaspSets get modified
                 See pydmclab.hpc.sets.GetSet.user_*_settings for more details
-
         dont_relax_cell (bool)
             if True, sets ISIF = 2 for all calculations
             if False, do nothing
-
         <input_file>_mods (dict)
             <input_file> in [incar, kpoints, potcar]
             all of these mods expect a dictionary of the format
@@ -50,7 +47,6 @@ def get_vasp_configs(
                 use xc-calc = 'all-<calc>' to apply modification to all xcs for a given <calc>
                 use xc-calc = '<xc>-all' to apply modifications to all calcs for a given <xc>
                 use xc-calc = 'all-all' to apply modifications to all xcs and all calcs
-
         incar_mods (dict)
             modifications to INCAR (on top of the VaspSet determined by pydmclab.hpc.sets.GetSet)
                 e.g., to modify INCAR settings for all of your metagga calculations:
@@ -58,50 +54,39 @@ def get_vasp_configs(
                                     'EDIFF' : 1e-7}}
                 e.g., to modify only your gga-relax calculations
                     {'gga-relax' : {'EDIFFG' : -0.05}}
-
         kpoints_mods (dict):
             modifications to KPOINTS (see pydmclab.hpc.sets.GetSet.user_kpoints_settings for options)
                 e.g., to set an 8x8x8 grid for all gga calculations
                     {'gga-all' : {'grid' : [8, 8, 8]}}
-
         potcar_mods (dict):
             modifications to POTCAR
                 e.g., to change your W pseudopotential for all calculations
                     {'all-all' : {'W' : 'W_pv'}}
-
         flexible_convergence_criteria (bool):
             if True, reduce EDIFF/EDIFFG if convergence is taking very many steps
             if False, only update NELM and NSW if convergence is taking very many steps
-
         compare_static_and_relax_energies (float):
             if True, if the difference between static and relax energies is greater than this, rerun the static calculation
             if False, don't compare the energies
-
         special_functional (dict or bool)
             if you're not using r2SCAN, PBE, or HSE06, specify here
                 e.g., {'gga' : 'PS'} would use PBESol for gga calculations
                 e.g., {'metagga' : 'SCAN'} would use SCAN for metagga calculations
             if False, do nothing
-
         COHPSteps (int):
             how many (E, DOS) points do you want in LOBSTER outputs
                 only applies to xc-calc='all-lobster'
-
         reciprocal_kpoints_density_for_lobster (int):
             kppra for LOBSTER calculations (higher is denser grid)
                 only applies to xc-calc='all-lobster'
-
         bandstructure_symprec (float):
             symmetry precision for finding primitive cell before bandstructure calculation
                 only applies to xc-calc='all-bs'
-
         bandstructure_kpoints_line_density (int):
             number of KPOINTS between each high-symmetry k-point for bandstructure calculation
                 only applies to xc-calc='all-bs'
-
     Returns:
         dictionary of configs relevant to running VASP
-
     """
     if incar_mods is None:
         incar_mods = {}
@@ -141,34 +126,24 @@ def get_slurm_configs(
     account="cbartel",
 ):
     """
-
     configs related to HPC settings for each submission script
-
     Args:
         total_nodes (int):
             how many nodes to run each VASP job on
-
         cores_per_node (int):
             how many cores per node to use for each VASP job
-
         walltime_in_hours (int):
             how long to run each VASP job
-
         mem_per_core (str):
             if 'all', try to use all avaiable mem; otherwise use specified memory (int, MB) per core
-
         partition (str):
             what part of the cluster to run each VASP job on
-
         error_file (str):
             where to send each VASP job errors
-
         output_file (str):
             where to send each VASP job outputs
-
         account (str):
             what account to charge for your VASP jobs
-
     Returns:
         {slurm config name : slurm config value}
     """
@@ -228,65 +203,50 @@ def get_sub_configs(
     machine="msi",
     mpi_command="mpirun",
     vasp_version=6,
+    struc_src_for_hse="metagga-relax",
 ):
     """
-
     configs related to generating submission scripts
-
     Args:
         relaxation_xcs (list):
             list of xcs you want to run relax + static for
                 e.g., ['gga', 'metaggau'] if you want to run PBE and R2SCAN+U calculations
-
         static_addons (dict):
             {xc : [list of additional calculations to run after static]}
                 e.g., {'gga' : ['lobster', 'parchg']} if you want to run LOBSTER and PARCHG analysis after your PBE calculation
-
         prioritize_relaxes (bool):
             the combination of relaxation_xcs and static_addons generates a calc_list (the order of calculations to be executed)
                 if True, run relax+static for all relaxation_xcs first, then run static_addons
                 if False, run xc by xc, so once a relax+static finishes for an xc, run all of that xc's static_addons next
-
             e.g.,
                 if relaxation_xcs = ['gga', 'metagga']
                 and static_addons = {'gga' : ['lobster'], 'metagga' : ['bs']}
-
                 if prioritize_relaxes = True,
                     calc_list = ['gga-relax', 'gga-static', 'metagga-relax', 'metagga-static', 'gga-lobster', 'metagga-bs']
-
                 if prioritize_relaxes = False,
                     calc_list = ['gga-relax', 'gga-static', 'gga-lobster', 'metagga-relax', 'metagga-static', 'metagga-lobster']
-
         start_with_loose (bool):
             if True, your first relaxation_xc will start with a loose calc before relax --> static
             if False, no loose calculations will be performed
-
         custom_calc_list (list):
             if you don't want to autogenerate a calc_list, you can specify the full list you want to run here
                 e.g., ['metagga-static'] would only run this single xc-calc
-
         restart_these_calcs (list):
             list of xc-calcs you want to start over (e.g., ['gga-lobster'])
-
         submit_calculations_in_parallel (bool or int):
             whether to prepare submission scripts in parallel or not
                 False: use 1 processor
                 True: use all available processors - 1
                 int: use that many processors
             you should only execute this function on a login node if submit_calculations_in_parallel = False
-
         machine (str):
             name of supercomputer
-
         mpi_command (str):
             the command to use for mpi (eg mpirun, srun, etc)
-
         vasp_version (int):
             5 for 5.4.4 or 6 for 6.4.1
-
     Returns:
         {config_name : config_value}
-
     """
     sub_configs = {}
 
@@ -313,6 +273,7 @@ def get_sub_configs(
     sub_configs["static_addons"] = static_addons
     sub_configs["machine"] = machine
     sub_configs["vasp_version"] = vasp_version
+    sub_configs["struc_src_for_hse"] = struc_src_for_hse
 
     if prioritize_relaxes:
         sub_configs["run_static_addons_before_all_relaxes"] = False
@@ -328,28 +289,22 @@ def get_launch_configs(
     ID_specific_vasp_configs=None,
 ):
     """
-
     configs related to launching chains of calculations
-
     Args:
         n_afm_configs (int):
             number of antiferromagnetic configurations to run for each structure (0 if you don't want to run AFM)
                 these are generated using pydmclab.core.mag.MagTools
                 each configuration will be its own calculation directory (afm_0, afm_1, ...)
-
         override_mag (str or bool):
             if False, do nothing
             if str, set mag to override_mag (rather than letting pydmclab.core.mag.MagTools figure out if it might be magnetic)
                 NOTE: not sure if this is working
-
         ID_specific_vasp_configs (dict):
             use this to modify VASP configs for a subset of the structures you're calculating
                 {<formula_indicator>_<struc_indicator> : {'incar_mods' : {<INCAR tag> : <value>}, {'kpoints' : <kpoints value>}, {'potcar' : <potcar value>}}
-
             e.g.,
                 to change EDIFF for the perovskite polymorph of SrZrS3
                     {'SrZrS3_perovskite' : {'incar_mods' : {'EDIFF' : 1e-5}}}
-
     Returns:
         dictionary of launch configurations
             {config param : config value}
@@ -378,49 +333,35 @@ def get_analysis_configs(
     verbose=False,
 ):
     """
-
     configs related to parsing calculations and compiling results
-
     Args:
-
         only_calc (bool or str):
             if str, only analyze this calc (eg 'static')
             if list, only analyze these calculations (eg ['static','lobster'])
             if None, analyze all calculations
-
         only_xc (bool or str):
             if str, only analyze this xc (eg 'gga')
             if list, only analyze these xcs (eg ['gga','ggau'])
             if None, analyze all xcs
-
         analyze_structure (bool):
             True to include structure in your results
-
         analyze_trajectory (bool):
             True to include ionic relaxation trajectory in your results
-
         analyze_mag (bool):
             True to include magnetization in your results
-
         analyze_charge (bool):
             True to include bader charge + lobster charges + madelung in your results
-
         analyze_dos (bool):
             True to include pdos, tdos in your results
-
         analyze_bonding (bool):
             True to include tcohp, pcohp, tcoop, pcoop, tcobi, pcobi in your results
-
         exclude (list):
             list of strings to exclude from analysis
                 overwrites other options
-
         remake_results (bool):
             if True, regeneration calc_dir/results.json file even if it exists and calc hasn't re-started
-
         verbose (bool):
             print ('analyzing %s' % calc_dir) whenever one is being analyzed
-
     Returns:
         dictionary of configs related to analysis
             {config param (str) : config value (str, bool)}
@@ -481,13 +422,11 @@ def get_query(
 ):
     """
     Use this to retrieve data + structures from the Materials Project (next-gen)
-
     Args:
         api_key (str or None)
             your API key (should be 32 characters for next-gen database)
                 can be None, but you need to configure pymatgen w/ your MP API key
                      `pmg config --add PMG_MAPI_KEY <USER_API_KEY>`
-
         search_for (str or list)
             can either be:
                 a chemical system (str) of elements joined by "-"
@@ -503,52 +442,39 @@ def get_query(
                     eg ['CaO', 'CaTiO3']
                 MP IDs (str)
                     eg ['mp-1', 'mp-2']
-
         max_Ehull (float)
             upper bound on energy above hull for retrieved entries
-
         max_polymorph_energy (float)
             upper bound on polymorph energy for retrieved entries
                 set to 0 to only retrieve ground-state structures for all compositions
-
         max_strucs_per_cmpd (int)
             upper bound on number of polymorphs to retrieve for each queried composition
                 retains the lowest energy ones
-
         max_sites_per_structure (int)
             upper bound on number of sites in retrieved structures
-
         include_sub_phase_diagrams (bool)
             if True, include all sub-phase diagrams for a given composition
                 e.g., if search_for = "Sr-Zr-S", then also include "Sr-S" and "Zr-S" in the query
-
         include_structure (bool)
             if True, include the structure (as a dictionary) for each entry
-
         properties (list or None)
             list of properties to query
                 if None, then use pydmclab.core.query.MPQuery.typical_properties
                 if 'all', then use all properties
                 if a string, then add that property to typical_properties
                 if a list, then add those properties to typical_properties
-
         data_dir (str)
             directory to save fjson
-
         savename (str)
             filename for fjson in data_dir
-
         remake (bool)
             write (True) or just read (False) fjson
-
     Returns:
         {ID (str) : {'structure' : Pymatgen Structure as dict,
                     '<other property>' : whatever you queried for}}
-
         e.g.,
             {'mp-1234' : {'structure' : Structure.as_dict,
                           'E_mp' : -5.4321}}
-
         Note: if you don't want to use MP data, you can create your own `get_query` function that gets whatever data you want
             e.g., it might return
             {'SrZrS3_perovskite' : {'structure' : Structure.as_dict,
@@ -598,7 +524,6 @@ def get_legacy_query(
 ):
     """
     NOTE: this is deprecated for get_query
-
     Args:
         comp (list or str)
             can either be:
@@ -607,48 +532,35 @@ def get_legacy_query(
             can either be a list of:
                 - chemical systems (str) of elements joined by "-"
                 - chemical formulas (str)
-
         api_key (str):
             your API key for Materials Project
-
         properties (list or None)
             list of properties to query
                 - if None, then use typical_properties
                 - if 'all', then use supported_properties
-
         criteria (dict or None)
             dictionary of criteria to query
                 - if None, then use {}
-
         only_gs (bool)
             if True, remove non-ground state polymorphs for each unique composition
-
         include_structure (bool)
             if True, include the structure (as a dictionary) for each entry
-
         supercell_structure (bool)
             only runs if include_structure = True
             if False, just retrieve the MP structure
             if not False, must be specified as [a,b,c] to make an a x b x c supercell of the MP structure
-
         max_Ehull (float)
             if not None, remove entries with Ehull_mp > max_Ehull
-
         max_sites_per_structure (int)
             if not None, remove entries with more than max_sites_per_structure sites
-
         max_strucs_per_cmpd (int)
             if not None, only retain the lowest energy structures for each composition until you reach max_strucs_per_cmpd
-
         data_dir (str)
             directory to save fjson
-
         savename (str)
             filename for fjson in data_dir
-
         remake (bool)
             write (True) or just read (False) fjson
-
     Returns:
         {ID (str) : {'structure' : Pymatgen Structure as dict,
                     < any other data you want to keep track of >}}
@@ -697,38 +609,28 @@ def get_strucs(
 ):
     """
     You should rarely use this default function, but it should give you an idea how to make your own structures
-
     Args:
         query (dict)
             {<unique structure indicator> (e.g., MP ID) :
                 {'structure' : Pymatgen Structure as dict,
                  '<any other info>' : ...}}
-
             usually generated with get_query (or similar custom function)
-
         data_dir (str)
             directory to save fjson
-
         savename (str)
             filename for fjson in DATA_DIR
-
         remake (bool)
             write (True) or just read (False) fjson
-
         force_supercell (bool)
             whether to create a 2x2x2 supercell for structures with only 1 atom
-
     Returns:
         {formula_indicator (str) :
             {struc_indicator (str) :
                 Pymatgen Structure object as dict}}
-
         e.g., if you got some MP data, this might return something like:
             {'Cl3Cs1Pb1' : {'mp-1234' : Structure.as_dict}}
-
         e.g., if you made this yourself, it might look like:
             {'Li2FeP2S6' : {'ordering_0' : Structure.as_dict}}
-
         All structures within a formula_indicator should have the same composition
         It's fine if the struc_indicator alone does not define a material, but formula_indicator + struc_indicator should
     """
@@ -781,31 +683,23 @@ def get_magmoms(
         strucs (dict)
             {formula_indicator :
                 {struc_indicator : structure}}
-
             usually generated with get_strucs (or similar custom function)
-
         max_afm_combos (int)
             maximum number of AFM configurations to generate
-
         treat_as_nm (list)
             any normally mag els you'd like to treat as nonmagnetic for AFM enumeration
                 e.g., if you know Ti won't be magnetic, you could set to ['Ti']
-
         data_dir (str)
             directory to save fjson
-
         savename (str)
             filename for fjson in data_dir
-
         remake (bool)
             write (True) or just read (False) fjson
-
     Returns:
         {formula identifier (str) :
             {structure identifier for that formula (str) :
                 {AFM ordering identifier (str) :
                     [list of magmoms (floats) for each site in the structure]}}}
-
         e.g.,
         {'Cr2O3' :
             {'mp-4321' :
@@ -861,70 +755,53 @@ def get_launch_dirs(
             {formula_indicator
                 : {struc_indicator
                     : structure}}
-
             usually generated w/ get_strucs (or similar custom function)
-
         magmoms (dict)
             {formula_indicator :
                 {struc_indicator :
                     {AFM configuration index :
                         [list of magmoms on each site]}}
-
             usually generated w/ get_magmoms (or similar custom function)
-
         user_configs (dict)
             optional configs that apply to launch directories
                 these usually get generated using get_launch_configs
-
                 n_afm_configs = 0 by default
                     how many AFM configurations to run
-
                 override_mag = False by default
                     could be 'nm' if you only want to run nonmagnetic,
                     won't check for whether structure is mag or not mag,
                     it will just do as you say
                     (not sure if this is properly implemented)
-
                 ID_specific_vasp_configs: None by default
                     {<formula_indicator>_<struc_indicator> :
                         {'incar_mods' : {<incar_key> : <incar_val>},
                         {'kpoints_mods' : {<kpoints_key> : <kpoints_val>},
                         {'potcar_mods' : {<potcar_key> : <potcar_val>}}
-
         make_launch_dirs (bool)
             make launch directories (True) or just return launch dict (False)
-
         data_dir (str)
             directory to save fjson
                 usually is this ../data
-
         calcs_dir (str)
             directory that holds all your calculations
                 usually this is ../calcs or /scratch/..../calcs
-
         savename (str)
             filename for fjson in data_dir
-
         remake (bool)
             write (True) or just read (False) fjson
-
     Returns:
         {launch_dir (str) :
             {'magmom' : [list of magmoms for the structure in that launch_dir (list)],
              'ID_specific_vasp_configs' : {<formula_indicator>_<struc_indicator> : {desired configs for this entry}}}
-
         Returns the minimal list of directories that will house submission files (each of which launch a chain of calcs)
             note a chain of calcs must have the same structure and magnetic information, otherwise, there's no reason to chain them
                 so the launch_dir defines: structure, magmom, ID-specific configs
-
         These launch_dirs have a very prescribed structure:
             calcs_dir / formula_indicator / struc_indicator / mag
-
             e.g.,
                 ../calcs/Nd2O7Ru2/mp-19930/fm
                 ../calcs/LiMn2O4_1/3/afm_4
                     (if LiMn2O4_1 was a unique compositional indicator and 3 was a unique structural indicator)
-
         also makes launch_dir and populates with POSCAR using strucs if make_dirs=True
     """
 
@@ -972,7 +849,6 @@ def check_launch_dirs(launch_dirs):
 def submit_one_calc(submit_args):
     """
     Prepares VASP inputs, writes submission script, and launches job for one launch_dir
-
     Args:
         submit_args (dict) should contain:
             {'launch_dir' :
@@ -991,10 +867,8 @@ def submit_one_calc(submit_args):
                 running_in_parallel (bool)
                     whether to run in parallel (True) or not (False)
                 }
-
     Returns:
         None
-
     """
     launch_dir = submit_args["launch_dir"]
     launch_dirs = submit_args["launch_dirs"]
@@ -1057,107 +931,75 @@ def submit_calcs(
 ):
     """
     Prepares VASP inputs, writes submission script, and launches job for all launch_dirs
-
     Args:
         launch_dirs (dict)
             {launch_dir (str) :
                 {'magmom' : [list of magmoms for the structure in that launch_dir (list)],
                  'ID_specific_vasp_configs' : {<formula_indicator>_<struc_indicator> : {desired configs for this entry}}}
-
              usually generated with get_launch_dirs
-
         user_configs (dict)
             optional sub or slurm configs
                 these normally get generated using get_sub_configs and get_slurm_configs
-
                 relaxation_xcs: default is ['gga']
                     list of xcs you want to at least run relax + static for
-
                 static_addons: default is {'gga' : ['lobster']}
                     dictionary of things you want to do after a static is converged. eg {'metagga' : ['lobster', 'bs']}
-
                 run_static_addons_before_all_relaxes: default is False
                     if False, prioritize relaxes finishing; if True, run static addons as soon as possible
-
                 custom_calc_list: default is None
                     complete list of calcs in the order you want to run (if you don't want these generated automatically)
-
                 start_with_loose: default is False
                     if True, add gga-loose or ggau-loose as your very first calc in the list to calculate
-
                 fresh_restart: default is None
                     if you want to start certain calcs over set them in a list here. eg ['metaggau-lobster', 'metagga-bs']
-
                 vasp: default is vasp_std
                     which vasp do you want to use
                         use vasp_gam for "loose" calcs (havent implemented yet)
-
                 vasp_version: default is 6
                     version of VASP (can be 5 for 5.4.4 or 6 for 6.4.1)
-
                 mpi_command: default is mpirun
                     how to launch on multicore/multinode (may be mpirun depending on compilation)
-
                 manager: default is '#SBATCH'
                     how to manage interactions with the queue (some machines dont use slurm)
-
                 machine: default is msi
                     which supercomputer
-
                 execute_flags: default is ['srun', 'python', 'bin/lobster', 'bin/vasp', 'bader', 'mpirun']
                     how to figure out if a submission script needs to be launched
-
                 n_procs_for_submission: default is 1
                     how many cores to parallelize the submission part of the launcher on
                         note: this has nothing to do w/ how many cores each VASP calc runs on
                         only affects how many cores this function gets executed on
-
                 nodes: default is 1
                     how many nodes
-
                 ntasks: default is 8
                     how many total cores
-
                 time: default is 1440
                     how long in minutes before hitting walltime
-
                 error: default is log.e
                     where to write slurm errors to in launch_dir
-
                 output: default is log.o
                     where to write slurm output to in launch_dir
-
                 account: default is cbartel
                     account to charge
-
                 partition: default is agsmall,msismall,msidmc
                     partition to use
-
                 job-name: default is None
                     unique job name; if none provided, will default to formula_indicator.struc_indicator.mag.project_dir
                         e.g., default might be SrZrS3.mp-1234.afm_0.perovskite_chalcs
-
                 mem-per-cpu: default is None
                     specify mem per core
-
                 mem-per-gpu: default is None
                     specify mem per gpu core
-
                 constraint: default is None
                     may not need this ever on MSI
-
                 qos: default is None
                     may not need this ever on MSI
-
         ready_to_launch (bool)
             write and launch (True) or just write submission scripts (False)
-
         n_procs (int or str)
             if parallelizing, how many processors
-
     Returns:
         None
-
     """
 
     if user_configs is None:
@@ -1219,86 +1061,59 @@ def get_results(
             {launch_dir (str) :
                 {'magmom' : [list of magmoms for the structure in that launch_dir (list)],
                  'ID_specific_vasp_configs' : {<formula_indicator>_<struc_indicator> : {desired configs for this entry}}}
-
         user_configs (dict)
             optional analysis configurations
                 usually generated using get_analysis_configs
-
                 only_calc: default is 'static'
                     only retrieve data from the static calculations
-
                 only_xc: default is None
                     if None, retrieve all xcs, else retrieve only the one specified
-
                 check_relax_energy: default is True
                     make sure the relax calculation and the static have similar energies
-
                 include_metadata: default is True
                     include metadata like INCAR, KPOINTS, POTCAR settings
-
                 include_calc_setup: default is True
                     include things related to the calculation setup -- mag, xc, etc
-
                 include_structure: default is True
                     include the relaxed crystal structure as a dict
-
                 include_trajectory: default is False
                     include the compact trajectory from the vasprun.xml
-
                 include_mag: default is False
                     include the relaxed magnetization info as as dict
-
                 include_tdos: default is False
                     include the light version of the density of states
-
                 include_pdos: default is False
                     include heavy dos
-
                 include_charge: default is False
                     include partial chage info
-
                 include_madelung: default is False
                     include Madelung energies
-
                 include_tcohp: default is False
                     include light COHPCAR data
-
                 include_pcohp: default is False
                     include heavy COHPCAR data
-
                 include_tcoop: default is False
                     include light COOPCAR data
-
                 include_pcoop: default is False
                     include heavy COOPCAR data
-
                 include_tcobi: default is False
                     include light COBICAR data
-
                 include_pcobi: default is False
                     include heavy COBICAR data
-
                 include_entry: default is False
                     include pymatgen computed structure entry
-
                 create_cif: default is True
                     create a .cif file for each CONTCAR
-
                 verbose: default is True
                     print stuff as things get analyzed
-
                 remake_results: default is False
                     whether or not to rerun analyzer in each calculation directory
-
         data_dir (str)
             directory to save fjson
-
         savename (str)
             filename for fjson in data_dir
-
         remake (bool)
             write (True) or just read (False) fjson
-
     Returns:
         {formula--ID--mag--xc-calc (str) :
             {scraped results from VASP calculation}}
@@ -1366,29 +1181,45 @@ def get_gs(
         results (dict)
             {formula--ID--mag--xc-calc (str) : {scraped results from VASP calculation}}
             usually generated with get_results
-
         include_structure (bool)
             include the structure or not
-
         non_default_functional (str)
             if you're not using r2SCAN or PBE
-
+        calc_types_to_search (tuple)
+            tuple of calculation types to include, e.g., ("static", "defect_neutral, "defect_charged_p1")
         calc_types_to_search (tuple)
             tuple of calculation types to include, e.g., ("static", "defect_neutral, "defect_charged_p1")
 
         compute_Ef (bool)
             if True, compute formation enthalpy
-
         data_dir (str)
             directory to save fjson
-
         savename (str)
             filename for fjson in data_dir
-
         remake (bool)
             write (True) or just read (False) fjson
-
     Returns:
+        for "static" only:
+            {xc (str, the exchange-correlation method) :
+                {formula (str) :
+                    {'E' : energy of the ground-structure,
+                    'key' : formula--ID--mag--xc-calc for the ground-state structure,
+                    'structure' : structure of the ground-state structure,
+                    'n_started' : how many polymorphs you tried to calculate,
+                    'n_converged' : how many polymorphs are converged,
+                    'complete' : True if n_converged = n_started (i.e., all structures for this formula at this xc are done),
+                    'Ef' : formation enthalpy at 0 K}}}
+        otherwise:
+            {calc_type (str, [static, defect_neutral, ...]) :
+                {xc (str, the exchange-correlation method) :
+                    {formula (str) :
+                        {'E' : energy of the ground-structure,
+                        'key' : formula--ID--mag--xc-calc for the ground-state structure,
+                        'structure' : structure of the ground-state structure,
+                        'n_started' : how many polymorphs you tried to calculate,
+                        'n_converged' : how many polymorphs are converged,
+                        'complete' : True if n_converged = n_started (i.e., all structures for this formula at this xc are done),
+                        'Ef' : formation enthalpy at 0 K}}}}
         for "static" only:
             {xc (str, the exchange-correlation method) :
                 {formula (str) :
@@ -1418,6 +1249,39 @@ def get_gs(
     results = {
         key: results[key]
         for key in results
+        if results[key]["meta"]["setup"]["calc"] in calc_types_to_search
+    }
+
+    calc_types = sorted(
+        list(set([results[key]["meta"]["setup"]["calc"] for key in results]))
+    )
+
+    gs = {}
+    for calc_type in calc_types:
+        gs[calc_type] = {
+            xc: {}
+            for xc in sorted(
+                list(
+                    set(
+                        [
+                            results[key]["meta"]["setup"]["xc"]
+                            for key in results
+                            if results[key]["meta"]["setup"]["calc"] == calc_type
+                        ]
+                    )
+                )
+            )
+        }
+
+    for calc_type in gs:
+        for xc in gs[calc_type]:
+            keys = [
+                k
+                for k in results
+                if results[k]["meta"]["setup"]["calc"] == calc_type
+                if results[k]["meta"]["setup"]["xc"] == xc
+                if results[k]["results"]["formula"]
+            ]
         if results[key]["meta"]["setup"]["calc"] in calc_types_to_search
     }
 
@@ -1512,7 +1376,6 @@ def get_gs(
 def check_gs(gs):
     """
     checks that this dictionary is generated properly
-
     """
 
     print("\nchecking ground-states")
@@ -1566,12 +1429,10 @@ def get_thermo_results(
     remake=False,
 ):
     """
-
     Args:
         results (dict):
             {formula--ID--mag--xc-calc (str) : {scraped results from VASP calculation}}
             usually generated with get_results
-
         gs (dict):
             {xc (str, the exchange-correlation method) :
                 {formula (str) :
@@ -1583,16 +1444,12 @@ def get_thermo_results(
                     'complete' : True if n_converged = n_started (i.e., all structures for this formula at this xc are done),
                     'Ef' : formation enthalpy at 0 K}
             usually generated with get_gs
-
         data_dir (str)
             directory to save fjson
-
         savename (str)
             fjson name in data_dir
-
         remake (bool)
             Read (False) or write (True) json
-
     Returns:
         {xc (str) :
             {formula (str) :
@@ -1606,14 +1463,19 @@ def get_thermo_results(
     fjson = os.path.join(data_dir, savename)
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
-
-    thermo_results = {xc: {formula: {} for formula in gs[xc]} for xc in gs}
+    
+    if "lobster" in gs:
+        thermo_results = {calc: {xc: {formula: {} for formula in gs[calc][xc]} for xc in gs[calc]} for calc in gs}
+    else:
+        thermo_results = {xc: {formula: {} for formula in gs[xc]} for xc in gs}
 
     for key in results:
         tmp_thermo = {}
 
         xc = results[key]["meta"]["setup"]["xc"]
         formula = results[key]["results"]["formula"]
+        calc = results[key]["meta"]["setup"]["calc"]
+        
         ID = "__".join(
             [
                 results[key]["meta"]["setup"]["formula_indicator"],
@@ -1633,6 +1495,9 @@ def get_thermo_results(
         tmp_thermo["calculated_formula"] = calcd_formula
 
         if E:
+            if "lobster" in gs:
+                gs = gs[calc]
+                
             gs_key = gs[xc][formula]["key"]
             if "Ef" in gs[xc][formula]:
                 gs_Ef = gs[xc][formula]["Ef"]
@@ -1661,8 +1526,11 @@ def get_thermo_results(
             tmp_thermo["Ef"] = None
             tmp_thermo["is_gs"] = False
             tmp_thermo["all_polymorphs_converged"] = False
-
-        thermo_results[xc][formula][ID] = tmp_thermo
+        
+        if "lobster" in thermo_results:
+            thermo_results[calc][xc][formula][ID] = tmp_thermo
+        else:
+            thermo_results[xc][formula][ID] = tmp_thermo
 
     write_json(thermo_results, fjson)
     return read_json(fjson)
@@ -1671,33 +1539,64 @@ def get_thermo_results(
 def check_thermo_results(thermo):
     print("\nchecking thermo results")
 
-    for xc in thermo:
-        print("\nxc = %s" % xc)
-        for formula in thermo[xc]:
-            print("formula = %s" % formula)
+    if "lobster" in thermo:
+        for calc in thermo:
+            for xc in thermo[calc]:
+                print("\nxc = %s" % xc)
+                for formula in thermo[calc][xc]:
+                    print("formula = %s" % formula)
+                    print(
+                        "%i polymorphs converged"
+                        % len([k for k in thermo[calc][xc][formula] if thermo[calc][xc][formula][k]["E"]])
+                    )
+                    gs_ID = [k for k in thermo[calc][xc][formula] if thermo[calc][xc][formula][k]["is_gs"]]
+                    if gs_ID:
+                        gs_ID = gs_ID[0]
+                        print("%s is the ground-state structure" % gs_ID)
+
+        print("\n\n  SUMMARY  ")
+        for calc in thermo:
+            for xc in thermo[calc]:
+                print("~~%s~~" % xc)
+                converged_formulas = []
+                for formula in thermo[calc][xc]:
+                    for ID in thermo[calc][xc][formula]:
+                        if thermo[calc][xc][formula][ID]["all_polymorphs_converged"]:
+                            converged_formulas.append(formula)
+
+                converged_formulas = list(set(converged_formulas))
+                print(
+                    "%i/%i formulas have all polymorphs converged"
+                    % (len(converged_formulas), len(thermo[calc][xc].keys()))
+                )
+    else:
+        for xc in thermo:
+            print("\nxc = %s" % xc)
+            for formula in thermo[xc]:
+                print("formula = %s" % formula)
+                print(
+                    "%i polymorphs converged"
+                    % len([k for k in thermo[xc][formula] if thermo[xc][formula][k]["E"]])
+                )
+                gs_ID = [k for k in thermo[xc][formula] if thermo[xc][formula][k]["is_gs"]]
+                if gs_ID:
+                    gs_ID = gs_ID[0]
+                    print("%s is the ground-state structure" % gs_ID)
+
+        print("\n\n  SUMMARY  ")
+        for xc in thermo:
+            print("~~%s~~" % xc)
+            converged_formulas = []
+            for formula in thermo[xc]:
+                for ID in thermo[xc][formula]:
+                    if thermo[xc][formula][ID]["all_polymorphs_converged"]:
+                        converged_formulas.append(formula)
+
+            converged_formulas = list(set(converged_formulas))
             print(
-                "%i polymorphs converged"
-                % len([k for k in thermo[xc][formula] if thermo[xc][formula][k]["E"]])
+                "%i/%i formulas have all polymorphs converged"
+                % (len(converged_formulas), len(thermo[xc].keys()))
             )
-            gs_ID = [k for k in thermo[xc][formula] if thermo[xc][formula][k]["is_gs"]]
-            if gs_ID:
-                gs_ID = gs_ID[0]
-                print("%s is the ground-state structure" % gs_ID)
-
-    print("\n\n  SUMMARY  ")
-    for xc in thermo:
-        print("~~%s~~" % xc)
-        converged_formulas = []
-        for formula in thermo[xc]:
-            for ID in thermo[xc][formula]:
-                if thermo[xc][formula][ID]["all_polymorphs_converged"]:
-                    converged_formulas.append(formula)
-
-        converged_formulas = list(set(converged_formulas))
-        print(
-            "%i/%i formulas have all polymorphs converged"
-            % (len(converged_formulas), len(thermo[xc].keys()))
-        )
 
 
 def get_dos_results(
@@ -1717,37 +1616,26 @@ def get_dos_results(
     Args:
         results (dict)
             from get_results
-
         thermo_results (dict)
             from get_thermo_results
-
         only_gs (bool)
             if True, only get DOS/COHP for the ground-state polymorphs
-
         only_xc (str)
             if not None, only get DOS/COHP for this XC
-
         only_formulas (list)
             if not None, only get DOS/COHP for these formulas
-
         only_standard (str)
             if not None, only get DOS/COHP for this standard
-
         dos_to_store (list)
             which DOS/COHP to store ['tcohp', 'pcohp', 'tdos', 'pdos', etc]
-
         regenerate_dos (bool)
             if True, make pdos/tdos jsons again even if it exists
-
         regenerate_cohp (bool)
             if True, make pcohp/tcohp jsons again even if it exists
-
         data_dir (str)
             path to data directory
-
         savename (str)
             name of json file to save results to
-
         remake (bool)
             if True, remake the json file
     """
@@ -1774,41 +1662,71 @@ def get_dos_results(
             ]
         )
         formula = results[key]["results"]["formula"]
-        thermo_result = thermo_results[xc][formula][ID]
+        if "lobster" in thermo_results:
+            tmp_thermo = thermo_results[calc][xc][formula][ID]
+        else:
+            tmp_thermo = thermo_results[xc][formula][ID]
         if only_gs:
-            if not thermo_result["is_gs"]:
+            if not tmp_thermo["is_gs"]:
                 continue
         if only_formulas:
-            if thermo_result["formula"] not in only_formulas:
+            if tmp_thermo["formula"] not in only_formulas:
                 continue
         if only_xc:
             if xc != only_xc:
                 continue
         av = AnalyzeVASP(calc_dir)
-        if "tdos" in dos_to_store:
-            pdos = av.pdos(remake=regenerate_dos)
-            tdos = av.tdos(pdos=pdos, remake=regenerate_dos)
-            thermo_results[xc][formula][ID]["tdos"] = tdos
-        if "pdos" in dos_to_store:
-            thermo_results[xc][formula][ID]["pdos"] = pdos
-        if "tcohp" in dos_to_store:
-            pcohp = av.pcohp(remake=regenerate_cohp)
-            tcohp = av.tcohp(pcohp=pcohp, remake=regenerate_cohp)
-            thermo_results[xc][formula][ID]["tcohp"] = tcohp
-        if "pcohp" in dos_to_store:
-            thermo_results[xc][formula][ID]["pcohp"] = pcohp
-        if "tcoop" in dos_to_store:
-            pcohp = av.pcohp(are_coops=True, remake=regenerate_cohp)
-            tcohp = av.tcohp(pcohp=pcohp, remake=regenerate_cohp)
-            thermo_results[xc][formula][ID]["tcoop"] = tcohp
-        if "pcoop" in dos_to_store:
-            thermo_results[xc][formula][ID]["pcoop"] = pcohp
-        if "tcobi" in dos_to_store:
-            pcohp = av.pcohp(are_cobis=True, remake=regenerate_cohp)
-            tcohp = av.tcohp(pcohp=pcohp, remake=regenerate_cohp)
-            thermo_results[xc][formula][ID]["tcobi"] = tcohp
-        if "pcobi" in dos_to_store:
-            thermo_results[xc][formula][ID]["pcobi"] = pcohp
+        
+        if "lobster" in thermo_results:
+            if "tdos" in dos_to_store:
+                pdos = av.pdos(remake=regenerate_dos)
+                tdos = av.tdos(pdos=pdos, remake=regenerate_dos)
+                thermo_results[calc][xc][formula][ID]["tdos"] = tdos
+            if "pdos" in dos_to_store:
+                thermo_results[calc][xc][formula][ID]["pdos"] = pdos
+            if "tcohp" in dos_to_store:
+                pcohp = av.pcohp(remake=regenerate_cohp)
+                tcohp = av.tcohp(pcohp=pcohp, remake=regenerate_cohp)
+                thermo_results[calc][xc][formula][ID]["tcohp"] = tcohp
+            if "pcohp" in dos_to_store:
+                thermo_results[calc][xc][formula][ID]["pcohp"] = pcohp
+            if "tcoop" in dos_to_store:
+                pcohp = av.pcohp(are_coops=True, remake=regenerate_cohp)
+                tcohp = av.tcohp(pcohp=pcohp, remake=regenerate_cohp)
+                thermo_results[calc][xc][formula][ID]["tcoop"] = tcohp
+            if "pcoop" in dos_to_store:
+                thermo_results[calc][xc][formula][ID]["pcoop"] = pcohp
+            if "tcobi" in dos_to_store:
+                pcohp = av.pcohp(are_cobis=True, remake=regenerate_cohp)
+                tcohp = av.tcohp(pcohp=pcohp, remake=regenerate_cohp)
+                thermo_results[calc][xc][formula][ID]["tcobi"] = tcohp
+            if "pcobi" in dos_to_store:
+                thermo_results[calc][xc][formula][ID]["pcobi"] = pcohp
+        else:
+            if "tdos" in dos_to_store:
+                pdos = av.pdos(remake=regenerate_dos)
+                tdos = av.tdos(pdos=pdos, remake=regenerate_dos)
+                thermo_results[xc][formula][ID]["tdos"] = tdos
+            if "pdos" in dos_to_store:
+                thermo_results[xc][formula][ID]["pdos"] = pdos
+            if "tcohp" in dos_to_store:
+                pcohp = av.pcohp(remake=regenerate_cohp)
+                tcohp = av.tcohp(pcohp=pcohp, remake=regenerate_cohp)
+                thermo_results[xc][formula][ID]["tcohp"] = tcohp
+            if "pcohp" in dos_to_store:
+                thermo_results[xc][formula][ID]["pcohp"] = pcohp
+            if "tcoop" in dos_to_store:
+                pcohp = av.pcohp(are_coops=True, remake=regenerate_cohp)
+                tcohp = av.tcohp(pcohp=pcohp, remake=regenerate_cohp)
+                thermo_results[xc][formula][ID]["tcoop"] = tcohp
+            if "pcoop" in dos_to_store:
+                thermo_results[xc][formula][ID]["pcoop"] = pcohp
+            if "tcobi" in dos_to_store:
+                pcohp = av.pcohp(are_cobis=True, remake=regenerate_cohp)
+                tcohp = av.tcohp(pcohp=pcohp, remake=regenerate_cohp)
+                thermo_results[xc][formula][ID]["tcobi"] = tcohp
+            if "pcobi" in dos_to_store:
+                thermo_results[xc][formula][ID]["pcobi"] = pcohp
 
     write_json(thermo_results, fjson)
     return read_json(fjson)
@@ -1825,20 +1743,15 @@ def get_entries(
         results (dict)
             from get_results
                 {formula--ID--standard--mag--xc-calc (str) : {scraped results from VASP calculation}}
-
         data_dir (str)
             path to data directory
-
         savename (str)
             name of json file to save results to
-
         remake (bool)
             if True, remake the json file
-
     Returns:
         dictionary with ComputedStructureEntry objects for each of your completed calculations
             {'entries' : [list of ComputedStructureEntry.as_dict() objects]}
-
         note: each of these entries has the "key" from the results dictionary stored as entry['data']['material_id']
     """
     fjson = os.path.join(data_dir, savename)
@@ -1863,31 +1776,24 @@ def get_mp_entries(
             list of chemical systems to get entries for (e.g., ['Li-Fe-O', 'Mg-Cr-O'])
                 will include "sub phase diagrams" in query
                 e.g., for 'Li-Fe-O', will include 'Li-Fe-O', 'Li-Fe', 'Li-O', 'Fe-O', 'Li', 'Fe', 'O'
-
         api_key (str)
             your Materials Project API key
-
         thermo_types (list)
             list of thermo types to get entries for
                 this could be ['GGA_GGA+U'], ['R2SCAN'], ['GGA_GGA+U', 'R2SCAN']
             if None, will get all data regardless of thermo_type (note: this should be equivalent to thermo_types=['GGA_GGA+U', 'R2SCAN'])
-
         data_dir (str)
             path to data directory
-
         savename (str)
             name of json file to save results to
-
         remake (bool)
             if True, remake the json file
-
     Returns:
         dictionary of ComputedStructureEntry objects from the Materials Project
             {chemsys (str) :
                 [list of ComputedStructureEntry.as_dict() objects]}
             note: the mp-id is stored as entry['data']['material_id']
             note: the xc is stored in entry['parameters']['run_type']
-
     """
     fjson = os.path.join(data_dir, savename)
     if os.path.exists(fjson) and not remake:
@@ -1918,24 +1824,18 @@ def get_merged_entries(
         my_entries (dict)
             from get_entries
                 {'entries' : [list of ComputedStructureEntry.as_dict() objects]}
-
         mp_entries (dict)
             from get_mp_entries
                 {chemsys (str) : [list of ComputedStructureEntry.as_dict() objects]}
-
         restrict_my_xc_to (str)
             if not None, only include my entries with this xc
                 e.g., 'GGA', 'GGA+U', 'r2SCAN'
-
         data_dir (str)
             path to data directory
-
         savename (str)
             name of json file to save results to
-
         remake (bool)
             if True, remake the json file
-
     Returns:
         dictionary of ComputedStructureEntry objects from the Materials Project and your calculations
             {chemsys (str) :
@@ -1993,16 +1893,12 @@ def get_mp_compatible_Efs(
         merged_entries (dict)
             from get_merged_entries
                 {chemsys (str) : [list of ComputedStructureEntry.as_dict() objects]}
-
         data_dir (str)
             path to data directory
-
         savename (str)
             name of json file to save results to
-
         remake (bool)
             if True, remake the json file
-
     Returns:
         dictionary of compatible formation energies for each chemsys
             {chemsys (str) :
@@ -2045,10 +1941,8 @@ def crawl_and_purge(
     Args:
         head_dir (str)
             directory to start crawling beneath
-
         files_to_purge (list)
             list of file names to purge
-
         safety (str)
             'on' or 'off' to turn on/off safety
                 - if safety is on, won't actually delete files

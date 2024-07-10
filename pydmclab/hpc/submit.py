@@ -2,6 +2,7 @@ import os
 from shutil import copyfile, rmtree
 import subprocess
 import json
+from collections import OrderedDict
 
 from pydmclab.core.struc import StrucTools
 from pydmclab.hpc.vasp import VASPSetUp
@@ -196,15 +197,23 @@ class SubmitTools(object):
             for xc in xcs:
                 if xc in static_addons:
                     calcs += ["-".join([xc, calc]) for calc in static_addons[xc]]
+        if ("hse06" not in relaxation_xcs) and ("hse06" in static_addons):
+            # if we're running hse06 addons but not hse06 relaxations and statics
+            calcs += ["-".join(["hse06", "preggastatic"])]
+            calcs += ["hse06-" + addon for addon in static_addons["hse06"]]
 
         final_calcs = []
         for xc_calc in calcs:
             xc, calc = xc_calc.split("-")
-            if calc in ["lobster", "bs"]:
+            if calc in ["lobster", "bs", "parchg"]:
                 final_calcs.append("-".join([xc, "prelobster"]))
+                if calc == "parchg":
+                    final_calcs.append("-".join([xc, "lobster"]))
             final_calcs.append(xc_calc)
 
-        return final_calcs
+        ordered_calcs = OrderedDict.fromkeys(final_calcs)
+        final_minimal_calcs = list(ordered_calcs.keys())
+        return final_minimal_calcs
 
     @property
     def queue_manager(self):
@@ -727,6 +736,7 @@ class SubmitTools(object):
                     "calc_dir": calc_dir,
                     "incar_mods": incar_mods,
                     "launch_dir": launch_dir,
+                    "struc_src_for_hse": configs["struc_src_for_hse"],
                 }
                 passer_dict_as_str = json.dumps(passer_dict)
 

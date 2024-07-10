@@ -88,6 +88,7 @@ class GetSet(object):
         Returns VaspSet (ie which MP set do we want to customize from)
         """
         xc = self.xc
+        calc = self.calc
 
         if xc in ["gga", "ggau"]:
             # start from MP relax for GGA or GGA+U
@@ -96,8 +97,12 @@ class GetSet(object):
             # start from MP Scan for metaGGA or metaGGA+U
             return MPScanRelaxSet
         elif xc in ["hse06"]:
-            # start fom MP HSE for HSE06
-            return MPHSERelaxSet
+            if calc in ["preggastatic"]:
+                # start fom MP HSE for HSE06
+                return MPRelaxSet
+            else:
+                # start fom MP HSE for HSE06
+                return MPHSERelaxSet
         else:
             raise NotImplementedError(f"xc: {xc} not implemented")
 
@@ -146,7 +151,7 @@ class GetSet(object):
         # these three calcs are static --> turn off relaxation things
         if calc in [
             "static",
-            "prelobster",
+        #    "prelobster",
             "lobster",
             "parchg",
         ]:
@@ -160,10 +165,10 @@ class GetSet(object):
             new_settings["ICHARG"] = 0
             new_settings["LAECHG"] = True
 
-        if calc == "prelobster":
-            new_settings["ISMEAR"] = -5
-            new_settings["NELM"] = 0
-            new_settings["NSW"] = 0
+        #if calc == "prelobster":
+        #    new_settings["ISMEAR"] = -5
+        #    new_settings["NELM"] = 0
+        #    new_settings["NSW"] = 0
 
         # for DFPT --> set explicit requirements
         if calc == "dfpt":
@@ -267,6 +272,20 @@ class GetSet(object):
             for setting, value in calc_settings.items():
                 new_settings[setting] = value
 
+        # for preggastatic --> set explicit requirements
+        if calc == "preggastatic":
+            new_settings["LWAVE"] = True
+            new_settings["LDAU"] = False
+            new_settings["NSW"] = 0
+            new_settings["ISIF"] = None
+            new_settings["IBRION"] = None
+            new_settings["POTIM"] = None
+            new_settings["LCHARG"] = True
+            new_settings["LORBIT"] = 0
+            new_settings["LVHAR"] = True
+            new_settings["ICHARG"] = 0
+            new_settings["LAECHG"] = True
+
         # now we'll customize based on a given standard
 
         # dmc is the only one implemented other than MP. for MP, we leave alone
@@ -296,7 +315,7 @@ class GetSet(object):
             else:
                 new_settings["METAGGA"] = functional[xc]
 
-        if xc in ["gga", "ggau"]:
+        if xc in ["gga", "ggau", "hse06"]:
             functional = self.configs["functional"]
             # PBE is default
             if not functional:
@@ -334,6 +353,10 @@ class GetSet(object):
         else:
             new_settings["ISPIN"] = 2
             new_settings["LORBIT"] = 11
+    
+        if xc == "hse06":
+            # speeding up the calculation by treating KPAR (number) of k-points in parallel
+            new_settings["KPAR"] = 4
 
         # if we asked for a KPOINTS file (grid, auto, etc), turn off KSPACING
         if user_passed_kpoints_settings:
@@ -361,7 +384,7 @@ class GetSet(object):
         """
         user_passed_settings = self.modify_kpoints
 
-        calc = self.calc
+        xc, calc = self.xc, self.calc
 
         new_settings = {}
 
@@ -371,6 +394,10 @@ class GetSet(object):
             new_settings["reciprocal_density"] = self.configs[
                 "reciprocal_kpoints_density_for_lobster"
             ]
+
+        # default (light) grid for HSE06 calcs (including preggastatic); user can changes this with modify_kpoints = {'hse06-all' : [X, Y, Z]}
+        # if xc == "hse06":
+        #     new_settings["grid"] = [2, 2, 2]
 
         if "1kpt" in calc:
             new_settings["grid"] = [1, 1, 1]
