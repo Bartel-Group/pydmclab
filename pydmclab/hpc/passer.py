@@ -123,7 +123,7 @@ class Passer(object):
             if curr_calc != "parchg":
                 # for hse06-parchg, inherit from hse06-static; for other addons in hse06, inherit from preggastatic
                 prev_xc_calc = curr_xc_calc.replace(curr_calc, "preggastatic")
-            return prev_xc_calc
+                return prev_xc_calc
         
         if curr_calc == "parchg":
             # for parchg, inherit from lobster
