@@ -1187,9 +1187,6 @@ def get_gs(
             if you're not using r2SCAN or PBE
         calc_types_to_search (tuple)
             tuple of calculation types to include, e.g., ("static", "defect_neutral, "defect_charged_p1")
-        calc_types_to_search (tuple)
-            tuple of calculation types to include, e.g., ("static", "defect_neutral, "defect_charged_p1")
-
         compute_Ef (bool)
             if True, compute formation enthalpy
         data_dir (str)
@@ -1220,27 +1217,6 @@ def get_gs(
                         'n_converged' : how many polymorphs are converged,
                         'complete' : True if n_converged = n_started (i.e., all structures for this formula at this xc are done),
                         'Ef' : formation enthalpy at 0 K}}}}
-        for "static" only:
-            {xc (str, the exchange-correlation method) :
-                {formula (str) :
-                    {'E' : energy of the ground-structure,
-                    'key' : formula--ID--mag--xc-calc for the ground-state structure,
-                    'structure' : structure of the ground-state structure,
-                    'n_started' : how many polymorphs you tried to calculate,
-                    'n_converged' : how many polymorphs are converged,
-                    'complete' : True if n_converged = n_started (i.e., all structures for this formula at this xc are done),
-                    'Ef' : formation enthalpy at 0 K}}}
-        otherwise:
-            {calc_type (str, [static, defect_neutral, ...]) :
-                {xc (str, the exchange-correlation method) :
-                    {formula (str) :
-                        {'E' : energy of the ground-structure,
-                        'key' : formula--ID--mag--xc-calc for the ground-state structure,
-                        'structure' : structure of the ground-state structure,
-                        'n_started' : how many polymorphs you tried to calculate,
-                        'n_converged' : how many polymorphs are converged,
-                        'complete' : True if n_converged = n_started (i.e., all structures for this formula at this xc are done),
-                        'Ef' : formation enthalpy at 0 K}}}}
     """
     fjson = os.path.join(data_dir, savename)
     if os.path.exists(fjson) and not remake:
@@ -1249,39 +1225,6 @@ def get_gs(
     results = {
         key: results[key]
         for key in results
-        if results[key]["meta"]["setup"]["calc"] in calc_types_to_search
-    }
-
-    calc_types = sorted(
-        list(set([results[key]["meta"]["setup"]["calc"] for key in results]))
-    )
-
-    gs = {}
-    for calc_type in calc_types:
-        gs[calc_type] = {
-            xc: {}
-            for xc in sorted(
-                list(
-                    set(
-                        [
-                            results[key]["meta"]["setup"]["xc"]
-                            for key in results
-                            if results[key]["meta"]["setup"]["calc"] == calc_type
-                        ]
-                    )
-                )
-            )
-        }
-
-    for calc_type in gs:
-        for xc in gs[calc_type]:
-            keys = [
-                k
-                for k in results
-                if results[k]["meta"]["setup"]["calc"] == calc_type
-                if results[k]["meta"]["setup"]["xc"] == xc
-                if results[k]["results"]["formula"]
-            ]
         if results[key]["meta"]["setup"]["calc"] in calc_types_to_search
     }
 
