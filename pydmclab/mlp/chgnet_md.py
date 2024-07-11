@@ -1,91 +1,346 @@
-from chgnet.model import StructOptimizer, CHGNet
-from pydmclab.mlp.md import Relaxer, Observer
+import os
+import io
+import sys
+import inspect
+import contextlib
+import pickle as pkl
+from enum import Enum
+from typing import TYPE_CHECKING, Literal
+
+from chgnet.model import CHGNet
+from chgnet.utils import determine_device
+
+import numpy as np
+import ase.optimize as opt
+from ase import Atoms
+from ase.calculators.calculator import Calculator, all_changes, all_properties
+
 from pymatgen.core.structure import Structure
+from pymatgen.io.ase import AseAtomsAdaptor
+
+from typing_extensions import Self
+from ase.optimize.optimize import Optimizer
 
 
-class CHGNetRelaxer(Relaxer):
-    """for relaxing structures using CHGNet"""
+class OPTIMIZERS(Enum):
+    """An enumeration of optimizers for used in."""
+
+    fire = opt.fire.FIRE
+    bfgs = opt.bfgs.BFGS
+    lbfgs = opt.lbfgs.LBFGS
+    lbfgslinesearch = opt.lbfgs.LBFGSLineSearch
+    mdmin = opt.mdmin.MDMin
+    scipyfmincg = opt.sciopt.SciPyFminCG
+    scipyfminbfgs = opt.sciopt.SciPyFminBFGS
+    bfgslinesearch = opt.bfgslinesearch.BFGSLineSearch
+
+
+class CHGNetCalculator(Calculator):
+    """CHGNet Calculator for ASE applications."""
+
+    implemented_properties = ("energy", "forces", "stress", "magmoms")
 
     def __init__(
         self,
-        initial_structure: Structure,
+        model: CHGNet | Literal["0.2.0", "0.3.0"] | None = None,
+        *,
+        use_device: Literal["mps", "cuda", "cpu"] | None = None,
+        check_cuda_mem: bool = False,
+        stress_weight: float | None = 1 / 160.21766208,
+        on_isolated_atoms: Literal["ignore", "warn", "error"] = "warn",
+        **kwargs,
     ) -> None:
-        """
+
+        super().__init__(**kwargs)
+
+        device = determine_device(use_device=use_device, check_cuda_mem=check_cuda_mem)
+        self.device = device
+        self.stress_weight = stress_weight
+
+        if isinstance(model, str):
+            self.model = CHGNet.load(model_name=model, verbose=False).to(self.device)
+        else:
+            self.model = (model or CHGNet.load(verbose=False)).to(self.device)
+
+        self.model.graph_converter.set_isolated_atom_response(on_isolated_atoms)
+        print(f"CHGNet will run on {self.device}")
+
+    @classmethod
+    def from_file(
+        cls,
+        path: str | os.PathLike,
+        use_device: Literal["mps", "cuda", "cpu"] | None = None,
+        check_cuda_mem: bool = False,
+        stress_weight: float | None = 1 / 160.21766208,
+        on_isolated_atoms: Literal["ignore", "warn", "error"] = "warn",
+        **kwargs,
+    ) -> Self:
+        """Load a user's CHGNet model and initialize the Calculator."""
+        return cls(
+            model=CHGNet.from_file(path),
+            use_device=use_device,
+            check_cuda_mem=check_cuda_mem,
+            stress_weight=stress_weight,
+            on_isolated_atoms=on_isolated_atoms,
+            **kwargs,
+        )
+
+    @property
+    def version(self) -> str | None:
+        """The version of CHGNet."""
+        return self.model.version
+
+    @property
+    def n_params(self) -> int:
+        """The number of parameters in CHGNet."""
+        return self.model.n_params
+
+    def calculate(
+        self,
+        atoms: Atoms | None = None,
+        properties: list | None = None,
+        system_changes: list | None = None,
+    ) -> None:
+        """Calculate various properties of the atoms using CHGNet.
+
         Args:
-            initial_structure (pymatgen.Structure):
-                initial structure to optimize (relax)
+            atoms (Atoms | None): The atoms object to calculate properties for.
+            properties (list | None): The properties to calculate.
+                Default is all properties.
+            system_changes (list | None): The changes made to the system.
+                Default is all changes.
         """
-        super().__init__(initial_structure)
-        self._model = CHGNet.load()
-        self._relaxer = StructOptimizer(model=self._model)
-        self.results = self._relaxer.relax(self.initial_structure, verbose=False)
-        self.predictions = {
-            "initial": self._model.predict_structure(structure=self.initial_structure),
-            "final": self._model.predict_structure(structure=self.final_structure),
+        properties = properties or all_properties
+        system_changes = system_changes or all_changes
+        super().calculate(
+            atoms=atoms,
+            properties=properties,
+            system_changes=system_changes,
+        )
+
+        # Run CHGNet
+        structure = AseAtomsAdaptor.get_structure(atoms)
+        graph = self.model.graph_converter(structure)
+        model_prediction = self.model.predict_graph(
+            graph.to(self.device), task="efsm", return_crystal_feas=True
+        )
+
+        # Convert Result
+        factor = 1 if not self.model.is_intensive else structure.composition.num_atoms
+        self.results.update(
+            energy=model_prediction["e"] * factor,
+            forces=model_prediction["f"],
+            free_energy=model_prediction["e"] * factor,
+            magmoms=model_prediction["m"],
+            stress=model_prediction["s"] * self.stress_weight,
+            crystal_fea=model_prediction["crystal_fea"],
+        )
+
+
+class CHGNetObserver:
+    """Trajectory observer is a hook in the relaxation process that saves the
+    intermediate structures.
+    """
+
+    def __init__(self, atoms: Atoms) -> None:
+        """Create a TrajectoryObserver from an Atoms object.
+
+        Args:
+            atoms (Atoms): the structure to observe.
+        """
+        self.atoms = atoms
+        self.energies: list[float] = []
+        self.forces: list[np.ndarray] = []
+        self.stresses: list[np.ndarray] = []
+        self.magmoms: list[np.ndarray] = []
+        self.atom_positions: list[np.ndarray] = []
+        self.cells: list[np.ndarray] = []
+        self.atomic_numbers: list[int] = []
+
+    def __call__(self) -> None:
+        """The logic for saving the properties of an Atoms during the relaxation."""
+        self.energies.append(self.atoms.get_potential_energy())
+        self.forces.append(self.atoms.get_forces())
+        self.stresses.append(self.atoms.get_stress())
+        self.magmoms.append(self.atoms.get_magnetic_moments())
+        self.atom_positions.append(self.atoms.get_positions())
+        self.cells.append(self.atoms.get_cell()[:])
+        self.atomic_numbers.append(self.atoms.get_atomic_numbers())
+
+    def __len__(self) -> int:
+        """The number of steps in the trajectory."""
+        return len(self.energies)
+
+    def save(self, filename: str) -> None:
+        """Save the trajectory to file.
+
+        Args:
+            filename (str): filename to save the trajectory
+        """
+        out_pkl = {
+            "energy": self.energies,
+            "forces": self.forces,
+            "stresses": self.stresses,
+            "magmoms": self.magmoms,
+            "atom_positions": self.atom_positions,
+            "cell": self.cells,
+            "atomic_number": self.atomic_numbers,
         }
+        with open(filename, "wb") as file:
+            pkl.dump(out_pkl, file)
 
 
-class CHGNetObserver(Observer):
-    """for manipulating CHGNet trajectories"""
+class CHGNetRelaxer:
+    """Wrapper class for structural relaxation."""
 
     def __init__(
         self,
-        relaxer: CHGNetRelaxer,
+        model: CHGNet | CHGNetCalculator | Literal["0.2.0", "0.3.0"] | None = None,
+        optimizer: Optimizer | str = "FIRE",
+        use_device: Literal["mps", "cuda", "cpu"] | None = None,
+        check_cuda_mem: bool = False,
+        stress_weight: float | None = 1 / 160.21766208,
+        on_isolated_atoms: Literal["ignore", "warn", "error"] = "warn",
     ) -> None:
-        """
-        Args:
-            relaxer (CHGNetRelaxer): CHGNetRelaxer object
-        """
-        super().__init__(relaxer)
-        self.structures = self._set_structures()
-        self.energies = self._set_energies()
 
-    def _set_structures(self):
-        """
-        Returns:
-            list of structures (pymatgen.Structure)
-        """
-        strucs = []
-        species = [atom for atom in self.initial_structure.species]
+        self.optimizer: Optimizer = (
+            OPTIMIZERS[optimizer.lower()].value
+            if isinstance(optimizer, str)
+            else optimizer
+        )
 
-        atom_positions = self.trajectory.atom_positions
-        cells = self.trajectory.cells
-        magmoms = self.trajectory.magmoms
+        if isinstance(model, CHGNetCalculator):
+            self.calculator = model
+            self.model = self.calculator.model
+        else:
+            self.calculator = CHGNetCalculator(
+                model=model,
+                use_device=use_device,
+                check_cuda_mem=check_cuda_mem,
+                stress_weight=stress_weight,
+                on_isolated_atoms=on_isolated_atoms,
+            )
+            self.model = self.calculator.model
 
-        for i, (coord, lattice, magmom) in enumerate(
-            zip(atom_positions, cells, magmoms)
-        ):
-            strucs.append(
-                Structure(
-                    lattice=lattice,
-                    species=species,
-                    coords=coord,
-                    site_properties={"magmom": magmom},
+    @classmethod
+    def from_file(
+        cls,
+        path: str | os.PathLike,
+        optimizer: Optimizer | str = "FIRE",
+        use_device: Literal["mps", "cuda", "cpu"] | None = None,
+        check_cuda_mem: bool = False,
+        stress_weight: float | None = 1 / 160.21766208,
+        on_isolated_atoms: Literal["ignore", "warn", "error"] = "warn",
+        **kwargs,
+    ) -> Self:
+        """Load a user's CHGNet model and initialize the Calculator."""
+        return cls(
+            model=CHGNet.from_file(path),
+            optimizer=optimizer,
+            use_device=use_device,
+            check_cuda_mem=check_cuda_mem,
+            stress_weight=stress_weight,
+            on_isolated_atoms=on_isolated_atoms,
+            **kwargs,
+        )
+
+    @property
+    def version(self) -> str | None:
+        """The version of CHGNet."""
+        return self.model.version
+
+    @property
+    def n_params(self) -> int:
+        """The number of parameters in CHGNet."""
+        return self.model.n_params
+
+    def relax(
+        self,
+        atoms: Structure | Atoms,
+        *,
+        fmax: float | None = 0.1,
+        steps: int | None = 500,
+        relax_cell: bool | None = True,
+        ase_filter: str | None = "FrechetCellFilter",
+        params_asefilter: dict | None = None,
+        traj_path: str | None = None,
+        interval: int | None = 1,
+        verbose: bool = True,
+        assign_magmoms: bool = True,
+        **kwargs,
+    ) -> dict[str, Structure | CHGNetObserver]:
+        """Relax the Structure/Atoms until maximum force is smaller than fmax."""
+
+        from ase import filters
+        from ase.filters import Filter
+
+        valid_filter_names = [
+            name
+            for name, cls in inspect.getmembers(filters, inspect.isclass)
+            if issubclass(cls, Filter)
+        ]
+
+        if isinstance(ase_filter, str):
+            if ase_filter in valid_filter_names:
+                ase_filter = getattr(filters, ase_filter)
+            else:
+                raise ValueError(
+                    f"Invalid {ase_filter=}, must be one of {valid_filter_names}. "
                 )
+
+        if isinstance(atoms, Structure):
+            atoms = AseAtomsAdaptor().get_atoms(atoms)
+        atoms.calc = self.calculator
+
+        stream = sys.stdout if verbose else io.StringIO()
+        params_asefilter = params_asefilter or {}
+        with contextlib.redirect_stdout(stream):
+            obs = CHGNetObserver(atoms)
+
+            if relax_cell:
+                atoms = ase_filter(atoms, **params_asefilter)
+
+            optimizer: Optimizer = self.optimizer(atoms, **kwargs)
+            optimizer.attach(obs, interval=interval)
+            optimizer.run(fmax=fmax, steps=steps)
+            obs()
+
+        if traj_path is not None:
+            obs.save(traj_path)
+
+        if isinstance(atoms, Filter):
+            atoms = atoms.atoms
+
+        struct = AseAtomsAdaptor.get_structure(atoms)
+        if assign_magmoms:
+            for key in struct.site_properties:
+                struct.remove_site_property(property_name=key)
+            struct.add_site_property(
+                "magmom", [float(magmom) for magmom in atoms.get_magnetic_moments()]
             )
 
-        return strucs
-
-    def _set_energies(self):
-        """
-        Returns:
-            list of energies (eV/atom) (float)
-        """
-        energies_per_atom = [
-            energy / len(self.initial_structure) for energy in self.trajectory.energies
-        ]
-        return energies_per_atom
+        return {"final_structure": struct, "trajectory": obs}
 
 
 def main():
-    fposcar = "../data/test_data/vasp/AlN/POSCAR"
-    chgnet_relaxer = CHGNetRelaxer(fposcar)
-    chgnet_trajectory = CHGNetObserver(chgnet_relaxer)
+    struct = Structure.from_file("./mp-18767-LiMnO2.cif")
 
-    print(chgnet_trajectory.energies)
+    relaxer = CHGNetRelaxer(model="0.3.0", use_device="mps")
 
-    return chgnet_relaxer, chgnet_trajectory
+    results = relaxer.relax(
+        struct,
+        fmax=0.1,
+        steps=500,
+        relax_cell=True,
+        ase_filter="FrechetCellFilter",
+        traj_path="traj_out.traj",
+        interval=1,
+        verbose=True,
+        assign_magmoms=True,
+    )
+
+    return results
 
 
 if __name__ == "__main__":
-    rel, traj = main()
+    results = main()
