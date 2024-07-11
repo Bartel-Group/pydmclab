@@ -385,9 +385,13 @@ class Passer(object):
         src_dir = self.prev_calc_dir
         dst_dir = self.calc_dir
 
-        fsrc = os.path.join(src_dir, "IBZKPT")
-        if os.path.exists(fsrc):
-            copyfile(fsrc, os.path.join(dst_dir, "KPOINTS"))
+        fsrc_kpt = os.path.join(src_dir, "KPOINTS")
+        fsrc_ibz = os.path.join(src_dir, "IBZKPT")
+        if os.path.exists(fsrc_ibz):
+            copyfile(fsrc_ibz, os.path.join(dst_dir, "KPOINTS"))
+            return "copied kpoints"
+        elif os.path.exists(fsrc_kpt):
+            copyfile(fsrc_kpt, os.path.join(dst_dir, "KPOINTS"))
             return "copied kpoints"
         return None
 
