@@ -355,6 +355,8 @@ class GetSet(object):
             new_settings["LORBIT"] = 11
     
         if xc == "hse06":
+            if calc == "parchg":
+                del new_settings["KPAR"]
             # speeding up the calculation by treating KPAR (number) of k-points in parallel
             new_settings["KPAR"] = 2
 
