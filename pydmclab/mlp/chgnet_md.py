@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 import io
 import sys
@@ -5,6 +7,7 @@ import inspect
 import contextlib
 import pickle as pkl
 from enum import Enum
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, Literal
 
 from chgnet.model import CHGNet
@@ -18,8 +21,12 @@ from ase.calculators.calculator import Calculator, all_changes, all_properties
 from pymatgen.core.structure import Structure
 from pymatgen.io.ase import AseAtomsAdaptor
 
-from typing_extensions import Self
-from ase.optimize.optimize import Optimizer
+from torch import Tensor
+
+if TYPE_CHECKING:
+    from chgnet import PredTask
+    from typing_extensions import Self
+    from ase.optimize.optimize import Optimizer
 
 
 class OPTIMIZERS(Enum):
@@ -254,6 +261,26 @@ class CHGNetRelaxer:
         """The number of parameters in CHGNet."""
         return self.model.n_params
 
+    def predict_structure(
+        self,
+        structure: Structure | Sequence[Structure],
+        *,
+        task: PredTask = "efsm",
+        return_site_energies: bool = False,
+        return_atom_feas: bool = False,
+        return_crystal_feas: bool = False,
+        batch_size: int = 16,
+    ) -> dict[str, Tensor] | list[dict[str, Tensor]]:
+        """Predict the properties of a structure or list of structures."""
+        return self.model.predict_structure(
+            structure,
+            task=task,
+            return_site_energies=return_site_energies,
+            return_atom_feas=return_atom_feas,
+            return_crystal_feas=return_crystal_feas,
+            batch_size=batch_size,
+        )
+
     def relax(
         self,
         atoms: Structure | Atoms,
@@ -320,27 +347,3 @@ class CHGNetRelaxer:
             )
 
         return {"final_structure": struct, "trajectory": obs}
-
-
-def main():
-    struct = Structure.from_file("./mp-18767-LiMnO2.cif")
-
-    relaxer = CHGNetRelaxer(model="0.3.0", use_device="mps")
-
-    results = relaxer.relax(
-        struct,
-        fmax=0.1,
-        steps=500,
-        relax_cell=True,
-        ase_filter="FrechetCellFilter",
-        traj_path="traj_out.traj",
-        interval=1,
-        verbose=True,
-        assign_magmoms=True,
-    )
-
-    return results
-
-
-if __name__ == "__main__":
-    results = main()

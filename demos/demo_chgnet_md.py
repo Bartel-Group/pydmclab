@@ -1,58 +1,44 @@
 import os
-import numpy as np
 from pydmclab.core.struc import StrucTools
-from pydmclab.mlp.chgnet_md import CHGNetRelaxer, CHGNetObserver
-from pydmclab.hpc.helpers import get_legacy_query, get_strucs
+from pydmclab.mlp.chgnet_md import CHGNetRelaxer
 
-API_KEY = "azRTXUxQ8u2qcyfl"
 
-DATA_DIR = os.path.join("outputs", "mlp-relaxation", "chgnet")
+DATA_DIR = os.path.join("output", "mlp-relaxation")
 if not os.path.exists(DATA_DIR):
     os.makedirs(DATA_DIR)
 
-COMPS = ["IrO2"]
+TEST_STRUC = os.path.join("cifs", "mp-18767-LiMnO2.cif")
+SAVE_TRAJ = os.path.join("output", "mlp-relaxation", "chgnet_traj.traj")
 
 
 def main():
-    query = get_legacy_query(
-        comp=COMPS,
-        api_key=API_KEY,
-        only_gs=True,
-        include_structure=True,
-        supercell_structure=False,
-        max_Ehull=0.05,
-        max_sites_per_structure=65,
-        max_strucs_per_cmpd=4,
-        data_dir=DATA_DIR,
-        savename="chgnet-relax-query.json",
-        remake=False,
-    )
-    strucs = get_strucs(
-        query=query,
-        data_dir=DATA_DIR,
-        savename="chgnet-relax-strucs.json",
-        remake=False,
+    # Load structure
+    initial_structure = StrucTools(TEST_STRUC).structure
+
+    # Perturb structure
+    perturbed_structure = initial_structure.perturb(0.3)
+
+    # Initialize relaxer
+    relaxer = CHGNetRelaxer(model="0.3.0", use_device="mps")
+
+    # Relax structure
+    results = relaxer.relax(
+        perturbed_structure,
+        fmax=0.1,
+        steps=50,
+        traj_path=SAVE_TRAJ,
+        verbose=False,
     )
 
-    for cmpd in strucs:
-        for mpid in strucs[cmpd]:
-            st = StrucTools(strucs[cmpd][mpid])  # Load IrO2
-            initial_structure = st.perturb(
-                0.1
-            )  # Perturb to get non-equilibrium structure
-            chgnet_relaxer = CHGNetRelaxer(
-                initial_structure=initial_structure
-            )  # Initialize Relaxer
-            chgnet_observer = CHGNetObserver(
-                relaxer=chgnet_relaxer
-            )  # Pass converged relaxer to observer
+    print(relaxer.predict_structure(initial_structure))
 
-            print(f"\n{cmpd} {mpid}")
-            print(
-                f"CHGNetObserver took {len(chgnet_observer.trajectory)} steps to converge."
-            )
-            print(f"Initial energy: {chgnet_observer.energies[0]:.4f} eV/atom")
-            print(f"Final energy: {chgnet_observer.energies[-1]:.4f} eV/atom")
+    # Get results from the observer
+    observer = results["trajectory"]
+    print("CHGNet took {} steps to converge.".format(len(observer)))
+
+    # Get initial and final energies
+    print("Initial energy: {:.3f} eV".format(observer.energies[0]))
+    print("Final energy: {:.3f} eV".format(observer.energies[-1]))
 
     return None
 
