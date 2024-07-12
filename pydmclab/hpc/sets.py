@@ -356,7 +356,7 @@ class GetSet(object):
     
         if xc == "hse06":
             # speeding up the calculation by treating KPAR (number) of k-points in parallel
-            new_settings["KPAR"] = 4
+            new_settings["KPAR"] = 2
 
         # if we asked for a KPOINTS file (grid, auto, etc), turn off KSPACING
         if user_passed_kpoints_settings:
