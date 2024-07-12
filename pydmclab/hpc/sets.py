@@ -355,8 +355,10 @@ class GetSet(object):
             new_settings["LORBIT"] = 11
     
         if xc == "hse06":
+            if calc == "parchg":
+                del new_settings["KPAR"]
             # speeding up the calculation by treating KPAR (number) of k-points in parallel
-            new_settings["KPAR"] = 4
+            new_settings["KPAR"] = 2
 
         # if we asked for a KPOINTS file (grid, auto, etc), turn off KSPACING
         if user_passed_kpoints_settings:
