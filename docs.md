@@ -140,7 +140,7 @@ source activate base
 - if this is working, you can create and activate a new environment for pydmclab
 
 ```bash
-conda create -n dmc python=3.9
+conda create -n dmc python=3.10
 source activate dmc
 ```
 
