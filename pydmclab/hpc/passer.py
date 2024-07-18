@@ -407,7 +407,7 @@ class Passer(object):
             return None
 
         if self.is_curr_calc_being_restarted:
-            return None
+            return "reading wavecar"
 
         errors_to_avoid_wavecar_passing = [
             "grad_not_orth",
@@ -615,7 +615,7 @@ class Passer(object):
             return {}
 
         # do not set KPAR for preggastatic calcs
-        if "preggastatic" in curr_calc:
+        if curr_calc in ["preggastatic", "parchg"]:
             return {}
 
         prev_number_of_kpoints = self.prev_number_of_kpoints
@@ -716,6 +716,7 @@ class Passer(object):
 
         return {"NELECT": int(charged_nelect)}
 
+    @property
     def pass_kpoints_for_lobster(self):
         """
         Passes prelobster's IBZKPT to lobster's KPOINTS
@@ -825,7 +826,8 @@ class Passer(object):
             incar_adjustments = {}
         incar = Incar.from_file(os.path.join(self.calc_dir, "INCAR"))
         ncore = incar["NCORE"] if "NCORE" in incar else 1
-        self.kpoints_based_incar_adjustments(ncore)
+        incar_adjustments.update(self.kpoints_based_incar_adjustments(ncore=ncore))
+
 
         # loop through adjustments and apply them
         for key, value in incar_adjustments.items():
