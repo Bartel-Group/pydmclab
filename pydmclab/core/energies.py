@@ -774,6 +774,10 @@ class ReactionEnergy(object):
 
         self.input_energies = input_energies
 
+        # clean the input formulas for reactants and products
+        reactants = [CompTools(c).clean for c in reactants]
+        products = [CompTools(c).clean for c in products]
+
         # turn the reactants and products into pymatgen Composition objects
         self.reactants = [Composition(c) for c in reactants]
         self.products = [Composition(c) for c in products]
