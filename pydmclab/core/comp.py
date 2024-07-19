@@ -132,6 +132,89 @@ class CompTools(object):
         """
         return np.sum(list(self.amts.values()))
 
+    @property
+    def clean_without_scaling(self):
+        """
+        Returns:
+            formula (str) that has been:
+                - sorted by elements
+                - parentheses removed
+
+        For cases where we are trying to maintain a particular basis (e.g., LaCoO2.5 instead of La2Co2O5)
+        """
+
+        # get input formula
+        formula = self.formula
+
+        # alphabetize
+        formula = Composition(formula).alphabetical_formula
+
+        # remove parentheses
+        formula = Composition(formula).to_pretty_string()
+
+        # remove "2" for diatomic elements
+        if (len(formula) <= 3) and (formula[-1] == "2"):
+            formula = formula.replace("2", "1")
+        return formula
+
+    def find_scaling(self, formula_to_compare):
+        """
+        Args:
+            formula_to_compare (str)
+                formula to compare to self.formula
+
+        Returns:
+            scaling factor (float)
+                the factor by which self.formula must be scaled to match formula_to_compare
+                e.g., self.formula = "La2Co2O5" and formula_to_compare = "LaCoO2.5", then the output will be 0.5
+        """
+
+        # get a cleaned formula and scaling factor of current formula
+        clean_self, current_formula_scale = Composition(
+            self.formula
+        ).get_integer_formula_and_factor()
+
+        # get a cleaned formula and scaling factor of comparison formula
+        clean_compare, comparison_formula_scale = Composition(
+            formula_to_compare
+        ).get_integer_formula_and_factor()
+
+        # check that the formulas represent the same compound
+        if clean_self != clean_compare:
+            raise ValueError(
+                "Formulas must represent the same compound to be compared: %s != %s"
+                % (clean_self, clean_compare)
+            )
+
+        # calculate and return scaling factor
+        return comparison_formula_scale / current_formula_scale
+
+    def scale_formula(self, scaling_factor):
+        """
+        Args:
+            scaling_factor (float)
+                the factor by which to scale the elements in the formula
+                e.g., if self.formula = "La2Co2O5" and scaling_factor = 0.5, then the output will be "LaCoO2.5"
+
+        Returns:
+            scaled formula (str)
+        """
+
+        if not isinstance(scaling_factor, (int, float)):
+            raise ValueError("scaling_factor must be an int or float")
+
+        # initialize Composition object
+        formula = Composition(self.formula)
+
+        # scale formula using built-in arthmetic operations
+        scaled_formula = formula * scaling_factor
+
+        # re-assign the formula attribute to the scaled formula so can use class methods
+        self.formula = str(scaled_formula)
+
+        # return clean version of scaled formula
+        return self.clean_without_scaling
+
     def label_for_plot(self, el_order=None):
         """
         @NOTE:
