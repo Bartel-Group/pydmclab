@@ -542,9 +542,11 @@ class AnalyzeHull(object):
             k for k in decomp_products if decomp_products[k] > min_amt_to_show
         ]
         decomp_products = {
-            k: {"amt": decomp_products[k], "E": hullin_data[k]["E"]}
-            if k in hullin_data
-            else 0
+            k: (
+                {"amt": decomp_products[k], "E": hullin_data[k]["E"]}
+                if k in hullin_data
+                else 0
+            )
             for k in relevant_decomp_products
         }
 
@@ -1097,13 +1099,28 @@ class MixingHull(object):
             for k in input_energies
         }
 
-        self.left_end_member = CompTools(left_end_member).clean
-        self.right_end_member = CompTools(right_end_member).clean
+        self.left_end_member_intended_basis = CompTools(left_end_member).scale_formula(
+            (1 / divide_left_by)
+        )
+        self.right_end_member_intended_basis = CompTools(
+            right_end_member
+        ).scale_formula((1 / divide_right_by))
 
         print(
             "Working on mixing hulls for (1-x) %s + (x) %s "
-            % (self.left_end_member, self.right_end_member)
+            % (
+                self.left_end_member_intended_basis,
+                self.right_end_member_intended_basis,
+            )
         )
+
+        self.left_end_member = CompTools(left_end_member).clean
+        self.right_end_member = CompTools(right_end_member).clean
+
+        self.intended_end_members = [
+            self.left_end_member_intended_basis,
+            self.right_end_member_intended_basis,
+        ]
         self.end_members = [self.left_end_member, self.right_end_member]
 
         self.input_energies = input_energies
@@ -1176,8 +1193,7 @@ class MixingHull(object):
         reactions = self.reactions
         input_energies = self.input_energies
         left, right = self.end_members
-        divide_left_by = self.divide_left_by
-        divide_right_by = self.divide_right_by
+        left_intended, right_intended = self.intended_end_members
         for target in reactions:
             E = input_energies[target]["E"]
 
@@ -1196,10 +1212,15 @@ class MixingHull(object):
                 coefs = reactions[target].coefs
                 rxn = reactions[target].rxn_string
 
+                left_basis_adj = 1 / CompTools(left).find_scaling(left_intended)
+                right_basis_adj = 1 / CompTools(right).find_scaling(right_intended)
+
                 # compute x based on reaction
                 n_left = abs(coefs[left]) if left in coefs else 0
                 n_right = abs(coefs[right]) if right in coefs else 0
-                x = n_right / (n_left + n_right)
+                x = (n_right * right_basis_adj) / (
+                    (n_left * left_basis_adj) + (n_right * right_basis_adj)
+                )
 
                 # compute mixing energy
                 # reaction energy as written to make 1 mole of target
@@ -1212,8 +1233,8 @@ class MixingHull(object):
                 ### target should be LEFT_{1-x}RIGHT_{x}
                 ### where LEFT and RIGHT have same basis
                 n_atoms_that_should_be_in_target = (
-                    (1 - x) * CompTools(left).n_atoms / divide_left_by
-                ) + ((x) * CompTools(right).n_atoms / divide_right_by)
+                    (1 - x) * CompTools(left).n_atoms / left_basis_adj
+                ) + ((x) * CompTools(right).n_atoms / right_basis_adj)
                 E_mix_per_fu = E_mix_per_atom * n_atoms_that_should_be_in_target
 
             energies[target] = {
