@@ -24,9 +24,9 @@ from pymatgen.io.ase import AseAtomsAdaptor
 from torch import Tensor
 
 if TYPE_CHECKING:
-    from chgnet import PredTask
+    from pydmclab.mlp import Versions, Devices, PredTask
     from typing_extensions import Self
-    from ase.optimize.optimize import Optimizer
+    from ase.optimize.optimize import Optimizer as ASEOptimizer
 
 
 class OPTIMIZERS(Enum):
@@ -45,13 +45,11 @@ class OPTIMIZERS(Enum):
 class CHGNetCalculator(Calculator):
     """CHGNet Calculator for ASE applications."""
 
-    implemented_properties = ("energy", "forces", "stress", "magmoms")
-
     def __init__(
         self,
-        model: CHGNet | Literal["0.2.0", "0.3.0"] | None = None,
+        model: CHGNet | Versions | None = None,
         *,
-        use_device: Literal["mps", "cuda", "cpu"] | None = None,
+        use_device: Devices | None = None,
         check_cuda_mem: bool = False,
         stress_weight: float | None = 1 / 160.21766208,
         on_isolated_atoms: Literal["ignore", "warn", "error"] = "warn",
@@ -75,8 +73,8 @@ class CHGNetCalculator(Calculator):
     @classmethod
     def from_file(
         cls,
-        path: str | os.PathLike,
-        use_device: Literal["mps", "cuda", "cpu"] | None = None,
+        path: str,
+        use_device: Devices | None = None,
         check_cuda_mem: bool = False,
         stress_weight: float | None = 1 / 160.21766208,
         on_isolated_atoms: Literal["ignore", "warn", "error"] = "warn",
@@ -202,15 +200,15 @@ class CHGNetRelaxer:
 
     def __init__(
         self,
-        model: CHGNet | CHGNetCalculator | Literal["0.2.0", "0.3.0"] | None = None,
-        optimizer: Optimizer | str = "FIRE",
-        use_device: Literal["mps", "cuda", "cpu"] | None = None,
+        model: CHGNet | CHGNetCalculator | Versions | None = None,
+        optimizer: ASEOptimizer | str = "FIRE",
+        use_device: Devices | None = None,
         check_cuda_mem: bool = False,
         stress_weight: float | None = 1 / 160.21766208,
         on_isolated_atoms: Literal["ignore", "warn", "error"] = "warn",
     ) -> None:
 
-        self.optimizer: Optimizer = (
+        self.optimizer: ASEOptimizer = (
             OPTIMIZERS[optimizer.lower()].value
             if isinstance(optimizer, str)
             else optimizer
@@ -233,8 +231,8 @@ class CHGNetRelaxer:
     def from_file(
         cls,
         path: str | os.PathLike,
-        optimizer: Optimizer | str = "FIRE",
-        use_device: Literal["mps", "cuda", "cpu"] | None = None,
+        optimizer: ASEOptimizer | str = "FIRE",
+        use_device: Devices | None = None,
         check_cuda_mem: bool = False,
         stress_weight: float | None = 1 / 160.21766208,
         on_isolated_atoms: Literal["ignore", "warn", "error"] = "warn",
@@ -327,7 +325,7 @@ class CHGNetRelaxer:
             if relax_cell:
                 atoms = ase_filter(atoms, **params_asefilter)
 
-            optimizer: Optimizer = self.optimizer(atoms, **kwargs)
+            optimizer: ASEOptimizer = self.optimizer(atoms, **kwargs)
             optimizer.attach(obs, interval=interval)
             optimizer.run(fmax=fmax, steps=steps)
             obs()
