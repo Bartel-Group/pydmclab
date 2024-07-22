@@ -14,7 +14,7 @@ class TorchOptimizerEnum(Enum):
     def __new__(
         cls,
         optimizer_object: TorchOptimizer,
-        default_kwargs: dict[str, (float | int)] | None = None,
+        default_kwargs: dict[str, (float | int | bool)] | None = None,
     ) -> TorchOptimizerEnum:
         obj = object.__new__(cls)
         obj._value_ = optimizer_object
@@ -26,6 +26,7 @@ class TorchOptimizerEnum(Enum):
     def __call__(
         self, params: Sequence[Parameter], learning_rate: float, **kwargs
     ) -> TorchOptimizer:
+
         # Merge default kwargs with provided kwargs
         all_kwargs = {**self._default_kwargs_, **kwargs}
         return self.value(params, learning_rate, **all_kwargs)
@@ -35,7 +36,7 @@ class TorchLrSchedulerEnum(Enum):
     def __new__(
         cls,
         scheduler_object: TorchLrScheduler,
-        default_kwargs: dict[str, (float | int)] | None = None,
+        default_kwargs: dict[str, (float | int | bool)] | None = None,
     ) -> TorchOptimizerEnum:
         obj = object.__new__(cls)
         obj._value_ = scheduler_object
@@ -50,12 +51,17 @@ class TorchLrSchedulerEnum(Enum):
         context: dict[str, (float | int | bool)],
         **kwargs,
     ) -> TorchOptimizer:
+
         # Merge default kwargs with provided kwargs
         all_kwargs = {**self._default_kwargs_, **kwargs}
+
+        # Evaluate all kwargs if they are callable, this would be set in the script that uses this enum
         evaluated_kwargs = {
             k: (v(context, all_kwargs) if callable(v) else v)
             for k, v in all_kwargs.copy().items()
         }
+
+        # Clean up kwargs that are not part of the optimizer's signature (e.g. if any of the kwargs were popped)
         evaluated_kwargs = {
             k: v for k, v in evaluated_kwargs.items() if k in all_kwargs
         }

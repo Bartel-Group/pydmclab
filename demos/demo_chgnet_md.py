@@ -27,7 +27,7 @@ def main():
         fmax=0.1,
         steps=50,
         traj_path=SAVE_TRAJ,
-        verbose=False,
+        verbose=True,
     )
 
     # Get results from the observer

@@ -120,9 +120,11 @@ class CombinedLoss(nn.Module):
             self.criterion = nn.HuberLoss(delta=delta)
         else:
             raise NotImplementedError
+
         self.target_str = target_str
         self.is_intensive = is_intensive
         self.energy_loss_ratio = energy_loss_ratio
+
         if "f" not in self.target_str:
             self.force_loss_ratio = 0
         else:
