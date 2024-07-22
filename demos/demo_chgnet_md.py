@@ -30,8 +30,6 @@ def main():
         verbose=False,
     )
 
-    print(relaxer.predict_structure(initial_structure))
-
     # Get results from the observer
     observer = results["trajectory"]
     print("CHGNet took {} steps to converge.".format(len(observer)))
