@@ -17,6 +17,7 @@ import numpy as np
 import ase.optimize as opt
 from ase import Atoms
 from ase import filters
+from ase.filters import Filter
 from ase.calculators.calculator import Calculator, all_changes, all_properties
 
 from pymatgen.core.structure import Structure
@@ -26,7 +27,6 @@ from torch import Tensor
 
 if TYPE_CHECKING:
     from pydmclab.mlp import Versions, Devices, PredTask
-    from ase.filters import Filter
     from typing_extensions import Self
     from ase.optimize.optimize import Optimizer as ASEOptimizer
 
@@ -52,7 +52,7 @@ class CHGNetCalculator(Calculator):
         "forces",
         "stress",
         "magmoms",
-    )
+    )  # Needed for ASE compatibility (DO NOT REMOVE)
 
     def __init__(
         self,
