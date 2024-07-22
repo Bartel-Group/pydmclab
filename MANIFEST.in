@@ -5,3 +5,4 @@ include pydmclab/demos/*
 include pydmclab/dev/*
 include pydmclab/hpc/*
 include pydmclab/utils/*
+include pydmclab/mlp/*
