@@ -16,6 +16,7 @@ from chgnet.utils import determine_device
 import numpy as np
 import ase.optimize as opt
 from ase import Atoms
+from ase import filters
 from ase.calculators.calculator import Calculator, all_changes, all_properties
 
 from pymatgen.core.structure import Structure
@@ -25,6 +26,7 @@ from torch import Tensor
 
 if TYPE_CHECKING:
     from pydmclab.mlp import Versions, Devices, PredTask
+    from ase.filters import Filter
     from typing_extensions import Self
     from ase.optimize.optimize import Optimizer as ASEOptimizer
 
@@ -44,6 +46,13 @@ class OPTIMIZERS(Enum):
 
 class CHGNetCalculator(Calculator):
     """CHGNet Calculator for ASE applications."""
+
+    implemented_properties = (
+        "energy",
+        "forces",
+        "stress",
+        "magmoms",
+    )
 
     def __init__(
         self,
@@ -230,7 +239,7 @@ class CHGNetRelaxer:
     @classmethod
     def from_file(
         cls,
-        path: str | os.PathLike,
+        path: str | os.PathLike[str],
         optimizer: ASEOptimizer | str = "FIRE",
         use_device: Devices | None = None,
         check_cuda_mem: bool = False,
@@ -295,9 +304,6 @@ class CHGNetRelaxer:
         **kwargs,
     ) -> dict[str, Structure | CHGNetObserver]:
         """Relax the Structure/Atoms until maximum force is smaller than fmax."""
-
-        from ase import filters
-        from ase.filters import Filter
 
         valid_filter_names = [
             name
