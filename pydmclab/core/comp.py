@@ -132,9 +132,13 @@ class CompTools(object):
         """
         return np.sum(list(self.amts.values()))
 
-    @property
-    def clean_without_scaling(self):
+    def clean_without_scaling(self, new_formula=None):
         """
+        Args:
+            new_formula (str)
+                formula to clean without scaling
+                if None, use self.formula
+
         Returns:
             formula (str) that has been:
                 - sorted by elements
@@ -144,7 +148,10 @@ class CompTools(object):
         """
 
         # get input formula
-        formula = self.formula
+        if new_formula is None:
+            formula = self.formula
+        else:
+            formula = new_formula
 
         # alphabetize
         formula = Composition(formula).alphabetical_formula
@@ -209,11 +216,8 @@ class CompTools(object):
         # scale formula using built-in arthmetic operations
         scaled_formula = formula * scaling_factor
 
-        # re-assign the formula attribute to the scaled formula so can use class methods
-        self.formula = str(scaled_formula)
-
         # return clean version of scaled formula
-        return self.clean_without_scaling
+        return self.clean_without_scaling(str(scaled_formula))
 
     def label_for_plot(self, el_order=None):
         """
