@@ -52,7 +52,7 @@ class CHGNetCalculator(Calculator):
         "forces",
         "stress",
         "magmoms",
-    )  # Needed for ASE compatibility (DO NOT REMOVE)
+    )  # Needed for ASE compatibility (Do not remove)
 
     def __init__(
         self,
@@ -73,8 +73,10 @@ class CHGNetCalculator(Calculator):
 
         if isinstance(model, str):
             self.model = CHGNet.load(model_name=model, verbose=False).to(self.device)
+        elif model is None:
+            self.model = CHGNet.load(use_device=self.device, verbose=False)
         else:
-            self.model = (model or CHGNet.load(verbose=False)).to(self.device)
+            self.model = model.to(self.device)
 
         self.model.graph_converter.set_isolated_atom_response(on_isolated_atoms)
         print(f"CHGNet will run on {self.device}")
