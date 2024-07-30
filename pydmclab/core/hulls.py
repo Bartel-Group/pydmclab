@@ -1411,15 +1411,37 @@ class MixingHull(object):
                  'E_mix_per_at' : mixing energy (float, eV/atom),
                  'x' : fraction of the right end member (float),
                  'stability' : True if the compound is on the mixing hull else False,
-                 'mixing_rxn' : mixing reaction (molar basis)}
+                 'mixing_rxn' : mixing reaction (molar basis),
+                 'basis_formula' : formula in the basis of the end members (str)}}
+
+        note: 'E_mix_per_fu is' the mixing energy per basis formula, where the basis
+              is that of the input end members (reactants)
+
         """
         stable_compounds = self.stable_compounds
         unstable_compounds = self.unstable_compounds
         mixing_energies = self.mixing_energies
+
+        # add in stability and basis formula (on which things like energy per formula are computed)
+
+        correct_left = Composition(self.left_end_member_intended_basis)
+        correct_right = Composition(self.right_end_member_intended_basis)
+
         for c in stable_compounds:
             mixing_energies[c]["stability"] = True
+            x = mixing_energies[c]["x"]
+            x = float(x)
+            correct_comp = (1 - x) * correct_left + x * correct_right
+            clean_correct_comp = CompTools(correct_comp).clean_without_scaling()
+            mixing_energies[c]["basis_formula"] = clean_correct_comp
+
         for c in unstable_compounds:
             mixing_energies[c]["stability"] = False
+            x = mixing_energies[c]["x"]
+            x = float(x)
+            correct_comp = (1 - x) * correct_left + x * correct_right
+            clean_correct_comp = CompTools(correct_comp).clean_without_scaling()
+            mixing_energies[c]["basis_formula"] = clean_correct_comp
 
         return mixing_energies
 
