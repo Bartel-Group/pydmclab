@@ -197,6 +197,9 @@ class MPQuery(object):
                     chemsyses.append("-".join(sorted(sub_els)))
             chemsyses += els
             search_for = chemsyses
+            docs = mpr.summary.search(
+            chemsys=search_for, energy_above_hull=(0, max_Ehull)
+            )
 
         # query MP based on a search for compounds containing at least these elements
         # if search_key == "elements":
