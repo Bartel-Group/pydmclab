@@ -475,15 +475,8 @@ class SubmitTools(object):
             E_per_at = AnalyzeVASP(calc_dir).E_per_at
             convergence = True if E_per_at else False
             if convergence:
-                # if calc looks converged, make sure it is actually clean
-                vsu = VASPSetUp(calc_dir, user_configs=configs)
-                is_calc_clean = vsu.is_clean
-                if not is_calc_clean:
-                    # if there were any errors or false convergences, make as continue
-                    statuses[xc_calc] = "continue"
-                else:
-                    # if it's converged and clean, then it's done
-                    statuses[xc_calc] = "done"
+                # if calc is converged
+                statuses[xc_calc] = "done"
 
             else:
                 # now we're dealing with calcs that are not converged
