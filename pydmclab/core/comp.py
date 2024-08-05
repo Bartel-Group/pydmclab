@@ -132,38 +132,6 @@ class CompTools(object):
         """
         return np.sum(list(self.amts.values()))
 
-    def clean_without_scaling(self, new_formula=None):
-        """
-        Args:
-            new_formula (str)
-                formula to clean without scaling
-                if None, use self.formula
-
-        Returns:
-            formula (str) that has been:
-                - sorted by elements
-                - parentheses removed
-
-        For cases where we are trying to maintain a particular basis (e.g., LaCoO2.5 instead of La2Co2O5)
-        """
-
-        # get input formula
-        if new_formula is None:
-            formula = self.formula
-        else:
-            formula = new_formula
-
-        # alphabetize
-        formula = Composition(formula).alphabetical_formula
-
-        # remove parentheses
-        formula = Composition(formula).to_pretty_string()
-
-        # remove "2" for diatomic elements
-        if (len(formula) <= 3) and (formula[-1] == "2"):
-            formula = formula.replace("2", "1")
-        return formula
-
     def find_scaling(self, formula_to_compare):
         """
         Args:
@@ -195,29 +163,6 @@ class CompTools(object):
 
         # calculate and return scaling factor
         return comparison_formula_scale / current_formula_scale
-
-    def scale_formula(self, scaling_factor):
-        """
-        Args:
-            scaling_factor (float)
-                the factor by which to scale the elements in the formula
-                e.g., if self.formula = "La2Co2O5" and scaling_factor = 0.5, then the output will be "LaCoO2.5"
-
-        Returns:
-            scaled formula (str)
-        """
-
-        if not isinstance(scaling_factor, (int, float)):
-            raise ValueError("scaling_factor must be an int or float")
-
-        # initialize Composition object
-        formula = Composition(self.formula)
-
-        # scale formula using built-in arthmetic operations
-        scaled_formula = formula * scaling_factor
-
-        # return clean version of scaled formula
-        return self.clean_without_scaling(str(scaled_formula))
 
     def label_for_plot(self, el_order=None):
         """
