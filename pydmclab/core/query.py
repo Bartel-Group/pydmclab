@@ -187,15 +187,16 @@ class MPQuery(object):
 
         # include sub-phase diagrams if asked for (eg for hull analysis)
         if (search_key == "chemsys") and include_sub_phase_diagrams:
+            chemsyses = []
             if isinstance(search_for, str):
-                chemsyses = [search_for]
-            else:
-                chemsyses = search_for
-            els = search_for.split("-")
-            for i in range(len(els)):
-                for sub_els in combinations(els, i + 1):
-                    chemsyses.append("-".join(sorted(sub_els)))
-            chemsyses += els
+                search_for = [search_for]
+
+            for chemsys in search_for:
+                els = chemsys.split("-")
+                for i in range(len(els)):
+                    for sub_els in combinations(els, i + 1):
+                        chemsyses.append("-".join(sorted(sub_els)))
+
             search_for = chemsyses
             docs = mpr.summary.search(
             chemsys=search_for, energy_above_hull=(0, max_Ehull)
