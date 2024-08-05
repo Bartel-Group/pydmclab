@@ -77,9 +77,9 @@ class UnitTestHulls(unittest.TestCase):
 
     def test_mixing(self):
 
-        # simplest test case (reactant basis match and are both the same as CompoundTools(formula).clean)
+        # test 1 - input end members agree with clean basis and are not divided (actual basis sane as clean)
 
-        input_energies = {
+        input_energies_1 = {
             "Al2O3": {"E": -10},
             "Ga2O3": {"E": -30},
             "AlGaO3": {"E": -25},
@@ -91,7 +91,7 @@ class UnitTestHulls(unittest.TestCase):
         divide_left, divide_right = 1, 1
 
         mh = MixingHull(
-            input_energies=input_energies,
+            input_energies=input_energies_1,
             left_end_member=end_members[0],
             right_end_member=end_members[1],
             energy_key=energy_key,
@@ -113,60 +113,24 @@ class UnitTestHulls(unittest.TestCase):
 
         self.assertEqual(results["Al1Ga1O3"]["E_mix_per_fu"], E_mix_middle_hard)
 
-        # check that input energies don't have to be clean or reduced form
-        # also check that the same basis is being maintained for reactants
-        #   whose specified states don't align with CompTools(formula).clean
+        self.assertEqual(results["Al1Ga1O3"]["num_atoms_in_basis"], 5)
+        self.assertEqual(results["Al3Ga1O6"]["num_atoms_in_basis"], 5)
 
-        input_energies = {
-            "O12Al8": {"E": -10},
-            "Ga4O6": {"E": -30},
-            "AlGaO3": {"E": -25},
-            "Al3GaO6": {"E": -11},
-        }
+        # test 2 - input end members agree with clean basis and are divided (actual basis different from clean)
 
-        end_members = ["Al8O12", "Ga4O6"]
-        energy_key = "E"
-        divide_left, divide_right = 2, 1
-
-        mh = MixingHull(
-            input_energies=input_energies,
-            left_end_member=end_members[0],
-            right_end_member=end_members[1],
-            energy_key=energy_key,
-            divide_left_by=divide_left,
-            divide_right_by=divide_right,
-        )
-
-        results = mh.results
-
-        self.assertEqual(results["Al2O3"]["E_mix_per_fu"], 0)
-        self.assertEqual(results["Ga2O3"]["E_mix_per_fu"], 0)
-        self.assertEqual(results["Al2O3"]["x"], 0)
-        self.assertEqual(results["Ga2O3"]["x"], 1)
-        self.assertEqual(results["Al1Ga1O3"]["x"], 0.5)
-        self.assertEqual(results["Al3Ga1O6"]["stability"], False)
-        self.assertEqual(results["Al1Ga1O3"]["stability"], True)
-
-        E_mix_middle_hard = 2 * -25 * 5 - (0.5 * -30 * 10 + 0.5 * -10 * 10)
-
-        self.assertEqual(results["Al1Ga1O3"]["E_mix_per_fu"], E_mix_middle_hard)
-
-        # check that the same basis is being maintained for compounds when the basis
-        #   between reactants is different if both are cleaned with CompTools(formula).clean
-
-        input_energies = {
+        input_energies_2 = {
             "LaCoO3": {"E": -10},
             "LaCoO2.5": {"E": -15},
             "LaCoO2.75": {"E": -30},
             "LaCoO2.875": {"E": -5},
         }
 
-        end_members = ["LaCoO3", "LaCoO2.5"]
+        end_members = ["LaCoO3", "La2Co2O5"]
         energy_key = "E"
-        divide_left, divide_right = 1, 1
+        divide_left, divide_right = 1, 2
 
         mh = MixingHull(
-            input_energies=input_energies,
+            input_energies=input_energies_2,
             left_end_member=end_members[0],
             right_end_member=end_members[1],
             energy_key=energy_key,
@@ -188,14 +152,119 @@ class UnitTestHulls(unittest.TestCase):
 
         self.assertEqual(results["Co4La4O11"]["E_mix_per_fu"], E_mix_middle_hard)
 
-        self.assertEqual(results["Co2La2O5"]["basis_formula"], "Co1La1O2.5")
-        self.assertEqual(results["Co4La4O11"]["basis_formula"], "Co1La1O2.75")
+        self.assertEqual(results["Co2La2O5"]["num_atoms_in_basis"], 4.5)
+        self.assertEqual(results["Co4La4O11"]["num_atoms_in_basis"], 4.75)
+
+        # test 3 - input end members do not agree with clean basis and are not divided (actual basis different from clean)
+
+        end_members = ["LaCoO3", "LaCoO2.5"]
+        energy_key = "E"
+        divide_left, divide_right = 1, 1
+
+        mh = MixingHull(
+            input_energies=input_energies_2,
+            left_end_member=end_members[0],
+            right_end_member=end_members[1],
+            energy_key=energy_key,
+            divide_left_by=divide_left,
+            divide_right_by=divide_right,
+        )
+
+        results = mh.results
+
+        self.assertEqual(results["Co1La1O3"]["E_mix_per_fu"], 0)
+        self.assertEqual(results["Co2La2O5"]["E_mix_per_fu"], 0)
+        self.assertEqual(results["Co1La1O3"]["x"], 0)
+        self.assertEqual(results["Co2La2O5"]["x"], 1)
+        self.assertEqual(results["Co4La4O11"]["x"], 0.5)
+        self.assertEqual(results["Co8La8O23"]["stability"], False)
+        self.assertEqual(results["Co4La4O11"]["stability"], True)
+
+        E_mix_middle_hard = -30 * 4.75 - (0.5 * -15 * 4.5 + 0.5 * -10 * 5)
+
+        self.assertEqual(results["Co4La4O11"]["E_mix_per_fu"], E_mix_middle_hard)
+
+        self.assertEqual(results["Co2La2O5"]["num_atoms_in_basis"], 4.5)
+        self.assertEqual(results["Co4La4O11"]["num_atoms_in_basis"], 4.75)
+
+        # test 4 - input end members do not agree with clean basis and are divided (actual basis same as clean)
+
+        # check that input energies don't have to be clean or reduced form
+        input_energies_3 = {
+            "O12Al8": {"E": -10},
+            "Ga4O6": {"E": -30},
+            "AlGaO3": {"E": -25},
+            "Al3GaO6": {"E": -11},
+        }
+
+        end_members = ["Al2O3", "Ga4O6"]
+        energy_key = "E"
+        divide_left, divide_right = 1, 2
+
+        mh = MixingHull(
+            input_energies=input_energies_3,
+            left_end_member=end_members[0],
+            right_end_member=end_members[1],
+            energy_key=energy_key,
+            divide_left_by=divide_left,
+            divide_right_by=divide_right,
+        )
+
+        results = mh.results
+
+        self.assertEqual(results["Al2O3"]["E_mix_per_fu"], 0)
+        self.assertEqual(results["Ga2O3"]["E_mix_per_fu"], 0)
+        self.assertEqual(results["Al2O3"]["x"], 0)
+        self.assertEqual(results["Ga2O3"]["x"], 1)
+        self.assertEqual(results["Al1Ga1O3"]["x"], 0.5)
+        self.assertEqual(results["Al3Ga1O6"]["stability"], False)
+        self.assertEqual(results["Al1Ga1O3"]["stability"], True)
+
+        E_mix_middle_hard = -25 * 5 - (0.5 * -30 * 5 + 0.5 * -10 * 5)
+
+        self.assertEqual(results["Al1Ga1O3"]["E_mix_per_fu"], E_mix_middle_hard)
+
+        self.assertEqual(results["Al1Ga1O3"]["num_atoms_in_basis"], 5)
+        self.assertEqual(results["Al3Ga1O6"]["num_atoms_in_basis"], 5)
+
+        # test 5 - input end members do not agree with clean basis and are divided (actual basis different from clean)
+
+        end_members = ["Al8O12", "Ga4O6"]
+        energy_key = "E"
+        divide_left, divide_right = 2, 1
+
+        mh = MixingHull(
+            input_energies=input_energies_3,
+            left_end_member=end_members[0],
+            right_end_member=end_members[1],
+            energy_key=energy_key,
+            divide_left_by=divide_left,
+            divide_right_by=divide_right,
+        )
+
+        results = mh.results
+
+        self.assertEqual(results["Al2O3"]["E_mix_per_fu"], 0)
+        self.assertEqual(results["Ga2O3"]["E_mix_per_fu"], 0)
+        self.assertEqual(results["Al2O3"]["x"], 0)
+        self.assertEqual(results["Ga2O3"]["x"], 1)
+        self.assertEqual(results["Al1Ga1O3"]["x"], 0.5)
+        self.assertEqual(results["Al3Ga1O6"]["stability"], False)
+        self.assertEqual(results["Al1Ga1O3"]["stability"], True)
+
+        E_mix_middle_hard = -25 * 10 - (0.5 * -30 * 10 + 0.5 * -10 * 10)
+
+        self.assertEqual(results["Al1Ga1O3"]["E_mix_per_fu"], E_mix_middle_hard)
+
+        self.assertEqual(results["Al1Ga1O3"]["num_atoms_in_basis"], 10)
+        self.assertEqual(results["Al3Ga1O6"]["num_atoms_in_basis"], 10)
 
         # test full system
 
         input_energies = read_json("../demos/output/hulls/data/query_Li-Mn-Fe-O.json")
         energy_key = "Ef_mp"
         end_members = ["Li", "MnO2"]
+        divide_left, divide_right = 1, 1
         mix = MixingHull(
             input_energies=input_energies,
             left_end_member=end_members[0],
@@ -205,7 +274,7 @@ class UnitTestHulls(unittest.TestCase):
             divide_right_by=divide_right,
         )
         out = mix.results
-        print(out["Li1Mn2O4"])
+        # print(out["Li1Mn2O4"])
         self.assertEqual(out["Li1Mn2O4"]["stability"], True)
         self.assertAlmostEqual(out["Li1Mn2O4"]["E_mix_per_at"], -0.520, places=2)
         self.assertEqual(out["Li1Mn2O4"]["mixing_rxn"], "Li + 2 MnO2 -> LiMn2O4")
@@ -218,7 +287,7 @@ class UnitTestHulls(unittest.TestCase):
         # test full system with difficult basis
 
         end_members = ["LiMnO2", "Li9Mn20O40"]
-        divide_right = 20
+        divide_left, divide_right = 1, 20
         mix = MixingHull(
             input_energies=input_energies,
             left_end_member=end_members[0],
@@ -228,7 +297,7 @@ class UnitTestHulls(unittest.TestCase):
             divide_right_by=divide_right,
         )
         out = mix.results
-        print(out["Li1Mn2O4"])
+        # print(out["Li1Mn2O4"])
 
         self.assertEqual(out["Li1Mn2O4"]["stability"], True)
         self.assertAlmostEqual(out["Li1Mn2O4"]["E_mix_per_at"], -0.011, places=2)
