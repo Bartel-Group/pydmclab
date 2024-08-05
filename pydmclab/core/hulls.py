@@ -13,6 +13,8 @@ from pydmclab.core.comp import CompTools
 from pydmclab.utils.handy import read_json, write_json
 from pydmclab.core.energies import ReactionEnergy
 
+from typing import Literal
+
 
 # HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -999,23 +1001,18 @@ class ParallelHulls(object):
 
 class MixingHull(object):
     """
-
     For performing the hull analysis w/ non-elemental end-members
-
     for computing mixing energies along one dimension
         i.e., between two end members
         if both end members are elements, this is a conventional hull so use GetHullInputData + AnalyzeHull
         this class is if one or both end members are compounds
-
     @TO-DO:
         - generalize to N dimensions (or at least 3)
-
     Some notes on normalizing energies:
         We are considering the mixing of two compounds, A (left end member) and B (right end member)
             Compunds in this mixing hull, C, must have a chemical formula that can be written as A_{1-x}B_{x}
             Therefore, mixing energies should be computed on a per A_{1-x}B_{x} formula unit basis
                 (1-x) A + (x) B --> C (A_{1-x}B_{x})
-
         A and B should adhere to the same "basis". There are a few cases:
             1) if A and B share no elements (e.g., A = MnO2, B = Li), then they necessarily adhere to the same basis
             2) if A and B share some (or all) elements, then they may or may not adhere to the same basis
@@ -1041,33 +1038,30 @@ class MixingHull(object):
                     - you want a ...P2S6 basis
                     - so A must be-recast as Li_{2}Fe_{0.75}Mn_{0.25}P2S6 and B = Fe_{0.75}Mn_{0.25}P2S6
                     - divide_left_by = 4, divide_right_by = 4
-
         Mixing hulls are computed for mixing energies with a basis formula having A_{1-x}B_{x} atoms where A and B are compounds having the same basis
             align the basis using divide_left_by and divide_right_by
-
         We generally care about mixing energies per formula unit basis ('E_mix_per_fu')
     """
 
     def __init__(
         self,
-        input_energies,
-        left_end_member,
-        right_end_member,
-        divide_left_by=1,
-        divide_right_by=1,
-        energy_key="E",
-    ):
+        input_energies: dict,
+        left_end_member: str,
+        right_end_member: str,
+        *,
+        divide_left_by: int | float = 1,
+        divide_right_by: int | float = 1,
+        energy_key: str = "E",
+    ) -> None:
         """
         Args:
             input_energies (dict):
                 {formula (str) :
                     {energy_key (str) :
                         total (or formation) energy in eV/atom (float)}}}
-
                 these should be ground-state energies for all relevant formulas
                 it's OK if entries in this dictionary are not relevant to the mixing hull you are trying to calculate
                     this code will just ignore them
-
             left_end_member (str):
             right_end_member (str):
                 this specifies the two "end members" of your mixing hull
@@ -1075,23 +1069,19 @@ class MixingHull(object):
                     if you were looking at the lithiation of FeP2S6 (e.g., to compute the insertion voltage)
                 e.g., left = 'BaZrS3', right = 'BaNbS3'
                         if you were looking at the formation of Ba(Zr_{1-x}Nb_x)S_3 phases
-
             energy_key (str): Defaults to "E".
                 the key inside of each formula in input_energies where the energy per atom lives
                 e.g., input_energies['Li2FeP2S6']['E'] should return the DFT total energy per atom if energy_key = 'E'
-
-            divide_left_by (int): Defaults to 1.
-            divide_right_by (int): Defaults to 1.
+            divide_left_by (int or float): Defaults to 1.
+            divide_right_by (int or float): Defaults to 1.
                 end members should have the same "basis" formula
                     if they do, then these can be left as 1
                     if they don't, then this is used to correct the right or left
-
                 let A = left and B = right end member
                     e.g., A = LiMnO2, B = Mn3O4
                         divide_right_by = 2 to make both formulas have Li_{z}MnO2 basis
                     e.g., A = Li9Mn20O40, B = LiMnO2
                         divide_left_by = 20, then basis = Li_{z}MnO2
-
         """
         # sanitize the input_energies
         input_energies = {
@@ -1099,37 +1089,28 @@ class MixingHull(object):
             for k in input_energies
         }
 
-        self.left_end_member_intended_basis = CompTools(left_end_member).scale_formula(
-            (1 / divide_left_by)
-        )
-        self.right_end_member_intended_basis = CompTools(
-            right_end_member
-        ).scale_formula((1 / divide_right_by))
-
-        print(
-            "Working on mixing hulls for (1-x) %s + (x) %s "
-            % (
-                self.left_end_member_intended_basis,
-                self.right_end_member_intended_basis,
-            )
-        )
-
         self.left_end_member = CompTools(left_end_member).clean
         self.right_end_member = CompTools(right_end_member).clean
 
-        self.intended_end_members = [
-            self.left_end_member_intended_basis,
-            self.right_end_member_intended_basis,
-        ]
+        print(
+            "Working on mixing hulls for (1-x) %s + (x) %s "
+            % (self.left_end_member, self.right_end_member)
+        )
         self.end_members = [self.left_end_member, self.right_end_member]
 
         self.input_energies = input_energies
 
-        self.divide_left_by = divide_left_by
-        self.divide_right_by = divide_right_by
+        left_cleaning_adj = CompTools(left_end_member).find_scaling(
+            self.left_end_member
+        )
+        right_cleaning_adj = CompTools(right_end_member).find_scaling(
+            self.right_end_member
+        )
+        self.divide_left_by = divide_left_by * left_cleaning_adj
+        self.divide_right_by = divide_right_by * right_cleaning_adj
 
     @property
-    def relevant_compounds(self):
+    def relevant_compounds(self) -> list[str]:
         """
         Returns:
             list of compounds (str) that appear in this mixing hull
@@ -1148,12 +1129,12 @@ class MixingHull(object):
             pd_entries, [Composition(c) for c in end_members], False
         )
 
-        # get the compounds that are still in this phsae diagram
+        # get the compounds that are still in this phase diagram
         entries = cpd.entries
         return [CompTools(e.name).clean for e in entries]
 
     @property
-    def reactions(self):
+    def reactions(self) -> dict[str, ReactionEnergy]:
         """
         dictionary of
             {formula (str) : ReactionEnergy object}
@@ -1180,7 +1161,7 @@ class MixingHull(object):
         return reactions
 
     @property
-    def mixing_energies(self):
+    def mixing_energies(self) -> dict[str, dict[str, float]]:
         """
         Returns:
             {formula (str) :
@@ -1193,7 +1174,8 @@ class MixingHull(object):
         reactions = self.reactions
         input_energies = self.input_energies
         left, right = self.end_members
-        left_intended, right_intended = self.intended_end_members
+        divide_left_by = self.divide_left_by
+        divide_right_by = self.divide_right_by
         for target in reactions:
             E = input_energies[target]["E"]
 
@@ -1202,8 +1184,16 @@ class MixingHull(object):
                 E_mix_per_atom = 0
                 E_mix_per_fu = 0
 
+                # define x and number of atoms in basis
+                if target == left:
+                    x = 0
+                    atoms_in_basis = CompTools(left).n_atoms / divide_left_by
+                else:
+                    x = 1
+                    atoms_in_basis = CompTools(right).n_atoms / divide_right_by
+
                 # x = 0 for first end member (left)
-                x = 0 if target == left else 1
+                # x = 0 if target == left else 1
 
                 # no mixing reaction (trivial)
                 rxn = None
@@ -1212,14 +1202,11 @@ class MixingHull(object):
                 coefs = reactions[target].coefs
                 rxn = reactions[target].rxn_string
 
-                left_basis_adj = 1 / CompTools(left).find_scaling(left_intended)
-                right_basis_adj = 1 / CompTools(right).find_scaling(right_intended)
-
                 # compute x based on reaction
                 n_left = abs(coefs[left]) if left in coefs else 0
                 n_right = abs(coefs[right]) if right in coefs else 0
-                x = (n_right * right_basis_adj) / (
-                    (n_left * left_basis_adj) + (n_right * right_basis_adj)
+                x = (n_right * divide_right_by) / (
+                    (n_left * divide_left_by) + (n_right * divide_right_by)
                 )
 
                 # compute mixing energy
@@ -1233,9 +1220,12 @@ class MixingHull(object):
                 ### target should be LEFT_{1-x}RIGHT_{x}
                 ### where LEFT and RIGHT have same basis
                 n_atoms_that_should_be_in_target = (
-                    (1 - x) * CompTools(left).n_atoms / left_basis_adj
-                ) + ((x) * CompTools(right).n_atoms / right_basis_adj)
+                    (1 - x) * CompTools(left).n_atoms / divide_left_by
+                ) + ((x) * CompTools(right).n_atoms / divide_right_by)
                 E_mix_per_fu = E_mix_per_atom * n_atoms_that_should_be_in_target
+
+                # number of atoms in target (which is defined by the basis)
+                atoms_in_basis = n_atoms_that_should_be_in_target
 
             energies[target] = {
                 "x": x,
@@ -1244,19 +1234,24 @@ class MixingHull(object):
                 "mixing_rxn": rxn,
                 "E_mix_per_fu": E_mix_per_fu,
                 "dE_rxn": dE_rxn,
+                "num_atoms_in_basis": atoms_in_basis,
             }
 
         return energies
 
     @property
-    def sorted_compounds(self):
+    def sorted_compounds(self) -> list[str]:
         """
         Returns:
             alphabetized list of relevant compounds (str) in the mixing hull
         """
         return sorted(list(self.mixing_energies.keys()))
 
-    def amts_matrix(self, compounds="all", chemical_space="all"):
+    def amts_matrix(
+        self,
+        compounds: Literal["all"] | list = "all",
+        chemical_space: Literal["all"] | tuple = "all",
+    ) -> np.ndarray:
         """
         Args:
             compounds (str or list)
@@ -1290,7 +1285,9 @@ class MixingHull(object):
                 A[row, col] = mixing_energies[compound]["x"]
         return A
 
-    def formation_energy_array(self, compounds="all"):
+    def formation_energy_array(
+        self, compounds: Literal["all"] | list = "all"
+    ) -> np.ndarray:
         """
         Args:
             compounds (str or list)
@@ -1306,7 +1303,11 @@ class MixingHull(object):
         # our "formation energies" for the hull calculation are the mixing energies we calculated
         return np.array([mixing_energies[c]["E_mix_per_fu"] for c in compounds])
 
-    def hull_input_matrix(self, compounds="all", chemical_space="all"):
+    def hull_input_matrix(
+        self,
+        compounds: Literal["all"] | list = "all",
+        chemical_space: Literal["all"] | tuple = "all",
+    ) -> np.ndarray:
         """
         Args:
             compounds (str or list)
@@ -1330,7 +1331,7 @@ class MixingHull(object):
         return X
 
     @property
-    def hull(self):
+    def hull(self) -> ConvexHull:
         """
         Returns:
             scipy.spatial.ConvexHull object for all compounds in a chemical space
@@ -1338,7 +1339,7 @@ class MixingHull(object):
         return ConvexHull(self.hull_input_matrix())
 
     @property
-    def hull_points(self):
+    def hull_points(self) -> np.ndarray:
         """
         Returns:
             array of (composition, formation energy) points (2-element tuple) fed to ConvexHull
@@ -1346,7 +1347,7 @@ class MixingHull(object):
         return self.hull.points
 
     @property
-    def hull_vertices(self):
+    def hull_vertices(self) -> np.ndarray:
         """
         Returns:
             array of indices (int) in hull_points corresponding with the points that are on the hull
@@ -1354,7 +1355,7 @@ class MixingHull(object):
         return self.hull.vertices
 
     @property
-    def hull_simplices(self):
+    def hull_simplices(self) -> np.ndarray:
         """
         Returns:
             indices of points forming the simplical facets of the convex hull.
@@ -1362,7 +1363,7 @@ class MixingHull(object):
         return self.hull.simplices
 
     @property
-    def stable_compounds(self):
+    def stable_compounds(self) -> list[str]:
         """
         Returns:
             list of compounds (str) that correspond with vertices on the mixing hull
@@ -1371,7 +1372,6 @@ class MixingHull(object):
                     1) assuming that the end members are stable
                     2) assuming that there are no other stable compounds in the chemical space that are orthogonal to the mixing axis
                         - e.g., we might be mixing RuO2 and IrO2, but RuIrO5 would not appear on this hull because it is orthogonal
-
         """
         mixing_energies = self.mixing_energies
         hull_vertices = self.hull_vertices
@@ -1388,60 +1388,38 @@ class MixingHull(object):
         return sorted(list(set(vertices)))
 
     @property
-    def unstable_compounds(self):
+    def unstable_compounds(self) -> list[str]:
         """
         Returns:
             list of compounds that do not correspond with vertices (str)
                 these are "above" the mixing hull
-
         """
         compounds = self.sorted_compounds
         stable_compounds = self.stable_compounds
         return [c for c in compounds if c not in stable_compounds]
 
     @property
-    def results(self):
+    def results(self) -> dict[str, dict]:
         """
         this is the only method that really needs to be called by the user
-
         Returns:
             {formula (str) :
                 {'E' : total (or formation) energy per atom (float, eV/atom),
                  'E_mix_per_fu' : mixing energy (float, eV/fu),
                  'E_mix_per_at' : mixing energy (float, eV/atom),
+                 'dE_rxn' : reaction energy as determined by ReactionEnergy (float, eV/rxn),
                  'x' : fraction of the right end member (float),
                  'stability' : True if the compound is on the mixing hull else False,
                  'mixing_rxn' : mixing reaction (molar basis),
-                 'basis_formula' : formula in the basis of the end members (str)}}
-
-        note: 'E_mix_per_fu is' the mixing energy per basis formula, where the basis
-              is that of the input end members (reactants)
-
+                 'num_atoms_in_basis' : number of atoms in the basis formula (float)}}
         """
         stable_compounds = self.stable_compounds
         unstable_compounds = self.unstable_compounds
         mixing_energies = self.mixing_energies
-
-        # add in stability and basis formula (on which things like energy per formula are computed)
-
-        correct_left = Composition(self.left_end_member_intended_basis)
-        correct_right = Composition(self.right_end_member_intended_basis)
-
         for c in stable_compounds:
             mixing_energies[c]["stability"] = True
-            x = mixing_energies[c]["x"]
-            x = float(x)
-            correct_comp = (1 - x) * correct_left + x * correct_right
-            clean_correct_comp = CompTools(correct_comp).clean_without_scaling()
-            mixing_energies[c]["basis_formula"] = clean_correct_comp
-
         for c in unstable_compounds:
             mixing_energies[c]["stability"] = False
-            x = mixing_energies[c]["x"]
-            x = float(x)
-            correct_comp = (1 - x) * correct_left + x * correct_right
-            clean_correct_comp = CompTools(correct_comp).clean_without_scaling()
-            mixing_energies[c]["basis_formula"] = clean_correct_comp
 
         return mixing_energies
 
