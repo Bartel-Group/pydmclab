@@ -310,6 +310,23 @@ class UnitTestReactions(unittest.TestCase):
         self.assertEqual(rxn.rxn_string, "CaO + 2 TiO2 -> CaTi2O4 + 0.5 O2")
         self.assertEqual(rxn.coefs["O1"], 1)
 
+        input_energies = {
+            "Co1La1O3": {"E": -7.939448833465576},
+            "Co8La8O23": {"E": -7.974939346313477},
+            "Co4La4O11": {"E": -8.00416374206543},
+            "Co8La8O21": {"E": -8.012917518615723},
+            "Co2La2O5": {"E": -8.028905868530273},
+        }
+
+        reactants = ["LaCoO3", "LaCoO2.5"]
+        products = ["LaCoO2.875"]
+        rxn = ReactionEnergy(input_energies, reactants, products)
+        self.assertEqual(rxn.rxn_string, "6 LaCoO3 + La2Co2O5 -> La8Co8O23")
+        self.assertEqual(rxn.coefs["Co2La2O5"], -1)
+        self.assertEqual(rxn.coefs["Co8La8O23"], 1)
+        self.assertAlmostEqual(rxn.species["Co8La8O23"]["E"], -7.9749393, places=5)
+        self.assertAlmostEqual(rxn.dE_rxn, -0.57901667, places=3)
+
 
 if __name__ == "__main__":
     unittest.main()

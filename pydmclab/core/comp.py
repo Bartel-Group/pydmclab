@@ -132,6 +132,38 @@ class CompTools(object):
         """
         return np.sum(list(self.amts.values()))
 
+    def find_scaling(self, formula_to_compare):
+        """
+        Args:
+            formula_to_compare (str)
+                formula to compare to self.formula
+
+        Returns:
+            scaling factor (float)
+                the factor by which self.formula must be scaled to match formula_to_compare
+                e.g., self.formula = "La2Co2O5" and formula_to_compare = "LaCoO2.5", then the output will be 0.5
+        """
+
+        # get a cleaned formula and scaling factor of current formula
+        clean_self, current_formula_scale = Composition(
+            self.formula
+        ).get_integer_formula_and_factor()
+
+        # get a cleaned formula and scaling factor of comparison formula
+        clean_compare, comparison_formula_scale = Composition(
+            formula_to_compare
+        ).get_integer_formula_and_factor()
+
+        # check that the formulas represent the same compound
+        if clean_self != clean_compare:
+            raise ValueError(
+                "Formulas must represent the same compound to be compared: %s != %s"
+                % (clean_self, clean_compare)
+            )
+
+        # calculate and return scaling factor
+        return comparison_formula_scale / current_formula_scale
+
     def label_for_plot(self, el_order=None):
         """
         @NOTE:

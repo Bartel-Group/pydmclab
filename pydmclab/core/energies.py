@@ -774,6 +774,10 @@ class ReactionEnergy(object):
 
         self.input_energies = input_energies
 
+        # clean the input formulas for reactants and products
+        reactants = [CompTools(c).clean for c in reactants]
+        products = [CompTools(c).clean for c in products]
+
         # turn the reactants and products into pymatgen Composition objects
         self.reactants = [Composition(c) for c in reactants]
         self.products = [Composition(c) for c in products]
@@ -818,12 +822,9 @@ class ReactionEnergy(object):
         out = {c: 0 for c in unique_comp}
         for i, coef in enumerate(coefs):
             comp = all_comp[i]
-            if comp in ["O1", "N1", "H1", "F1", "Cl1"]:
-                # pymatgen stores these as O2, N2, etc but we use O1, N1, etc
-                coef *= 2
-
             # rounding b/c balancing sometimes leads to imprecision (e.g., 0.00000000001)
             out[comp] += np.round(coef, 5)
+
         return out
 
     @property
