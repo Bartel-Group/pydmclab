@@ -13,12 +13,6 @@ class UnitTestQuery(unittest.TestCase):
         self.assertEqual(len(unique_formulas), len(formulas_from_q))
 
 
-
-
-
-
-
-
 """
 class UnitTestQuery2(unittest.TestCase):
     def test_data_for_comp1(self):
@@ -36,4 +30,3 @@ class UnitTestQuery2(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-    #unittest.main(argv=[''], exit=False)
