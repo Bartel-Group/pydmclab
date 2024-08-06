@@ -35,4 +35,5 @@ class UnitTestQuery2(unittest.TestCase):
 """
 
 if __name__ == "__main__":
-    unittest.main(argv=[''], exit=False)
+    unittest.main()
+    #unittest.main(argv=[''], exit=False)
