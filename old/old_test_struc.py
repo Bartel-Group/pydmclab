@@ -87,6 +87,7 @@ class UnitTestStruc(unittest.TestCase):
         self.assertAlmostEqual(scaled_struc.volume, scaled_vol, places=3)
 
     def test_site(self):
+        warnings.filterwarnings("ignore", category=DeprecationWarning)
         q = get_generic_query()
         Cr2O3 = q["Cr2O3"]["structure"]
         st = StrucTools(Cr2O3, ox_states={"Cr": 3, "O": -2})
@@ -104,4 +105,4 @@ class UnitTestStruc(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main(argv=[""], exit=False)
+    unittest.main()

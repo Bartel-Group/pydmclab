@@ -1,3 +1,4 @@
+import os
 import unittest
 import warnings
 
@@ -6,24 +7,29 @@ from pydmclab.utils.handy import read_json
 
 from pymatgen.core.structure import Structure
 
+TEST_DATA = os.path.join("..", "pydmclab", "data", "test_data", "struc")
+
 
 class TestStrucTools(unittest.TestCase):
     """
     Test cases for the StrucTools class.
     """
 
-    @classmethod
-    def setUpClass(cls):
-        cro_dict = read_json("cro_structure.json")
-        crmo_dict = read_json("crmo_structure.json")
-        cro_supercell_dict = read_json("cro_supercell.json")
+    def setUp(self):
+        cro_dict = read_json(os.path.join(TEST_DATA, "cro_structure.json"))
+        crmo_dict = read_json(os.path.join(TEST_DATA, "crmo_structure.json"))
+        cro_supercell_dict = read_json(os.path.join(TEST_DATA, "cro_supercell.json"))
 
-        cls.struc_cro = Structure.from_dict(cro_dict)
-        cls.struc_crmo = Structure.from_dict(crmo_dict)
-        cls.struc_supercell = Structure.from_dict(cro_supercell_dict)
+        self.struc_cro = Structure.from_dict(cro_dict)
+        self.struc_crmo = Structure.from_dict(crmo_dict)
+        self.struc_supercell = Structure.from_dict(cro_supercell_dict)
 
-        cls.st_cro = StrucTools(cls.struc_cro)
-        cls.st_crmo = StrucTools(cls.struc_crmo)
+        self.st_cro = StrucTools(self.struc_cro)
+        self.st_crmo = StrucTools(self.struc_crmo)
+
+    def test_init_with_empty_structure_path(self):
+        with self.assertRaises(ValueError):
+            StrucTools(structure="my_fake_path")
 
     def test_compact_formula(self):
         self.assertEqual(self.st_cro.compact_formula, "Cr2O3")
@@ -38,7 +44,7 @@ class TestStrucTools(unittest.TestCase):
         self.assertEqual(self.st_cro.amts, {"Cr": 4, "O": 6})
 
     def test_make_supercell(self):
-        new_supercell = self.st_cro.make_supercell([1, 2, 3])
+        new_supercell = self.st_cro.make_supercell([1, 2, 3], verbose=False)
         self.assertEqual(len(new_supercell), 60)
         self.assertEqual(new_supercell, self.struc_supercell)
 
@@ -69,20 +75,22 @@ class TestStrucTools(unittest.TestCase):
         self.assertEqual(new_supercell[5].species_string, "Li:0.5")
 
     def test_decorate_with_ox_states(self):
-        st = StrucTools(self.struc_cro, ox_states={"Cr": 3, "O": -2})
-        oxidized_struc = st.decorate_with_ox_states
+        self.st_cro.ox_states = {"Cr": 3, "O": -2}
+        oxidized_struc = self.st_cro.decorate_with_ox_states(verbose=False)
         self.assertEqual(oxidized_struc[0].species_string, "Cr3+")
 
     def test_get_ordered_structures(self):
         warnings.filterwarnings("ignore", category=DeprecationWarning)
 
-        ordered_strucs = self.st_crmo.get_ordered_structures(n_strucs=2)
+        ordered_strucs = self.st_crmo.get_ordered_structures(n_strucs=2, verbose=False)
         self.assertEqual(len(ordered_strucs), 2)
         self.assertEqual(StrucTools(ordered_strucs[1]).compact_formula, "Cr1Mn1O3")
 
     def test_replace_species(self):
         strucs = self.st_cro.replace_species(
-            species_mapping={"Cr": {"Cr": 0.5, "Mn": 0.5}}, n_strucs=2
+            species_mapping={"Cr": {"Cr": 0.5, "Mn": 0.5}},
+            n_strucs=2,
+            verbose=False,
         )
         self.assertEqual(StrucTools(strucs[1]).compact_formula, "Cr1Mn1O3")
 
@@ -98,4 +106,4 @@ class TestStrucTools(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main(argv=[""], exit=False)
+    unittest.main()
