@@ -1,16 +1,282 @@
 import unittest
 
 from pydmclab.hpc.submit import SubmitTools
+from pydmclab.core.struc import StrucTools
+from pydmclab.hpc.launch import LaunchTools
 
 import os
 
 from pymatgen.io.vasp.inputs import Kpoints
 
-test_data_dir = "../pydmclab/data/test_data/vasp/test_submit"
+HERE = os.path.dirname(os.path.abspath(__file__))
 
 
 class UnitTestSubmitTools(unittest.TestCase):
-    def test_submission(self):
+
+    def setUp(self) -> None:
+
+        # directory to store data
+        self.test_data_dir = os.path.join(
+            HERE, "..", "pydmclab", "data", "test_data", "submit"
+        )
+
+        # some structure that shouldn't be magnetic
+        self.AlN_structure = StrucTools(
+            os.path.join(self.test_data_dir, "Al1N1.vasp")
+        ).structure
+
+        calcs_dir_AlN = os.path.join(self.test_data_dir, "calcs_AlN")
+        if not os.path.exists(calcs_dir_AlN):
+            os.mkdir(calcs_dir_AlN)
+
+        calcs_dir = calcs_dir_AlN
+        structure = self.AlN_structure
+        formula_indicator = StrucTools(structure).compact_formula
+        struc_indicator = "my-struc"
+        initial_magmoms = None
+        user_configs = None
+
+        lt = LaunchTools(
+            calcs_dir=calcs_dir,
+            structure=structure,
+            formula_indicator=formula_indicator,
+            struc_indicator=struc_indicator,
+            initial_magmoms=initial_magmoms,
+            user_configs=user_configs,
+        )
+
+        launch_dirs = lt.launch_dirs(make_dirs=True)
+
+        self.launch_dir_AlN = list(launch_dirs.keys())[0]
+
+        # some structure that could be AFM
+        self.MnO_structure = StrucTools(
+            os.path.join(self.test_data_dir, "Mn1O1.vasp")
+        ).structure
+
+        calcs_dir_MnO = os.path.join(self.test_data_dir, "calcs_MnO")
+        if not os.path.exists(calcs_dir_MnO):
+            os.mkdir(calcs_dir_MnO)
+
+        # testing w/ AFM and vasp-specific configs
+        calcs_dir = calcs_dir_MnO
+        structure = self.MnO_structure
+        formula_indicator = StrucTools(structure).compact_formula
+        struc_indicator = "some-struc"
+        initial_magmoms = {0: [5.0, -5.0], 1: [-5.0, 5.0]}
+        ID_specific_vasp_configs = {
+            "_".join([formula_indicator, struc_indicator]): {
+                "incar_mods": {"NEDOS": 4321}
+            }
+        }
+        n_afm_configs = 2
+        user_configs = {
+            "ID_specific_vasp_configs": ID_specific_vasp_configs,
+            "n_afm_configs": n_afm_configs,
+        }
+
+        lt = LaunchTools(
+            calcs_dir=calcs_dir,
+            structure=structure,
+            formula_indicator=formula_indicator,
+            struc_indicator=struc_indicator,
+            initial_magmoms=initial_magmoms,
+            user_configs=user_configs,
+        )
+
+        self.assertEqual(lt.valid_mags, ["fm", "afm_0", "afm_1"])
+
+        launch_dirs = lt.launch_dirs(make_dirs=True)
+
+        self.launch_dir_MnO_afm = [k for k in launch_dirs if "afm_1" in k]
+
+        return
+
+    def test_submit(self):
+
+        launch_dir = self.launch_dir_AlN
+        initial_magmom = None
+
+        relaxation_xcs = ["gga"]
+        static_addons = {}
+        user_configs = {
+            "relaxation_xcs": relaxation_xcs,
+            "static_addons": static_addons,
+        }
+        st = SubmitTools(
+            launch_dir=launch_dir,
+            initial_magmom=initial_magmom,
+            user_configs=user_configs,
+        )
+
+        self.assertEqual(st.calc_list, ["gga-relax", "gga-static"])
+
+        relaxation_xcs = ["gga", "metagga"]
+        static_addons = {}
+        user_configs = {
+            "relaxation_xcs": relaxation_xcs,
+            "static_addons": static_addons,
+        }
+        st = SubmitTools(
+            launch_dir=launch_dir,
+            initial_magmom=initial_magmom,
+            user_configs=user_configs,
+        )
+
+        self.assertEqual(
+            st.calc_list, ["gga-relax", "gga-static", "metagga-relax", "metagga-static"]
+        )
+
+        relaxation_xcs = ["gga", "metagga"]
+        static_addons = {"gga": ["lobster"], "metagga": ["bs"]}
+        user_configs = {
+            "relaxation_xcs": relaxation_xcs,
+            "static_addons": static_addons,
+            "run_static_addons_before_all_relaxes": False,
+        }
+        st = SubmitTools(
+            launch_dir=launch_dir,
+            initial_magmom=initial_magmom,
+            user_configs=user_configs,
+        )
+
+        self.assertEqual(
+            st.calc_list,
+            [
+                "gga-relax",
+                "gga-static",
+                "metagga-relax",
+                "metagga-static",
+                "gga-prelobster",
+                "gga-lobster",
+                "metagga-prelobster",
+                "metagga-bs",
+            ],
+        )
+
+        relaxation_xcs = ["gga", "metagga"]
+        static_addons = {"gga": ["lobster"], "metagga": ["bs"]}
+        user_configs = {
+            "relaxation_xcs": relaxation_xcs,
+            "static_addons": static_addons,
+            "run_static_addons_before_all_relaxes": True,
+        }
+        st = SubmitTools(
+            launch_dir=launch_dir,
+            initial_magmom=initial_magmom,
+            user_configs=user_configs,
+        )
+
+        self.assertEqual(
+            st.calc_list,
+            [
+                "gga-relax",
+                "gga-static",
+                "gga-prelobster",
+                "gga-lobster",
+                "metagga-relax",
+                "metagga-static",
+                "metagga-prelobster",
+                "metagga-bs",
+            ],
+        )
+
+        relaxation_xcs = ["gga", "metagga"]
+        static_addons = {"gga": ["lobster"], "metagga": ["bs"], "hse06": ["lobster"]}
+        user_configs = {
+            "relaxation_xcs": relaxation_xcs,
+            "static_addons": static_addons,
+            "run_static_addons_before_all_relaxes": False,
+        }
+        st = SubmitTools(
+            launch_dir=launch_dir,
+            initial_magmom=initial_magmom,
+            user_configs=user_configs,
+        )
+
+        self.assertEqual(
+            st.calc_list,
+            [
+                "gga-relax",
+                "gga-static",
+                "metagga-relax",
+                "metagga-static",
+                "gga-prelobster",
+                "gga-lobster",
+                "metagga-prelobster",
+                "metagga-bs",
+                "hse06-preggastatic",
+                "hse06-prelobster",
+                "hse06-lobster",
+            ],
+        )
+
+        relaxation_xcs = ["gga"]
+        static_addons = {}
+        user_configs = {
+            "relaxation_xcs": relaxation_xcs,
+            "static_addons": static_addons,
+            "vasp_version": 6,
+        }
+        st = SubmitTools(
+            launch_dir=launch_dir,
+            initial_magmom=initial_magmom,
+            user_configs=user_configs,
+        )
+
+        self.assertIn("6.4.1", st.vasp_dir)
+
+        relaxation_xcs = ["gga"]
+        static_addons = {}
+        user_configs = {
+            "relaxation_xcs": relaxation_xcs,
+            "static_addons": static_addons,
+            "vasp_version": 5,
+        }
+        st = SubmitTools(
+            launch_dir=launch_dir,
+            initial_magmom=initial_magmom,
+            user_configs=user_configs,
+        )
+
+        self.assertIn("5.4.4", st.vasp_dir)
+
+        relaxation_xcs = ["gga"]
+        static_addons = {}
+        user_configs = {
+            "relaxation_xcs": relaxation_xcs,
+            "static_addons": static_addons,
+            "mpi_command": "srun",
+        }
+        st = SubmitTools(
+            launch_dir=launch_dir,
+            initial_magmom=initial_magmom,
+            user_configs=user_configs,
+        )
+
+        self.assertIn("--ntasks", st.vasp_command)
+
+        relaxation_xcs = ["gga"]
+        static_addons = {}
+        user_configs = {
+            "relaxation_xcs": relaxation_xcs,
+            "static_addons": static_addons,
+            "mpi_command": "mpirun",
+        }
+        st = SubmitTools(
+            launch_dir=launch_dir,
+            initial_magmom=initial_magmom,
+            user_configs=user_configs,
+        )
+
+        self.assertIn("-np", st.vasp_command)
+
+        self.assertEqual(st.job_name.count("."), 3)
+        self.assertEqual(st.job_name.split(".")[-2], "nm")
+
+        # TODO: everything requiring queue checking can only be run on HPC..
+
+    def _old_test_submission(self):
         mags = ["fm", "afm_0"]
         launch_dirs = {}
         for mag in mags:

@@ -1,3 +1,6 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
 import os
 
 from pymatgen.core.structure import Structure
@@ -6,6 +9,9 @@ from pydmclab.core.mag import MagTools
 from pydmclab.data.configs import load_base_configs
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+
+if TYPE_CHECKING:
+    from pymatgen.core.structure import Structure
 
 
 class LaunchTools(object):
@@ -24,12 +30,12 @@ class LaunchTools(object):
 
     def __init__(
         self,
-        calcs_dir,
-        structure,
-        formula_indicator,
-        struc_indicator,
-        initial_magmoms=None,
-        user_configs=None,
+        calcs_dir: str,
+        structure: Structure,
+        formula_indicator: str,
+        struc_indicator: str,
+        initial_magmoms: list | None = None,
+        user_configs: dict | None = None,
     ):
         """
         Args:
@@ -137,7 +143,7 @@ class LaunchTools(object):
         self.configs = configs.copy()
 
     @property
-    def valid_mags(self):
+    def valid_mags(self) -> list:
         """
         Returns:
             list of magnetic configuration names that make sense to run based on the inputs
@@ -187,7 +193,7 @@ class LaunchTools(object):
         # return FM + AFM configs for AFM calcs
         return ["fm"] + afm_indices
 
-    def launch_dirs(self, make_dirs=True):
+    def launch_dirs(self, make_dirs: bool = True) -> dict:
         """
         Args:
             make_dirs (bool)
