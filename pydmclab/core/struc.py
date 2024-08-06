@@ -347,7 +347,7 @@ class StrucTools(object):
         else:
             # otherwise, need to order this partially occupied structure
             structools = StrucTools(structure, self.ox_states)
-            return structools.get_ordered_structures(n_strucs=n_strucs)
+            return structools.get_ordered_structures(n_strucs=n_strucs, verbose=verbose)
 
     @property
     def spacegroup_info(self) -> dict[str, dict[str, int | str]]:
