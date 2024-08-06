@@ -353,5 +353,4 @@ class UnitTestReactions(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    # unittest.main()
-    unittest.main(argv=['','-v'], exit=False)
+    unittest.main()
