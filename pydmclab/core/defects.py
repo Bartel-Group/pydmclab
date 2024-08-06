@@ -3,11 +3,11 @@
 pip install doped
 """
 
+from __future__ import annotations
+from typing import TYPE_CHECKING, Optional
+
 import os
 import numpy as np
-
-from pydmclab.core.struc import StrucTools
-from pydmclab.core.comp import CompTools
 
 from doped.generation import DefectsGenerator, get_ideal_supercell_matrix
 from doped.utils.supercells import get_min_image_distance
@@ -19,6 +19,13 @@ from doped.utils.symmetry import (
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from shakenbreak.input import Distortions
 
+from pydmclab.core.struc import StrucTools
+from pydmclab.core.comp import CompTools
+
+if TYPE_CHECKING:
+    from pymatgen.core.structure import Structure
+    from tqdm import tqdm
+
 
 class SupercellForDefects(object):
     """
@@ -27,16 +34,17 @@ class SupercellForDefects(object):
 
     def __init__(
         self,
-        sc_structure,
-        min_image_distance=10.0,
-        min_atoms=50,
-        force_cubic=False,
-        force_diagnoal=False,
-        ideal_threshold=0.1,
-        pbar=None,
-        savename=None,
-        data_dir=os.getcwd(),
-    ):
+        sc_structure: Structure | dict | str,
+        *,
+        min_image_distance: float = 10.0,
+        min_atoms: int = 50,
+        force_cubic: bool = False,
+        force_diagnoal: bool = False,
+        ideal_threshold: float = 0.1,
+        pbar: Optional[tqdm] = None,
+        savename: str | None = None,
+        data_dir: str = os.getcwd(),
+    ) -> None:
         """
         Allows for determination of "ideal" supercell for defect calculations
 
@@ -85,7 +93,7 @@ class SupercellForDefects(object):
         self.data_dir = data_dir
 
     @property
-    def make_supercell(self):
+    def make_supercell(self) -> Structure:
         """
         Returns:
             supercell (pymatgen Structure object)
@@ -121,7 +129,9 @@ class SupercellForDefects(object):
 
         return new_sc_structure
 
-    def curr_min_image_distance(self, sc_structure=None):
+    def curr_min_image_distance(
+        self, sc_structure: Structure | dict | str | None = None
+    ) -> float:
         """
         Returns:
             minimum image distance for the input structure (float)
@@ -130,9 +140,11 @@ class SupercellForDefects(object):
         if not sc_structure:
             sc_structure = self.sc_structure
 
-        return get_min_image_distance(sc_structure)
+        return get_min_image_distance(StrucTools(sc_structure).structure)
 
-    def find_primitive_structure(self, sc_structure=None):
+    def find_primitive_structure(
+        self, sc_structure: Structure | dict | str | None = None
+    ) -> Structure:
         """
         Returns:
             primitive structure associated with input structure (pymatgen Structure object)
@@ -142,6 +154,8 @@ class SupercellForDefects(object):
 
         if not sc_structure:
             sc_structure = self.sc_structure
+
+        sc_structure = StrucTools(sc_structure).structure
 
         # initializes SpacegroupAnalyzer object
         struc_as_sga = SpacegroupAnalyzer(sc_structure, symprec=0.01)
@@ -156,16 +170,20 @@ class SupercellForDefects(object):
 
         return primitive_struc
 
-    def find_primitive_structure_grid(self, sc_structure=None):
+    def find_primitive_structure_grid(
+        self, sc_structure: Structure | dict | str | None = None
+    ) -> tuple[Structure, np.ndarray]:
         """
         Returns:
             rotated primitive structure (pymatgen Structure object)
                 note: it may or may not rotate the initial input structure to find the transformation
-            find supercell transformation in terms of the primitive structure (np array)
+            find supercell transformation in terms of the primitive structure (np ndarray)
         """
 
         if not sc_structure:
             sc_structure = self.sc_structure
+
+        sc_structure = StrucTools(sc_structure).structure
 
         # the following directly follows from doped (see init for DefectsGenerator)
 
@@ -191,11 +209,12 @@ class SupercellForDefects(object):
 class DefectStructures(object):
     def __init__(
         self,
-        supercell,
-        ox_states=None,
-        how_many=1,
-        n_strucs=1,
-    ):
+        supercell: Structure | dict | str,
+        *,
+        ox_states: dict[str, int | float] | None = None,
+        how_many: int = 1,
+        n_strucs: int = 1,
+    ) -> None:
         """
         Args:
             supercell (Structure or structure file or Structure.as_dict): bulk structure
@@ -212,10 +231,12 @@ class DefectStructures(object):
         self.how_many = how_many
         self.n_strucs = n_strucs
 
-    def vacancies(self, el_to_remove, algo_to_use=0):
+    def vacancies(self, el_to_remove: str, *, algo_to_use: int = 0) -> dict[int, dict]:
         """
         Args:
             el_to_remove (str): element to remove
+            algo_to_use (int): pymatgen ordered structure algo to use
+                (see pymatgen.transformations.standard_transformations.OrderDisorderedStructureTransformation)
 
         Returns:
             dictionary of structures with vacancies
@@ -235,11 +256,15 @@ class DefectStructures(object):
 
         return strucs
 
-    def substitutions(self, substitution):
+    def substitutions(
+        self, substitution: str, *, algo_to_use: int = 0
+    ) -> dict[int, dict]:
         """
         Args:
             substitution (str): element to put in and element to remove
                 e.g. "Ti_Cr" Ti on Cr site is the substitution
+            algo_to_use (int): pymatgen ordered structure algo to use
+                (see pymatgen.transformations.standard_transformations.OrderDisorderedStructureTransformation)
 
         Returns:
             dictionary of structures with substitutions
@@ -259,7 +284,7 @@ class DefectStructures(object):
         )
         st = StrucTools(sub, ox_states=self.ox_states)
 
-        strucs = st.get_ordered_structures(n_strucs=self.n_strucs)
+        strucs = st.get_ordered_structures(algo=algo_to_use, n_strucs=self.n_strucs)
 
         return strucs
 
@@ -271,18 +296,19 @@ class ShakeDefectiveStrucs(object):
 
     def __init__(
         self,
-        initial_defect_strucs,
-        bulk_struc,
-        oxidation_states=None,
-        padding=0,
-        num_of_electrons=None,
-        distortion_increment=0.1,
-        bond_distortions=None,
-        local_rattle=False,
-        distorted_elements=None,
-        distorted_atoms=None,
-        mc_rattle_kwargs=None,
-    ):
+        initial_defect_strucs: list[Structure | dict | str],
+        bulk_struc: Structure | dict | str,
+        *,
+        oxidation_states: dict[str, int] | None = None,
+        padding: int = 0,
+        num_of_electrons: dict[str, int] | None = None,
+        distortion_increment: float = 0.1,
+        bond_distortions: list[float] | None = None,
+        local_rattle: bool = False,
+        distorted_elements: dict[str, list[str]] | None = None,
+        distorted_atoms: dict[str, list[str]] | None = None,
+        mc_rattle_kwargs: dict | None = None,
+    ) -> None:
         """
         Takes in a list of defective structures and a bulk structure and
         applies distortions to the defective structures
@@ -291,7 +317,7 @@ class ShakeDefectiveStrucs(object):
         potential minima in the energy landscape that might otherwise be
         missed when running DFT calculations
 
-        If you want to shake a bulk (pristine) structure, see StrucTools.perturb()
+        If you only want to shake a bulk (pristine) structure, see StrucTools.perturb()
 
         Args:
             initial_defect_strucs (list of Structures)
@@ -314,7 +340,7 @@ class ShakeDefectiveStrucs(object):
                 e.g., removing a neutral Al from AlN would result in a loss of 3 electrons
                 from the system, so "negative of electron count change" = -(-3) = 3
             distortion_increment (float)
-                bond distortions will range from 0 to +/- 0.6 in steps of this value
+                bond distortions will range from 0 to +/- 0.6 Å in steps of this value
             bond_distortions (list)
                 list of bond distortions to apply to nearest neighbors in place of default set
             local_rattle (bool)
@@ -374,10 +400,10 @@ class ShakeDefectiveStrucs(object):
 
         shaken_defects_data, distortion_metadata = distortions.apply_distortions()
 
-        for defect in shaken_defects_data:
+        for defect, defect_data in shaken_defects_data.items():
             print(
                 "\n\033[1m%s defect type: %s\033[0m"
-                % (defect, shaken_defects_data[defect]["defect_type"])
+                % (defect, defect_data["defect_type"])
             )
         print()
 
@@ -388,7 +414,7 @@ class ShakeDefectiveStrucs(object):
         self.distortions_metadata = distortion_metadata
 
     @property
-    def get_shaken_strucs_summary(self):
+    def get_shaken_strucs_summary(self) -> dict[str, dict[str, dict]]:
         """
         Returns:
             shaken_strucs_summary (dict)
@@ -417,7 +443,12 @@ class ShakeDefectiveStrucs(object):
 
         return shaken_strucs_summary
 
-    def get_shaken_strucs(self, relative_chg_of_interest, defects_of_interest=None):
+    def get_shaken_strucs(
+        self,
+        relative_chg_of_interest: int,
+        *,
+        defects_of_interest: list[str] | None = None,
+    ) -> dict[str, dict[str, dict]]:
         """
         When running DFT calcs for charged defects using pydmclab launcher script,
         may only be able to run calculations for a single relative charge state per script
@@ -480,16 +511,17 @@ class GenerateMostDefects(object):
 
     def __init__(
         self,
-        pristine_struc,
-        extrinsic=None,
-        interstitial_coords=None,
-        generate_supercell=True,
-        charge_state_gen_kwargs=None,
-        supercell_gen_kwargs=None,
-        interstitial_gen_kwargs=None,
-        target_frac_coords=None,
-        processes=None,
-    ):
+        pristine_struc: Structure | dict | str,
+        *,
+        extrinsic: str | list[str] | dict[str, str] | None = None,
+        interstitial_coords: list[float] = None,
+        generate_supercell: bool = True,
+        charge_state_gen_kwargs: dict | None = None,
+        supercell_gen_kwargs: dict | None = None,
+        interstitial_gen_kwargs: dict | None = None,
+        target_frac_coords: list[float] | None = None,
+        processes: None = None,
+    ) -> None:
         """
         Allows for automatic generation of most defects for a given pristine structure
 
@@ -557,7 +589,7 @@ class GenerateMostDefects(object):
         self.all_defects = all_defects
 
     @property
-    def summary_of_defects(self):
+    def summary_of_defects(self) -> DefectsGenerator:
         """
         Returns:
             all_defects (DefectsGenerator)
@@ -568,7 +600,7 @@ class GenerateMostDefects(object):
         return self.all_defects
 
     @property
-    def to_dict(self):
+    def to_dict(self) -> dict:
         """
         Returns:
             all_defects (dict)
@@ -578,7 +610,7 @@ class GenerateMostDefects(object):
         return self.all_defects.as_dict()
 
     @property
-    def get_all_defective_supercells(self):
+    def get_all_defective_supercells(self) -> dict[str, dict]:
         """
         Returns:
             all_defective_strucs (dict)
@@ -597,7 +629,7 @@ class GenerateMostDefects(object):
         return all_defective_strucs
 
     @property
-    def get_bulk_supercell(self):
+    def get_bulk_supercell(self) -> dict:
         """
         Returns:
             bulk_supercell (Structure as dict)
@@ -612,7 +644,9 @@ class GenerateMostDefects(object):
 
         return bulk_supercell
 
-    def add_charge_states(self, defect_entry_name, charge_states):
+    def add_charge_states(
+        self, defect_entry_name: str, charge_states: list[int]
+    ) -> None:
         """
         Adds additional charge states to a defect in the all_defects attribute
 
@@ -628,7 +662,9 @@ class GenerateMostDefects(object):
 
         self.all_defects.add_charge_states(defect_entry_name, charge_states)
 
-    def remove_charge_states(self, defect_entry_name, charge_states):
+    def remove_charge_states(
+        self, defect_entry_name: str, charge_states: list[int]
+    ) -> None:
         """
         Removes charge states from a defect in the all_defects attribute
 
@@ -646,9 +682,6 @@ class GenerateMostDefects(object):
 
 
 def main():
-
-    import os
-    from pydmclab.utils.handy import read_json
 
     data_dir = "/Users/lanne056/Documents/AJ-Research/local-scripts/MOx-redox-local/data/AlN_testing"
     strucs = read_json(os.path.join(data_dir, "struc.json"))
