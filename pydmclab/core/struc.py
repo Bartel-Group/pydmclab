@@ -189,7 +189,7 @@ class StrucTools(object):
         return structure
 
     @property
-    def decorate_with_ox_states(self, verbose: bool = True) -> Structure:
+    def decorate_with_ox_states(self) -> Structure:
         """
         args:
             verbose (bool)
@@ -199,8 +199,7 @@ class StrucTools(object):
             - uses Auto algorithm if no ox_states are provided
             - otherwise, applies ox_states
         """
-        if verbose:
-            print("decorating with oxidation states\n")
+        print("decorating with oxidation states\n")
         structure = self.structure
         ox_states = self.ox_states
 
@@ -209,15 +208,13 @@ class StrucTools(object):
             ox_states = {els[0]: 0}
 
         if not ox_states:
-            if verbose:
-                print("     automatically\n")
+            print("     automatically\n")
             transformer = AutoOxiStateDecorationTransformation()
         else:
             transformer = OxidationStateDecorationTransformation(
                 oxidation_states=ox_states
             )
-            if verbose:
-                print("     using %s" % str(ox_states))
+            print("     using %s" % str(ox_states))
         return transformer.apply_transformation(structure)
 
     def get_ordered_structures(
@@ -253,7 +250,7 @@ class StrucTools(object):
 
         # decorat with oxidation states or not
         if decorate:
-            structure = self.decorate_with_ox_states(verbose=verbose)
+            structure = self.decorate_with_ox_states
         else:
             structure = self.structure
 
