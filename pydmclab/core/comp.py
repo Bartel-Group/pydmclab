@@ -3,7 +3,7 @@ import numpy as np
 
 
 class CompTools(object):
-    def __init__(self, formula):
+    def __init__(self, formula: str):
         """
         Args:
             formula (str) - chemical formula
@@ -67,7 +67,7 @@ class CompTools(object):
 
         return Composition(self.clean).get_el_amt_dict()
 
-    def mol_frac(self, el):
+    def mol_frac(self, el:str):
         """
         Returns:
             the molar fraction (float) of an element (str)
@@ -77,7 +77,7 @@ class CompTools(object):
         """
         return Composition(self.clean).get_atomic_fraction(el)
 
-    def stoich(self, el):
+    def stoich(self, el:str):
         """
         Returns:
             the stoichiometry of an element (int)
@@ -132,7 +132,7 @@ class CompTools(object):
         """
         return np.sum(list(self.amts.values()))
 
-    def find_scaling(self, formula_to_compare):
+    def find_scaling(self, formula_to_compare:str):
         """
         Args:
             formula_to_compare (str)
@@ -163,8 +163,8 @@ class CompTools(object):
 
         # calculate and return scaling factor
         return comparison_formula_scale / current_formula_scale
-
-    def label_for_plot(self, el_order=None):
+# el_order=None is default
+    def label_for_plot(self, el_order:list):
         """
         @NOTE:
             this is redundant w/ pydmclab.plotting.utils.get_label ?
