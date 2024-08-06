@@ -21,8 +21,8 @@ class MPQuery(object):
     """
     New MP API
     """
-
-    def __init__(self, api_key=None):
+# api_key = None is default
+    def __init__(self, api_key: str):
         """
         Args:
             api_key (str)
@@ -69,17 +69,27 @@ class MPQuery(object):
             "material_id": "mpid",
             "symmetry.number": "sg",
         }
-
+    # def get_data(
+    #     self,
+    #     search_for,
+    #     max_Ehull=0.05,
+    #     max_polymorph_energy=0.1,
+    #     max_strucs_per_cmpd=1,
+    #     max_sites_per_structure=41,
+    #     include_sub_phase_diagrams=False,
+    #     include_structure=True,
+    #     properties=None,
+    # ):
     def get_data(
         self,
-        search_for,
-        max_Ehull=0.05,
-        max_polymorph_energy=0.1,
-        max_strucs_per_cmpd=1,
-        max_sites_per_structure=41,
-        include_sub_phase_diagrams=False,
-        include_structure=True,
-        properties=None,
+        search_for: str | list,
+        max_Ehull: float,
+        max_polymorph_energy: float,
+        max_strucs_per_cmpd: int,
+        max_sites_per_structure: int,
+        include_sub_phase_diagrams: bool,
+        include_structure: bool,
+        properties: list | None,
     ):
         """
         Args:
@@ -298,7 +308,7 @@ class MPQuery(object):
                 }
         return d
 
-    def get_structures_by_material_id(self, material_ids):
+    def get_structures_by_material_id(self, material_ids: list[str]):
         """
         Args:
             material_ids (list)
@@ -317,8 +327,9 @@ class MPQuery(object):
             mpid = d_doc["material_id"]
             d[mpid] = d_doc["structure"]
         return d
-
-    def get_entries_for_chemsys(self, chemsys, thermo_types=["GGA_GGA+U", "R2SCAN"]):
+    
+    # def get_entries_for_chemsys(self, chemsys, thermo_types=["GGA_GGA+U", "R2SCAN"]):
+    def get_entries_for_chemsys(self, chemsys: str, thermo_types=["GGA_GGA+U", "R2SCAN"]):
         """
         Args:
             chemsys (str)
@@ -345,8 +356,8 @@ class MPLegacyQuery(object):
     class to assist with downloading data from Materials Project
 
     """
-
-    def __init__(self, api_key=None):
+# api_key = None is default
+    def __init__(self, api_key: str):
         """
         Args:
             api_key (str)
@@ -460,17 +471,30 @@ class MPLegacyQuery(object):
             "material_id": "mpid",
         }
 
+    # def get_data_for_comp(
+    #     self,
+    #     comp,
+    #     properties=None,
+    #     criteria={},
+    #     only_gs=True,
+    #     include_structure=True,
+    #     supercell_structure=False,
+    #     max_Ehull=0.1,
+    #     max_sites_per_structure=100,
+    #     max_strucs_per_cmpd=5,
+    # ):
+
     def get_data_for_comp(
         self,
-        comp,
-        properties=None,
-        criteria={},
-        only_gs=True,
-        include_structure=True,
-        supercell_structure=False,
-        max_Ehull=0.1,
-        max_sites_per_structure=100,
-        max_strucs_per_cmpd=5,
+        comp: str | list,
+        properties: list | None,
+        criteria: dict | None,
+        only_gs: bool,
+        include_structure: bool,
+        supercell_structure: bool,
+        max_Ehull: float,
+        max_sites_per_structure: int,
+        max_strucs_per_cmpd: int,
     ):
         """
         Args:
@@ -654,14 +678,23 @@ class MPLegacyQuery(object):
         # close rester
         mpr.session.close()
         return query
+    
+#   def get_entry_by_material_id(
+#         self,
+#         material_id,
+#         properties=None,
+#         incl_structure=True,
+#         conventional=False,
+#         compatible_only=True,
+#     ):
 
     def get_entry_by_material_id(
         self,
-        material_id,
-        properties=None,
-        incl_structure=True,
-        conventional=False,
-        compatible_only=True,
+        material_id: str,
+        properties: list,
+        incl_structure: bool,
+        conventional: bool,
+        compatible_only: bool,
     ):
         """
         Args:
@@ -688,7 +721,7 @@ class MPLegacyQuery(object):
             material_id, compatible_only, incl_structure, properties, conventional
         )
 
-    def get_structure_by_material_id(self, material_id):
+    def get_structure_by_material_id(self, material_id: str):
         """
         Args:
             material_id (str)
@@ -700,7 +733,7 @@ class MPLegacyQuery(object):
         mpr = self.mpr
         return mpr.get_structure_by_material_id(material_id)
 
-    def get_incar(self, material_id):
+    def get_incar(self, material_id: str):
         """
         Args:
             material_id (str)
@@ -712,7 +745,7 @@ class MPLegacyQuery(object):
         mpr = self.mpr
         return mpr.query(material_id, ["input.incar"])[0]
 
-    def get_kpoints(self, material_id):
+    def get_kpoints(self, material_id: str):
         """
         Args:
             material_id (str)
@@ -724,7 +757,7 @@ class MPLegacyQuery(object):
         mpr = self.mpr
         return mpr.query(material_id, ["input.kpoints"])[0]["input.kpoints"].as_dict()
 
-    def get_vasp_inputs(self, material_id):
+    def get_vasp_inputs(self, material_id: str):
         """
         Args:
             material_id (str)
