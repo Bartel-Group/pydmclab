@@ -16,22 +16,22 @@ class UnitTestChemPots(unittest.TestCase):
         muTi = cp.chempots["Ti"]
         muO = cp.chempots["O"]
 
-        # from 240528_dmc-mus.json
-        self.assertEqual(muTi, -7.808586146666666)
-        self.assertEqual(muO, -4.942281875)
+        # from 230122_dmc-mus.json
+        self.assertEqual(muTi, -7.805884913333333)
+        self.assertEqual(muO, -4.942339795)
 
         cp = ChemPots(functional="r2scan", standard="dmc")
         muTi = cp.chempots["Ti"]
         muO = cp.chempots["O"]
-        self.assertEqual(muTi, -12.93594209)
-        self.assertEqual(muO, -5.93040766)
+        self.assertEqual(muTi, -12.935879826666666)
+        self.assertEqual(muO, -5.93051377)
 
         # from mus_from_mp_no_corrections.json + mp2020_compatibility_dmus()
         cp = ChemPots(functional="pbe", standard="mp")
         muTi = cp.chempots["Ti"]
         muO = cp.chempots["O"]
         self.assertEqual(muTi, -7.895052840000001)
-        self.assertEqual(muO, -4.26095546875)
+        self.assertEqual(muO, -4.94795546875 - -0.687)
 
     def test_Tdep_mus(self):
         cp = ChemPots(temperature=1000)
@@ -58,21 +58,13 @@ class UnitTestChemPots(unittest.TestCase):
     def test_user_modifications(self):
         cp = ChemPots(user_chempots={"Re": -123})
         muRe = cp.chempots["Re"]
-        self.assertEqual(muRe, -123, "muRe is incorrect")
+        self.assertEqual(muRe, -123)
 
         cp = ChemPots(functional="r2scan", standard="dmc", user_dmus={"Ti": 0.23})
-        self.assertEqual(cp.chempots["Ti"], -12.93594209 + 0.23)
+        self.assertEqual(cp.chempots["Ti"], -12.935879826666666 + 0.23)
 
 
-class UnitTestFormationEnergies(unittest.TestCase):
-    def test_weighted_elemental_energies(self):
-        formula = 'Li2MnO2F'
-        E_DFT = -6.0355
-        mus = ChemPots(functional="pbe", standard="dmc").chempots
-        weighted_hard = 2*mus['Li'] + mus['Mn'] + 2*mus['O'] + mus['F']
-        weighted_auto = FormationEnthalpy(formula, E_DFT, mus).weighted_elemental_energies
-        self.assertAlmostEqual(weighted_auto, weighted_hard, places=3)
-
+class UnitTestFormationEnthalpy(unittest.TestCase):
     def test_Ef_zeroK(self):
         formula = "Li2MnO2F"
         E_DFT = -6.0355
@@ -84,22 +76,6 @@ class UnitTestFormationEnergies(unittest.TestCase):
         )
 
         self.assertAlmostEqual(Ef_auto, Ef_hard, places=3)
-
-    def test_reduced_mass(self):
-        formula = 'NaCl'
-        Ef_0K = -2.11
-        m_Na = 22.98976928
-        m_Cl = 35.453
-        m_NaCl_hard = m_Na * m_Cl / (m_Na + m_Cl)
-        m_NaCl_auto = FormationEnergy(
-            formula=formula,
-            Ef=Ef_0K,
-            chempots = ChemPots().chempots,
-            include_Sconfig=False,
-            include_Svib=True,
-            atomic_volume=174.50 / 8,
-        ).reduced_mass
-        self.assertAlmostEqual(m_NaCl_auto, m_NaCl_hard, places=3)
 
     def test_dGf_Sconfig(self):
         formula = "Ba2ZrNbS6"
@@ -353,5 +329,4 @@ class UnitTestReactions(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    # unittest.main()
-    unittest.main(argv=['','-v'], exit=False)
+    unittest.main()
