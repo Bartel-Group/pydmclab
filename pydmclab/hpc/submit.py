@@ -13,6 +13,12 @@ from pydmclab.data.configs import load_base_configs, load_partition_configs
 # this is the directory where this file is located (for path purposes)
 HERE = os.path.dirname(os.path.abspath(__file__))
 
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    pass
+
 
 class SubmitTools(object):
     """
@@ -28,11 +34,11 @@ class SubmitTools(object):
 
     def __init__(
         self,
-        launch_dir,
-        initial_magmom,
-        ID_specific_vasp_configs=None,
-        user_configs={},
-    ):
+        launch_dir: str,
+        initial_magmom: list | None,
+        ID_specific_vasp_configs: dict | bool = None,
+        user_configs: dict = {},
+    ) -> None:
         """
         Args:
             launch_dir (str)
@@ -131,7 +137,7 @@ class SubmitTools(object):
         self.job_dir = self.scripts_dir.split("/")[-2]
 
     @property
-    def calc_list(self):
+    def calc_list(self) -> list:
         """
         Returns:
             [xc-calc in the order they should be executed]
@@ -216,14 +222,14 @@ class SubmitTools(object):
         return final_minimal_calcs
 
     @property
-    def queue_manager(self):
+    def queue_manager(self) -> str:
         """
         Returns queue manager (eg #SBATCH)
         """
         return self.configs["manager"]
 
     @property
-    def slurm_options(self):
+    def slurm_options(self) -> dict:
         """
         Returns dictionary of slurm options {option (str) : value (str, float, int, bool}
             nodes, ntasks, walltime, etc
@@ -285,7 +291,7 @@ class SubmitTools(object):
         return options
 
     @property
-    def bin_dir(self):
+    def bin_dir(self) -> str:
         """
         Returns bin directory (str) where things (eg LOBSTER) are located
         """
@@ -301,7 +307,7 @@ class SubmitTools(object):
             raise NotImplementedError('dont have bin path for machine "%s"' % machine)
 
     @property
-    def vasp_dir(self):
+    def vasp_dir(self) -> str:
         """
         Returns directory (str) containing vasp executable
 
@@ -326,7 +332,7 @@ class SubmitTools(object):
             raise NotImplementedError('dont have VASP path for machine "%s"' % machine)
 
     @property
-    def vasp_command(self):
+    def vasp_command(self) -> str:
         """
         Returns command used to execute vasp (str)
             e.g., 'srun -n 24 PATH_TO_VASP/vasp_std > vasp.o' (if mpi_command == 'srun')
@@ -351,7 +357,7 @@ class SubmitTools(object):
             )
 
     @property
-    def lobster_command(self):
+    def lobster_command(self) -> str:
         """
         Returns command used to execute lobster (str)
         """
@@ -361,7 +367,7 @@ class SubmitTools(object):
         return "\n%s\n" % lobster_path
 
     @property
-    def bader_command(self):
+    def bader_command(self) -> str:
         """
         Returns command used to execute bader (str)
         """
@@ -370,7 +376,7 @@ class SubmitTools(object):
         return "\n%s\n%s\n" % (chgsum, bader)
 
     @property
-    def job_name(self):
+    def job_name(self) -> str:
         """
         Returns job name based on launch_dir (str)
             eg if launch_dir = /home/my_stuff/perovskites/SrZrS3/perovskite/fm
@@ -379,7 +385,7 @@ class SubmitTools(object):
         return ".".join(self.launch_dir.split("/")[-3:]) + "." + self.job_dir
 
     @property
-    def is_job_in_queue(self):
+    def is_job_in_queue(self) -> bool:
         """
 
         Returns:
@@ -416,7 +422,7 @@ class SubmitTools(object):
         return False
 
     @property
-    def statuses(self):
+    def statuses(self) -> dict:
         """
         Returns dictionary of statuses for each calculation in the chain
             {xc-calc : status}
@@ -516,7 +522,7 @@ class SubmitTools(object):
         return statuses
 
     @property
-    def prepare_directories(self):
+    def prepare_directories(self) -> dict:
         """
         Given the statuses dictionary, prepare (update) each VASP calculation directory accordingly
         """
@@ -577,7 +583,7 @@ class SubmitTools(object):
             print("  %s is prepared\n" % xc_calc)
         return statuses
 
-    def collection_status(self, xc_calc):
+    def collection_status(self, xc_calc: str) -> bool:
         """
         Returns:
             True if no need to run collector
@@ -596,7 +602,7 @@ class SubmitTools(object):
             return False
 
     @property
-    def write_sub(self):
+    def write_sub(self) -> bool:
         """
         A lot going on here. The objective is to write a submission script for each pack of VASP calculations
             each submission script will launch a chain of jobs
@@ -771,7 +777,7 @@ class SubmitTools(object):
         return True
 
     @property
-    def launch_sub(self):
+    def launch_sub(self) -> None:
         """
         launch the submission script written in write_sub
             if job is not in queue already

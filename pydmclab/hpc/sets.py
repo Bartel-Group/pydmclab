@@ -3,6 +3,14 @@ from pymatgen.io.vasp.sets import MPRelaxSet, MPScanRelaxSet, MPHSERelaxSet
 
 from pydmclab.core.struc import StrucTools
 
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pymatgen.core.structure import Structure
+    from pymatgen.io.vasp.sets import VaspSet
+    from pymatgen.io.vasp import Kpoints
+
 
 class GetSet(object):
     """
@@ -15,14 +23,14 @@ class GetSet(object):
 
     def __init__(
         self,
-        structure,
-        configs,
-        potcar_functional=None,
-        validate_magmom=False,
-        modify_incar={},
-        modify_kpoints={},
-        modify_potcar={},
-    ):
+        structure: Structure,
+        configs: dict,
+        potcar_functional: str | None = None,
+        validate_magmom: bool = False,
+        modify_incar: dict = {},
+        modify_kpoints: dict = {},
+        modify_potcar: dict = {},
+    ) -> None:
         """
         Args:
             structure (Structure):
@@ -83,7 +91,7 @@ class GetSet(object):
         self.validate_magmom = validate_magmom
 
     @property
-    def base_set(self):
+    def base_set(self) -> VaspSet:
         """
         Returns VaspSet (ie which MP set do we want to customize from)
         """
@@ -107,7 +115,7 @@ class GetSet(object):
             raise NotImplementedError(f"xc: {xc} not implemented")
 
     @property
-    def user_incar_settings(self):
+    def user_incar_settings(self) -> dict:
         """
         These are changes we want to make to a given base VaspSet
 
@@ -151,7 +159,7 @@ class GetSet(object):
         # these three calcs are static --> turn off relaxation things
         if calc in [
             "static",
-        #    "prelobster",
+            #    "prelobster",
             "lobster",
             "parchg",
         ]:
@@ -165,7 +173,7 @@ class GetSet(object):
             new_settings["ICHARG"] = 0
             new_settings["LAECHG"] = True
 
-        #if calc == "prelobster":
+        # if calc == "prelobster":
         #    new_settings["ISMEAR"] = -5
         #    new_settings["NELM"] = 0
         #    new_settings["NSW"] = 0
@@ -353,7 +361,7 @@ class GetSet(object):
         else:
             new_settings["ISPIN"] = 2
             new_settings["LORBIT"] = 11
-    
+
         if xc == "hse06":
             if calc == "parchg":
                 del new_settings["KPAR"]
@@ -375,7 +383,7 @@ class GetSet(object):
         return new_settings.copy()
 
     @property
-    def user_kpoints_settings(self):
+    def user_kpoints_settings(self) -> Kpoints:
         """
         Returns KPOINTS object based on user passed settings
 
@@ -421,7 +429,7 @@ class GetSet(object):
             )
 
     @property
-    def user_potcar_settings(self):
+    def user_potcar_settings(self) -> dict:
         """
         Returns:
             {element (str) : desired potcar (str)}
@@ -440,7 +448,7 @@ class GetSet(object):
         return new_settings.copy()
 
     @property
-    def vaspset(self):
+    def vaspset(self) -> VaspSet:
         """
         Returns:
             VaspSet object
