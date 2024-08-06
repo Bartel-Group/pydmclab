@@ -1,3 +1,6 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
 import os
 from shutil import copyfile, rmtree
 import subprocess
@@ -12,9 +15,6 @@ from pydmclab.data.configs import load_base_configs, load_partition_configs
 
 # this is the directory where this file is located (for path purposes)
 HERE = os.path.dirname(os.path.abspath(__file__))
-
-from __future__ import annotations
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     pass
