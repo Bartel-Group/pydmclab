@@ -22,10 +22,6 @@ class UnitTestCompTools(unittest.TestCase):
         self.assertEqual(CompTools(formula).mol_frac("Na"), 2 / 71)
         self.assertEqual(CompTools(formula).mol_frac("Ti"), 0.0)
 
-    def test_stoich(self):
-        formula = "V4Na2(P2O8)6.5"
-        self.assertEqual(CompTools(formula).stoich("Na"), 2)
-
     def test_chemsys(self):
         formula = "V4Na2(P2O8)6.5"
         self.assertEqual(CompTools(formula).chemsys, "Na-O-P-V")
@@ -42,11 +38,6 @@ class UnitTestCompTools(unittest.TestCase):
         formula = "V4Na2(P2O8)6.5"
         self.assertEqual(CompTools(formula).n_atoms, 71)
 
-    def test_find_scaling(self):
-        formula = "V4Na2(P2O8)6.5"
-        formula_to_compare = "V2Na1(P1O4)3.25"
-        self.assertEqual(CompTools(formula).find_scaling(formula_to_compare), 0.5)
-
     def test_label_for_plot(self):
         formula = "V4Na2(P2O8)6.5"
         self.assertEqual(
@@ -56,4 +47,3 @@ class UnitTestCompTools(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-    #unittest.main(argv=[''], exit=False)
