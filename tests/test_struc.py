@@ -76,7 +76,7 @@ class TestStrucTools(unittest.TestCase):
 
     def test_decorate_with_ox_states(self):
         self.st_cro.ox_states = {"Cr": 3, "O": -2}
-        oxidized_struc = self.st_cro.decorate_with_ox_states(verbose=False)
+        oxidized_struc = self.st_cro.decorate_with_ox_states
         self.assertEqual(oxidized_struc[0].species_string, "Cr3+")
 
     def test_get_ordered_structures(self):
