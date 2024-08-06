@@ -17,8 +17,9 @@ from pydmclab.data.thermochem import (
 from pydmclab.data.features import atomic_masses
 from pydmclab.core.comp import CompTools
 from pydmclab.core.struc import StrucTools
+from typing import Literal, get_args
 
-
+ALLOWED_TS = Literal[0, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200, 1300, 1400, 1500, 1600, 1700, 1800, 1900, 2000]
 class ChemPots(object):
     """
     return dictionary of chemical potentials {el : chemical potential (eV/at)} based on user inputs
@@ -26,14 +27,14 @@ class ChemPots(object):
 
     def __init__(
         self,
-        temperature=0,
-        functional="pbe",
-        standard="dmc",
-        partial_pressures={},  # atm
+        temperature: ALLOWED_TS=0,
+        functional: Literal["pbe","pbeu","r2scan"]="pbe",
+        standard: Literal["dmc","mp"]="dmc",
+        partial_pressures: dict[str, float]={},  # atm
         diatomics=["H", "N", "O", "F", "Cl"],
         oxide_type="oxide",
-        user_chempots={},
-        user_dmus={},
+        user_chempots: dict[str, float]={},
+        user_dmus: dict[str, float]={},
     ):
         """
         Args:
@@ -178,9 +179,9 @@ class FormationEnthalpy(object):
 
     def __init__(
         self,
-        formula,
-        E_DFT,
-        chempots,
+        formula: str,
+        E_DFT: float,
+        chempots: dict[str, float],
     ):
         """
         Args:
@@ -241,15 +242,15 @@ class FormationEnergy(object):
 
     def __init__(
         self,
-        formula,
-        Ef,
-        chempots,
+        formula: str,
+        Ef: float,
+        chempots: dict[str, float],
         structure=False,
-        atomic_volume=False,
-        x_config=None,
-        n_config=1,
-        include_Svib=True,
-        include_Sconfig=False,
+        atomic_volume: float=False,
+        x_config:float=None,
+        n_config: int=1,
+        include_Svib: bool=True,
+        include_Sconfig: bool=False,
     ):
         """
         Args:
@@ -381,7 +382,7 @@ class FormationEnergy(object):
         ).n_atoms
         return S_config
 
-    def dGf(self, temperature):
+    def dGf(self, temperature: ALLOWED_TS):
         """
         Args:
             temperature (int)
@@ -435,16 +436,16 @@ class DefectFormationEnergy(object):
 
     def __init__(
         self,
-        E_pristine,
-        formula_pristine,
-        Eg_pristine,
-        E_defect,
-        formula_defect,
-        charge_defect,
-        fixed_els,
-        chempots,
-        charge_correction,
-        gap_discretization=0.1,
+        E_pristine: float,
+        formula_pristine: str,
+        Eg_pristine: float,
+        E_defect: float,
+        formula_defect: str,
+        charge_defect: int,
+        fixed_els: list,
+        chempots: dict[str, float],
+        charge_correction: float,
+        gap_discretization: float=0.1,
     ):
         """
         Args:
@@ -730,7 +731,11 @@ class ReactionEnergy(object):
 
     """
 
-    def __init__(self, input_energies, reactants, products, energy_key="E", norm="rxn"):
+    def __init__(self, input_energies: dict[str, dict[str, float]], 
+                 reactants: list, 
+                 products:list, 
+                 energy_key:str="E", 
+                 norm:str="rxn"):
         """
 
         Args:
@@ -900,7 +905,7 @@ class MPFormationEnergy(object):
 
     """
 
-    def __init__(self, all_entries):
+    def __init__(self, all_entries: list):
         """
         Args:
             all_entries (list)
