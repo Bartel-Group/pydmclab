@@ -191,10 +191,6 @@ class StrucTools(object):
     @property
     def decorate_with_ox_states(self) -> Structure:
         """
-        args:
-            verbose (bool)
-                whether to print out what's happening
-
         Returns oxidation state decorated structure
             - uses Auto algorithm if no ox_states are provided
             - otherwise, applies ox_states
