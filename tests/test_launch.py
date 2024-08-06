@@ -35,8 +35,6 @@ class UnitTestLaunchTools(unittest.TestCase):
             for calc_dir_name in calcs_dirs
         ]
         for calcs_dir in calcs_dirs:
-            if os.path.exists(calcs_dir):
-                rmtree(calcs_dir)
             if not os.path.exists(calcs_dir):
                 os.mkdir(calcs_dir)
         self.calcs_dirs = calcs_dirs
@@ -149,6 +147,14 @@ class UnitTestLaunchTools(unittest.TestCase):
                 len(StrucTools(self.MnO_structure).structure),
                 len(StrucTools(os.path.join(launch_dir, "POSCAR")).structure),
             )
+
+    def tearDown(self):
+
+        for calcs_dir in self.calcs_dirs:
+            if os.path.exists(calcs_dir):
+                rmtree(calcs_dir)
+
+        return
 
 
 if __name__ == "__main__":
