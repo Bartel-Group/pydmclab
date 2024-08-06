@@ -164,7 +164,7 @@ class CompTools(object):
         # calculate and return scaling factor
         return comparison_formula_scale / current_formula_scale
 # el_order=None is default
-    def label_for_plot(self, el_order:str):
+    def label_for_plot(self, el_order:list):
         """
         @NOTE:
             this is redundant w/ pydmclab.plotting.utils.get_label ?
