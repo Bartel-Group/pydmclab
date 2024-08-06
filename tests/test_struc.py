@@ -2,7 +2,7 @@ import os
 import unittest
 import warnings
 
-from pydmclab.core.struc import StrucTools
+from pydmclab.core.struc import StrucTools, SiteTools
 from pydmclab.utils.handy import read_json
 
 from pymatgen.core.structure import Structure
@@ -103,6 +103,34 @@ class TestStrucTools(unittest.TestCase):
         scaled_vol = 1.2 * initial_vol
         scaled_struc = self.st_cro.scale_structure(1.2)
         self.assertAlmostEqual(scaled_struc.volume, scaled_vol, places=3)
+
+
+class TestSiteTools(unittest.TestCase):
+    """
+    Test cases for the SiteTools class.
+    """
+
+    def setUp(self):
+        cro_dict = read_json(os.path.join(TEST_DATA, "cro_structure.json"))
+        self.struc_cro = Structure.from_dict(cro_dict)
+        self.st_cro = StrucTools(self.struc_cro, ox_states={"Cr": 3, "O": -2})
+        self.ox_struc = self.st_cro.decorate_with_ox_states
+        self.sitet = SiteTools(self.ox_struc, 3)
+
+    def test_is_fully_occupied(self):
+        self.assertTrue(self.sitet.is_fully_occ)
+
+    def test_site_string(self):
+        self.assertEqual(self.sitet.site_string, "1.0_Cr_3.0+")
+
+    def test_ion(self):
+        self.assertEqual(self.sitet.ion, "Cr3.0+")
+
+    def test_element(self):
+        self.assertEqual(self.sitet.el, "Cr")
+
+    def test_ox_state(self):
+        self.assertEqual(self.sitet.ox_state, 3.0)
 
 
 if __name__ == "__main__":
