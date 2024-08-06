@@ -22,7 +22,7 @@ class MPQuery(object):
     New MP API
     """
 # api_key = None is default
-    def __init__(self, api_key: str):
+    def __init__(self, api_key : str | None):
         """
         Args:
             api_key (str)
@@ -83,12 +83,12 @@ class MPQuery(object):
     def get_data(
         self,
         search_for: str | list,
-        max_Ehull: float,
-        max_polymorph_energy: float,
-        max_strucs_per_cmpd: int,
-        max_sites_per_structure: int,
-        include_sub_phase_diagrams: bool,
-        include_structure: bool,
+        max_Ehull: float | None,
+        max_polymorph_energy: float | None,
+        max_strucs_per_cmpd: int | None,
+        max_sites_per_structure: int | None,
+        include_sub_phase_diagrams: bool | None,
+        include_structure: bool | None,
         properties: list | None,
     ):
         """
