@@ -1,10 +1,11 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
 from pymatgen.io.vasp import Kpoints
 from pymatgen.io.vasp.sets import MPRelaxSet, MPScanRelaxSet, MPHSERelaxSet
 
 from pydmclab.core.struc import StrucTools
 
-from __future__ import annotations
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from pymatgen.core.structure import Structure
