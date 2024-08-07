@@ -92,8 +92,7 @@ class SupercellForDefects(object):
         self.savename = savename
         self.data_dir = data_dir
 
-    @property
-    def make_supercell(self) -> Structure:
+    def make_supercell(self, verbose: bool = True) -> Structure:
         """
         Returns:
             supercell (pymatgen Structure object)
@@ -112,15 +111,16 @@ class SupercellForDefects(object):
         )
         new_sc_structure = primitive_cell * ideal_supercell_grid
 
-        print(
-            "The minimum image distance of the generated supercell structure is: %.2f Å \n"
-            % (self.curr_min_image_distance(new_sc_structure))
-        )
+        if verbose:
+            print(
+                "The minimum image distance of the generated supercell structure is: %.2f Å \n"
+                % (self.curr_min_image_distance(new_sc_structure))
+            )
 
-        print(
-            "The supercell grid in terms of the deterministic primitive structure is:"
-        )
-        print(ideal_supercell_grid)
+            print(
+                "The supercell grid in terms of the deterministic primitive structure is:"
+            )
+            print(ideal_supercell_grid)
 
         if self.savename:
             StrucTools(new_sc_structure).structure_to_cif(
