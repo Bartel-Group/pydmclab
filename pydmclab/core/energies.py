@@ -235,7 +235,6 @@ class FormationEnthalpy(object):
 class FormationEnergy(object):
     """
     This class is for computing formation energies at T > 0 K
-
     By default, uses the Bartel2018 model for vibrational entropy: https://doi.org/10.1038/s41467-018-06682-4
 
     """
@@ -245,10 +244,10 @@ class FormationEnergy(object):
         formula: str,
         Ef: float,
         chempots: dict[str, float],
-        structure=False,
-        atomic_volume: float=False,
-        x_config:float=None,
-        n_config: int=1,
+        structure: ComputedStructureEntry | dict[str,float] | None = None ,
+        atomic_volume: float | None=None,
+        x_config:float | None = None,
+        n_config: None | int=1,
         include_Svib: bool=True,
         include_Sconfig: bool=False,
     ):
@@ -442,7 +441,7 @@ class DefectFormationEnergy(object):
         E_defect: float,
         formula_defect: str,
         charge_defect: int,
-        fixed_els: list,
+        fixed_els: list[str],
         chempots: dict[str, float],
         charge_correction: float,
         gap_discretization: float=0.1,
@@ -732,8 +731,8 @@ class ReactionEnergy(object):
     """
 
     def __init__(self, input_energies: dict[str, dict[str, float]], 
-                 reactants: list, 
-                 products:list, 
+                 reactants: list[str], 
+                 products:list[str], 
                  energy_key:str="E", 
                  norm:str="rxn"):
         """
@@ -905,7 +904,7 @@ class MPFormationEnergy(object):
 
     """
 
-    def __init__(self, all_entries: list):
+    def __init__(self, all_entries: list[ComputedStructureEntry]|list[dict[str, float]]):
         """
         Args:
             all_entries (list)
