@@ -1,4 +1,7 @@
 import os
+
+from typing import Literal
+
 import numpy as np
 
 from pymatgen.core.structure import Structure
@@ -19,7 +22,9 @@ class StrucTools(object):
     Purpose: to manipulate crystal structures for DFT calculations
     """
 
-    def __init__(self, structure, ox_states=None):
+    def __init__(
+        self, structure: Structure | dict | str, ox_states: dict | None = None
+    ) -> None:
         """
         Args:
             structure (Structure): pymatgen Structure object
@@ -45,7 +50,7 @@ class StrucTools(object):
         self.ox_states = ox_states
 
     @property
-    def structure_as_dict(self):
+    def structure_as_dict(self) -> dict:
         """
 
         Returns:
@@ -54,28 +59,28 @@ class StrucTools(object):
         return self.structure.as_dict()
 
     @property
-    def compact_formula(self):
+    def compact_formula(self) -> str:
         """
         "clean" (reduced, systematic) formula (str) for structure
         """
         return CompTools(self.structure.formula).clean
 
     @property
-    def formula(self):
+    def formula(self) -> str:
         """
         pretty (unreduced formula) for structure
         """
         return self.structure.formula
 
     @property
-    def els(self):
+    def els(self) -> list[str]:
         """
         list of unique elements (str) in structure
         """
         return CompTools(self.compact_formula).els
 
     @property
-    def amts(self):
+    def amts(self) -> dict[str, int]:
         """
         Returns:
             {el (str): number of el in struc (int)}
@@ -89,10 +94,11 @@ class StrucTools(object):
                 amts[el] += 1
         return amts
 
-    def make_supercell(self, grid):
+    def make_supercell(self, grid: list[int], verbose: bool = True) -> Structure:
         """
         Args:
             grid (list) - [nx, ny, nz]
+            verbose (bool) - whether to print out grid
 
         Returns:
             Structure repeated nx, ny, nz
@@ -101,11 +107,12 @@ class StrucTools(object):
                 supercell = StrucTools(structure).make_supercell([1, 2, 3])
         """
         structure = self.structure
-        print("making supercell with grid %s\n" % str(grid))
+        if verbose:
+            print("making supercell with grid %s\n" % str(grid))
         structure.make_supercell(grid)
         return structure
 
-    def perturb(self, perturbation=0.1):
+    def perturb(self, perturbation: float = 0.1) -> Structure:
         """
         Args:
             perturbation (float) - distance in Angstrom to randomly perturb each atom
@@ -117,7 +124,12 @@ class StrucTools(object):
         structure.perturb(perturbation)
         return structure
 
-    def change_occ_for_site(self, site_idx, new_occ, structure=None):
+    def change_occ_for_site(
+        self,
+        site_idx: int,
+        new_occ: dict[str, float],
+        structure: Structure | None = None,
+    ) -> Structure:
         """
 
         return a structure with a new occupation for some site
@@ -152,7 +164,9 @@ class StrucTools(object):
             s[site_idx].species = new_occ
         return s
 
-    def change_occ_for_el(self, el, new_occ, structure=None):
+    def change_occ_for_el(
+        self, el: str, new_occ: dict[str, float], structure: Structure | None = None
+    ) -> Structure:
         """
         Args:
             el (str)
@@ -175,7 +189,7 @@ class StrucTools(object):
         return structure
 
     @property
-    def decorate_with_ox_states(self):
+    def decorate_with_ox_states(self) -> Structure:
         """
         Returns oxidation state decorated structure
             - uses Auto algorithm if no ox_states are provided
@@ -199,7 +213,13 @@ class StrucTools(object):
             print("     using %s" % str(ox_states))
         return transformer.apply_transformation(structure)
 
-    def get_ordered_structures(self, algo=0, decorate=True, n_strucs=1):
+    def get_ordered_structures(
+        self,
+        algo: Literal[0, 1, 2] = 0,
+        decorate: bool = True,
+        n_strucs: int = 1,
+        verbose: bool = True,
+    ) -> dict[int, dict]:
         """
         Args:
             algo (int):
@@ -234,14 +254,16 @@ class StrucTools(object):
         return_ranked_list = n_strucs if n_strucs > 1 else False
 
         # generate ordered structure
-        print("ordering disordered structures\n")
+        if verbose:
+            print("ordering disordered structures\n")
         out = transformer.apply_transformation(
             structure, return_ranked_list=return_ranked_list
         )
 
         if isinstance(out, list):
             # more than 1 structure, so check for duplicates (symmetrically equivalent structures) and remove them
-            print("getting unique structures\n")
+            if verbose:
+                print("getting unique structures\n")
             matcher = StructureMatcher()
             out = [i["structure"] for i in out]
             # find unique groups of structures
@@ -254,11 +276,12 @@ class StrucTools(object):
 
     def replace_species(
         self,
-        species_mapping,
-        n_strucs=1,
-        use_ox_states_in_mapping=False,
-        use_occ_in_mapping=True,
-    ):
+        species_mapping: dict[str, dict[str, float]],
+        n_strucs: int = 1,
+        use_ox_states_in_mapping: bool = False,
+        use_occ_in_mapping: bool = True,
+        verbose: bool = True,
+    ) -> dict[int, dict]:
         """
         Args:
             species_mapping (dict)
@@ -283,7 +306,8 @@ class StrucTools(object):
                     index = 0 has lowest Ewald energy
         """
         structure = self.structure
-        print("replacing species with %s\n" % str(species_mapping))
+        if verbose:
+            print("replacing species with %s\n" % str(species_mapping))
 
         # purge oxidation states if you'd like
         if not use_ox_states_in_mapping:
@@ -319,10 +343,10 @@ class StrucTools(object):
         else:
             # otherwise, need to order this partially occupied structure
             structools = StrucTools(structure, self.ox_states)
-            return structools.get_ordered_structures(n_strucs=n_strucs)
+            return structools.get_ordered_structures(n_strucs=n_strucs, verbose=verbose)
 
     @property
-    def spacegroup_info(self):
+    def spacegroup_info(self) -> dict[str, dict[str, int | str]]:
         """
         Returns:
             dict of spacegroup info with 'tight' or 'loose' symmetry tolerance
@@ -352,7 +376,11 @@ class StrucTools(object):
 
         return data
 
-    def sg(self, number_or_symbol="symbol", loose_or_tight="loose"):
+    def sg(
+        self,
+        number_or_symbol: Literal["number", "symbol"] = "symbol",
+        loose_or_tight: Literal["loose", "tight"] = "loose",
+    ) -> int | str:
         """
 
         returns spacegroup number of symbol with loose or tight tolerance
@@ -370,7 +398,9 @@ class StrucTools(object):
         sg_info = self.spacegroup_info
         return sg_info[loose_or_tight][number_or_symbol]
 
-    def scale_structure(self, scale_factor, structure=None):
+    def scale_structure(
+        self, scale_factor: float, structure: Structure | None = None
+    ) -> Structure:
         """
 
         Isotropically scale a structure
@@ -401,22 +431,32 @@ class StrucTools(object):
 
     def get_slabs(
         self,
-        miller=(1, 0, 0),
-        min_slab_size=10,
-        min_vacuum_size=10,
-        center_slab=True,
-        in_unit_planes=False,
-        reorient_lattice=True,
-        symmetrize=True,
-        tolerance=0.1,
-        ftolerance=0.1,
-    ):
+        miller: tuple[int, int, int] = (1, 0, 0),
+        *,
+        min_slab_size: int = 10,
+        min_vacuum_size: int = 10,
+        center_slab: bool = True,
+        in_unit_planes: bool = False,
+        reorient_lattice: bool = True,
+        symmetrize: bool = True,
+        tolerance: float = 0.1,
+        ftolerance: float = 0.1,
+    ) -> dict[str, dict]:
         """
         Args:
-            TODO
+            miller (tuple): miller index of slab
+            min_slab_size (int): minimum slab size in Angstrom
+            min_vacuum_size (int): minimum vacuum size in Angstrom
+            center_slab (bool): whether to center the slab
+            in_unit_planes (bool): whether to use unit planes
+            reorient_lattice (bool): whether to reorient the lattice
+            symmetrize (bool): whether to symmetrize the slab
+            tolerance (float): tolerance for symmetrization
+            ftolerance (float): tolerance for finding the fractional positions of the terminations
 
         Returns:
-            TODO
+            dict of slabs
+                {miller_min_vacuum_size_i : slab.as_dict()}
 
         Use case:
 
@@ -445,20 +485,21 @@ class StrucTools(object):
 
         slabs = slabgen.get_slabs(symmetrize=symmetrize, tol=tolerance, ftol=ftolerance)
 
-        out = {}
+        miller_str = "".join([str(i) for i in miller])
+
+        out = {miller_str: {}, "bulk_structure": bulk.as_dict()}
         for i, slab in enumerate(slabs):
-            key = (
-                "".join([str(v) for v in miller])
-                + "_"
-                + str(min_vacuum_size)
-                + "_"
-                + str(i)
-            )
-            out[key] = slab.as_dict()
+            out[miller_str][i] = {}
+            out[miller_str][i]["slab"] = slab.as_dict()
+            out[miller_str][i]["vacuum_size"] = min_vacuum_size
+            out[miller_str][i]["slab_size"] = min_slab_size
+            out[miller_str][i]["center_slab"] = center_slab
+            out[miller_str][i]["in_unit_planes"] = in_unit_planes
+            out[miller_str][i]["reorient_lattice"] = reorient_lattice
 
         return out
 
-    def structure_to_cif(self, filename, data_dir=None):
+    def structure_to_cif(self, filename: str, data_dir: str = None) -> None:
         """
         Coverts a structure to a cif file and saves it to a directory, useful for VESTA viewing
 

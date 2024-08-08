@@ -17,9 +17,8 @@ from pydmclab.data.thermochem import (
 from pydmclab.data.features import atomic_masses
 from pydmclab.core.comp import CompTools
 from pydmclab.core.struc import StrucTools
-from typing import Literal, get_args
 
-ALLOWED_TS = Literal[0, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200, 1300, 1400, 1500, 1600, 1700, 1800, 1900, 2000]
+
 class ChemPots(object):
     """
     return dictionary of chemical potentials {el : chemical potential (eV/at)} based on user inputs
@@ -27,14 +26,14 @@ class ChemPots(object):
 
     def __init__(
         self,
-        temperature: ALLOWED_TS=0,
-        functional: Literal["pbe","pbeu","r2scan"]="pbe",
-        standard: Literal["dmc","mp"]="dmc",
-        partial_pressures: dict[str, float]={},  # atm
+        temperature=0,
+        functional="pbe",
+        standard="dmc",
+        partial_pressures={},  # atm
         diatomics=["H", "N", "O", "F", "Cl"],
         oxide_type="oxide",
-        user_chempots: dict[str, float]={},
-        user_dmus: dict[str, float]={},
+        user_chempots={},
+        user_dmus={},
     ):
         """
         Args:
@@ -179,9 +178,9 @@ class FormationEnthalpy(object):
 
     def __init__(
         self,
-        formula: str,
-        E_DFT: float,
-        chempots: dict[str, float],
+        formula,
+        E_DFT,
+        chempots,
     ):
         """
         Args:
@@ -381,7 +380,7 @@ class FormationEnergy(object):
         ).n_atoms
         return S_config
 
-    def dGf(self, temperature: ALLOWED_TS):
+    def dGf(self, temperature):
         """
         Args:
             temperature (int)

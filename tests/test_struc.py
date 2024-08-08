@@ -1,104 +1,136 @@
+import os
 import unittest
+import warnings
+
 from pydmclab.core.struc import StrucTools, SiteTools
-import numpy as np
+from pydmclab.utils.handy import read_json
+
+from pymatgen.core.structure import Structure
+
+TEST_DATA = os.path.join("..", "pydmclab", "data", "test_data", "struc")
 
 
-def get_generic_query(remake=False):
-    from pydmclab.core.query import MPQuery
-    from pydmclab.utils.handy import read_json, write_json
-    import os
+class TestStrucTools(unittest.TestCase):
+    """
+    Test cases for the StrucTools class.
+    """
 
-    fjson = "query.json"
+    def setUp(self):
+        cro_dict = read_json(os.path.join(TEST_DATA, "cro_structure.json"))
+        crmo_dict = read_json(os.path.join(TEST_DATA, "crmo_structure.json"))
+        cro_supercell_dict = read_json(os.path.join(TEST_DATA, "cro_supercell.json"))
 
-    if not remake and os.path.exists(fjson):
-        return read_json(fjson)
-    comps = ["MgO", "MnO", "Cr2O3"]
-    mpq = MPQuery(api_key="***REMOVED***")
-    q = mpq.get_data_for_comp(comps, only_gs=True)
-    q = {q[k]["cmpd"]: q[k] for k in q}
-    write_json(q, fjson)
-    return read_json(fjson)
+        self.struc_cro = Structure.from_dict(cro_dict)
+        self.struc_crmo = Structure.from_dict(crmo_dict)
+        self.struc_supercell = Structure.from_dict(cro_supercell_dict)
 
+        self.st_cro = StrucTools(self.struc_cro)
+        self.st_crmo = StrucTools(self.struc_crmo)
 
-class UnitTestStruc(unittest.TestCase):
-    def test_struc(self):
-        q = get_generic_query()
-        Cr2O3 = q["Cr2O3"]["structure"]
+    def test_init_with_empty_structure_path(self):
+        with self.assertRaises(ValueError):
+            StrucTools(structure="my_fake_path")
 
-        st = StrucTools(Cr2O3)
+    def test_compact_formula(self):
+        self.assertEqual(self.st_cro.compact_formula, "Cr2O3")
 
-        self.assertEqual("Cr2O3", st.compact_formula)
-        self.assertEqual("Cr4 O6", st.formula)
-        self.assertEqual(["Cr", "O"], st.els)
-        self.assertEqual({"Cr": 4, "O": 6}, st.amts)
-        supercell = st.make_supercell([1, 2, 3])
+    def test_formula(self):
+        self.assertEqual(self.st_cro.formula, "Cr4 O6")
 
-        self.assertEqual(len(supercell), 60)
+    def test_els(self):
+        self.assertEqual(self.st_cro.els, ["Cr", "O"])
 
-        st = StrucTools(Cr2O3)
-        new_struc = st.change_occ_for_site(5, {"Li": 0.5})
+    def test_amts(self):
+        self.assertEqual(self.st_cro.amts, {"Cr": 4, "O": 6})
 
-        self.assertEqual(new_struc[5].species_string, "Li:0.500")
+    def test_make_supercell(self):
+        new_supercell = self.st_cro.make_supercell([1, 2, 3], verbose=False)
+        self.assertEqual(len(new_supercell), 60)
+        self.assertEqual(new_supercell, self.struc_supercell)
 
-        new_struc = st.change_occ_for_site(55, {"Li": 0.5}, structure=supercell)
-        self.assertEqual(new_struc[55].species_string, "Li:0.500")
-
-        new_struc = st.change_occ_for_el("Cr", {"Li": 0.5}, structure=supercell)
-        self.assertEqual(new_struc[5].species_string, "Li:0.500")
-
-        new_struc = st.change_occ_for_site(5, {"Cr": 0})
+    def test_change_occ_for_site(self):
+        new_struc = self.st_cro.change_occ_for_site(5, {"Cr": 0})
         self.assertEqual(len(new_struc), 9)
 
-        st = StrucTools(Cr2O3, ox_states={"Cr": 3, "O": -2})
+        new_struc = self.st_cro.change_occ_for_site(5, {"Li": 0.5})
+        self.assertEqual(new_struc[5].species_string, "Li:0.5")
 
-        s = st.decorate_with_ox_states
-        self.assertEqual(s[0].species_string, "Cr3+")
-
-        s = StrucTools(Cr2O3.copy()).structure
-        for i in range(4):
-            s = st.change_occ_for_site(i, {"Cr": 0.5, "Mn": 0.5}, structure=s)
-
-        st = StrucTools(s)
-        strucs = st.get_ordered_structures(n_strucs=2)
-
-        self.assertEqual(StrucTools(strucs[1]).compact_formula, "Cr1Mn1O3")
-
-        st = StrucTools(Cr2O3)
-
-        strucs = st.replace_species(
-            species_mapping={"Cr": {"Cr": 0.5, "Mn": 0.5}}, n_strucs=2
+        new_supercell = self.st_cro.change_occ_for_site(
+            55, {"Cr": 0}, structure=self.struc_supercell
         )
+        self.assertEqual(len(new_supercell), 59)
 
+        new_supercell = self.st_cro.change_occ_for_site(
+            55, {"Li": 0.5}, structure=self.struc_supercell
+        )
+        self.assertEqual(new_supercell[55].species_string, "Li:0.5")
+
+    def test_change_occ_for_el(self):
+        new_struc = self.st_cro.change_occ_for_el("O", {"Li": 0.5})
+        self.assertEqual(new_struc[5].species_string, "Li:0.5")
+
+        new_supercell = self.st_cro.change_occ_for_el(
+            "Cr", {"Li": 0.5}, structure=self.struc_supercell
+        )
+        self.assertEqual(new_supercell[5].species_string, "Li:0.5")
+
+    def test_decorate_with_ox_states(self):
+        self.st_cro.ox_states = {"Cr": 3, "O": -2}
+        oxidized_struc = self.st_cro.decorate_with_ox_states
+        self.assertEqual(oxidized_struc[0].species_string, "Cr3+")
+
+    def test_get_ordered_structures(self):
+        warnings.filterwarnings("ignore", category=DeprecationWarning)
+
+        ordered_strucs = self.st_crmo.get_ordered_structures(n_strucs=2, verbose=False)
+        self.assertEqual(len(ordered_strucs), 2)
+        self.assertEqual(StrucTools(ordered_strucs[1]).compact_formula, "Cr1Mn1O3")
+
+    def test_replace_species(self):
+        strucs = self.st_cro.replace_species(
+            species_mapping={"Cr": {"Cr": 0.5, "Mn": 0.5}},
+            n_strucs=2,
+            verbose=False,
+        )
         self.assertEqual(StrucTools(strucs[1]).compact_formula, "Cr1Mn1O3")
 
-        st = StrucTools(Cr2O3)
+    def test_get_spacegroup_info(self):
+        self.assertEqual(self.st_cro.spacegroup_info["loose"]["number"], 167)
+        self.assertEqual(self.st_cro.sg(), "R-3c")
 
-        self.assertEqual(st.spacegroup_info["loose"]["number"], 167)
-
-        self.assertEqual(st.sg(), "R-3c")
-
-        initial_vol = st.structure.volume
-
+    def test_scale_structure(self):
+        initial_vol = self.st_cro.structure.volume
         scaled_vol = 1.2 * initial_vol
-
-        scaled_struc = st.scale_structure(1.2)
+        scaled_struc = self.st_cro.scale_structure(1.2)
         self.assertAlmostEqual(scaled_struc.volume, scaled_vol, places=3)
 
-    def test_site(self):
-        q = get_generic_query()
-        Cr2O3 = q["Cr2O3"]["structure"]
-        st = StrucTools(Cr2O3, ox_states={"Cr": 3, "O": -2})
-        s = st.decorate_with_ox_states
-        print(s[0])
-        s = s.as_dict()
-        index = 3
 
-        sitet = SiteTools(s, index)
-        self.assertEqual(sitet.ion, "Cr3.0+")
-        self.assertEqual(sitet.el, "Cr")
-        self.assertEqual(sitet.ox_state, 3.0)
+class TestSiteTools(unittest.TestCase):
+    """
+    Test cases for the SiteTools class.
+    """
 
-        self.assertEqual(sitet.site_string, "1.0_Cr_3.0+")
+    def setUp(self):
+        cro_dict = read_json(os.path.join(TEST_DATA, "cro_structure.json"))
+        self.struc_cro = Structure.from_dict(cro_dict)
+        self.st_cro = StrucTools(self.struc_cro, ox_states={"Cr": 3, "O": -2})
+        self.ox_struc = self.st_cro.decorate_with_ox_states
+        self.sitet = SiteTools(self.ox_struc, 3)
+
+    def test_is_fully_occupied(self):
+        self.assertTrue(self.sitet.is_fully_occ)
+
+    def test_site_string(self):
+        self.assertEqual(self.sitet.site_string, "1.0_Cr_3.0+")
+
+    def test_ion(self):
+        self.assertEqual(self.sitet.ion, "Cr3.0+")
+
+    def test_element(self):
+        self.assertEqual(self.sitet.el, "Cr")
+
+    def test_ox_state(self):
+        self.assertEqual(self.sitet.ox_state, 3.0)
 
 
 if __name__ == "__main__":

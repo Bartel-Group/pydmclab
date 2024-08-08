@@ -1,3 +1,6 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
 import os
 import warnings
 from shutil import copyfile
@@ -11,6 +14,9 @@ from pydmclab.core.mag import MagTools
 from pydmclab.hpc.analyze import AnalyzeVASP, VASPOutputs
 from pydmclab.data.configs import load_base_configs
 from pydmclab.hpc.sets import GetSet
+
+if TYPE_CHECKING:
+    from pymatgen.io.vasp.sets import VaspSet
 
 
 class VASPSetUp(object):
@@ -43,7 +49,7 @@ class VASPSetUp(object):
             2) $ pmg config --add PMG_DEFAULT_FUNCTIONAL PBE_54
     """
 
-    def __init__(self, calc_dir, user_configs=None):
+    def __init__(self, calc_dir: str, user_configs: dict | None = None) -> None:
         """
         Args:
             calc_dir (str):
@@ -79,7 +85,7 @@ class VASPSetUp(object):
         self.user_configs = user_configs
 
     @property
-    def configs(self):
+    def configs(self) -> dict:
         """
         Blends default configs with user_configs
             does some work with incar_mods, kpoints_mods, and potcar_mods
@@ -120,7 +126,7 @@ class VASPSetUp(object):
         return configs.copy()
 
     @property
-    def get_vaspset(self):
+    def get_vaspset(self) -> VaspSet:
         """
         Returns:
             vasp_input (pymatgen.io.vasp.sets.VaspInputSet)
@@ -178,7 +184,7 @@ class VASPSetUp(object):
         return vaspset
 
     @property
-    def prepare_calc(self):
+    def prepare_calc(self) -> VaspSet | None:
         """
         Write input files (INCAR, KPOINTS, POTCAR)
         """
@@ -280,7 +286,7 @@ class VASPSetUp(object):
         return vaspset
 
     @property
-    def error_msgs(self):
+    def error_msgs(self) -> dict:
         """
         Returns:
             dict of {group of errors (str) : [list of error messages (str) in group]}
@@ -339,7 +345,7 @@ class VASPSetUp(object):
         }
 
     @property
-    def unconverged_log(self):
+    def unconverged_log(self) -> list:
         """
         Returns:
             list of str messages
@@ -421,7 +427,7 @@ class VASPSetUp(object):
         return unconverged
 
     @property
-    def error_log(self):
+    def error_log(self) -> list:
         """
         Returns
             list of errors (str)
@@ -447,7 +453,7 @@ class VASPSetUp(object):
         return errors
 
     @property
-    def all_errors(self):
+    def all_errors(self) -> list:
         """
         Returns:
             list of str messages
@@ -457,7 +463,7 @@ class VASPSetUp(object):
         return self.error_log + self.unconverged_log
 
     @property
-    def is_clean(self):
+    def is_clean(self) -> bool:
         """
         Returns:
             True if no errors found and calc is fully converged, else False
@@ -501,7 +507,7 @@ class VASPSetUp(object):
         return clean
 
     @property
-    def incar_changes_from_errors(self):
+    def incar_changes_from_errors(self) -> dict:
         """
         Returns
             {INCAR key (str) : INCAR value (str)}
