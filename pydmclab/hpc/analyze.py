@@ -399,11 +399,15 @@ class AnalyzeVASP(object):
         vr = self.outputs.vasprun
         if vr:
             props = vr.eigenvalue_band_properties
+            E_fermi = vr.efermi
+            corrected_E_fermi = vr.calculate_efermi()
             return {
                 "bandgap": props[0],
                 "cbm": props[1],
                 "vbm": props[2],
                 "is_direct": props[3],
+                "EF": E_fermi,
+                "corrected_EF": corrected_E_fermi,
             }
         else:
             return None
