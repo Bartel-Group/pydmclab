@@ -139,17 +139,22 @@ class Passer(object):
                 prev_xc_calc = curr_xc_calc.replace(curr_xc, "gga")
             return prev_xc_calc
 
+        if curr_calc == "lobster":
+            # lobster calcs inherit from prelobster
+            prev_xc_calc = curr_xc_calc.replace(curr_calc, "prelobster")
+            return prev_xc_calc
+        
         if curr_xc == "hse06":
             if curr_calc == "preggastatic":
                 # for hse06-preggastatic, inherit from the source structure selected by the user
                 prev_xc_calc = struc_src_for_hse
                 return prev_xc_calc
-            if curr_calc != "parchg":
+            if curr_calc not in ["parchg", "lobster"]:
                 # for hse06-parchg, inherit from hse06-static; for other addons in hse06, inherit from preggastatic
                 prev_xc_calc = curr_xc_calc.replace(curr_calc, "preggastatic")
                 return prev_xc_calc
         
-        if curr_calc == "parchg":
+        if curr_calc in ["parchg"]:
             # for parchg, inherit from lobster
             return curr_xc_calc.replace(curr_calc, "lobster")
 
@@ -307,7 +312,7 @@ class Passer(object):
 
         curr_calc = self.curr_calc
 
-        if "prelobster" not in curr_calc:
+        if curr_calc not in ["prelobster"]:
             return None
 
         src_dir = self.prev_calc_dir
@@ -331,7 +336,7 @@ class Passer(object):
 
         curr_calc = self.curr_calc
 
-        if "prelobster" not in curr_calc:
+        if curr_calc not in ["prelobster"]:
             return None
 
         src_dir = self.prev_calc_dir
