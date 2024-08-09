@@ -146,7 +146,6 @@ class CHGNetCalculator(Calculator):
         self.results.update(
             energy=model_prediction["e"] * factor,
             forces=model_prediction["f"],
-            free_energy=model_prediction["e"] * factor,
             magmoms=model_prediction["m"],
             stress=model_prediction["s"] * self.stress_weight,
             crystal_fea=model_prediction["crystal_fea"],
@@ -169,9 +168,9 @@ class CHGNetObserver:
         self.forces: list[np.ndarray] = []
         self.stresses: list[np.ndarray] = []
         self.magmoms: list[np.ndarray] = []
+        self.atomic_numbers: list[int] = []
         self.atom_positions: list[np.ndarray] = []
         self.cells: list[np.ndarray] = []
-        self.atomic_numbers: list[int] = []
 
     def __call__(self) -> None:
         """The logic for saving the properties of an Atoms during the relaxation."""
@@ -179,9 +178,9 @@ class CHGNetObserver:
         self.forces.append(self.atoms.get_forces())
         self.stresses.append(self.atoms.get_stress())
         self.magmoms.append(self.atoms.get_magnetic_moments())
+        self.atomic_numbers.append(self.atoms.get_atomic_numbers())
         self.atom_positions.append(self.atoms.get_positions())
         self.cells.append(self.atoms.get_cell()[:])
-        self.atomic_numbers.append(self.atoms.get_atomic_numbers())
 
     def __len__(self) -> int:
         """The number of steps in the trajectory."""
@@ -198,9 +197,9 @@ class CHGNetObserver:
             "forces": self.forces,
             "stresses": self.stresses,
             "magmoms": self.magmoms,
+            "atomic_number": self.atomic_numbers,
             "atom_positions": self.atom_positions,
             "cell": self.cells,
-            "atomic_number": self.atomic_numbers,
         }
         with open(filename, "wb") as file:
             pkl.dump(out_pkl, file)
@@ -302,7 +301,6 @@ class CHGNetRelaxer:
         traj_path: str | None = None,
         interval: int | None = 1,
         verbose: bool = True,
-        assign_magmoms: bool = True,
         **kwargs,
     ) -> dict[str, Structure | CHGNetObserver]:
         """Relax the Structure/Atoms until maximum force is smaller than fmax."""
