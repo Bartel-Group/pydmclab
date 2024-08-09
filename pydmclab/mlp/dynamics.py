@@ -16,6 +16,8 @@ from chgnet.utils import determine_device
 import numpy as np
 import ase.optimize as opt
 from ase import Atoms
+from ase import filters
+from ase.filters import Filter
 from ase.calculators.calculator import Calculator, all_changes, all_properties
 
 from pymatgen.core.structure import Structure
@@ -24,13 +26,13 @@ from pymatgen.io.ase import AseAtomsAdaptor
 from torch import Tensor
 
 if TYPE_CHECKING:
-    from chgnet import PredTask
+    from pydmclab.mlp import Versions, Devices, PredTask
     from typing_extensions import Self
-    from ase.optimize.optimize import Optimizer
+    from ase.optimize.optimize import Optimizer as ASEOptimizer
 
 
 class OPTIMIZERS(Enum):
-    """An enumeration of optimizers for used in."""
+    """An enumeration of optimizers available in ASE."""
 
     fire = opt.fire.FIRE
     bfgs = opt.bfgs.BFGS
@@ -45,13 +47,18 @@ class OPTIMIZERS(Enum):
 class CHGNetCalculator(Calculator):
     """CHGNet Calculator for ASE applications."""
 
-    implemented_properties = ("energy", "forces", "stress", "magmoms")
+    implemented_properties = (
+        "energy",
+        "forces",
+        "stress",
+        "magmoms",
+    )  # Needed for ASE compatibility (Do not remove)
 
     def __init__(
         self,
-        model: CHGNet | Literal["0.2.0", "0.3.0"] | None = None,
+        model: CHGNet | Versions | None = None,
         *,
-        use_device: Literal["mps", "cuda", "cpu"] | None = None,
+        use_device: Devices | None = None,
         check_cuda_mem: bool = False,
         stress_weight: float | None = 1 / 160.21766208,
         on_isolated_atoms: Literal["ignore", "warn", "error"] = "warn",
@@ -66,8 +73,10 @@ class CHGNetCalculator(Calculator):
 
         if isinstance(model, str):
             self.model = CHGNet.load(model_name=model, verbose=False).to(self.device)
+        elif model is None:
+            self.model = CHGNet.load(use_device=self.device, verbose=False)
         else:
-            self.model = (model or CHGNet.load(verbose=False)).to(self.device)
+            self.model = model.to(self.device)
 
         self.model.graph_converter.set_isolated_atom_response(on_isolated_atoms)
         print(f"CHGNet will run on {self.device}")
@@ -75,8 +84,8 @@ class CHGNetCalculator(Calculator):
     @classmethod
     def from_file(
         cls,
-        path: str | os.PathLike,
-        use_device: Literal["mps", "cuda", "cpu"] | None = None,
+        path: str,
+        use_device: Devices | None = None,
         check_cuda_mem: bool = False,
         stress_weight: float | None = 1 / 160.21766208,
         on_isolated_atoms: Literal["ignore", "warn", "error"] = "warn",
@@ -137,7 +146,6 @@ class CHGNetCalculator(Calculator):
         self.results.update(
             energy=model_prediction["e"] * factor,
             forces=model_prediction["f"],
-            free_energy=model_prediction["e"] * factor,
             magmoms=model_prediction["m"],
             stress=model_prediction["s"] * self.stress_weight,
             crystal_fea=model_prediction["crystal_fea"],
@@ -160,9 +168,9 @@ class CHGNetObserver:
         self.forces: list[np.ndarray] = []
         self.stresses: list[np.ndarray] = []
         self.magmoms: list[np.ndarray] = []
+        self.atomic_numbers: list[int] = []
         self.atom_positions: list[np.ndarray] = []
         self.cells: list[np.ndarray] = []
-        self.atomic_numbers: list[int] = []
 
     def __call__(self) -> None:
         """The logic for saving the properties of an Atoms during the relaxation."""
@@ -170,9 +178,9 @@ class CHGNetObserver:
         self.forces.append(self.atoms.get_forces())
         self.stresses.append(self.atoms.get_stress())
         self.magmoms.append(self.atoms.get_magnetic_moments())
+        self.atomic_numbers.append(self.atoms.get_atomic_numbers())
         self.atom_positions.append(self.atoms.get_positions())
         self.cells.append(self.atoms.get_cell()[:])
-        self.atomic_numbers.append(self.atoms.get_atomic_numbers())
 
     def __len__(self) -> int:
         """The number of steps in the trajectory."""
@@ -189,9 +197,9 @@ class CHGNetObserver:
             "forces": self.forces,
             "stresses": self.stresses,
             "magmoms": self.magmoms,
+            "atomic_number": self.atomic_numbers,
             "atom_positions": self.atom_positions,
             "cell": self.cells,
-            "atomic_number": self.atomic_numbers,
         }
         with open(filename, "wb") as file:
             pkl.dump(out_pkl, file)
@@ -202,15 +210,15 @@ class CHGNetRelaxer:
 
     def __init__(
         self,
-        model: CHGNet | CHGNetCalculator | Literal["0.2.0", "0.3.0"] | None = None,
-        optimizer: Optimizer | str = "FIRE",
-        use_device: Literal["mps", "cuda", "cpu"] | None = None,
+        model: CHGNet | CHGNetCalculator | Versions | None = None,
+        optimizer: ASEOptimizer | str = "FIRE",
+        use_device: Devices | None = None,
         check_cuda_mem: bool = False,
         stress_weight: float | None = 1 / 160.21766208,
         on_isolated_atoms: Literal["ignore", "warn", "error"] = "warn",
     ) -> None:
 
-        self.optimizer: Optimizer = (
+        self.optimizer: ASEOptimizer = (
             OPTIMIZERS[optimizer.lower()].value
             if isinstance(optimizer, str)
             else optimizer
@@ -232,9 +240,9 @@ class CHGNetRelaxer:
     @classmethod
     def from_file(
         cls,
-        path: str | os.PathLike,
-        optimizer: Optimizer | str = "FIRE",
-        use_device: Literal["mps", "cuda", "cpu"] | None = None,
+        path: str | os.PathLike[str],
+        optimizer: ASEOptimizer | str = "FIRE",
+        use_device: Devices | None = None,
         check_cuda_mem: bool = False,
         stress_weight: float | None = 1 / 160.21766208,
         on_isolated_atoms: Literal["ignore", "warn", "error"] = "warn",
@@ -293,13 +301,9 @@ class CHGNetRelaxer:
         traj_path: str | None = None,
         interval: int | None = 1,
         verbose: bool = True,
-        assign_magmoms: bool = True,
         **kwargs,
     ) -> dict[str, Structure | CHGNetObserver]:
         """Relax the Structure/Atoms until maximum force is smaller than fmax."""
-
-        from ase import filters
-        from ase.filters import Filter
 
         valid_filter_names = [
             name
@@ -327,7 +331,7 @@ class CHGNetRelaxer:
             if relax_cell:
                 atoms = ase_filter(atoms, **params_asefilter)
 
-            optimizer: Optimizer = self.optimizer(atoms, **kwargs)
+            optimizer: ASEOptimizer = self.optimizer(atoms, **kwargs)
             optimizer.attach(obs, interval=interval)
             optimizer.run(fmax=fmax, steps=steps)
             obs()
@@ -339,11 +343,5 @@ class CHGNetRelaxer:
             atoms = atoms.atoms
 
         struct = AseAtomsAdaptor.get_structure(atoms)
-        if assign_magmoms:
-            for key in struct.site_properties:
-                struct.remove_site_property(property_name=key)
-            struct.add_site_property(
-                "magmom", [float(magmom) for magmom in atoms.get_magnetic_moments()]
-            )
 
         return {"final_structure": struct, "trajectory": obs}

@@ -1,6 +1,6 @@
 import os
 from pydmclab.core.struc import StrucTools
-from pydmclab.mlp.chgnet_md import CHGNetRelaxer
+from pydmclab.mlp.dynamics import CHGNetRelaxer
 
 
 DATA_DIR = os.path.join("output", "mlp-relaxation")
@@ -27,10 +27,8 @@ def main():
         fmax=0.1,
         steps=50,
         traj_path=SAVE_TRAJ,
-        verbose=False,
+        verbose=True,
     )
-
-    print(relaxer.predict_structure(initial_structure))
 
     # Get results from the observer
     observer = results["trajectory"]
