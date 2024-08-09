@@ -1441,7 +1441,7 @@ def get_thermo_results(
         tmp_thermo["calculated_formula"] = calcd_formula
 
         if E:
-            if "lobster" in gs_original:
+            if "lobster" in gs:
                 gs = gs_original[calc]
 
             gs_key = gs[xc][formula]["key"]
