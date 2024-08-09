@@ -4,6 +4,7 @@ import numpy as np
 from numpy.testing import assert_array_equal
 
 from pymatgen.core.structure import Structure
+from shakenbreak.input import Distortions
 
 from pydmclab.utils.handy import read_json
 from pydmclab.core.struc import StrucTools
@@ -253,7 +254,110 @@ class TestDefects_DefectStructures(unittest.TestCase):
         self.assertEqual(len(AlN_vacancy_strucs), 2)
 
 
-# make another class to test
+class TestDefects_ShakeDefectiveStrucs(unittest.TestCase):
+    """
+    Test the ShakeDefectiveStrucs class in defects.py
+    """
+
+    def setUp(self):
+        """
+        Set up the test
+        """
+        data_dir = "../pydmclab/data/test_data/defects"
+        self.AlN_pristine_sc = read_json(
+            os.path.join(data_dir, "AlN_pristine_supercell.json")
+        )
+        self.AlN_vacancy_defects = read_json(
+            os.path.join(data_dir, "AlN_vacancy_defects.json")
+        )
+        self.AlN_shaking_vacancies = ShakeDefectiveStrucs(
+            self.AlN_vacancy_defects, self.AlN_pristine_sc
+        )
+
+    def test_init(self):
+        """
+        Test the __init__ method of ShakeDefectiveStrucs
+        """
+
+        initial_defect_strucs = self.AlN_shaking_vacancies.initial_defect_strucs
+        bulk_struc = self.AlN_shaking_vacancies.bulk_struc
+        distortions = self.AlN_shaking_vacancies.distortions
+        shaken_defects_data = self.AlN_shaking_vacancies.shaken_defects_data
+        distortions_metadata = self.AlN_shaking_vacancies.distortions_metadata
+
+        self.assertIsInstance(initial_defect_strucs, list)
+        for struc in initial_defect_strucs:
+            self.assertIsInstance(struc, Structure)
+        self.assertIsInstance(bulk_struc, Structure)
+        self.assertIsInstance(distortions, Distortions)
+        self.assertIsInstance(shaken_defects_data, dict)
+        self.assertEqual(
+            shaken_defects_data["v_Al_C3v_N1.90"]["defect_type"], "vacancy"
+        )
+        self.assertIsInstance(
+            shaken_defects_data["v_Al_C3v_N1.90"]["charges"][-3]["structures"][
+                "Unperturbed"
+            ],
+            Structure,
+        )
+        self.assertIsInstance(
+            shaken_defects_data["v_Al_C3v_N1.90"]["charges"][-3]["structures"][
+                "distortions"
+            ]["Rattled"],
+            Structure,
+        )
+        self.assertIsInstance(distortions_metadata, dict)
+        self.assertEqual(
+            distortions_metadata["defects"]["v_Al_C3v_N1.90"]["unique_site"],
+            [0.500238, 0.666785, 0.499644],
+        )
+        self.assertEqual(
+            distortions_metadata["distortion_parameters"]["distortion_increment"], 0.1
+        )
+
+    def test_get_shaken_strucs_summary(self):
+        """
+        Test the get_shaken_strucs_summary method of ShakeDefectiveStrucs
+        """
+
+        shaken_strucs_summary = self.AlN_shaking_vacancies.get_shaken_strucs_summary
+
+        self.assertIsInstance(shaken_strucs_summary, dict)
+        self.assertEqual(
+            list(shaken_strucs_summary.keys()), ["v_Al_C3v_N1.90", "v_N_C3v_Al1.90"]
+        )
+        self.assertEqual(len(shaken_strucs_summary["v_Al_C3v_N1.90"].keys()), 40)
+        self.assertEqual(
+            len(
+                shaken_strucs_summary["v_Al_C3v_N1.90"][
+                    "v_Al_C3v_N1.90__-1__Bond_Distortion_-10.0%"
+                ]["sites"]
+            ),
+            95,
+        )
+
+    def test_get_shaken_strucs(self):
+        """
+        Test the get_shaken_strucs method of ShakeDefectiveStrucs
+        """
+
+        shaken_strucs = self.AlN_shaking_vacancies.get_shaken_strucs(
+            -2, defects_of_interest=["v_Al_C3v_N1.90"]
+        )
+
+        self.assertEqual(list(shaken_strucs.keys()), ["Al47N48"])
+        self.assertEqual(len(shaken_strucs["Al47N48"]), 13)
+        self.assertEqual(
+            len(
+                shaken_strucs["Al47N48"]["v_Al_C3v_N1.90__-2__Bond_Distortion_-30.0%"][
+                    "sites"
+                ]
+            ),
+            95,
+        )
+
+
+# need to add tests for the GenerateMostDefects class
 
 if __name__ == "__main__":
     unittest.main()
