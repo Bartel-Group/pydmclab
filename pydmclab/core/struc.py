@@ -485,16 +485,17 @@ class StrucTools(object):
 
         slabs = slabgen.get_slabs(symmetrize=symmetrize, tol=tolerance, ftol=ftolerance)
 
-        out = {}
+        miller_str = "".join([str(i) for i in miller])
+
+        out = {miller_str: {}, "bulk_structure": bulk.as_dict()}
         for i, slab in enumerate(slabs):
-            key = (
-                "".join([str(v) for v in miller])
-                + "_"
-                + str(min_vacuum_size)
-                + "_"
-                + str(i)
-            )
-            out[key] = slab.as_dict()
+            out[miller_str][i] = {}
+            out[miller_str][i]["slab"] = slab.as_dict()
+            out[miller_str][i]["vacuum_size"] = min_vacuum_size
+            out[miller_str][i]["slab_size"] = min_slab_size
+            out[miller_str][i]["center_slab"] = center_slab
+            out[miller_str][i]["in_unit_planes"] = in_unit_planes
+            out[miller_str][i]["reorient_lattice"] = reorient_lattice
 
         return out
 

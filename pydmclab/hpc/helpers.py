@@ -1409,7 +1409,8 @@ def get_thermo_results(
     
     if "lobster" in gs:
         thermo_results = {calc: {xc: {formula: {} for formula in gs[calc][xc]} for xc in gs[calc]} for calc in gs}
-    else:
+        gs_original = gs.copy()
+    elif "static" in gs:
         thermo_results = {xc: {formula: {} for formula in gs[xc]} for xc in gs}
 
     for key in results:
@@ -1438,9 +1439,9 @@ def get_thermo_results(
         tmp_thermo["calculated_formula"] = calcd_formula
 
         if E:
-            if "lobster" in gs:
-                gs = gs[calc]
-                
+            if "lobster" in gs_original:
+                gs = gs_original[calc]
+
             gs_key = gs[xc][formula]["key"]
             if "Ef" in gs[xc][formula]:
                 gs_Ef = gs[xc][formula]["Ef"]

@@ -1,10 +1,11 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
 from pymatgen.io.vasp import Kpoints
 from pymatgen.io.vasp.sets import MPRelaxSet, MPScanRelaxSet, MPHSERelaxSet
 
 from pydmclab.core.struc import StrucTools
 
-from __future__ import annotations
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from pymatgen.core.structure import Structure
@@ -363,10 +364,10 @@ class GetSet(object):
             new_settings["LORBIT"] = 11
 
         if xc == "hse06":
-            if calc == "parchg":
-                del new_settings["KPAR"]
             # speeding up the calculation by treating KPAR (number) of k-points in parallel
             new_settings["KPAR"] = 2
+            if ("KPAR" in new_settings) and (calc == "parchg"):
+                del new_settings["KPAR"]
 
         # if we asked for a KPOINTS file (grid, auto, etc), turn off KSPACING
         if user_passed_kpoints_settings:

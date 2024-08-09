@@ -1,3 +1,6 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
 import os
 import warnings
 from shutil import copyfile
@@ -11,9 +14,6 @@ from pydmclab.core.mag import MagTools
 from pydmclab.hpc.analyze import AnalyzeVASP, VASPOutputs
 from pydmclab.data.configs import load_base_configs
 from pydmclab.hpc.sets import GetSet
-
-from __future__ import annotations
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from pymatgen.io.vasp.sets import VaspSet
