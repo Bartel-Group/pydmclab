@@ -5,6 +5,7 @@ from numpy.testing import assert_array_equal
 
 from pymatgen.core.structure import Structure
 from shakenbreak.input import Distortions
+from doped.generation import DefectsGenerator
 
 from pydmclab.utils.handy import read_json
 from pydmclab.core.struc import StrucTools
@@ -26,6 +27,7 @@ class TestDefects_SupercellForDefects(unittest.TestCase):
         """
         Set up the test
         """
+
         self.data_dir = "../pydmclab/data/test_data/defects"
         strucs = read_json(os.path.join(self.data_dir, "AlN_struc.json"))
         self.AlN_struc_dict = strucs["Al1N1"]["mp-661"]
@@ -175,6 +177,7 @@ class TestDefects_DefectStructures(unittest.TestCase):
         """
         Set up the test
         """
+
         data_dir = "../pydmclab/data/test_data/defects"
         AlN_supercell_savepath = os.path.join(data_dir, "AlN_supercell.cif")
         self.AlN_supercell = StrucTools(AlN_supercell_savepath).structure_as_dict
@@ -223,6 +226,9 @@ class TestDefects_DefectStructures(unittest.TestCase):
         )
 
     def test_ordered_strucs(self):
+        """
+        Test getting various ordered structures
+        """
 
         AlN_defect_struc = DefectStructures(
             self.AlN_supercell,
@@ -263,6 +269,7 @@ class TestDefects_ShakeDefectiveStrucs(unittest.TestCase):
         """
         Set up the test
         """
+
         data_dir = "../pydmclab/data/test_data/defects"
         self.AlN_pristine_sc = read_json(
             os.path.join(data_dir, "AlN_pristine_supercell.json")
@@ -357,7 +364,84 @@ class TestDefects_ShakeDefectiveStrucs(unittest.TestCase):
         )
 
 
-# need to add tests for the GenerateMostDefects class
+class TestDefects_GenerateMostDefects(unittest.TestCase):
+    """
+    Test the GenerateMostDefects class in defects.py
+    """
+
+    def setUp(self):
+        """
+        Set up the test
+        """
+
+        data_dir = "../pydmclab/data/test_data/defects"
+        strucs = read_json(os.path.join(data_dir, "AlN_struc.json"))
+        self.AlN_struc_dict = strucs["Al1N1"]["mp-661"]
+        self.AlN_defects = GenerateMostDefects(self.AlN_struc_dict)
+
+    def test_init(self):
+        """
+        Test the __init__ method of GenerateMostDefects
+        """
+
+        self.assertIsInstance(
+            self.AlN_defects.all_defects,
+            DefectsGenerator,
+            "The all_defects attribute is not a DefectsGenerator object!",
+        )
+        self.assertIsInstance(
+            self.AlN_defects.pristine_struc,
+            Structure,
+            "The pristine_struc attribute is not a pymatgen Structure object!",
+        )
+
+    def test_summary_of_defects(self):
+        """
+        Test the summary_of_defects method of GenerateMostDefects
+        """
+
+        self.assertIsInstance(self.AlN_defects.summary_of_defects, DefectsGenerator)
+
+    def test_to_dict(self):
+        """
+        Test the to_dict method of GenerateMostDefects
+        """
+
+        self.assertIsInstance(self.AlN_defects.to_dict, dict)
+
+    def test_get_all_defective_supercells(self):
+        """
+        Test the get_all_defective_supercells method of GenerateMostDefects
+        """
+
+        all_defective_supercells = self.AlN_defects.get_all_defective_supercells
+
+        self.assertIsInstance(all_defective_supercells, dict)
+        self.assertEqual(len(all_defective_supercells), 59)
+        self.assertEqual(len(all_defective_supercells["Al_N_+1"]["sites"]), 96)
+
+    def test_add_charge_states(self):
+        """
+        Test the add_charge_states method of GenerateMostDefects
+        """
+
+        AlN_defects = GenerateMostDefects(self.AlN_struc_dict)
+        AlN_defects.add_charge_states("v_Al", [2, 3])
+        all_defective_supercells = AlN_defects.get_all_defective_supercells
+
+        self.assertEqual(len(all_defective_supercells), 61)
+
+    def test_remove_charge_states(self):
+        """
+        Test the remove_charge_states method of GenerateMostDefects
+        """
+
+        AlN_defects = GenerateMostDefects(self.AlN_struc_dict)
+        AlN_defects.remove_charge_states("Al_N", [6, 5])
+        all_defective_supercells = AlN_defects.get_all_defective_supercells
+
+        self.assertEqual(len(all_defective_supercells), 57)
+
 
 if __name__ == "__main__":
     unittest.main()
