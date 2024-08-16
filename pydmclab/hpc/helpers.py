@@ -203,6 +203,7 @@ def get_sub_configs(
     machine="msi",
     mpi_command="mpirun",
     vasp_version=6,
+    lobster_version=4,
     struc_src_for_hse="metagga-relax",
 ):
     """
@@ -273,6 +274,7 @@ def get_sub_configs(
     sub_configs["static_addons"] = static_addons
     sub_configs["machine"] = machine
     sub_configs["vasp_version"] = vasp_version
+    sub_configs["lobster_version"] = lobster_version
     sub_configs["struc_src_for_hse"] = struc_src_for_hse
 
     if prioritize_relaxes:
