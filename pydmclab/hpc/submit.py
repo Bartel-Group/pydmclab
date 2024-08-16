@@ -357,13 +357,39 @@ class SubmitTools(object):
             )
 
     @property
+    def lobster_dir(self) -> str:
+        """
+        Returns directory (str) containing lobster executable
+
+        MSI has LOBSTER4 or LOBSTER5 (set by configs['lobster_version'])
+        Bridges has only LOBSTER4
+        """
+        configs = self.configs.copy()
+        machine = configs["machine"]
+        version = configs["lobster_version"]
+        if machine == "msi":
+            preamble = "%s/lobster" % self.bin_dir
+            if version == 4:
+                return "%s/lobster-4.1.0/lobster-4.1.0" % preamble
+            elif version == 5:
+                return "%s/lobster-5.1.0/lobster-5.1.0" % preamble
+        elif machine == "bridges2":
+            if version == 4:
+                return "%s/lobster-4.1.0/lobster-4.1.0" % preamble
+            else:
+                raise NotImplementedError("LOBSTER > 4 not on Bridges?")
+        else:
+            raise NotImplementedError('dont have LOBSTER path for machine "%s"' % machine)
+    
+    @property
     def lobster_command(self) -> str:
         """
         Returns command used to execute lobster (str)
         """
-        lobster_path = os.path.join(
-            self.bin_dir, "lobster", "lobster-4.1.0", "lobster-4.1.0"
-        )
+        lobster_path = self.lobster_dir
+        # lobster_path = os.path.join(
+        #     self.bin_dir, "lobster", "lobster-4.1.0", "lobster-4.1.0"
+        # )
         return "\n%s\n" % lobster_path
 
     @property
