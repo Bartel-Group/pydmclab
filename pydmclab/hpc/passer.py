@@ -1,3 +1,6 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
 import sys
 import os
 import json
@@ -10,6 +13,10 @@ from pymatgen.io.vasp.sets import get_structure_from_prev_run
 
 from pydmclab.hpc.analyze import AnalyzeVASP, VASPOutputs
 from pydmclab.core.struc import StrucTools
+
+if TYPE_CHECKING:
+    from pymatgen.core.structure import Structure
+    from pymatgen.io.vasp.inputs import Poscar
 
 
 class Passer(object):
@@ -29,7 +36,7 @@ class Passer(object):
     Can be customized to do whatever you'd like between calculations that are chained together in your calc_list
     """
 
-    def __init__(self, passer_dict_as_str):
+    def __init__(self, passer_dict_as_str: str) -> None:
         """
         Args:
             passer_dict_as_str (str):
@@ -57,15 +64,15 @@ class Passer(object):
         self.struc_src_for_hse = passer_dict["struc_src_for_hse"]
 
     @property
-    def poscar(self):
+    def poscar(self) -> Poscar:
         """
         Returns:
             the structure of the current calculation
         """
         return Poscar.from_file(os.path.join(self.calc_dir, "POSCAR"))
-    
+
     @property
-    def errors_encountered_in_curr_calc(self):
+    def errors_encountered_in_curr_calc(self) -> list | None:
         """
         Returns:
             get all errors present in errors.o file so can augment passer behavior as needed
@@ -80,10 +87,24 @@ class Passer(object):
             return [line.strip() for line in f]
 
     @property
-    def prev_xc_calc(self):
+    def prev_xc_calc(self) -> str:
         """
         Returns:
             the parent xc_calc (eg 'gga-relax') that should pass stuff to the present xc_calc (eg 'gga-static)
+
+        Inheritance tree:
+            - xc-loose = <dummy>
+            - xc-relax = xc-loose | gga-static
+            - xc-static = xc-relax
+              - hse06-static = hse06-relax | hse06-preggastatic
+            - xc-defect_neutral = <dummy>
+            - xc-defect_charged = xc-defect_neutral
+                - presumes charged defects are run after neutral defects
+            - xc-lobster = xc-prelobster
+                - this is used to establish LOBSTER-friendly explicit KPOINTS
+            - xc-parchg = xc-lobster
+                - presumes the user runs LOBSTER before PARCHG
+            - xc-<other> = xc-static
         """
 
         calc_list = self.calc_list
@@ -143,7 +164,7 @@ class Passer(object):
             # lobster calcs inherit from prelobster
             prev_xc_calc = curr_xc_calc.replace(curr_calc, "prelobster")
             return prev_xc_calc
-        
+
         if curr_xc == "hse06":
             if curr_calc == "preggastatic":
                 # for hse06-preggastatic, inherit from the source structure selected by the user
@@ -153,56 +174,56 @@ class Passer(object):
                 # for hse06-parchg, inherit from hse06-static; for other addons in hse06, inherit from preggastatic
                 prev_xc_calc = curr_xc_calc.replace(curr_calc, "preggastatic")
                 return prev_xc_calc
-        
+
         if curr_calc in ["parchg"]:
             # for parchg, inherit from lobster
             return curr_xc_calc.replace(curr_calc, "lobster")
 
         # everything else inherits from static
         return curr_xc_calc.replace(curr_calc, "static")
-    
+
     @property
-    def prev_xc(self):
+    def prev_xc(self) -> str:
         """
         Returns:
             xc (str) for parent calculation
                 take the parent xc_calc and split it to get the exchange functional type
         """
         prev_xc_calc = self.prev_xc_calc
-        return prev_xc_calc.split('-')[0]
-    
+        return prev_xc_calc.split("-")[0]
+
     @property
-    def prev_calc(self):
+    def prev_calc(self) -> str:
         """
         Returns:
             xc (str) for parent calculation
                 take the parent xc_calc and split it to get the calculation type
         """
         prev_xc_calc = self.prev_xc_calc
-        return prev_xc_calc.split('-')[1]
-    
+        return prev_xc_calc.split("-")[1]
+
     @property
-    def curr_xc(self):
+    def curr_xc(self) -> str:
         """
         Returns:
             xc (str) for current calculation
                 take the current xc_calc and split it to get the exchange functional type
         """
         curr_xc_calc = self.xc_calc
-        return curr_xc_calc.split('-')[0]
-    
+        return curr_xc_calc.split("-")[0]
+
     @property
-    def curr_calc(self):
+    def curr_calc(self) -> str:
         """
         Returns:
             calc (str) for current calculation
                 take the current xc_calc and split it to get the calculation type
         """
         curr_xc_calc = self.xc_calc
-        return curr_xc_calc.split('-')[1]
-    
+        return curr_xc_calc.split("-")[1]
+
     @property
-    def prev_calc_dir(self):
+    def prev_calc_dir(self) -> str:
         """
         Returns:
             calc_dir (str) for parent calculation
@@ -214,7 +235,7 @@ class Passer(object):
         return calc_dir.replace(curr_xc_calc, prev_xc_calc)
 
     @property
-    def prev_calc_convergence(self):
+    def prev_calc_convergence(self) -> bool:
         """
         Returns:
             True if parent is converged else False
@@ -225,7 +246,7 @@ class Passer(object):
         return AnalyzeVASP(prev_calc_dir).is_converged
 
     @property
-    def kill_job(self):
+    def kill_job(self) -> bool:
         """
         Returns:
             True if child should not be launched
@@ -237,14 +258,22 @@ class Passer(object):
         calc_list = self.calc_list
         prev_xc_calc = self.prev_xc_calc
         if prev_xc_calc not in calc_list:
+            # if parent doesn't exist, then the calc must not need to be killed (it's the first job)
             return False
         prev_calc_convergence = self.prev_calc_convergence
         if not prev_calc_convergence:
+            # if a parent exists but it's not converged, need to kill passer to prevent child from running
             return True
         return False
 
     @property
-    def is_curr_calc_being_restarted(self):
+    def is_curr_calc_being_restarted(self) -> bool:
+        """
+        Returns:
+            True if the current calculation was previously launched (and did not complete)
+                otherwise False
+            Used to copy CONTCAR to POSCAR as needed
+        """
 
         calc_dir = self.calc_dir
         curr_contcar = os.path.join(calc_dir, "CONTCAR")
@@ -258,161 +287,94 @@ class Passer(object):
                 return False
 
     @property
-    def copy_contcar_to_poscar(self):
-        """
-        Copies CONTCAR from parent to POSCAR of child
-        """
-        kill_job = self.kill_job
-        if kill_job:
-            return None
-
-        curr_contcar = os.path.join(self.calc_dir, "CONTCAR")
-        prev_contcar = os.path.join(self.prev_calc_dir, "CONTCAR")
-        curr_poscar = os.path.join(self.calc_dir, "POSCAR")
+    def update_poscar(self) -> None:
+        # copy CONTCAR from curr directory or previous
         if self.is_curr_calc_being_restarted:
-            copyfile(curr_contcar, curr_poscar)
-            return "copied contcar from current calc"
-
+            prev_contcar = os.path.join(self.calc_dir, "CONTCAR")
+        else:
+            prev_contcar = os.path.join(self.prev_calc_dir, "CONTCAR")
+        curr_poscar = os.path.join(self.calc_dir, "POSCAR")
         if os.path.exists(prev_contcar):
-            with open(prev_contcar, "r", encoding="utf-8") as f:
-                contents = f.read()
-                if len(contents) > 0:
-                    copyfile(prev_contcar, curr_poscar)
-                    return "copied contcar from prev calc"
-                else:
-                    return None
-        return None
-    
-    @property
-    def clean_poscar(self):
-        """
-        Returns:
-            For any near zero values in lattice (e.g. 0.00000#####...), round to 0
-                to avoid potential symprec related errors
-        """
-        poscar = self.poscar
+            copyfile(prev_contcar, curr_poscar)
 
-        struc = poscar.structure
+        # clean the POSCAR to avoid symmetry issues
+        struc = StrucTools(curr_poscar).structure
         lattice = np.copy(struc.lattice.matrix)
         lattice[np.abs(lattice) < 1e-5] = 0.0
         struc.lattice = lattice
-
-        struc.to(filename=os.path.join(self.calc_dir, "POSCAR"), fmt="poscar")
+        struc.to(filename=curr_poscar, fmt="poscar")
 
     @property
-    def copy_incar_for_prelobster(self):
+    def setup_prelobster(self) -> str | None:
         """
-        Copies INCAR from parent to child
-            only pass if current calculation is prelobster to keep the same INCAR settings
-            prelobster calcs are applied to generate a KPOINTS with the tetrahedra information (see ISMEAR = -5)
-        """
-        kill_job = self.kill_job
-        if kill_job:
-            return None
+        Returns:
+            str if files are copied for prelobster else None
 
+            copies INCAR and KPOINTS from static to prelobster
+        """
         curr_calc = self.curr_calc
-
         if curr_calc not in ["prelobster"]:
             return None
 
         src_dir = self.prev_calc_dir
         dst_dir = self.calc_dir
 
-        fsrc = os.path.join(src_dir, "INCAR")
-        if os.path.exists(fsrc):
-            copyfile(fsrc, os.path.join(dst_dir, "INCAR"))
-            return "copied incar"
-        return None
-    
+        copied = []
+
+        fsrc_incar = os.path.join(src_dir, "INCAR")
+        if os.path.exists(fsrc_incar):
+            copyfile(fsrc_incar, os.path.join(dst_dir, "INCAR"))
+            copied.append("incar")
+
+        fsrc_kpts = os.path.join(src_dir, "KPOINTS")
+        if os.path.exists(fsrc_kpts):
+            copyfile(fsrc_kpts, os.path.join(dst_dir, "KPOINTS"))
+            copied.append("kpoints")
+
+        return "_".join(copied) + " copied" if copied else None
+
     @property
-    def copy_kpoints_for_prelobster(self):
+    def setup_parchg(self) -> str | None:
         """
-        Copies KPOINTS from parent to child
-            only pass if current calculation is prelobster to keep the same KPOINTS settings
-        """
-        kill_job = self.kill_job
-        if kill_job:
-            return None
+        Returns:
+            str if files are copied for parchg else None
 
+            copies CHGCAR and IBZKPT (if exists) | KPOINTS from lobster to parchg
+        """
         curr_calc = self.curr_calc
-
-        if curr_calc not in ["prelobster"]:
-            return None
-
-        src_dir = self.prev_calc_dir
-        dst_dir = self.calc_dir
-
-        fsrc = os.path.join(src_dir, "KPOINTS")
-        if os.path.exists(fsrc):
-            copyfile(fsrc, os.path.join(dst_dir, "KPOINTS"))
-            return "copied kpoints"
-        return None
-    
-    @property
-    def copy_chgcar_for_parchg(self):
-        """
-        Copies CHGCAR from parent to child
-            only pass if current calculation is parchg
-        """
-        kill_job = self.kill_job
-        if kill_job:
-            return None
-
-        curr_calc = self.curr_calc
-
         if "parchg" not in curr_calc:
             return None
 
         src_dir = self.prev_calc_dir
         dst_dir = self.calc_dir
 
-        fsrc = os.path.join(src_dir, "CHGCAR")
-        if os.path.exists(fsrc):
-            copyfile(fsrc, os.path.join(dst_dir, "CHGCAR"))
-            return "copied chgcar"
-        return None
+        copied = []
 
-    @property
-    def copy_kpoints_for_parchg(self):
-        """
-        Copies KPOINTS from parent to child
-            only pass if current calculation is parchg
-        """
-        kill_job = self.kill_job
-        if kill_job:
-            return None
-
-        curr_calc = self.curr_calc
-
-        if "parchg" not in curr_calc:
-            return None
-
-        src_dir = self.prev_calc_dir
-        dst_dir = self.calc_dir
+        fsrc_chg = os.path.join(src_dir, "CHGCAR")
+        if os.path.exists(fsrc_chg):
+            copyfile(fsrc_chg, os.path.join(dst_dir, "CHGCAR"))
+            copied.append("chgcar")
 
         fsrc_kpt = os.path.join(src_dir, "KPOINTS")
         fsrc_ibz = os.path.join(src_dir, "IBZKPT")
         if os.path.exists(fsrc_ibz):
             copyfile(fsrc_ibz, os.path.join(dst_dir, "KPOINTS"))
-            return "copied kpoints"
+            copied.append("kpoints")
         elif os.path.exists(fsrc_kpt):
             copyfile(fsrc_kpt, os.path.join(dst_dir, "KPOINTS"))
-            return "copied kpoints"
-        return None
+            copied.append("kpoints")
+
+        return "_".join(copied) + " copied" if copied else None
 
     @property
-    def copy_wavecar(self):
+    def copy_wavecar(self) -> str | None:
         """
         Copies WAVECAR from parent to child
-            doesn't pass if current calculation is relax or lobster
-                (because KPOINTS will be different)
+
         """
-        kill_job = self.kill_job
-        if kill_job:
-            return None
 
         if self.is_curr_calc_being_restarted:
-            return "reading wavecar"
+            return None
 
         errors_to_avoid_wavecar_passing = [
             "grad_not_orth",
@@ -423,8 +385,9 @@ class Passer(object):
         ]
 
         errors_in_curr_calc = self.errors_encountered_in_curr_calc
-
-        if set(errors_to_avoid_wavecar_passing) and errors_in_curr_calc:
+        if errors_in_curr_calc and set(errors_to_avoid_wavecar_passing).intersection(
+            set(errors_in_curr_calc)
+        ):
             return None
 
         prev_wavecar = os.path.join(self.prev_calc_dir, "WAVECAR")
@@ -436,14 +399,39 @@ class Passer(object):
         return None
 
     @property
-    def prev_gap(self):
+    def pass_kpoints_for_lobster(self) -> str | None:
+        """
+        Passes prelobster's IBZKPT to lobster's KPOINTS
+        """
+
+        curr_calc = self.curr_calc
+        curr_calc_dir = self.calc_dir
+
+        if curr_calc != "lobster":
+            return None
+
+        prev_calc_dir = curr_calc_dir.replace(curr_calc, "prelobster")
+        if not os.path.exists(prev_calc_dir):
+            return None
+
+        prev_ibz = os.path.join(prev_calc_dir, "IBZKPT")
+        prev_kpt = os.path.join(prev_calc_dir, "KPOINTS")
+        curr_kpt = os.path.join(curr_calc_dir, "KPOINTS")
+
+        if os.path.exists(prev_ibz):
+            copyfile(prev_ibz, curr_kpt)
+            return "copied IBZKPT from prev calc"
+        elif os.path.exists(prev_kpt):
+            copyfile(prev_kpt, curr_kpt)
+            return "copied KPOINTS from prev calc"
+        return None
+
+    @property
+    def prev_gap(self) -> float | None:
         """
         Returns:
             parent's band gap (float) if parent is ready to pass else None
         """
-        kill_job = self.kill_job
-        if kill_job:
-            return None
 
         # try to get bandgap
         gap_props = AnalyzeVASP(self.prev_calc_dir).gap_properties
@@ -452,7 +440,7 @@ class Passer(object):
         return None
 
     @property
-    def bandgap_label(self):
+    def bandgap_label(self) -> str | None:
         """
         Returns:
             'metal'
@@ -480,7 +468,7 @@ class Passer(object):
                     return "insulator"
 
     @property
-    def bandgap_based_incar_adjustments(self):
+    def bandgap_based_incar_adjustments(self) -> dict:
         """
         Returns:
             a dictionary of INCAR adjustments based on band gap
@@ -517,7 +505,7 @@ class Passer(object):
         return adjustments
 
     @property
-    def magmom_based_incar_adjustments(self):
+    def magmom_based_incar_adjustments(self) -> dict:
         """
         Returns:
             a dictionary of INCAR adjustments based on magnetic moments
@@ -538,9 +526,6 @@ class Passer(object):
             return {}
 
         av_prev = AnalyzeVASP(prev_calc_dir)
-        vr_prev = av_prev.outputs.vasprun
-        if not vr_prev:
-            return {}
 
         if not av_prev.is_converged:
             return {}
@@ -556,7 +541,7 @@ class Passer(object):
         return {"MAGMOM": magmom_string}
 
     @property
-    def nbands_based_incar_adjustments(self):
+    def nbands_based_incar_adjustments(self) -> dict:
         """
         Returns:
             a dictionary of INCAR adjustments based on NBANDS
@@ -579,34 +564,27 @@ class Passer(object):
         return new_nbands
 
     @property
-    def prev_number_of_kpoints(self):
+    def prev_number_of_kpoints(self) -> int | None:
         """
         Returns:
             parent's number_of_kpoints (float) if parent is ready to pass else None
         """
-        kill_job = self.kill_job
-        if kill_job:
-            return None
 
         prev_calc_dir = self.prev_calc_dir
         prev_ibz = os.path.join(prev_calc_dir, "IBZKPT")
 
-        try:
-            kpoints = Kpoints.from_file(prev_ibz)
-        except:
+        if not os.path.exists(prev_ibz):
             return None
 
-        kpts = kpoints.kpts
-        if not kpts:
-            return None
-
-        num_kpoints = len(kpoints.kpts)
+        num_kpoints = len(Kpoints.from_file(prev_ibz).kpts)
 
         if num_kpoints:
             return num_kpoints
         return None
 
-    def kpoints_based_incar_adjustments(self, ncore, min_total_tasks=32):
+    def kpoints_based_incar_adjustments(
+        self, ncore: int, min_total_tasks: int = 32
+    ) -> dict:
         """
         Returns:
             a dictionary of INCAR adjustments based on kpoints
@@ -627,8 +605,6 @@ class Passer(object):
         if not prev_number_of_kpoints:
             return {}
 
-        adjustments = {}
-
         cores_for_kpoints = min_total_tasks / ncore
 
         kpar = max(
@@ -640,11 +616,11 @@ class Passer(object):
             ]
         )
 
-        adjustments["KPAR"] = kpar
+        adjustments = {"KPAR": kpar}
         return adjustments
 
     @property
-    def nelect_from_neutral_calc_dir(self):
+    def nelect_from_neutral_calc_dir(self) -> dict:
         """
         Returns:
             number of electrons in neutral defect structure
@@ -682,7 +658,7 @@ class Passer(object):
         return all_input_settings["NELECT"]
 
     @property
-    def charged_defects_based_incar_adjustments(self):
+    def charged_defects_based_incar_adjustments(self) -> dict:
         """
         Method will be called when the calc name include "defect_charged"
 
@@ -721,39 +697,12 @@ class Passer(object):
 
         return {"NELECT": int(charged_nelect)}
 
-    @property
-    def pass_kpoints_for_lobster(self):
-        """
-        Passes prelobster's IBZKPT to lobster's KPOINTS
-        """
-        kill_job = self.kill_job
-        if kill_job:
-            return None
-        
-        curr_calc = self.curr_calc
-        curr_calc_dir = self.calc_dir
-
-        if curr_calc != "lobster":
-            return None
-
-        prev_calc_dir = curr_calc_dir.replace(curr_calc, 'prelobster')
-        if not os.path.exists(prev_calc_dir):
-            return None
-
-        prev_ibz = os.path.join(prev_calc_dir, "IBZKPT")
-        prev_kpt = os.path.join(prev_calc_dir, "KPOINTS")
-        curr_kpt = os.path.join(curr_calc_dir, "KPOINTS")
-
-        if os.path.exists(prev_ibz):
-            copyfile(prev_ibz, curr_kpt)
-            return "copied IBZKPT from prev calc"
-        elif os.path.exists(prev_kpt):
-            copyfile(prev_kpt, curr_kpt)
-            return "copied KPOINTS from prev calc"
-        return None
-
-    @property
-    def update_incar(self):
+    def update_incar(
+        self,
+        wavecar_out: str | None,
+        prelobster_out: str | None,
+        parchg_out: str | None,
+    ) -> str:
         """
         Returns: Nothing
             Updates INCAR based on band gap, magnetic moments, and NBANDS
@@ -778,13 +727,7 @@ class Passer(object):
         curr_calc = self.curr_calc
         curr_xc_calc = self.xc_calc
         if curr_calc in ["lobster"]:
-            # for lobster calcs, we can't use KSPACING
-            if "KSPACING" in incar_adjustments:
-                del incar_adjustments["KSPACING"]
-
-            # lobster calcs should have ISMEAR = 0 and SIGMA = 0.05 (I think there are issues with other ISMEAR values)
             incar_adjustments["ISMEAR"] = -5
-            # incar_adjustments["SIGMA"] = 0.05
 
             # update NBANDS if doing lobster
             nbands_based_incar_adjustments = self.nbands_based_incar_adjustments
@@ -798,30 +741,17 @@ class Passer(object):
             # use ISMEAR = 0 to avoid NKPT < 4 error associated with ISMEAR = -5
             incar_adjustments["ISMEAR"] = 0
 
-        was_wavecar_copied = self.copy_wavecar
-        if was_wavecar_copied or os.path.exists(os.path.join(self.calc_dir, "WAVECAR")):
+        if wavecar_out or os.path.exists(os.path.join(self.calc_dir, "WAVECAR")):
             incar_adjustments["ISTART"] = 1
-            
-        was_incar_copied_prelobster = self.copy_incar_for_prelobster
-        if was_incar_copied_prelobster:
+
+        if prelobster_out:
             # since prelobster calcs are used to generate KPOINTS with tetrahedra information (ISMEAR = -5), we don't want to run any vasp steps
             incar_adjustments["NELM"] = 0
             incar_adjustments["NSW"] = 0
             incar_adjustments["ISMEAR"] = -5
-            
-        was_kpoints_copied_prelobster = self.copy_kpoints_for_prelobster
-        if was_kpoints_copied_prelobster:
-            if "KSPACING" in incar_adjustments:
-                del incar_adjustments["KSPACING"]
-        
-        was_chgcar_copied_parchg = self.copy_chgcar_for_parchg
-        if was_chgcar_copied_parchg:
-            incar_adjustments["ICHARG"] = 1
 
-        was_kpoints_copied_parchg = self.copy_kpoints_for_parchg
-        if was_kpoints_copied_parchg:
-            if "KSPACING" in incar_adjustments:
-                del incar_adjustments["KSPACING"]
+        if parchg_out:
+            incar_adjustments["ICHARG"] = 1
 
         # make sure we don't override user-defined INCAR modifications
         user_incar_mods = self.incar_mods
@@ -832,7 +762,6 @@ class Passer(object):
         incar = Incar.from_file(os.path.join(self.calc_dir, "INCAR"))
         ncore = incar["NCORE"] if "NCORE" in incar else 1
         incar_adjustments.update(self.kpoints_based_incar_adjustments(ncore=ncore))
-
 
         # loop through adjustments and apply them
         for key, value in incar_adjustments.items():
@@ -849,6 +778,7 @@ class Passer(object):
                 continue
             incar[key] = value
 
+        # incorporate U values
         poscar = self.poscar
         for key in hubbard_keys:
             if key in user_incar_mods:
@@ -870,7 +800,7 @@ class Passer(object):
         return "updated incar"
 
     @property
-    def write_to_job_killer(self):
+    def write_to_job_killer(self) -> bool:
         """
         Writes to a file in launch_dir called job_killer.o that will trigger the job to be canceled
             b/c of the try/except block in main, this will also write the error message to the file if passer fails for some reason
@@ -882,16 +812,26 @@ class Passer(object):
                 f.write("kill this job")
             else:
                 f.write("good to pass")
+        return kill_job
 
     @property
-    def complete_pass(self):
+    def complete_pass(self) -> str:
         """
         copy files + update INCAR
         """
-        self.copy_contcar_to_poscar
-        self.clean_poscar
-        self.update_incar  # this also copies wavecar
-        self.pass_kpoints_for_lobster
+        kill_job = self.write_to_job_killer
+        if kill_job:
+            return "killed job"
+        poscar_out = self.update_poscar
+        prelobster_out = self.setup_prelobster
+        parchg_out = self.setup_parchg
+        wavecar_out = self.copy_wavecar
+        lobster_kpts_out = self.pass_kpoints_for_lobster
+        incar_out = self.update_incar(
+            wavecar_out=wavecar_out,
+            prelobster_out=prelobster_out,
+            parchg_out=parchg_out,
+        )
 
         return "completed pass"
 
@@ -906,7 +846,6 @@ def debug():
     # initialize the Passer for this claculation
     passer = Passer(passer_dict_as_str=passer_dict_as_str)
 
-    passer.write_to_job_killer
     passer.complete_pass
 
 
@@ -922,16 +861,15 @@ def main():
 
     # try to write to job_killer and complete pass (copy CONTCAR, WAVECAR and update INCAR)
     try:
-        passer.write_to_job_killer
         passer.complete_pass
 
     # if this fails for some reason, kill the job and populate job_killer.o with python error message that caused failure
     except Exception as e:
         fready_to_pass = os.path.join(passer.launch_dir, "job_killer.o")
         with open(fready_to_pass, "w", encoding="utf-8") as f:
-            f.write("kill this job\n\n\n")
-            f.write(str(e))
-        f.write(traceback.print_exc())
+            f.write("kill this job\n\n")
+            f.write(str(e) + "\n\n")
+            f.write(traceback.print_exc())
 
 
 if __name__ == "__main__":
