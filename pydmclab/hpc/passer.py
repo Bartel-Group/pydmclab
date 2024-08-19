@@ -1,6 +1,9 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
 
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
 import sys
 import os
 import json
@@ -13,6 +16,10 @@ from pymatgen.io.vasp.sets import get_structure_from_prev_run
 
 from pydmclab.hpc.analyze import AnalyzeVASP, VASPOutputs
 from pydmclab.core.struc import StrucTools
+
+if TYPE_CHECKING:
+    from pymatgen.core.structure import Structure
+    from pymatgen.io.vasp.inputs import Poscar
 
 if TYPE_CHECKING:
     from pymatgen.core.structure import Structure
@@ -36,6 +43,7 @@ class Passer(object):
     Can be customized to do whatever you'd like between calculations that are chained together in your calc_list
     """
 
+    def __init__(self, passer_dict_as_str: str) -> None:
     def __init__(self, passer_dict_as_str: str) -> None:
         """
         Args:
@@ -326,7 +334,12 @@ class Passer(object):
 
     @property
     def setup_parchg(self) -> str | None:
+    def setup_parchg(self) -> str | None:
         """
+        Returns:
+            str if files are copied for parchg else None
+
+            copies CHGCAR and IBZKPT (if exists) | KPOINTS from lobster to parchg
         Returns:
             str if files are copied for parchg else None
 
@@ -345,11 +358,18 @@ class Passer(object):
         if os.path.exists(fsrc_chg):
             copyfile(fsrc_chg, os.path.join(dst_dir, "CHGCAR"))
             copied.append("chgcar")
+        copied = []
+
+        fsrc_chg = os.path.join(src_dir, "CHGCAR")
+        if os.path.exists(fsrc_chg):
+            copyfile(fsrc_chg, os.path.join(dst_dir, "CHGCAR"))
+            copied.append("chgcar")
 
         fsrc_kpt = os.path.join(src_dir, "KPOINTS")
         fsrc_ibz = os.path.join(src_dir, "IBZKPT")
         if os.path.exists(fsrc_ibz):
             copyfile(fsrc_ibz, os.path.join(dst_dir, "KPOINTS"))
+            copied.append("kpoints")
             copied.append("kpoints")
         elif os.path.exists(fsrc_kpt):
             copyfile(fsrc_kpt, os.path.join(dst_dir, "KPOINTS"))
@@ -357,30 +377,20 @@ class Passer(object):
 
         return "_".join(copied) + " copied" if copied else None
 
-    @property
-    def errors_encountered_in_curr_calc(self) -> list | None:
-        """
-        Returns:
-            get all errors present in errors.o file
-                if we have certain errors in the current calc, we may want to start from a WAVECAR-less calculation
-        """
-
-        errors_o = os.path.join(self.calc_dir, "errors.o")
-
-        if not os.path.exists(errors_o):
-            return None
-
         with open(errors_o, "r", encoding="utf-8") as f:
             return [line.strip() for line in f]
 
     @property
     def copy_wavecar(self) -> str | None:
+    def copy_wavecar(self) -> str | None:
         """
         Copies WAVECAR from parent to child
+
 
         """
 
         if self.is_curr_calc_being_restarted:
+            return None
             return None
 
         errors_to_avoid_wavecar_passing = [
@@ -395,6 +405,9 @@ class Passer(object):
         if errors_in_curr_calc and set(errors_to_avoid_wavecar_passing).intersection(
             set(errors_in_curr_calc)
         ):
+        if errors_in_curr_calc and set(errors_to_avoid_wavecar_passing).intersection(
+            set(errors_in_curr_calc)
+        ):
             return None
 
         prev_wavecar = os.path.join(self.prev_calc_dir, "WAVECAR")
@@ -406,6 +419,35 @@ class Passer(object):
         return None
 
     @property
+    def pass_kpoints_for_lobster(self) -> str | None:
+        """
+        Passes prelobster's IBZKPT to lobster's KPOINTS
+        """
+
+        curr_calc = self.curr_calc
+        curr_calc_dir = self.calc_dir
+
+        if curr_calc != "lobster":
+            return None
+
+        prev_calc_dir = curr_calc_dir.replace(curr_calc, "prelobster")
+        if not os.path.exists(prev_calc_dir):
+            return None
+
+        prev_ibz = os.path.join(prev_calc_dir, "IBZKPT")
+        prev_kpt = os.path.join(prev_calc_dir, "KPOINTS")
+        curr_kpt = os.path.join(curr_calc_dir, "KPOINTS")
+
+        if os.path.exists(prev_ibz):
+            copyfile(prev_ibz, curr_kpt)
+            return "copied IBZKPT from prev calc"
+        elif os.path.exists(prev_kpt):
+            copyfile(prev_kpt, curr_kpt)
+            return "copied KPOINTS from prev calc"
+        return None
+
+    @property
+    def prev_gap(self) -> float | None:
     def pass_kpoints_for_lobster(self) -> str | None:
         """
         Passes prelobster's IBZKPT to lobster's KPOINTS
