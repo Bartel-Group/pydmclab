@@ -379,8 +379,10 @@ class SubmitTools(object):
             else:
                 raise NotImplementedError("LOBSTER > 4 not on Bridges?")
         else:
-            raise NotImplementedError('dont have LOBSTER path for machine "%s"' % machine)
-    
+            raise NotImplementedError(
+                'dont have LOBSTER path for machine "%s"' % machine
+            )
+
     @property
     def lobster_command(self) -> str:
         """
@@ -738,6 +740,10 @@ class SubmitTools(object):
                 calc_dir = os.path.join(launch_dir, xc_calc)
 
                 if status == "done":
+                    if calc_to_run in ["lobster", "bs"]:
+                        if not os.path.exists(os.path.join(calc_dir, "lobsterout")):
+                            f.write("\ncd %s\n" % calc_dir)
+                            f.write(self.lobster_command)
                     if not self.collection_status(xc_calc):
                         # execute the collector (writes)
                         f.write("\ncd %s\n" % self.scripts_dir)
