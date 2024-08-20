@@ -31,7 +31,7 @@ class Passer(object):
         passing CONTCAR --> POSCAR
         passing WAVECAR
         passing optimized magnetic moments as initial guesses (MAGMOM)
-        passing NBANDS for lobster
+        passing NBANDS, KPOINTS for lobster
 
     Can be customized to do whatever you'd like between calculations that are chained together in your calc_list
     """
@@ -62,29 +62,6 @@ class Passer(object):
         self.incar_mods = passer_dict["incar_mods"]
         self.launch_dir = passer_dict["launch_dir"]
         self.struc_src_for_hse = passer_dict["struc_src_for_hse"]
-
-    @property
-    def poscar(self) -> Poscar:
-        """
-        Returns:
-            the structure of the current calculation
-        """
-        return Poscar.from_file(os.path.join(self.calc_dir, "POSCAR"))
-
-    @property
-    def errors_encountered_in_curr_calc(self) -> list | None:
-        """
-        Returns:
-            get all errors present in errors.o file so can augment passer behavior as needed
-        """
-
-        errors_o = os.path.join(self.calc_dir, "errors.o")
-
-        if not os.path.exists(errors_o):
-            return None
-
-        with open(errors_o, "r", encoding="utf-8") as f:
-            return [line.strip() for line in f]
 
     @property
     def prev_xc_calc(self) -> str:
@@ -365,6 +342,22 @@ class Passer(object):
             copied.append("kpoints")
 
         return "_".join(copied) + " copied" if copied else None
+
+    @property
+    def errors_encountered_in_curr_calc(self) -> list | None:
+        """
+        Returns:
+            get all errors present in errors.o file
+                if we have certain errors in the current calc, we may want to start from a WAVECAR-less calculation
+        """
+
+        errors_o = os.path.join(self.calc_dir, "errors.o")
+
+        if not os.path.exists(errors_o):
+            return None
+
+        with open(errors_o, "r", encoding="utf-8") as f:
+            return [line.strip() for line in f]
 
     @property
     def copy_wavecar(self) -> str | None:
@@ -697,6 +690,14 @@ class Passer(object):
 
         return {"NELECT": int(charged_nelect)}
 
+    @property
+    def poscar(self) -> Poscar:
+        """
+        Returns:
+            the Poscar of the current calculation
+        """
+        return Poscar.from_file(os.path.join(self.calc_dir, "POSCAR"))
+
     def update_incar(
         self,
         wavecar_out: str | None,
@@ -715,9 +716,6 @@ class Passer(object):
 
         # get new magmom if relevant (MAGMOM)
         magmom_based_incar_adjustments = self.magmom_based_incar_adjustments
-
-        # get kpoints related adjustments if relevant
-        # kpoints_based_incar_adjustments = self.kpoints_based_incar_adjustments
 
         # merge bandgap and magmom
         incar_adjustments = magmom_based_incar_adjustments.copy()
