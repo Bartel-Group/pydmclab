@@ -500,10 +500,10 @@ class SubmitTools(object):
             if not os.path.exists(calc_dir):
                 os.mkdir(calc_dir)
 
-            if restart_this_one:
-                # if restarting, status = new
-                statuses[xc_calc] = "new"
-                continue
+            # if restart_this_one:
+            #     # if restarting, status = new
+            #     statuses[xc_calc] = "new"
+            #     continue
 
             # (2) check convergence of current calc
             E_per_at = AnalyzeVASP(calc_dir).E_per_at
@@ -544,6 +544,10 @@ class SubmitTools(object):
                     statuses[xc_calc] = "new"
             if (calc_to_run == "prelobster") and os.path.exists(
                 os.path.join(calc_dir, "IBZKPT")
+            ):
+                statuses[xc_calc] = "done"
+            if (calc_to_run == "parchg") and os.path.exists(
+                os.path.join(calc_dir, "PARCHG")
             ):
                 statuses[xc_calc] = "done"
 

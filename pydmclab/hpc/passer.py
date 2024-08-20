@@ -220,10 +220,15 @@ class Passer(object):
         prev_calc_dir = self.prev_calc_dir
         if not os.path.exists(prev_calc_dir):
             return False
-        if self.prev_calc == "prelobster":
+
+        prev_calc = self.prev_calc
+        if prev_calc == "prelobster":
             if os.path.exists(os.path.join(prev_calc_dir, "IBZKPT")) or os.path.exists(
                 os.path.join(prev_calc_dir, "KPOINTS")
             ):
+                return True
+        if prev_calc == "parchg":
+            if os.path.exists(os.path.join(prev_calc_dir, "PARCHG")):
                 return True
         return AnalyzeVASP(prev_calc_dir).is_converged
 
@@ -543,7 +548,7 @@ class Passer(object):
         """
         Returns:
             a dictionary of INCAR adjustments based on NBANDS
-                NBANDS = 1.5 * NBANDS of previous calculation for LOBSTER
+                NBANDS = 2 * NBANDS of previous calculation for LOBSTER
         """
         prev_calc_dir = self.prev_calc_dir
         if not os.path.exists(prev_calc_dir):
@@ -558,7 +563,7 @@ class Passer(object):
 
         old_nbands = prev_settings["NBANDS"]
         # based on CJB heuristic; note pymatgen io lobster seems to set too few bands by default
-        new_nbands = {"NBANDS": int(1.5 * old_nbands)}
+        new_nbands = {"NBANDS": int(2 * old_nbands)}
         return new_nbands
 
     @property
