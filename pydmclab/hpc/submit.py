@@ -372,7 +372,7 @@ class SubmitTools(object):
             if version == 4:
                 return "%s/lobster-4.1.0/lobster-4.1.0" % preamble
             elif version == 5:
-                return "%s/lobster-5.1.0/lobster-5.1.0" % preamble
+                return "%s/lobster-5.0.0/lobster-5.0.0" % preamble
         elif machine == "bridges2":
             if version == 4:
                 return "%s/lobster-4.1.0/lobster-4.1.0" % preamble
