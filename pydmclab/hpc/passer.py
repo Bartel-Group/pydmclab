@@ -752,6 +752,7 @@ class Passer(object):
             incar_adjustments["NELM"] = 0
             incar_adjustments["NSW"] = 0
             incar_adjustments["ISMEAR"] = -5
+            incar_adjustments["LWAVE"] = False
 
         if parchg_out:
             incar_adjustments["ICHARG"] = 1
