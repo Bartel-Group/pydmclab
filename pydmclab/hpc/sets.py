@@ -223,7 +223,7 @@ class GetSet(object):
             new_settings["NBMOD"] = -3
             if "EINT" not in user_passed_settings:
                 print("WARNING: PARCH analysis but no EINT set. Setting to Ef - 2 eV")
-                new_settings["EINT"] = "".join([str(v) for v in [-2.0, 0]])
+                new_settings["EINT"] = " ".join([str(v) for v in [-2.0, 0]])
 
         # for LOBSTER --> set explicit requirements
         if calc == "lobster":
