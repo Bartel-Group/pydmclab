@@ -220,6 +220,11 @@ class Passer(object):
         prev_calc_dir = self.prev_calc_dir
         if not os.path.exists(prev_calc_dir):
             return False
+        if self.prev_calc == "prelobster":
+            if os.path.exists(os.path.join(prev_calc_dir, "IBZKPT")) or os.path.exists(
+                os.path.join(prev_calc_dir, "KPOINTS")
+            ):
+                return True
         return AnalyzeVASP(prev_calc_dir).is_converged
 
     @property
