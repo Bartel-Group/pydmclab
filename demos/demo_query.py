@@ -68,7 +68,7 @@ def demo_get_ground_state_data_for_formulas(formulas):
         data (dict): dictionary of data from MPQuery for formulas
     """
     mpq = MPQuery(api_key=API_KEY)
-    data = mpq.get_data(search_for=formulas, only_gs=True)
+    data = mpq.get_data(search_for=formulas)
     print(
         "queried gs data for %i formulas so got %i mpids" % (len(formulas), len(data))
     )
@@ -84,7 +84,7 @@ def demo_get_small_structures_in_chemsys(chemsys):
         data (dict): dictionary of data from MPQuery for chemsys
     """
     mpq = MPQuery(api_key=API_KEY)
-    data = mpq.get_data(chemsys, max_sites_per_structure=30, only_gs=False)
+    data = mpq.get_data(chemsys, max_sites_per_structure=30)
     print(
         "queried small structures for %s. got %i mpids. most sites in a structure = %i"
         % (chemsys, len(data), max([data[k]["nsites"] for k in data]))
@@ -102,7 +102,7 @@ def demo_get_hull_data(chemsys):
 
     """
     mpq = MPQuery(api_key=API_KEY)
-    data = mpq.get_data(chemsys, only_gs=True, include_sub_phase_diagrams=True)
+    data = mpq.get_data(chemsys, include_sub_phase_diagrams=True)
     print("%i compounds in %s hull" % (len(data), chemsys))
 
 
