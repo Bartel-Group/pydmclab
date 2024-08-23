@@ -32,7 +32,7 @@ Source = "https://github.umn.edu/bartel-group/pydmclab"
 Package = "https://pypi.org/project/pydmclab/"
 
 [tool.setuptools.packages.find]
-find = {include = ["pydmclab*"]}
+include = ["pydmclab*"]
 
 [tool.setuptools.package-data]
-pydmclab.data.data = ["*.json", "*.csv", "*.dat", "*.yaml"]
+"pydmclab.data.data" = ["*.json", "*.csv", "*.dat", "*.yaml"]
