@@ -1,6 +1,6 @@
-from pydmc.core.mag import MagTools
+from pydmclab.core.mag import MagTools
 
-from pydmclab.core.query import MPQuery
+from pydmclab.core.query import MPLegacyQuery
 
 """ 
 Purpose: 
@@ -18,7 +18,7 @@ def demo_get_afm_structures():
     """
 
     comps = ["Cr2O3"]
-    mpq = MPQuery(api_key="***REMOVED***")
+    mpq = MPLegacyQuery(api_key="***REMOVED***")
     q = mpq.get_data_for_comp(comps, only_gs=True)
     q = {q[k]["cmpd"]: q[k] for k in q}
 
