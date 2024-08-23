@@ -6,7 +6,7 @@ from pydmclab.plotting.utils import get_colors
 
 
 def main():
-    test_data_dir = "../data/test_data/vasp/AlN"
+    test_data_dir = "../pydmclab/data/test_data/vasp/AlN"
     tdos = read_json(os.path.join(test_data_dir, "tdos.json"))
 
     fig = plt.figure()

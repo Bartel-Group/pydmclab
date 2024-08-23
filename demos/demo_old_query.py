@@ -1,4 +1,4 @@
-from pydmclab.core.query import MPQuery
+from pydmclab.core.query import MPLegacyQuery as MPQuery
 from pydmclab.core.struc import StrucTools
 from pydmclab.utils.handy import read_json, write_json
 import os
