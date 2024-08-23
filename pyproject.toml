@@ -14,7 +14,7 @@ dependencies = ["numpy>=1.25.0", "mp-api>=0.39", "pymatgen>=2023.0.0"]
 classifiers = [
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent"
+    "Operating System :: OS Independent",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
