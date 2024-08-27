@@ -13,6 +13,9 @@ from pydmclab.core.comp import CompTools
 from pydmclab.utils.handy import read_json, write_json, read_yaml, write_yaml
 from pydmclab.data.configs import load_base_configs
 
+from phonopy import Phonopy
+from phonopy.interface.vasp import read_vasp, parse_force_constants
+
 
 class VASPOutputs(object):
     def __init__(self, calc_dir):
