@@ -297,8 +297,8 @@ class AnalyzePhonons(object):
         self.calc_dir = calc_dir
         self.supercell_matrix = supercell_matrix
         
-        if not isinstance(mesh, (list, tuple, float)):
-            raise TypeError("Mesh should be a list, tuple, or float.")
+        if not isinstance(mesh, (list, tuple, float, int)):
+            raise TypeError("Mesh should be a list, tuple, or int.")
         elif isinstance(mesh, (list, tuple)) and len(mesh) != 3:
             raise ValueError("Mesh should be a list or tuple of three integers or a float.")
 
@@ -427,7 +427,12 @@ class AnalyzePhonons(object):
 
         '''
         try:
-            _ = self.phonon.run_thermal_properties(...)
+            _ = self.phonon.run_thermal_properties(t_min=t_min, t_max=t_max, 
+                                                   t_step=t_step, temperatures=temperatures, 
+                                                   cutoff_frequency=cutoff_frequency, 
+                                                   pretend_real=pretend_real, 
+                                                   band_indices=band_indices, 
+                                                   is_projection=is_projection)
             tp = self.phonon.get_thermal_properties_dict()
             if tp is None:
                 print("Thermal properties could not be calculated.")
@@ -1353,9 +1358,29 @@ class AnalyzeVASP(object):
         entry.data["queried"] = False
         return entry.as_dict()
     
-    def analyze_phonons(self, supercell_matrix=None, mesh = 100):
-        return AnalyzePhonons(self.calc_dir, supercell_matrix=supercell_matrix, mesh=mesh)
+    def analyze_phonons(self, supercell_matrix=None, mesh = 100, 
+                        include_phonon_force_constants=False, include_phonon_mesh=False, 
+                        include_thermal_properties=False, 
+                        include_phonon_band_structure=False, 
+                        include_phonon_dos=False):
+        ap = AnalyzePhonons(self.calc_dir, supercell_matrix=supercell_matrix, mesh=mesh)
+        
+        if not ap:
+            return None
+    
+        out = {}
+        if include_phonon_force_constants:
+            out["force_constants"] = ap.force_constants
+        if include_phonon_mesh:
+            out["mesh"] = ap.mesh
+        if include_thermal_properties:
+            out["thermal_properties"] = ap.thermal_properties()
+        if include_phonon_band_structure:
+            out["band_structure"] = ap.band_structure()
+        if include_phonon_dos:
+            out["phonon_dos"] = ap.total_dos
 
+        return out
     
 
     def summary(
@@ -1377,6 +1402,11 @@ class AnalyzeVASP(object):
         include_tcobi=False,
         include_pcobi=False,
         include_entry=False,
+        include_phonon_force_constants=False,
+        include_phonon_mesh=False,
+        include_thermal_properties=False,
+        include_phonon_band_structure=False,
+        include_phonon_dos=False,
     ):
         """
         Returns all desired data for post-processing DFT calculations
@@ -1487,6 +1517,16 @@ class AnalyzeVASP(object):
                 data["pcobi"] = None
         if include_entry:
             data["entry"] = self.computed_structure_entry
+
+        if (include_phonon_force_constants or 
+            include_phonon_mesh or include_thermal_properties or 
+            include_phonon_band_structure or include_phonon_dos):
+
+            data["phonons"] = self.analyze_phonons(include_phonon_force_constants=include_phonon_force_constants,
+                                                   include_phonon_mesh=include_phonon_mesh,
+                                                   include_thermal_properties=include_thermal_properties,
+                                                   include_phonon_band_structure=include_phonon_band_structure,
+                                                   include_phonon_dos=include_phonon_dos)
 
         return data
 
