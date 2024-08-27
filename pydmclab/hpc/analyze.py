@@ -277,114 +277,119 @@ class VASPOutputs(object):
         data = {el: {"orbs": orbs[el], "basis": basis_functions[el]} for el in orbs}
 
         return data
-    
+
+
 class AnalyzePhonons(object):
-    def __init__(self, calc_dir, supercell_matrix=None, mesh = 100):
-        '''
+    def __init__(self, calc_dir, supercell_matrix=None, mesh=100):
+        """
         Class to analyze phonon data from a VASP calculation using Phonopy, Can return force constants, dynamical matrix, mesh data, thermal properties, band structure, and total density of states.
         Args:
-            calc_dir (str): 
+            calc_dir (str):
                 Path to the directory containing the VASP calculation
-            supercell_matrix (list): 
+            supercell_matrix (list):
                 Supercell matrix for the phonon calculation
-            mesh (array-like or float): 
-                Mesh numbers along a, b, c axes when array_like object is given, shape=(3,).  
+            mesh (array-like or float):
+                Mesh numbers along a, b, c axes when array_like object is given, shape=(3,).
                 When float value is given, uniform mesh is generated following VASP convention by N = max(1, nint(l * |a|^*)) where 'nint' is the function to return the nearest integer. In this case, it is forced to set is_gamma_center=True.
                 Default value is 100.0.
 
-        '''
-        
+        """
+
         self.calc_dir = calc_dir
         self.supercell_matrix = supercell_matrix
-        
+
         if not isinstance(mesh, (list, tuple, float, int)):
             raise TypeError("Mesh should be a list, tuple, or int.")
         elif isinstance(mesh, (list, tuple)) and len(mesh) != 3:
-            raise ValueError("Mesh should be a list or tuple of three integers or a float.")
+            raise ValueError(
+                "Mesh should be a list or tuple of three integers or a float."
+            )
 
-        poscar_path = os.path.join(calc_dir, 'POSCAR')
+        poscar_path = os.path.join(calc_dir, "POSCAR")
         if not os.path.exists(poscar_path):
-            # print(f"Warning: POSCAR file not found in {calc_dir}. Returning None.")
+            print(f"Warning: POSCAR file not found in {calc_dir}. Returning None.")
             self.phonon = None
             return  # Early exit from the initialization if POSCAR is missing
-        
+
         self.unitcell = read_vasp(poscar_path)
-        self.phonon = Phonopy(self.unitcell, supercell_matrix)
-        
-        force_constants_path = os.path.join(calc_dir, 'vasprun.xml')
+        phonon = Phonopy(self.unitcell, supercell_matrix)
+
+        force_constants_path = os.path.join(calc_dir, "vasprun.xml")
         if not os.path.exists(force_constants_path):
             # print(f"Warning: vasprun.xml file not found in {calc_dir}. Returning None.")
             self.phonon = None
             return  # Early exit if force constants are missing
-        
-        self.force_constants_dict = parse_force_constants(force_constants_path)
-        if not self.force_constants_dict:
+
+        force_constants_dict = parse_force_constants(force_constants_path)
+        if not force_constants_dict:
             # print("Warning: Failed to parse force constants. Returning None.")
             self.phonon = None
             return  # Exit if force constants parsing fails
-        
-        self.force_constants_array = self.force_constants_dict[0]
-        self.phonon.force_constants = self.force_constants_array
-        
-        _ = self.phonon.dynamical_matrix
-        _ = self.phonon.run_mesh(mesh)
 
+        phonon.force_constants = force_constants_dict[0]
+
+        self.dynamical_matrix = phonon.dynamical_matrix
+        _mesh_out = phonon.run_mesh(mesh)
+
+        self.phonon = phonon
 
     @property
     def force_constants(self):
-        '''
+        """
         Returns the force constants for the phonopy object as a NumPy array
-        '''
-        return self.force_constants_array
+        """
+        return self.phonon.force_constants
 
     @property
     def dynamical_matrix(self):
-        '''
+        """
         returns phonopy.harmonic.dynamical_matrix.DynamicalMatrix object
-        '''
+        """
         return self.phonon.dynamical_matrix
 
     @property
     def mesh(self):
-        '''
+        """
         Returns the mesh data for the phonon object in a dictionary
-        '''
+        """
         mesh = self.phonon.get_mesh_dict()
         return mesh
-    
+
     def parse_thermal_properties(self, phonopy_data):
-        '''
+        """
         Parses the thermal properties data from the phonopy object into a dictionary
         Args:
-            phonopy_data (dict): 
+            phonopy_data (dict):
                 Thermal properties data obtained from the phonopy object self.phonon.get_thermal_properties_dict()
-            
+
         Returns:
             {T (in K) (float) :
                 thermal properties as dict}}
         e.g. at 300K:
         {300 : {'temperature' : T as float}, {'free_energy' : free energy at 300K (float)}, {'entropy' : entropy at 300K (float)}, {'heat_capacity' : heat capacity at 300K (float)}}
-        '''
+        """
         parsed_data = {}
-        
+
         # Extract arrays from the original data
-        temperatures = phonopy_data['temperatures']
-        free_energies = phonopy_data['free_energy']
-        entropies = phonopy_data['entropy']
-        heat_capacities = phonopy_data['heat_capacity']
-        
+        temperatures = phonopy_data["temperatures"]
+        free_energies = phonopy_data["free_energy"]
+        entropies = phonopy_data["entropy"]
+        heat_capacities = phonopy_data["heat_capacity"]
+
         # Iterate through the arrays and build the new dictionary structure
         for i, T in enumerate(temperatures):
             parsed_data[T] = {
-                'temperature': T,
-                'free_energy': free_energies[i],
-                'entropy': entropies[i],
-                'heat_capacity': heat_capacities[i],
+                "temperature": T,
+                "free_energy": free_energies[i],
+                "entropy": entropies[i],
+                "heat_capacity": heat_capacities[i],
             }
-        
+
         return parsed_data
 
-    def thermal_properties(self, t_min=0,
+    def thermal_properties(
+        self,
+        t_min=0,
         t_max=1000,
         t_step=10,
         temperatures=None,
@@ -393,7 +398,7 @@ class AnalyzePhonons(object):
         band_indices=None,
         is_projection=False,
     ):
-        '''
+        """
         returns the thermal properties for the phonon object in a dictionary
         Args:
             t_min, t_max, t_step (float, optional)
@@ -418,59 +423,64 @@ class AnalyzePhonons(object):
                 multiplied to mode thermal property quantities at respective phonon
                 modes. Note that use of this results in unphysical values, and it
                 is not recommended to use this feature. Default is False.
-        
+
         Returns parsed thermal properties in the following format:
             {T (in K) (float) :
                 thermal properties as dict}}
         e.g. at 300K:
         {300 : {'temperature' : T as float}, {'free_energy' : free energy at 300K (float)}, {'entropy' : entropy at 300K (float)}, {'heat_capacity' : heat capacity at 300K (float)}}
 
-        '''
-        try:
-            _ = self.phonon.run_thermal_properties(t_min=t_min, t_max=t_max, 
-                                                   t_step=t_step, temperatures=temperatures, 
-                                                   cutoff_frequency=cutoff_frequency, 
-                                                   pretend_real=pretend_real, 
-                                                   band_indices=band_indices, 
-                                                   is_projection=is_projection)
-            tp = self.phonon.get_thermal_properties_dict()
-            if tp is None:
-                print("Thermal properties could not be calculated.")
-            return self.parse_thermal_properties(tp)
-        except Exception as e:
-            print(f"Error calculating thermal properties: {e}")
-            return None
-    
+        """
+        _ = self.phonon.run_thermal_properties(
+            t_min=t_min,
+            t_max=t_max,
+            t_step=t_step,
+            temperatures=temperatures,
+            cutoff_frequency=cutoff_frequency,
+            pretend_real=pretend_real,
+            band_indices=band_indices,
+            is_projection=is_projection,
+        )
+        tp = self.phonon.get_thermal_properties_dict()
+        if tp is None:
+            print("Thermal properties could not be calculated.")
+        return self.parse_thermal_properties(tp)
+        # except Exception as e:
+        #     print(f"Error calculating thermal properties: {e}")
+        #     return None
+
     # def plot_thermal_properties(self):
     #     self.phonon.plot_thermal_properties()
 
-    
-    def band_structure(self, paths = [
-            [[0.0, 0.0, 0.0], [0.5, 0.0, 0.0]],   # Γ to X
-            [[0.5, 0.0, 0.0], [0.5, 0.5, 0.5]],   # X to L
-            [[0.5, 0.5, 0.5], [0.0, 0.0, 0.0]],   # L to Γ
-            [[0.5, 0.0, 0.0], [0.5, 0.25, 0.75]]]  # X to W
-            ):
-        '''
+    def band_structure(
+        self,
+        paths=[
+            [[0.0, 0.0, 0.0], [0.5, 0.0, 0.0]],  # Γ to X
+            [[0.5, 0.0, 0.0], [0.5, 0.5, 0.5]],  # X to L
+            [[0.5, 0.5, 0.5], [0.0, 0.0, 0.0]],  # L to Γ
+            [[0.5, 0.0, 0.0], [0.5, 0.25, 0.75]],
+        ],  # X to W
+    ):
+        """
         Returns the band structure for the phonon object in a dictionary
         Args:
-            paths (list): 
+            paths (list):
                 List of paths in reciprocal space
 
         Returns:
             {'qpoints': arrays of q points, 'distances': arrays of distances, 'frequencies': arrays of frequencies, 'eigenvectors': arrays of eigenvectors, group_velocities': arrays of group velocities}
-        '''
-        
-        _ = self.phonon.run_band_structure(paths) 
+        """
+
+        _ = self.phonon.run_band_structure(paths)
         return self.phonon.get_band_structure_dict()
 
     @property
     def total_dos(self):
-        '''
+        """
         Returns the total density of states for the phonon object in a dictionary.
         Returns:
             {'frequency_points ': array of frequency points, 'total_dos': array of total density of states}
-        '''
+        """
         _ = self.phonon.run_total_dos()
         return self.phonon.get_total_dos_dict()
 
@@ -501,7 +511,6 @@ class AnalyzeVASP(object):
             self.calc = calc
 
         self.outputs = VASPOutputs(calc_dir)
-
 
     @property
     def is_converged(self):
@@ -1357,17 +1366,22 @@ class AnalyzeVASP(object):
         entry.data["formula"] = CompTools(entry.composition.reduced_formula).clean
         entry.data["queried"] = False
         return entry.as_dict()
-    
-    def analyze_phonons(self, supercell_matrix=None, mesh = 100, 
-                        include_phonon_force_constants=False, include_phonon_mesh=False, 
-                        include_thermal_properties=False, 
-                        include_phonon_band_structure=False, 
-                        include_phonon_dos=False):
+
+    def analyze_phonons(
+        self,
+        supercell_matrix=None,
+        mesh=100,
+        include_phonon_force_constants=False,
+        include_phonon_mesh=False,
+        include_thermal_properties=False,
+        include_phonon_band_structure=False,
+        include_phonon_dos=False,
+    ):
         ap = AnalyzePhonons(self.calc_dir, supercell_matrix=supercell_matrix, mesh=mesh)
-        
+
         if not ap:
             return None
-    
+
         out = {}
         if include_phonon_force_constants:
             out["force_constants"] = ap.force_constants
@@ -1381,7 +1395,6 @@ class AnalyzeVASP(object):
             out["phonon_dos"] = ap.total_dos
 
         return out
-    
 
     def summary(
         self,
@@ -1518,15 +1531,21 @@ class AnalyzeVASP(object):
         if include_entry:
             data["entry"] = self.computed_structure_entry
 
-        if (include_phonon_force_constants or 
-            include_phonon_mesh or include_thermal_properties or 
-            include_phonon_band_structure or include_phonon_dos):
+        if (
+            include_phonon_force_constants
+            or include_phonon_mesh
+            or include_thermal_properties
+            or include_phonon_band_structure
+            or include_phonon_dos
+        ):
 
-            data["phonons"] = self.analyze_phonons(include_phonon_force_constants=include_phonon_force_constants,
-                                                   include_phonon_mesh=include_phonon_mesh,
-                                                   include_thermal_properties=include_thermal_properties,
-                                                   include_phonon_band_structure=include_phonon_band_structure,
-                                                   include_phonon_dos=include_phonon_dos)
+            data["phonons"] = self.analyze_phonons(
+                include_phonon_force_constants=include_phonon_force_constants,
+                include_phonon_mesh=include_phonon_mesh,
+                include_thermal_properties=include_thermal_properties,
+                include_phonon_band_structure=include_phonon_band_structure,
+                include_phonon_dos=include_phonon_dos,
+            )
 
         return data
 
@@ -1578,7 +1597,7 @@ class AnalyzeBatch(object):
                 for c in stuff_in_launch_dir
                 if "-" in c
                 if any(xc in c for xc in ["gga", "metagga", "hse"])
-                if 'prelobster' not in c
+                if "prelobster" not in c
             ]
             calc_dirs = [os.path.join(launch_dir, c) for c in relevant_stuff]
             calc_dirs = [
