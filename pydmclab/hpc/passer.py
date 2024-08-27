@@ -314,9 +314,13 @@ class Passer(object):
             copied.append("incar")
 
         fsrc_kpts = os.path.join(src_dir, "KPOINTS")
+        fsrc_ibzkpt = os.path.join(src_dir, "IBZKPT")
         if os.path.exists(fsrc_kpts):
             copyfile(fsrc_kpts, os.path.join(dst_dir, "KPOINTS"))
             copied.append("kpoints")
+        elif os.path.exists(fsrc_ibzkpt):
+            copyfile(fsrc_ibzkpt, os.path.join(dst_dir, "KPOINTS"))
+            copied.append("ibzkpt")
 
         return "_".join(copied) + " copied" if copied else None
 
