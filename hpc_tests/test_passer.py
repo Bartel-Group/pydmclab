@@ -15,10 +15,20 @@ class UnitTestPasser(unittest.TestCase):
 
     @classmethod
     def setUpClass(self): # Optional: This method runs once before all tests
+        self.prev_xc_calc_dict = {"gga-loose":"gga-pre_loose", "gga-relax":"gga-loose", "gga-static":"gga-relax", \
+            "metagga-relax":"gga-relax", "metagga-static": "metagga-relax", \
+            "metaggau-relax":"gga-relax", "metaggau-static": "metaggau-relax", \
+            "hse06-preggastatic":"metagga-relax", "hse06-prelobster":"hse06-preggastatic", "hse06-lobster":"hse06-prelobster", "hse06-parchg":"hse06-lobster"}
+        
         self.hse06_preggastatic_poscar_path = os.path.join("..", "pydmclab", "data", "test_data", "hpc", "passer", "calcs", "Co1Li1O2", "mp-22526", "fm", "hse06-preggastatic", "POSCAR")
+        
         self.hse06_prelobster_incar_path = os.path.join("..", "pydmclab", "data", "test_data", "hpc", "passer", "calcs", "Co1Li1O2", "mp-22526", "fm", "hse06-prelobster", "INCAR")
-        self.hse06_prelobster_ibzkpt_path = os.path.join("..", "pydmclab", "data", "test_data", "hpc", "passer", "calcs", "Co1Li1O2", "mp-22526", "fm", "hse06-prelobster", "IBZKPT")
-
+        self.hse06_prelobster_kpoints_path = os.path.join("..", "pydmclab", "data", "test_data", "hpc", "passer", "calcs", "Co1Li1O2", "mp-22526", "fm", "hse06-prelobster", "KPOINTS")
+        
+        self.hse06_parchg_chgcar_path = os.path.join("..", "pydmclab", "data", "test_data", "hpc", "passer", "calcs", "Co1Li1O2", "mp-22526", "fm", "hse06-parchg", "CHGCAR")
+        self.hse06_parchg_kpoints_path = os.path.join("..", "pydmclab", "data", "test_data", "hpc", "passer", "calcs", "Co1Li1O2", "mp-22526", "fm", "hse06-parchg", "KPOINTS")
+        ##### working progress #####
+        
     def setUp(self): # Initialization before each test method
         hse06_preggastatic_passer_dict_as_str = '{"xc_calc": "hse06-preggastatic", \
             "calc_list": ["gga-relax", "gga-static", "metagga-relax", "metagga-static", "metaggau-relax", "metaggau-static", \
@@ -34,9 +44,17 @@ class UnitTestPasser(unittest.TestCase):
             "incar_mods": {}, \
             "launch_dir": "../pydmclab/data/test_data/hpc/passer/calcs/Co1Li1O2/mp-22526/fm", \
             "struc_src_for_hse": "metagga-relax"}'
+        hse06_parchg_passer_dict_as_str = '{"xc_calc": "hse06-parchg", \
+            "calc_list": ["gga-relax", "gga-static", "metagga-relax", "metagga-static", "metaggau-relax", "metaggau-static", \
+            "hse06-preggastatic", "hse06-prelobster", "hse06-lobster", "hse06-parchg"], \
+            "calc_dir": "../pydmclab/data/test_data/hpc/passer/calcs/Co1Li1O2/mp-22526/fm/hse06-parchg", \
+            "incar_mods": {}, \
+            "launch_dir": "../pydmclab/data/test_data/hpc/passer/calcs/Co1Li1O2/mp-22526/fm", \
+            "struc_src_for_hse": "metagga-relax"}'
             
         self.passer_hse06_preggastatic = Passer(passer_dict_as_str=hse06_preggastatic_passer_dict_as_str)
         self.passer_hse06_prelobster = Passer(passer_dict_as_str=hse06_prelobster_passer_dict_as_str)
+        self.passer_hse06_parchg = Passer(passer_dict_as_str=hse06_parchg_passer_dict_as_str)
         ##### working progress #####
         
     @classmethod
@@ -52,18 +70,25 @@ class UnitTestPasser(unittest.TestCase):
             os.remove(self.hse06_prelobster_incar_path)
             print(f"Deleted {self.hse06_prelobster_incar_path}")
             
-        if os.path.exists(self.hse06_prelobster_ibzkpt_path):
-            os.remove(self.hse06_prelobster_ibzkpt_path)
-            print(f"Deleted {self.hse06_prelobster_ibzkpt_path}")
+        if os.path.exists(self.hse06_prelobster_kpoints_path):
+            os.remove(self.hse06_prelobster_kpoints_path)
+            print(f"Deleted {self.hse06_prelobster_kpoints_path}")
+            
+        if os.path.exists(self.hse06_parchg_chgcar_path):
+            os.remove(self.hse06_parchg_chgcar_path)
+            print(f"Deleted {self.hse06_parchg_chgcar_path}")
+            
+        if os.path.exists(self.hse06_parchg_kpoints_path):
+            os.remove(self.hse06_parchg_kpoints_path)
+            print(f"Deleted {self.hse06_parchg_kpoints_path}")
         ##### working progress #####
         
     def test_prev_xc_calc(self):
         """
         Test the prev_xc_calc property of the Passer class
         """
-        self.assertEqual(self.passer_hse06_preggastatic.prev_xc_calc, "metagga-relax")
-        self.assertEqual(self.passer_hse06_prelobster.prev_xc_calc, "hse06-preggastatic")
-        ##### working progress #####
+        self.assertEqual(self.passer_hse06_preggastatic.prev_xc_calc, self.prev_xc_calc_dict["hse06-preggastatic"])
+        self.assertEqual(self.passer_hse06_prelobster.prev_xc_calc, self.prev_xc_calc_dict["hse06-prelobster"])
     
     def test_prev_xc(self):
         """
@@ -126,13 +151,32 @@ class UnitTestPasser(unittest.TestCase):
         """
         self.assertEqual(self.passer_hse06_preggastatic.setup_prelobster, None)
         
-        self.assertEqual(self.passer_hse06_prelobster.setup_prelobster, "incar_ibzkpt_copied")
+        self.assertEqual(self.passer_hse06_prelobster.setup_prelobster, "incar_ibzkpt copied")
         self.passer_hse06_prelobster.setup_prelobster
         self.assertTrue(os.path.exists(self.hse06_prelobster_incar_path), f"{self.hse06_prelobster_incar_path} does not exist")
-        self.assertTrue(os.path.exists(self.hse06_prelobster_ibzkpt_path), f"{self.hse06_prelobster_ibzkpt_path} does not exist")
+        self.passer_hse06_prelobster.setup_prelobster
+        self.assertTrue(os.path.exists(self.hse06_prelobster_kpoints_path), f"{self.hse06_prelobster_kpoints_path} does not exist")
         
-
-    
+    def test_setup_parchg(self):
+        """
+        Test the setup_parchg method of the Passer class
+        """
+        self.assertEqual(self.passer_hse06_preggastatic.setup_parchg, None)
+        
+        self.assertEqual(self.passer_hse06_parchg.setup_parchg, "chgcar_kpoints copied")
+        self.passer_hse06_parchg.setup_prelobster
+        self.assertTrue(os.path.exists(self.hse06_parchg_chgcar_path), f"{self.hse06_parchg_chgcar_path} does not exist")
+        self.passer_hse06_parchg.setup_prelobster
+        self.assertTrue(os.path.exists(self.hse06_parchg_kpoints_path), f"{self.hse06_parchg_kpoints_path} does not exist")
+        
+    def test_errors_encountered_in_curr_calc(self):
+        """
+        Test the errors_encountered_in_curr_calc property of the Passer class
+        """
+        self.assertEqual(self.passer_hse06_preggastatic.errors_encountered_in_curr_calc, False)
+        
+        
+        
 
     # def test_copy_kpoints_for_prelobster(self):
     #     """
