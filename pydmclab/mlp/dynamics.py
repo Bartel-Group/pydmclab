@@ -344,4 +344,8 @@ class CHGNetRelaxer:
 
         struct = AseAtomsAdaptor.get_structure(atoms)
 
-        return {"final_structure": struct, "trajectory": obs}
+        return {
+            "final_structure": struct,
+            "final_energy": obs.energies[-1],
+            "trajectory": obs,
+        }
