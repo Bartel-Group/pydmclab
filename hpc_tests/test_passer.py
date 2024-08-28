@@ -53,7 +53,23 @@ class UnitTestPasser(unittest.TestCase):
             "calc_dir": "../pydmclab/data/test_data/hpc/passer/calcs/Co1Li1O2/mp-22526/fm/metagga-static", \
             "incar_mods": {}, \
             "launch_dir": "../pydmclab/data/test_data/hpc/passer/calcs/Co1Li1O2/mp-22526/fm", \
-            "struc_src_for_hse": "metagga-relax"}'        
+            "struc_src_for_hse": "metagga-relax"}'     
+        metagga_defect_neutral_passer_dict_as_str = '{"xc_calc": "metagga-defect_neutral", \
+            "calc_list": ["gga-relax", "gga-static", "metagga-relax", "metagga-static", "metagga-defect_neutral", "metagga-defect_charged_p1", \
+            "metaggau-relax", "metaggau-static", \
+            "hse06-preggastatic", "hse06-prelobster", "hse06-lobster"], \
+            "calc_dir": "../pydmclab/data/test_data/hpc/passer/calcs/Co1Li1O2/mp-22526/fm/metagga-defect_neutral", \
+            "incar_mods": {}, \
+            "launch_dir": "../pydmclab/data/test_data/hpc/passer/calcs/Co1Li1O2/mp-22526/fm", \
+            "struc_src_for_hse": "metagga-relax"}'  
+        metagga_defect_charged_p_1_passer_dict_as_str = '{"xc_calc": "metagga-defect_charged_p1", \
+            "calc_list": ["gga-relax", "gga-static", "metagga-relax", "metagga-static", "metagga-defect_neutral", "metagga-defect_charged_p1", \
+            "metaggau-relax", "metaggau-static", \
+            "hse06-preggastatic", "hse06-prelobster", "hse06-lobster"], \
+            "calc_dir": "../pydmclab/data/test_data/hpc/passer/calcs/Co1Li1O2/mp-22526/fm/metagga-defect_charged_p1", \
+            "incar_mods": {}, \
+            "launch_dir": "../pydmclab/data/test_data/hpc/passer/calcs/Co1Li1O2/mp-22526/fm", \
+            "struc_src_for_hse": "metagga-relax"}'  
         hse06_preggastatic_passer_dict_as_str = '{"xc_calc": "hse06-preggastatic", \
             "calc_list": ["gga-relax", "gga-static", "metagga-relax", "metagga-static", "metaggau-relax", "metaggau-static", \
             "hse06-preggastatic", "hse06-prelobster", "hse06-lobster"], \
@@ -84,6 +100,8 @@ class UnitTestPasser(unittest.TestCase):
             "struc_src_for_hse": "metagga-relax"}'
             
         self.passer_metagga_static = Passer(passer_dict_as_str=metagga_static_passer_dict_as_str)
+        self.passer_metagga_defect_neutral = Passer(passer_dict_as_str=metagga_defect_neutral_passer_dict_as_str)
+        self.passer_metagga_defect_charged_p_1 = Passer(passer_dict_as_str=metagga_defect_charged_p_1_passer_dict_as_str)
         self.passer_hse06_preggastatic = Passer(passer_dict_as_str=hse06_preggastatic_passer_dict_as_str)
         self.passer_hse06_prelobster = Passer(passer_dict_as_str=hse06_prelobster_passer_dict_as_str)
         self.passer_hse06_lobster = Passer(passer_dict_as_str=hse06_lobster_passer_dict_as_str)
@@ -100,7 +118,7 @@ class UnitTestPasser(unittest.TestCase):
         
         if os.path.exists(self.hse06_preggastatic_poscar_path):
             os.remove(self.hse06_preggastatic_poscar_path)
-            print(f"\nDeleted {self.hse06_preggastatic_poscar_path}")
+            print(f"Deleted {self.hse06_preggastatic_poscar_path}")
             
         if os.path.exists(self.hse06_preggastatic_wavecar_path):
             os.remove(self.hse06_preggastatic_wavecar_path)
@@ -285,20 +303,18 @@ class UnitTestPasser(unittest.TestCase):
         """
         self.assertEqual(self.passer_hse06_lobster.kpoints_based_incar_adjustments(ncore=4)["KPAR"], 4)
         
-    # def test_nelect_from_neutral_calc_dir(self):
-    #     """
-    #     Test the nelect_from_neutral_calc_dir method of the Passer class
-    #     """
-    #     self.assertEqual(self.passer_metagga_static.nelect_from_neutral_calc_dir, 24) 
-    ##### working progress #####
+    def test_nelect_from_neutral_calc_dir(self):
+        """
+        Test the nelect_from_neutral_calc_dir method of the Passer class
+        """
+        self.assertEqual(self.passer_metagga_defect_charged_p_1.nelect_from_neutral_calc_dir, 24) 
     
-    # def test_charged_defects_based_incar_adjustments
-    #     """
-    #     Test the charged_defects_based_incar_adjustments method of the Passer class
-    #     """
-    #     self.assertEqual(self.passer_metagga_static.charged_defects_based_incar_adjustments["NELECT"], 24)
-    ##### working progress #####
-    
+    def test_charged_defects_based_incar_adjustments(self):
+        """
+        Test the charged_defects_based_incar_adjustments method of the Passer class
+        """
+        self.assertEqual(self.passer_metagga_defect_charged_p_1.charged_defects_based_incar_adjustments["NELECT"], 23)
+    #### working progress #####
     
     def test_poscar(self):
         """
