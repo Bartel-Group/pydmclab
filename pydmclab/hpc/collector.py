@@ -61,6 +61,8 @@ class Collector(object):
             configs["include_mag"] = False
             configs["include_entry"] = False
             configs["include_structure"] = False
+        if calc == "dfpt":
+            configs["include_phonons"] = True
 
         verbose = configs["verbose"]
         include_meta = configs["include_metadata"]
@@ -77,6 +79,7 @@ class Collector(object):
         include_tcobi = configs["include_tcobi"]
         include_pcobi = configs["include_pcobi"]
         include_entry = configs["include_entry"]
+        include_phonons = configs["include_phonons"]
         check_relax = configs["check_relax_energy"]
         create_cif = configs["create_cif"]
 
@@ -100,6 +103,7 @@ class Collector(object):
             include_tcobi=include_tcobi,
             include_pcobi=include_pcobi,
             include_entry=include_entry,
+            include_phonons=include_phonons,
         )
 
         # store the relax energy if we asked to
