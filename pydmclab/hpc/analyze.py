@@ -302,7 +302,7 @@ class AnalyzePhonons(object):
             raise TypeError("Mesh should be a list, tuple, or int.")
         elif isinstance(mesh, (list, tuple)) and len(mesh) != 3:
             raise ValueError(
-                "Mesh should be a list or tuple of three integers or a float."
+                "Mesh should be a list or tuple of three integers or an int."
             )
 
         poscar_path = os.path.join(calc_dir, "POSCAR")
@@ -311,41 +311,29 @@ class AnalyzePhonons(object):
             self.phonon = None
             return  # Early exit from the initialization if POSCAR is missing
 
-        self.unitcell = read_vasp(poscar_path)
-        phonon = Phonopy(self.unitcell, supercell_matrix)
+        unitcell = read_vasp(poscar_path)
+        phonon = Phonopy(unitcell, supercell_matrix)
+        self.unitcell = unitcell
 
         force_constants_path = os.path.join(calc_dir, "vasprun.xml")
         if not os.path.exists(force_constants_path):
-            # print(f"Warning: vasprun.xml file not found in {calc_dir}. Returning None.")
+            print(f"Warning: vasprun.xml file not found in {calc_dir}. Returning None.")
             self.phonon = None
             return  # Early exit if force constants are missing
 
         force_constants_dict = parse_force_constants(force_constants_path)
         if not force_constants_dict:
-            # print("Warning: Failed to parse force constants. Returning None.")
+            print("Warning: Failed to parse force constants. Returning None.")
             self.phonon = None
             return  # Exit if force constants parsing fails
 
         phonon.force_constants = force_constants_dict[0]
+        self.force_constants = phonon.force_constants
 
         self.dynamical_matrix = phonon.dynamical_matrix
         _mesh_out = phonon.run_mesh(mesh)
 
         self.phonon = phonon
-
-    @property
-    def force_constants(self):
-        """
-        Returns the force constants for the phonopy object as a NumPy array
-        """
-        return self.phonon.force_constants
-
-    @property
-    def dynamical_matrix(self):
-        """
-        returns phonopy.harmonic.dynamical_matrix.DynamicalMatrix object
-        """
-        return self.phonon.dynamical_matrix
 
     @property
     def mesh(self):
@@ -357,18 +345,17 @@ class AnalyzePhonons(object):
 
     def parse_thermal_properties(self, phonopy_data):
         """
-        Parses the thermal properties data from the phonopy object into a dictionary
+        Parses the thermal properties data from the phonopy object into a list of dictionaries
         Args:
             phonopy_data (dict):
                 Thermal properties data obtained from the phonopy object self.phonon.get_thermal_properties_dict()
 
         Returns:
-            {T (in K) (float) :
-                thermal properties as dict}}
-        e.g. at 300K:
-        {300 : {'temperature' : T as float}, {'free_energy' : free energy at 300K (float)}, {'entropy' : entropy at 300K (float)}, {'heat_capacity' : heat capacity at 300K (float)}}
+            A list of dictionaries where each dictionary corresponds to a specific temperature point.
+            e.g. [{'temperature': 300, 'free_energy': float, 'entropy': float, 'heat_capacity': float},
+                {'temperature': 310, 'free_energy': float, 'entropy': float, 'heat_capacity': float}, ...]
         """
-        parsed_data = {}
+        parsed_data = []
 
         # Extract arrays from the original data
         temperatures = phonopy_data["temperatures"]
@@ -376,16 +363,18 @@ class AnalyzePhonons(object):
         entropies = phonopy_data["entropy"]
         heat_capacities = phonopy_data["heat_capacity"]
 
-        # Iterate through the arrays and build the new dictionary structure
+        # Iterate through the arrays and build the list of dictionaries
         for i, T in enumerate(temperatures):
-            parsed_data[T] = {
+            data_point = {
                 "temperature": T,
                 "free_energy": free_energies[i],
                 "entropy": entropies[i],
                 "heat_capacity": heat_capacities[i],
             }
+            parsed_data.append(data_point)
 
         return parsed_data
+
 
     def thermal_properties(
         self,
@@ -1367,34 +1356,23 @@ class AnalyzeVASP(object):
         entry.data["queried"] = False
         return entry.as_dict()
 
-    def analyze_phonons(
+    def phonons(
         self,
         supercell_matrix=None,
         mesh=100,
-        include_phonon_force_constants=False,
-        include_phonon_mesh=False,
-        include_thermal_properties=False,
-        include_phonon_band_structure=False,
-        include_phonon_dos=False,
     ):
         ap = AnalyzePhonons(self.calc_dir, supercell_matrix=supercell_matrix, mesh=mesh)
-
         if not ap:
             return None
+        
+        force_constants = ap.force_constants
+        mesh = ap.mesh
+        thermal_properties = ap.thermal_properties()
+        band_structure = ap.band_structure()
+        phonon_dos = ap.total_dos
 
-        out = {}
-        if include_phonon_force_constants:
-            out["force_constants"] = ap.force_constants
-        if include_phonon_mesh:
-            out["mesh"] = ap.mesh
-        if include_thermal_properties:
-            out["thermal_properties"] = ap.thermal_properties()
-        if include_phonon_band_structure:
-            out["band_structure"] = ap.band_structure()
-        if include_phonon_dos:
-            out["phonon_dos"] = ap.total_dos
 
-        return out
+        return {'force_constants': force_constants, 'mesh': mesh, 'thermal_properties': thermal_properties, 'band_structure': band_structure, 'phonon_dos': phonon_dos}
 
     def summary(
         self,
@@ -1415,11 +1393,7 @@ class AnalyzeVASP(object):
         include_tcobi=False,
         include_pcobi=False,
         include_entry=False,
-        include_phonon_force_constants=False,
-        include_phonon_mesh=False,
-        include_thermal_properties=False,
-        include_phonon_band_structure=False,
-        include_phonon_dos=False,
+        include_phonons=False,
     ):
         """
         Returns all desired data for post-processing DFT calculations
@@ -1431,7 +1405,7 @@ class AnalyzeVASP(object):
             include_mag (bool, optional): _description_. Defaults to False.
             include_dos (bool, optional): _description_. Defaults to False.
             include_gap (bool, optional): _description_. Defaults to True.
-
+            include_phonons (bool, optional): _description_. Defaults to False.
         Raises:
             NotImplementedError: _description_
 
@@ -1531,21 +1505,8 @@ class AnalyzeVASP(object):
         if include_entry:
             data["entry"] = self.computed_structure_entry
 
-        if (
-            include_phonon_force_constants
-            or include_phonon_mesh
-            or include_thermal_properties
-            or include_phonon_band_structure
-            or include_phonon_dos
-        ):
-
-            data["phonons"] = self.analyze_phonons(
-                include_phonon_force_constants=include_phonon_force_constants,
-                include_phonon_mesh=include_phonon_mesh,
-                include_thermal_properties=include_thermal_properties,
-                include_phonon_band_structure=include_phonon_band_structure,
-                include_phonon_dos=include_phonon_dos,
-            )
+        if include_phonons:
+            data["phonons"] = self.phonons(supercell_matrix=None, mesh=100)
 
         return data
 
@@ -1713,6 +1674,9 @@ def _results_for_calc_dir(calc_dir, configs):
     #     configs["include_entry"] = False
     #     configs["include_structure"] = False
 
+    if calc == "dfpt":
+        configs["include_phonons"] = True
+
     verbose = configs["verbose"]
     include_meta = configs["include_metadata"]
     include_calc_setup = configs["include_calc_setup"]
@@ -1728,6 +1692,7 @@ def _results_for_calc_dir(calc_dir, configs):
     include_tcobi = configs["include_tcobi"]
     include_pcobi = configs["include_pcobi"]
     include_entry = configs["include_entry"]
+    include_phonons = configs["include_phonons"]
     check_relax = configs["check_relax_energy"]
     create_cif = configs["create_cif"]
 
@@ -1751,6 +1716,7 @@ def _results_for_calc_dir(calc_dir, configs):
         include_tcobi=include_tcobi,
         include_pcobi=include_pcobi,
         include_entry=include_entry,
+        include_phonons=include_phonons,
     )
 
     # store the relax energy if we asked to
