@@ -346,6 +346,6 @@ class CHGNetRelaxer:
 
         return {
             "final_structure": struct,
-            "final_energy": obs.energies[-1],
+            "final_energy": float(obs.energies[-1]),
             "trajectory": obs,
         }
