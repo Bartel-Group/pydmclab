@@ -1507,7 +1507,10 @@ class AnalyzeVASP(object):
             data["entry"] = self.computed_structure_entry
 
         if include_phonons:
-            data["phonons"] = self.phonons(supercell_matrix=None, mesh=100)
+            if convergence:
+                data["phonons"] = self.phonons(supercell_matrix=None, mesh=100)
+            else:
+                data["phonons"] = None
 
         return data
 
@@ -1675,8 +1678,8 @@ def _results_for_calc_dir(calc_dir, configs):
     #     configs["include_entry"] = False
     #     configs["include_structure"] = False
 
-    if calc == "dfpt":
-        configs["include_phonons"] = True
+    if calc != "dfpt":
+        configs["include_phonons"] = False
 
     verbose = configs["verbose"]
     include_meta = configs["include_metadata"]

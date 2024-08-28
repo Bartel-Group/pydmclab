@@ -61,8 +61,8 @@ class Collector(object):
             configs["include_mag"] = False
             configs["include_entry"] = False
             configs["include_structure"] = False
-        if calc == "dfpt":
-            configs["include_phonons"] = True
+        if calc != "dfpt":
+            configs["include_phonons"] = False
 
         verbose = configs["verbose"]
         include_meta = configs["include_metadata"]
