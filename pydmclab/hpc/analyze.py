@@ -472,6 +472,7 @@ class AnalyzePhonons(object):
         """
         _ = self.phonon.run_total_dos()
         return self.phonon.get_total_dos_dict()
+  
 
 
 class AnalyzeVASP(object):
