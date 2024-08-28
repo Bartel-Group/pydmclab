@@ -131,3 +131,6 @@ include_entry: False # include pymatgen computed structure entry
 create_cif: True # create a .cif file for each CONTCAR
 verbose: True # print stuff as things get analyzed
 remake_results: False # whether or not to rerun analyzer in each calculation directory
+include_phonons: False # include phonon data when running dfpt
+phonon_mesh: 100 # what mesh size you want for mesh calculations for phonons
+phonon_super_cell_matrix: None # what supercell matrix size you want, takes in list, e.g. [[1,0,0], [0,1,0], [0,0,1]]
