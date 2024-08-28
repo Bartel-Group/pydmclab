@@ -1110,6 +1110,8 @@ def get_results(
                     include heavy COBICAR data
                 include_entry: default is False
                     include pymatgen computed structure entry
+                include_phonons: default is False
+                    include phonon data
                 create_cif: default is True
                     create a .cif file for each CONTCAR
                 verbose: default is True
