@@ -472,8 +472,135 @@ class AnalyzePhonons(object):
         """
         _ = self.phonon.run_total_dos()
         return self.phonon.get_total_dos_dict()
+
+
+    def make_json_serializable(self, data):
+        if isinstance(data, dict):
+            return {key: self.make_json_serializable(value) for key, value in data.items()}
+        elif isinstance(data, list):
+            return [self.make_json_serializable(item) for item in data]
+        elif isinstance(data, np.ndarray):
+            return data.tolist()  # Convert NumPy arrays to lists
+        else:
+            return data  # Return the item as is if it's not a dict, list, or np.ndarray
+
+# Example usage
+# data = ap.band_structure or any other structure
+# json_serializable_data = make_json_serializable(data)
   
 
+    def summary(
+        self,
+        savename = "phonons.json",
+        remake=False,
+        include_force_constants=True,
+        include_mesh=True,
+        include_thermal_properties=True,
+        include_band_structure =True,
+        include_total_dos=True,
+        supercell_matrix=None,
+        mesh=None,
+        paths=None, 
+        temperatures=None,
+        cutoff_frequency=None,
+        pretend_real=None,
+        band_indices=None,
+        is_projection=None,
+    ):
+        
+        """
+        Returns all desired data for post-processing DFT calculations
+
+        Args:
+
+            include_force_constants (bool, optional):
+                Include force constants in the output. Default is True.
+            include_mesh (bool, optional):  
+                Include mesh data in the output. Default is True.
+            include_thermal_properties (bool, optional):
+                Include thermal properties in the output. Default is True.
+            include_band_structure (bool, optional):
+                Include band structure in the output. Default is True.
+            include_total_dos (bool, optional):         
+                Include total density of states in the output. Default is True.
+            supercell_matrix (list, optional):
+                Supercell matrix for the phonon calculation. Default is None.
+            mesh (array-like or float, optional):
+                Mesh numbers along a, b, c axes when array_like object is given, shape=(3,).
+                When float value is given, uniform mesh is generated following VASP convention by N = max(1, nint(l * |a|^*)) where 'nint' is the function to return the nearest integer. In this case, it is forced to set is_gamma_center=True.
+                Default value is 100.0.
+            paths (list, optional):
+                List of paths in reciprocal space. Default is None.
+            temperatures (array-like, optional):
+                Temperature points where thermal properties are calculated. Default is None.
+            cutoff_frequency (float, optional):
+                Ignore phonon modes whose frequencies are smaller than this value. Default is None.
+            pretend_real (bool, optional):
+                Use absolute value of phonon frequency when True. Default is False.
+            band_indices (array-like, optional):    
+                Band indices starting with 0. 
+
+        Returns:
+            Dictionary with the specified information
+        """
+        
+        calc_dir = self.calc_dir
+        fjson = os.path.join(calc_dir, savename)
+        if os.path.exists(fjson) and not remake:
+            return read_json(fjson)
+        data = {}
+    
+
+        # if supercell_matrix or mesh:
+        #     self.phonon = AnalyzePhonons(
+        #         self.calc_dir, supercell_matrix=supercell_matrix, mesh=mesh
+        #     )
+
+        if include_force_constants:
+            fc = self.force_constants
+            force_constants = self.make_json_serializable(fc)
+            data["force_constants"] = force_constants
+
+        if include_mesh:
+            mesh_array = self.mesh
+            mesh_list = self.make_json_serializable(mesh_array)
+            data["mesh"] = mesh_list
+
+        if include_thermal_properties:
+            # Prepare a dictionary of arguments
+            thermal_properties_kwargs = {}
+
+            # Add arguments to the dictionary only if they are not None
+            if temperatures is not None:
+                thermal_properties_kwargs["temperatures"] = temperatures
+            if cutoff_frequency is not None:
+                thermal_properties_kwargs["cutoff_frequency"] = cutoff_frequency
+            if pretend_real is not None:
+                thermal_properties_kwargs["pretend_real"] = pretend_real
+            if band_indices is not None:
+                thermal_properties_kwargs["band_indices"] = band_indices
+            if is_projection is not None:
+                thermal_properties_kwargs["is_projection"] = is_projection
+
+            # Pass the arguments dynamically
+            if thermal_properties_kwargs:
+                data["thermal_properties"] = self.thermal_properties(**thermal_properties_kwargs)
+            else:
+                data["thermal_properties"] = self.thermal_properties()
+
+
+        if include_band_structure:
+            if paths:
+                data["band_structure"] = self.make_json_serializable(self.band_structure(paths=paths))
+
+            data["band_structure"] = self.make_json_serializable(self.band_structure())
+
+        if include_total_dos:
+            total_dos = self.total_dos
+            data["total_dos"] = self.make_json_serializable(total_dos)
+
+        write_json(data, fjson)
+        return read_json(fjson)
 
 class AnalyzeVASP(object):
     """
@@ -1365,16 +1492,9 @@ class AnalyzeVASP(object):
         ap = AnalyzePhonons(self.calc_dir, supercell_matrix=supercell_matrix, mesh=mesh)
         if not ap:
             return None
-        
-        force_constants = ap.force_constants
-        mesh = ap.mesh
-        thermal_properties = ap.thermal_properties()
-        band_structure = ap.band_structure()
-        phonon_dos = ap.total_dos
 
-
-        return {'force_constants': force_constants, 'mesh': mesh, 'thermal_properties': thermal_properties, 'band_structure': band_structure, 'phonon_dos': phonon_dos}
-
+        return ap.summary()
+    
     def summary(
         self,
         include_meta=False,
