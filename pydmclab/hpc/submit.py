@@ -732,7 +732,8 @@ class SubmitTools(object):
 
             for xc_calc in calc_list:
                 status = statuses[xc_calc]
-
+                xc_to_run, calc_to_run = xc_calc.split("-")
+                
                 # write status to status.o
                 f.write('\necho "%s is %s" >> %s\n' % (xc_calc, status, fstatus))
 
@@ -758,7 +759,6 @@ class SubmitTools(object):
                     continue
 
                 # retrieve the incar_mods that pertain to this particular calculation
-                xc_to_run, calc_to_run = xc_calc.split("-")
                 configs["xc_to_run"] = xc_to_run
                 configs["calc_to_run"] = calc_to_run
                 vsu = VASPSetUp(calc_dir=calc_dir, user_configs=configs)
