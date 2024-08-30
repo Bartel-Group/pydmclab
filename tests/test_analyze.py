@@ -1,6 +1,8 @@
 import unittest
 import numpy as np
-from pydmclab.hpc.analyze import VASPOutputs, AnalyzePhonons, AnalyzeVASP, AnalyzeBatch
+from pydmclab.hpc.analyze import VASPOutputs, AnalyzeVASP, AnalyzeBatch
+from pydmclab.hpc.analyze import AnalyzePhonons
+
 
 from phonopy.structure.atoms import PhonopyAtoms
 from phonopy.harmonic.dynamical_matrix import DynamicalMatrix
@@ -31,7 +33,7 @@ class UnitTestAnalyzePhonons(unittest.TestCase):
         self.assertEqual(ap_test.force_constants[0][0][0], np.array([ 1.84336625, -0.        , -0.        ]))
         self.assertIsInstance(ap_test.dynamical_matrix, DynamicalMatrix)
 
-        self.assertEqual(ap_test.thermal_properties[30]['entropy'], 5139.760194037135)
+        self.assertEqual(ap_test.thermal_properties()[30]['entropy'], 5139.760194037135)
 
 
     def test_force_constants(self):
@@ -44,7 +46,6 @@ class UnitTestAnalyzePhonons(unittest.TestCase):
         self.assertEqual(thermal_properties[30]['entropy'], 2395.48425510759)
 
 
-
     def test_total_dos(self):
         phonon_dos = self.ap.total_dos()
         self.assertIsInstance(phonon_dos['frequency_points'], np.ndarray)
@@ -55,5 +56,10 @@ class UnitTestAnalyzePhonons(unittest.TestCase):
 class UnitTestAnalyzeVasp(unittest.TestCase):
     # Test AnalyzeVASP class
 
+    def setUp(self):
+        data_dir = "../pydmclab/data/test_data/analyze" #Need to add info to this folder to get stuff in AnalyzeVASP to work
+        self.av = AnalyzeVASP(data_dir)
+
+        self.data_dir = data_dir
     ap = AnalyzeVASP(calc_dir)
 
