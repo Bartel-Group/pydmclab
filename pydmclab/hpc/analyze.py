@@ -328,10 +328,10 @@ class AnalyzePhonons(object):
             return  # Exit if force constants parsing fails
 
         phonon.force_constants = force_constants_dict[0]
-        self.force_constants = phonon.force_constants
+        self.force_constants = phonon.force_constants #This is just a setter for the force constants, need it to make the dynamical matrix
 
-        self.dynamical_matrix = phonon.dynamical_matrix
-        _mesh_out = phonon.run_mesh(mesh)
+        self.dynamical_matrix = phonon.dynamical_matrix # This is just a phonopy.dynamical_matrix.DynamicalMatrix object. Need it to run mesh.
+        _mesh_out = phonon.run_mesh(mesh) #Need to run this in order to get mesh data, thermal properties, band structure, and total density of states
 
         self.phonon = phonon
 
@@ -498,8 +498,8 @@ class AnalyzePhonons(object):
         include_thermal_properties=True,
         include_band_structure =True,
         include_total_dos=True,
-        supercell_matrix=None,
-        mesh=None,
+        # supercell_matrix=None,
+        # mesh=None,
         paths=None, 
         temperatures=None,
         cutoff_frequency=None,
@@ -567,10 +567,8 @@ class AnalyzePhonons(object):
             data["mesh"] = mesh_list
 
         if include_thermal_properties:
-            # Prepare a dictionary of arguments
             thermal_properties_kwargs = {}
 
-            # Add arguments to the dictionary only if they are not None
             if temperatures is not None:
                 thermal_properties_kwargs["temperatures"] = temperatures
             if cutoff_frequency is not None:
