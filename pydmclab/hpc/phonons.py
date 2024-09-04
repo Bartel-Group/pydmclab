@@ -1,10 +1,17 @@
 import os
 import numpy as np
+import matplotlib.pyplot as plt
+from pydmclab.plotting.utils import get_colors, set_rc_params
+from matplotlib.ticker import MaxNLocator
+
 
 from pydmclab.utils.handy import read_json, write_json
 
 from phonopy import Phonopy
 from phonopy.interface.vasp import read_vasp, parse_force_constants
+
+set_rc_params()
+COLORS = get_colors(palette="tab10")
 
 class AnalyzePhonons(object):
     def __init__(self, calc_dir, supercell_matrix=None, mesh=100):
@@ -113,6 +120,7 @@ class AnalyzePhonons(object):
         pretend_real=False,
         band_indices=None,
         is_projection=False,
+        force_rerun=False,
     ):
         """
         returns the thermal properties for the phonon object in a dictionary
@@ -139,34 +147,38 @@ class AnalyzePhonons(object):
                 multiplied to mode thermal property quantities at respective phonon
                 modes. Note that use of this results in unphysical values, and it
                 is not recommended to use this feature. Default is False.
+            force_rerun (bool, optional)
+                If you already ran thermal properties but now want to change some of the arguments
+                and want it to recalculate the thermal properties, set this to True. 
+                Default is False.
 
         Returns parsed thermal properties in the following format:
-            {T (in K) (float) :
-                thermal properties as dict}}
-        e.g. at 300K:
-        {300 : {'temperature' : T as float}, {'free_energy' : free energy at 300K (float)}, {'entropy' : entropy at 300K (float)}, {'heat_capacity' : heat capacity at 300K (float)}}
-
+        A list of dictionaries where each dictionary corresponds to a specific temperature point.
+        e.g. [{'temperature': 300, 'free_energy': float, 'entropy': float, 'heat_capacity': float},
+                {'temperature': 310, 'free_energy': float, 'entropy': float, 'heat_capacity': float}, ...]
         """
-        _ = self.phonon.run_thermal_properties(
-            t_min=t_min,
-            t_max=t_max,
-            t_step=t_step,
-            temperatures=temperatures,
-            cutoff_frequency=cutoff_frequency,
-            pretend_real=pretend_real,
-            band_indices=band_indices,
-            is_projection=is_projection,
-        )
-        tp = self.phonon.get_thermal_properties_dict()
-        if tp is None:
-            print("Thermal properties could not be calculated.")
-        return self.parse_thermal_properties(tp)
-        # except Exception as e:
-        #     print(f"Error calculating thermal properties: {e}")
-        #     return None
-
-    # def plot_thermal_properties(self):
-    #     self.phonon.plot_thermal_properties()
+        if force_rerun or not hasattr(self, '_thermal_properties'):
+            # Run the thermal properties calculation
+            self.phonon.run_thermal_properties(
+                t_min=t_min,
+                t_max=t_max,
+                t_step=t_step,
+                temperatures=temperatures,
+                cutoff_frequency=cutoff_frequency,
+                pretend_real=pretend_real,
+                band_indices=band_indices,
+                is_projection=is_projection,
+            )
+            
+            # Store the parsed thermal properties
+            tp = self.phonon.get_thermal_properties_dict()
+            if tp is not None:
+                self._thermal_properties = self.parse_thermal_properties(tp)
+            else:
+                print("Thermal properties could not be calculated.")
+                return None
+        
+        return self._thermal_properties
 
     def band_structure(
         self,
@@ -174,8 +186,8 @@ class AnalyzePhonons(object):
             [[0.0, 0.0, 0.0], [0.5, 0.0, 0.0]],  # Γ to X
             [[0.5, 0.0, 0.0], [0.5, 0.5, 0.5]],  # X to L
             [[0.5, 0.5, 0.5], [0.0, 0.0, 0.0]],  # L to Γ
-            [[0.5, 0.0, 0.0], [0.5, 0.25, 0.75]],
-        ],  # X to W
+            [[0.5, 0.0, 0.0], [0.5, 0.25, 0.75]],  # X to W
+        ],
     ):
         """
         Returns the band structure for the phonon object in a dictionary
@@ -186,9 +198,13 @@ class AnalyzePhonons(object):
         Returns:
             {'qpoints': arrays of q points, 'distances': arrays of distances, 'frequencies': arrays of frequencies, 'eigenvectors': arrays of eigenvectors, group_velocities': arrays of group velocities}
         """
-
-        _ = self.phonon.run_band_structure(paths)
-        return self.phonon.get_band_structure_dict()
+        # Check if band structure has already been calculated with the same paths
+        if not hasattr(self, '_band_structure') or self._band_structure_paths != paths:
+            _ = self.phonon.run_band_structure(paths)
+            self._band_structure = self.phonon.get_band_structure_dict()
+            self._band_structure_paths = paths  # Store the paths used for comparison
+        
+        return self._band_structure
 
     @property
     def total_dos(self):
@@ -197,23 +213,26 @@ class AnalyzePhonons(object):
         Returns:
             {'frequency_points ': array of frequency points, 'total_dos': array of total density of states}
         """
-        _ = self.phonon.run_total_dos()
-        return self.phonon.get_total_dos_dict()
+        if not hasattr(self, '_total_dos'):
+            _ = self.phonon.run_total_dos()
+            self._total_dos = self.phonon.get_total_dos_dict()
+
+        return self._total_dos
 
 
     def make_json_serializable(self, data):
+        """
+        Makes the data JSON serializable by converting NumPy arrays to lists.
+        """
+
         if isinstance(data, dict):
             return {key: self.make_json_serializable(value) for key, value in data.items()}
         elif isinstance(data, list):
             return [self.make_json_serializable(item) for item in data]
         elif isinstance(data, np.ndarray):
-            return data.tolist()  # Convert NumPy arrays to lists
+            return data.tolist() 
         else:
-            return data  # Return the item as is if it's not a dict, list, or np.ndarray
-
-# Example usage
-# data = ap.band_structure or any other structure
-# json_serializable_data = make_json_serializable(data)
+            return data
   
 
     def summary(
@@ -225,8 +244,6 @@ class AnalyzePhonons(object):
         include_thermal_properties=True,
         include_band_structure =True,
         include_total_dos=True,
-        # supercell_matrix=None,
-        # mesh=None,
         paths=None, 
         temperatures=None,
         cutoff_frequency=None,
@@ -250,12 +267,6 @@ class AnalyzePhonons(object):
                 Include band structure in the output. Default is True.
             include_total_dos (bool, optional):         
                 Include total density of states in the output. Default is True.
-            supercell_matrix (list, optional):
-                Supercell matrix for the phonon calculation. Default is None.
-            mesh (array-like or float, optional):
-                Mesh numbers along a, b, c axes when array_like object is given, shape=(3,).
-                When float value is given, uniform mesh is generated following VASP convention by N = max(1, nint(l * |a|^*)) where 'nint' is the function to return the nearest integer. In this case, it is forced to set is_gamma_center=True.
-                Default value is 100.0.
             paths (list, optional):
                 List of paths in reciprocal space. Default is None.
             temperatures (array-like, optional):
@@ -269,6 +280,8 @@ class AnalyzePhonons(object):
 
         Returns:
             Dictionary with the specified information
+            {'force_constants': array of force constances, 'mesh': mesh array, 'thermal_properties': dictionary of thermal properties, 'band_structure': band structure data, 'total_dos': dos data}
+
         """
         
         calc_dir = self.calc_dir
@@ -277,11 +290,6 @@ class AnalyzePhonons(object):
             return read_json(fjson)
         data = {}
     
-
-        # if supercell_matrix or mesh:
-        #     self.phonon = AnalyzePhonons(
-        #         self.calc_dir, supercell_matrix=supercell_matrix, mesh=mesh
-        #     )
 
         if include_force_constants:
             fc = self.force_constants
@@ -327,14 +335,24 @@ class AnalyzePhonons(object):
         write_json(data, fjson)
         return read_json(fjson)
     
+    #Plotting functions are just using phonopy's built in plotting functions for the moment, need to updgrade this in the future
+    @property
     def plot_thermal_properties(self):
+        self.thermal_properties() #If thermal properties haven't been calculated, calculations will be done with defaults
         self.phonon.plot_thermal_properties()
 
+    @property
     def plot_band_structure(self):
+        self.band_structure()
         self.phonon.plot_band_structure()
 
+    @property
     def plot_total_dos(self):
+        self.total_dos
         self.phonon.plot_total_dos()
     
+    @property
     def plot_band_structure_and_dos(self):
+        self.band_structure(paths = self._band_structure_paths)
+        self.total_dos
         self.phonon.plot_band_structure_and_dos()
