@@ -326,3 +326,15 @@ class AnalyzePhonons(object):
 
         write_json(data, fjson)
         return read_json(fjson)
+    
+    def plot_thermal_properties(self):
+        self.phonon.plot_thermal_properties()
+
+    def plot_band_structure(self):
+        self.phonon.plot_band_structure()
+
+    def plot_total_dos(self):
+        self.phonon.plot_total_dos()
+    
+    def plot_band_structure_and_dos(self):
+        self.phonon.plot_band_structure_and_dos()
