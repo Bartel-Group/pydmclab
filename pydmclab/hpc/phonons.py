@@ -331,8 +331,8 @@ class AnalyzePhonons(object):
             data["band_structure"] = band_struc
 
         if include_total_dos:
-            total_dos = self.total_dos
-            data["total_dos"] = self.make_json_serializable(total_dos)
+            total_dos = self.make_json_serializable(self.total_dos)
+            data["total_dos"] = total_dos
 
         write_json(data, fjson)
         return read_json(fjson)
