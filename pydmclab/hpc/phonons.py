@@ -91,13 +91,11 @@ class AnalyzePhonons(object):
         """
         parsed_data = []
 
-        # Extract arrays from the original data
         temperatures = phonopy_data["temperatures"]
         free_energies = phonopy_data["free_energy"]
         entropies = phonopy_data["entropy"]
         heat_capacities = phonopy_data["heat_capacity"]
 
-        # Iterate through the arrays and build the list of dictionaries
         for i, T in enumerate(temperatures):
             data_point = {
                 "temperature": T,
@@ -158,7 +156,7 @@ class AnalyzePhonons(object):
                 {'temperature': 310, 'free_energy': float, 'entropy': float, 'heat_capacity': float}, ...]
         """
         if force_rerun or not hasattr(self, '_thermal_properties'):
-            # Run the thermal properties calculation
+            print("Calculating thermal properties...")
             self.phonon.run_thermal_properties(
                 t_min=t_min,
                 t_max=t_max,
@@ -170,7 +168,6 @@ class AnalyzePhonons(object):
                 is_projection=is_projection,
             )
             
-            # Store the parsed thermal properties
             tp = self.phonon.get_thermal_properties_dict()
             if tp is not None:
                 self._thermal_properties = self.parse_thermal_properties(tp)
@@ -198,11 +195,11 @@ class AnalyzePhonons(object):
         Returns:
             {'qpoints': arrays of q points, 'distances': arrays of distances, 'frequencies': arrays of frequencies, 'eigenvectors': arrays of eigenvectors, group_velocities': arrays of group velocities}
         """
-        # Check if band structure has already been calculated with the same paths
         if not hasattr(self, '_band_structure') or self._band_structure_paths != paths:
+            print("Calculating band structure...")
             _ = self.phonon.run_band_structure(paths)
             self._band_structure = self.phonon.get_band_structure_dict()
-            self._band_structure_paths = paths  # Store the paths used for comparison
+            self._band_structure_paths = paths  
         
         return self._band_structure
 
@@ -214,6 +211,7 @@ class AnalyzePhonons(object):
             {'frequency_points ': array of frequency points, 'total_dos': array of total density of states}
         """
         if not hasattr(self, '_total_dos'):
+            print("Calculating total density of states...")
             _ = self.phonon.run_total_dos()
             self._total_dos = self.phonon.get_total_dos_dict()
 
@@ -317,16 +315,20 @@ class AnalyzePhonons(object):
 
             # Pass the arguments dynamically
             if thermal_properties_kwargs:
-                data["thermal_properties"] = self.thermal_properties(**thermal_properties_kwargs)
+                tp = self.thermal_properties(**thermal_properties_kwargs, force_rerun=True)
             else:
-                data["thermal_properties"] = self.thermal_properties()
+                tp = self.thermal_properties()
+            
+            data["thermal_properties"] = tp
 
 
         if include_band_structure:
             if paths:
-                data["band_structure"] = self.make_json_serializable(self.band_structure(paths=paths))
+                band_struc = self.make_json_serializable(self.band_structure(paths=paths))
+            else:
+                band_struc = self.make_json_serializable(self.band_structure())
 
-            data["band_structure"] = self.make_json_serializable(self.band_structure())
+            data["band_structure"] = band_struc
 
         if include_total_dos:
             total_dos = self.total_dos
