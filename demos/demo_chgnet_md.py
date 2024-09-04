@@ -32,14 +32,15 @@ def main():
 
     # Get results from the observer
     observer = results["trajectory"]
+    final_energy = results["final_energy"]
     print("CHGNet took {} steps to converge.".format(len(observer)))
 
     # Get initial and final energies
     print("Initial energy: {:.3f} eV".format(observer.energies[0]))
-    print("Final energy: {:.3f} eV".format(observer.energies[-1]))
+    print("Final energy: {:.3f} eV".format(final_energy))
 
-    return None
+    return observer
 
 
 if __name__ == "__main__":
-    main()
+    obs = main()

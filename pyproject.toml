@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=65.0.0", "wheel >= 0.38"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pydmclab"
+version = "1.3.0"
+description = "A Python package to facilitate DFT calculations and analysis for the Design of Materials on Computers Group."
+authors = [{name = "Chris Bartel", email = "cbartel@umn.edu"}]
+requires-python = ">=3.10.0"
+readme = "README.md"
+license = {text = "MIT"}
+dependencies = ["numpy>=1.25.0", "mp-api>=0.39", "pymatgen>=2023.0.0"]
+classifiers = [
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Chemistry",
+    "Topic :: Scientific/Engineering :: Physics",
+]
+
+[project.optional-dependencies]
+mlp = ["chgnet"]
+defects = ["doped"]
+phonons = ["phonopy"]
+
+[project.urls]
+Source = "https://github.umn.edu/bartel-group/pydmclab"
+Package = "https://pypi.org/project/pydmclab/"
+
+[tool.setuptools.packages.find]
+include = ["pydmclab*"]
+
+[tool.setuptools.package-data]
+"pydmclab.data.data" = ["*.json", "*.csv", "*.dat", "*.yaml"]

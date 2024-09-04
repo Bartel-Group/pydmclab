@@ -165,6 +165,7 @@ ANALYSIS_CONFIGS = get_analysis_configs(
     analyze_charge=False,
     analyze_dos=False,
     analyze_bonding=False,
+    analyze_phonons=False,
     exclude=None,
     remake_results=False,
     verbose=False,

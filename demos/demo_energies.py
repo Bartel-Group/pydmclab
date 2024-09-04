@@ -108,7 +108,7 @@ def get_T_dependent_formation_energy_with_vibrational_entropy():
         by approximating vibrational entropy
     """
     print("\n formation energy (Gibbs free energy from vibrational entropy)")
-    data_dir = "../data/test_data/vasp/AlN"
+    data_dir = "../pydmclab/data/test_data/vasp/AlN"
 
     formula = "AlN"
 

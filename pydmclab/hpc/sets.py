@@ -163,6 +163,7 @@ class GetSet(object):
             #    "prelobster",
             "lobster",
             "parchg",
+            "polar",
         ]:
             new_settings["NSW"] = 0
             new_settings["ISIF"] = None
@@ -233,6 +234,13 @@ class GetSet(object):
             new_settings["NSW"] = 0
             new_settings["LWAVE"] = True
             new_settings["ISMEAR"] = -5
+
+        # for computing polarization --> set explicit requirements
+        # Note: VASP will only compute the macroscopic polarization if the system is insulating
+        # grep "dipole moment" in your OUTCAR to see if it was computed
+        if calc == "polar":
+            new_settings["LCALCPOL"] = True
+            new_settings["NCORE"] = None
 
         # for charged defect calculations --> set explicit requirements
         if "defect" in calc:
