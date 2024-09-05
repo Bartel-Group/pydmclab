@@ -8,7 +8,7 @@ from phonopy.harmonic.dynamical_matrix import DynamicalMatrix
 
 class UnitTestAnalyzePhonons(unittest.TestCase):
     def setUp(self):
-        data_dir = "../pydmclab/data/test_data/analyze"
+        data_dir = "../pydmclab/data/test_data/phonons/phonons"
         self.ap = AnalyzePhonons(data_dir)
 
         self.data_dir = data_dir
@@ -33,7 +33,7 @@ class UnitTestAnalyzePhonons(unittest.TestCase):
         self.assertEqual(ap_test.force_constants[0][0][0], np.array([ 1.84336625, -0.        , -0.        ]))
         self.assertIsInstance(ap_test.dynamical_matrix, DynamicalMatrix)
 
-        self.assertEqual(ap_test.thermal_properties[30]['entropy'], 5139.760194037135)
+        self.assertEqual(ap_test.thermal_properties()[30]['entropy'], 5139.760194037135)
 
 
     def test_force_constants(self):
