@@ -57,5 +57,11 @@ class UnitTestAnalyzePhonons(unittest.TestCase):
         self.assertIsInstance(phonon_dos['frequency_points'], np.ndarray)
         self.assertAlmostEqual(phonon_dos['total_dos'][20], 0.02141757498414954, places=4)
 
+    def test_summary(self):
+        summary = self.ap.summary()
+        self.assertIsInstance(summary, dict)
+        self.assertAlmostEqual(summary['thermal_properties'][30]['entropy'], 3479.6892859770733, places=4)
+        self.assertAlmostEqual(summary['total_dos']['total_dos'][20], 0.02141757498414954, places=4)
+
 if __name__ == '__main__':
     unittest.main(argv=['', '-v'], exit=False)
