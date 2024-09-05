@@ -10,8 +10,10 @@ from pymatgen.io.lobster.outputs import Doscar, Cohpcar, Charge, MadelungEnergie
 
 from pydmclab.core.struc import StrucTools, SiteTools
 from pydmclab.core.comp import CompTools
-from pydmclab.utils.handy import read_json, write_json, read_yaml, write_yaml
+from pydmclab.utils.handy import read_json, write_json
 from pydmclab.data.configs import load_base_configs
+
+from pydmclab.hpc.phonons import AnalyzePhonons
 
 
 class VASPOutputs(object):
@@ -274,7 +276,6 @@ class VASPOutputs(object):
         data = {el: {"orbs": orbs[el], "basis": basis_functions[el]} for el in orbs}
 
         return data
-
 
 class AnalyzeVASP(object):
     """
@@ -1158,6 +1159,17 @@ class AnalyzeVASP(object):
         entry.data["queried"] = False
         return entry.as_dict()
 
+    def phonons(
+        self,
+        supercell_matrix=None,
+        mesh=100,
+    ):
+        ap = AnalyzePhonons(self.calc_dir, supercell_matrix=supercell_matrix, mesh=mesh)
+        if not ap:
+            return None
+
+        return ap.summary()
+    
     def summary(
         self,
         include_meta=False,
@@ -1177,6 +1189,7 @@ class AnalyzeVASP(object):
         include_tcobi=False,
         include_pcobi=False,
         include_entry=False,
+        include_phonons=False,
     ):
         """
         Returns all desired data for post-processing DFT calculations
@@ -1188,7 +1201,7 @@ class AnalyzeVASP(object):
             include_mag (bool, optional): _description_. Defaults to False.
             include_dos (bool, optional): _description_. Defaults to False.
             include_gap (bool, optional): _description_. Defaults to True.
-
+            include_phonons (bool, optional): _description_. Defaults to False.
         Raises:
             NotImplementedError: _description_
 
@@ -1288,6 +1301,12 @@ class AnalyzeVASP(object):
         if include_entry:
             data["entry"] = self.computed_structure_entry
 
+        if include_phonons:
+            if convergence:
+                data["phonons"] = self.phonons(supercell_matrix=None, mesh=100)
+            else:
+                data["phonons"] = None
+
         return data
 
 
@@ -1338,7 +1357,7 @@ class AnalyzeBatch(object):
                 for c in stuff_in_launch_dir
                 if "-" in c
                 if any(xc in c for xc in ["gga", "metagga", "hse"])
-                if 'prelobster' not in c
+                if "prelobster" not in c
             ]
             calc_dirs = [os.path.join(launch_dir, c) for c in relevant_stuff]
             calc_dirs = [
@@ -1454,6 +1473,9 @@ def _results_for_calc_dir(calc_dir, configs):
     #     configs["include_entry"] = False
     #     configs["include_structure"] = False
 
+    if calc != "dfpt":
+        configs["include_phonons"] = False
+
     verbose = configs["verbose"]
     include_meta = configs["include_metadata"]
     include_calc_setup = configs["include_calc_setup"]
@@ -1469,6 +1491,7 @@ def _results_for_calc_dir(calc_dir, configs):
     include_tcobi = configs["include_tcobi"]
     include_pcobi = configs["include_pcobi"]
     include_entry = configs["include_entry"]
+    include_phonons = configs["include_phonons"]
     check_relax = configs["check_relax_energy"]
     create_cif = configs["create_cif"]
 
@@ -1492,6 +1515,7 @@ def _results_for_calc_dir(calc_dir, configs):
         include_tcobi=include_tcobi,
         include_pcobi=include_pcobi,
         include_entry=include_entry,
+        include_phonons=include_phonons,
     )
 
     # store the relax energy if we asked to
