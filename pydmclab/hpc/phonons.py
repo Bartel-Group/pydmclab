@@ -14,14 +14,16 @@ set_rc_params()
 COLORS = get_colors(palette="tab10")
 
 class AnalyzePhonons(object):
-    def __init__(self, calc_dir, supercell_matrix=None, mesh=100):
+    def __init__(self, calc_dir: str, 
+                 supercell_matrix: list = None, 
+                 mesh: int|list|float=100):
         """
         Class to analyze phonon data from a VASP calculation using Phonopy, Can return force constants, dynamical matrix, mesh data, thermal properties, band structure, and total density of states.
         Args:
             calc_dir (str):
                 Path to the directory containing the VASP calculation
             supercell_matrix (list):
-                Supercell matrix for the phonon calculation
+                Supercell matrix for the phonon calculation. e.g. [[2, 0, 0], [0, 2, 0], [0, 0, 2]] for a 2x2x2 supercell.
             mesh (array-like or float):
                 Mesh numbers along a, b, c axes when array_like object is given, shape=(3,).
                 When float value is given, uniform mesh is generated following VASP convention by N = max(1, nint(l * |a|^*)) where 'nint' is the function to return the nearest integer. In this case, it is forced to set is_gamma_center=True.
@@ -32,11 +34,9 @@ class AnalyzePhonons(object):
         self.calc_dir = calc_dir
         self.supercell_matrix = supercell_matrix
 
-        if not isinstance(mesh, (list, tuple, float, int)):
-            raise TypeError("Mesh should be a list, tuple, or int.")
-        elif isinstance(mesh, (list, tuple)) and len(mesh) != 3:
+        if isinstance(mesh, (list, tuple)) and len(mesh) != 3:
             raise ValueError(
-                "Mesh should be a list or tuple of three integers or an int."
+                "Mesh should be a list of three integers or an int."
             )
 
         poscar_path = os.path.join(calc_dir, "POSCAR")
@@ -77,7 +77,7 @@ class AnalyzePhonons(object):
         mesh = self.phonon.get_mesh_dict()
         return mesh
 
-    def parse_thermal_properties(self, phonopy_data):
+    def parse_thermal_properties(self, phonopy_data: dict):
         """
         Parses the thermal properties data from the phonopy object into a list of dictionaries
         Args:
@@ -110,15 +110,15 @@ class AnalyzePhonons(object):
 
     def thermal_properties(
         self,
-        t_min=0,
-        t_max=2000,
-        t_step=20,
-        temperatures=None,
-        cutoff_frequency=None,
-        pretend_real=False,
-        band_indices=None,
-        is_projection=False,
-        force_rerun=False,
+        t_min: int|float =0,
+        t_max: int|float = 2000,
+        t_step: int =20,
+        temperatures: list|int|float = None,
+        cutoff_frequency: int|float = None,
+        pretend_real: bool = False,
+        band_indices: list = None,
+        is_projection: bool = False,
+        force_rerun: bool = False,
     ):
         """
         returns the thermal properties for the phonon object in a dictionary
@@ -179,7 +179,7 @@ class AnalyzePhonons(object):
 
     def band_structure(
         self,
-        paths=[
+        paths: list =[
             [[0.0, 0.0, 0.0], [0.5, 0.0, 0.0]],  # Γ to X
             [[0.5, 0.0, 0.0], [0.5, 0.5, 0.5]],  # X to L
             [[0.5, 0.5, 0.5], [0.0, 0.0, 0.0]],  # L to Γ
@@ -190,7 +190,7 @@ class AnalyzePhonons(object):
         Returns the band structure for the phonon object in a dictionary
         Args:
             paths (list):
-                List of paths in reciprocal space
+                List of paths in reciprocal space. e.g. [[[0.0, 0.0, 0.0], [0.5, 0.0, 0.0]], [[0.5, 0.0, 0.0], [0.5, 0.5, 0.5]], ...]
 
         Returns:
             {'qpoints': arrays of q points, 'distances': arrays of distances, 'frequencies': arrays of frequencies, 'eigenvectors': arrays of eigenvectors, group_velocities': arrays of group velocities}
@@ -235,19 +235,19 @@ class AnalyzePhonons(object):
 
     def summary(
         self,
-        savename = "phonons.json",
-        remake=False,
-        include_force_constants=True,
-        include_mesh=True,
-        include_thermal_properties=True,
-        include_band_structure =True,
-        include_total_dos=True,
-        paths=None, 
-        temperatures=None,
-        cutoff_frequency=None,
-        pretend_real=None,
-        band_indices=None,
-        is_projection=None,
+        savename: str = "phonons.json",
+        remake: bool = False,
+        include_force_constants: bool= True,
+        include_mesh: bool = True,
+        include_thermal_properties: bool = True,
+        include_band_structure = True,
+        include_total_dos: bool = True,
+        paths: list = None, 
+        temperatures: list|int|float = None,
+        cutoff_frequency: int|float = None,
+        pretend_real: bool = None,
+        band_indices: bool = None,
+        is_projection: bool = None,
     ):
         
         """

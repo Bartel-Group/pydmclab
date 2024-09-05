@@ -1,12 +1,12 @@
 import unittest
 import numpy as np
-from pydmclab.hpc.analyze import VASPOutputs, AnalyzeVASP, AnalyzeBatch
 from pydmclab.hpc.phonons import AnalyzePhonons
 
 from phonopy.structure.atoms import PhonopyAtoms
 from phonopy.harmonic.dynamical_matrix import DynamicalMatrix
 
 class UnitTestAnalyzePhonons(unittest.TestCase):
+    
     def setUp(self):
         data_dir = "../pydmclab/data/test_data/phonons/phonons"
         self.ap = AnalyzePhonons(data_dir)
@@ -22,7 +22,7 @@ class UnitTestAnalyzePhonons(unittest.TestCase):
         mesh=50
         
         ap_test = AnalyzePhonons(self.data_dir, supercell_matrix, mesh)
-        if ap_test:
+        if ap_test is not None:
             print("AnalyzePhonons object created")
         else:
             print("AnalyzePhonons object not created")
@@ -30,16 +30,16 @@ class UnitTestAnalyzePhonons(unittest.TestCase):
         self.assertIsInstance(ap_test.unitcell, PhonopyAtoms)
         self.assertIsInstance(ap_test.force_constants, np.ndarray)
 
-        self.assertEqual(ap_test.force_constants[0][0][0], np.array([ 1.84336625, -0.        , -0.        ]))
+        self.assertEqual(ap_test.force_constants[0][0][0][0], 1.8433662478)
         self.assertIsInstance(ap_test.dynamical_matrix, DynamicalMatrix)
 
         self.assertEqual(ap_test.thermal_properties()[30]['entropy'], 5139.760194037135)
 
 
     def test_force_constants(self):
-        force_constants = self.ap.force_constants()
-        self.assertEqual(force_constants[0][0][0], np.array([ 1.84336625, -0.        , -0.        ]))
-        self.assertEqual(force_constants[0][5][2], np.array([-0.        , -0.        , -0.01228379]))
+        force_constants = self.ap.force_constants
+        self.assertEqual(force_constants[0][0][0][0], 1.84336625)
+        self.assertEqual(force_constants[0][5][2][2], -0.01228379)
     
     def test_thermal_properties(self):
         thermal_properties = self.ap.thermal_properties()
@@ -54,6 +54,6 @@ class UnitTestAnalyzePhonons(unittest.TestCase):
 
 
     def test_total_dos(self):
-        phonon_dos = self.ap.total_dos()
+        phonon_dos = self.ap.total_dos
         self.assertIsInstance(phonon_dos['frequency_points'], np.ndarray)
         self.assertEqual(phonon_dos['total_dos'][20], 0.02141757498414954)
