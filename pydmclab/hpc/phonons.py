@@ -70,12 +70,12 @@ class AnalyzePhonons(object):
         self.phonon = phonon
 
     @property
-    def mesh(self):
+    def mesh_dict(self):
         """
         Returns the mesh data for the phonon object in a dictionary
         """
-        mesh = self.phonon.get_mesh_dict()
-        return mesh
+        mesh_dict = self.phonon.get_mesh_dict()
+        return mesh_dict
 
     def parse_thermal_properties(self, phonopy_data: dict):
         """
@@ -113,7 +113,7 @@ class AnalyzePhonons(object):
         t_min: int|float =0,
         t_max: int|float = 2000,
         t_step: int =20,
-        temperatures: list|int|float = None,
+        temperatures: list|int|float|np.ndarray = None,
         cutoff_frequency: int|float = None,
         pretend_real: bool = False,
         band_indices: list = None,
@@ -243,7 +243,7 @@ class AnalyzePhonons(object):
         include_band_structure = True,
         include_total_dos: bool = True,
         paths: list = None, 
-        temperatures: list|int|float = None,
+        temperatures: list|int|float|np.ndarray = None,
         cutoff_frequency: int|float = None,
         pretend_real: bool = None,
         band_indices: bool = None,
@@ -295,7 +295,7 @@ class AnalyzePhonons(object):
             data["force_constants"] = force_constants
 
         if include_mesh:
-            mesh_array = self.mesh
+            mesh_array = self.mesh_dict
             mesh_list = self.make_json_serializable(mesh_array)
             data["mesh"] = mesh_list
 
