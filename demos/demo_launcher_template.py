@@ -30,6 +30,7 @@ from pydmclab.utils.handy import read_json, write_json
 
 # importing these b/c they're often useful for custom functions
 #  (ie non-default helpers)
+from pymatgen.core.structure import Structure
 from pydmclab.core.comp import CompTools
 from pydmclab.core.struc import StrucTools
 from pydmclab.hpc.analyze import AnalyzeVASP
@@ -48,9 +49,10 @@ for d in [CALCS_DIR, DATA_DIR]:
     if not os.path.exists(d):
         os.makedirs(d)
 
-# set your username -- this will just be used to point to your local copies of the pydmclab repo
-#   assumed to be in /home/cbartel/<USER_NAME>/bin/
-USER_NAME = "cbartel"
+# set your home directory path -- this will just be used to point to your local copies of the pydmclab repo
+#   assumed to be in /users/{number}/{username}/bin/pydmclab
+#   $HOME points to /users/{number}/{username}
+HOME_PATH = os.environ["HOME"]
 
 
 # copy our passer.py file to your scripts_dir
@@ -60,9 +62,7 @@ USER_NAME = "cbartel"
 #  see pydmclab.hpc.passer
 CUSTOM_PASSER = False
 if not CUSTOM_PASSER:
-    copyfile(
-        "/home/cbartel/%s/bin/pydmclab/pydmclab/hpc/passer.py" % USER_NAME, "passer.py"
-    )
+    copyfile("%s/bin/pydmclab/pydmclab/hpc/passer.py" % HOME_PATH, "passer.py")
 
 # copy our collector.py file to your scripts_dir
 #  if you want to use a custom collector, just set CUSTOM_COLLECTOR = True and put your collector.py in the scripts dir
@@ -71,10 +71,7 @@ if not CUSTOM_PASSER:
 #  see pydmclab.hpc.collector
 CUSTOM_COLLECTOR = False
 if not CUSTOM_COLLECTOR:
-    copyfile(
-        "/home/cbartel/%s/bin/pydmclab/pydmclab/hpc/collector.py" % USER_NAME,
-        "collector.py",
-    )
+    copyfile("%s/bin/pydmclab/pydmclab/hpc/collector.py" % HOME_PATH, "collector.py")
 
 # load our baseline configs
 #  see pydmclab.data.data._hpc_configs.yaml
