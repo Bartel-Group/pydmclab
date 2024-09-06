@@ -13,8 +13,6 @@ from pydmclab.core.comp import CompTools
 from pydmclab.utils.handy import read_json, write_json
 from pydmclab.data.configs import load_base_configs
 
-from pydmclab.hpc.phonons import AnalyzePhonons
-
 
 class VASPOutputs(object):
     def __init__(self, calc_dir):
@@ -276,6 +274,7 @@ class VASPOutputs(object):
         data = {el: {"orbs": orbs[el], "basis": basis_functions[el]} for el in orbs}
 
         return data
+
 
 class AnalyzeVASP(object):
     """
@@ -1164,12 +1163,15 @@ class AnalyzeVASP(object):
         supercell_matrix=None,
         mesh=100,
     ):
+
+        from pydmclab.hpc.phonons import AnalyzePhonons
+
         ap = AnalyzePhonons(self.calc_dir, supercell_matrix=supercell_matrix, mesh=mesh)
         if not ap:
             return None
 
         return ap.summary()
-    
+
     def summary(
         self,
         include_meta=False,
