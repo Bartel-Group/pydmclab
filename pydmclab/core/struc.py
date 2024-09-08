@@ -1,19 +1,24 @@
 import os
-
-from typing import Literal
+import subprocess
+import yaml
+from collections import Counter
+from shutil import copyfile, rmtree
+from typing import List, Tuple, Literal
 
 import numpy as np
 
-from pymatgen.core.structure import Structure
+from pymatgen.core import Structure, PeriodicSite
+from pymatgen.core.surface import SlabGenerator
 from pymatgen.transformations.standard_transformations import (
     OrderDisorderedStructureTransformation,
     AutoOxiStateDecorationTransformation,
     OxidationStateDecorationTransformation,
 )
+from pymatgen.analysis import structure_matcher
 from pymatgen.analysis.structure_matcher import StructureMatcher
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
-from pymatgen.core.surface import SlabGenerator
 
+from pydmclab.core import struc as pydmc_struc
 from pydmclab.core.comp import CompTools
 
 
@@ -663,3 +668,209 @@ class SiteTools(object):
             if entry["oxidation_state"]:
                 ox += entry["oxidation_state"] * entry["occu"]
         return ox
+
+class SolidSolutionGenerator:
+    """
+    Purpose:
+        Generate quasi-random solid solutions (SQS) between two crystal structures.
+        This is accomplished using the sqsgen package. Details can be found here:
+        https://sqsgenerator.readthedocs.io/en/latest/how_to.html
+
+    Example usage:
+        struc_A = Structure.from_file('Endmembers/SrRuO3.cif')
+        struc_B = Structure.from_file('Endmembers/SrZrO3.cif')
+        generator = SolidSolutionGenerator(endmembers=[struc_A, struc_B], num_solns=15, supercell_dim=[2, 1, 2])
+        disordered, ordered, sqs = generator.run(sqsgen_path='/path/to/sqsgen')
+
+        Where '/path/to/sqsgen' should be replaced with the location of your sqsgen installation.
+    """
+    def __init__(self, endmembers: List[Structure], num_solns: int = 15, supercell_dim: List[int] = [2, 2, 2]):
+        self.endmembers = endmembers
+        self.num_solns = num_solns
+        self.supercell_dim = supercell_dim
+        self.element_A = None
+        self.element_B = None
+        self.disordered_solns = None
+        self.ordered_solns = None
+        self.sqs_solns = None
+
+        # Create necessary directories
+        self.dirs = {
+            'output': 'Ordered_Solutions',
+            'yaml': 'yaml_files',
+            'sqs': 'SQS',
+            'temp': 'working_dir'
+        }
+        for dir_name in self.dirs.values():
+            os.makedirs(dir_name, exist_ok=True)
+
+    def generate_solid_solutions(self) -> List[Structure]:
+        struc_A, struc_B = self.endmembers
+        assert len(self.endmembers) == 2, f'There should be 2 endmembers, but you provided {len(self.endmembers)}.'
+
+        # Ensure the two endmember structures are compatible
+        matcher = structure_matcher.StructureMatcher(
+            scale=True, attempt_supercell=True, primitive_cell=False,
+            comparator=structure_matcher.FrameworkComparator())
+        try:
+            struc_B = matcher.get_s2_like_s1(struc_A, struc_B)
+        except ValueError:
+            struc_A = matcher.get_s2_like_s1(struc_B, struc_A)
+
+        assert struc_A is not None and struc_B is not None, 'The endmember structures you provided cannot be matched!'
+
+        struc_A.remove_oxidation_states()
+        struc_B.remove_oxidation_states()
+
+        # Determine which elements differ between the two endmembers
+        elements_A = set([str(el) for el in struc_A.composition.elements])
+        elements_B = set([str(el) for el in struc_B.composition.elements])
+        differing_elements = elements_A.symmetric_difference(elements_B)
+
+        if len(differing_elements) != 2:
+            raise ValueError('The code currently supports systems where only one element differs between the endmembers.')
+
+        # Map differing elements to variables
+        self.element_A = differing_elements.intersection(elements_A).pop()
+        self.element_B = differing_elements.intersection(elements_B).pop()
+
+        # Create dummy structures while saving original species and occupancies
+        A_species, B_species = [], []
+
+        for index, site in enumerate(struc_A):
+            site_dict = site.as_dict()
+            A_species.append(site_dict['species'][0]['element'])
+            site_dict['species'] = [{'element': 'Li', 'oxidation_state': 0.0, 'occu': 1.0}]
+            struc_A[index] = PeriodicSite.from_dict(site_dict)
+
+        for index, site in enumerate(struc_B):
+            site_dict = site.as_dict()
+            B_species.append(site_dict['species'][0]['element'])
+            site_dict['species'] = [{'element': 'Li', 'oxidation_state': 0.0, 'occu': 1.0}]
+            struc_B[index] = PeriodicSite.from_dict(site_dict)
+
+        # Interpolate the two structures and ignore the first entry (an end-member)
+        interp_structs = struc_A.interpolate(struc_B, nimages=self.num_solns, interpolate_lattices=True)[1:]
+
+        # Compute fractional occupancies
+        soln_interval = 1.0 / (self.num_solns + 1)
+        soln_fractions = [(i + 1) * soln_interval for i in range(self.num_solns)]
+
+        # Place fractional occupancies on each site
+        for index, (A, B) in enumerate(zip(A_species, B_species)):
+            for i in range(self.num_solns):
+                site_dict = interp_structs[i][index].as_dict()
+                site_dict['species'] = []
+
+                if A == B:
+                    site_dict['species'].append({'element': A, 'oxidation_state': 0.0, 'occu': 1.0})
+                else:
+                    c1 = 1 - soln_fractions[i]
+                    c2 = soln_fractions[i]
+                    site_dict['species'].append({'element': A, 'oxidation_state': 0.0, 'occu': c1})
+                    site_dict['species'].append({'element': B, 'oxidation_state': 0.0, 'occu': c2})
+
+                interp_structs[i][index] = PeriodicSite.from_dict(site_dict)
+
+        self.disordered_solns = interp_structs
+        return interp_structs
+
+    def generate_ordered_solutions(self) -> List[Structure]:
+        if self.disordered_solns is None:
+            self.generate_solid_solutions()
+
+        ordered_solns = []
+        for i, interp_struc in enumerate(self.disordered_solns):
+            interp_struc.make_supercell(self.supercell_dim)
+            interp_struc = interp_struc.add_oxidation_state_by_guess()
+            struc_tools = pydmc_struc.StrucTools(interp_struc)
+            ordered_struc = struc_tools.get_ordered_structures()[0]
+            ordered_struc = Structure.from_dict(ordered_struc)
+            ordered_solns.append(ordered_struc)
+            ordered_struc.to(filename=os.path.join(self.dirs['output'], f'{i}.vasp'), fmt='poscar')
+
+        self.ordered_solns = ordered_solns
+        return ordered_solns
+
+    def _parse_structure(self, file_path: str) -> Tuple[List[List[float]], List[List[float]], List[str], Structure]:
+        structure = Structure.from_file(file_path)
+        structure.remove_oxidation_states()
+        lattice = structure.lattice.matrix.tolist()
+        species = [str(site.specie) for site in structure]
+        coords = [site.frac_coords.tolist() for site in structure]
+        return lattice, coords, species, structure
+
+    def _write_output_file(self, output_path: str, lattice: List[List[float]], coords: List[List[float]], species: List[str]):
+        composition_dict = dict(Counter(species))
+        filtered_composition = {self.element_A: composition_dict.get(self.element_A, 0),
+                                self.element_B: composition_dict.get(self.element_B, 0)}
+        species = [self.element_A if specie == self.element_B else specie for specie in species]
+        data = {
+            "structure": {
+                "supercell": [1, 1, 1],
+                "lattice": lattice,
+                "coords": coords,
+                "species": species,
+            },
+            "iterations": 1e6,
+            "shell_weights": {1: 1.0},
+            "which": self.element_A,
+            "composition": filtered_composition
+        }
+        with open(output_path, 'w') as file:
+            yaml.dump(data, file, default_flow_style=False)
+
+    def generate_sqs(self, sqsgen_path: str = 'path/to/sqsgen') -> List[Structure]:
+        if self.ordered_solns is None:
+            self.generate_ordered_solutions()
+
+        # Convert ordered structures to YAML format
+        for i, fname in enumerate(os.listdir(self.dirs['output'])):
+            input_file = os.path.join(self.dirs['output'], fname)
+            output_file = os.path.join(self.dirs['yaml'], f'{os.path.splitext(fname)[0]}.yaml')
+            lattice, coords, species, structure = self._parse_structure(input_file)
+            self._write_output_file(output_file, lattice, coords, species)
+
+        # Generate an SQS from each YAML file
+        calc_sqs = [os.path.join(sqsgen_path, 'sqsgen'), "run", "iteration", "sqs_input.yaml"]
+        export_sqs = [os.path.join(sqsgen_path, 'sqsgen'), "export", "sqs_input.result.yaml"]
+        sqs_solns = []
+
+        for fname in os.listdir(self.dirs['yaml']):
+            # Copy YAML input to temp_dir
+            copyfile(os.path.join(self.dirs['yaml'], fname), os.path.join(self.dirs['temp'], 'sqs_input.yaml'))
+            os.chdir(self.dirs['temp'])
+
+            # Run sqsgen and export CIF(s)
+            subprocess.run(calc_sqs, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            subprocess.run(export_sqs, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+            # Copy one SQS to the sqs_dir
+            cif_filenames = [filename for filename in os.listdir('.') if filename.endswith('.cif')]
+            struc = Structure.from_file(cif_filenames[0])
+            num_struc = fname.split('.')[0]
+            struc.to(filename=f'../{self.dirs["sqs"]}/{num_struc}.vasp', fmt='poscar')
+            sqs_solns.append(struc)
+
+            # Clean up by removing all files in temp_dir
+            for existing_fname in os.listdir('.'):
+                os.remove(existing_fname)
+
+            os.chdir('..')
+
+        self.sqs_solns = sqs_solns
+        return sqs_solns
+
+    def cleanup(self):
+        for dir_name in self.dirs.values():
+            rmtree(dir_name)
+
+    def run(self, sqsgen_path: str = 'path/to/sqsgen', cleanup: bool = True) -> Tuple[List[Structure], List[Structure], List[Structure]]:
+        self.generate_solid_solutions()
+        self.generate_ordered_solutions()
+        self.generate_sqs(sqsgen_path)
+
+        if cleanup:
+            self.cleanup()
+
+        return self.disordered_solns, self.ordered_solns, self.sqs_solns
