@@ -614,7 +614,7 @@ class QHA(object):
                 plt.show()
                 if save:
                     fig_gibbs.savefig(os.path.join(fig_dir, f"{formula}_{mpid}_gibbs.png"))
-                    
+
                 self.plot_qha_info(formula, mpid)
                 plt.show()
                 if save:
