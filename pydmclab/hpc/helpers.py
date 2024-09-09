@@ -1,6 +1,7 @@
 import multiprocessing as multip
 import os
 import warnings
+import numpy as np
 
 from pydmclab.hpc.launch import LaunchTools
 from pydmclab.hpc.submit import SubmitTools
@@ -13,6 +14,7 @@ from pydmclab.core.energies import ChemPots, FormationEnthalpy, MPFormationEnerg
 from pydmclab.utils.handy import read_json, write_json
 from pydmclab.data.configs import load_partition_configs
 from pydmclab.hpc.phonons import QHA
+
 
 
 def get_vasp_configs(
@@ -678,7 +680,7 @@ def check_strucs(strucs):
             struc = strucs[formula][ID]
             print("\tstructure formula: %s" % StrucTools(struc).formula)
 
-def get_QHA_strucs(strucs,
+def get_qha_strucs(strucs,
     scale = np.linspace(0.96, 1.04, 5),
     write=False,
     data_dir=os.getcwd().replace("scripts", "data"),
