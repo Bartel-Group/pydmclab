@@ -1941,15 +1941,6 @@ def get_mp_compatible_Efs(
     write_json(out, fjson)
     return read_json(fjson)
 
-def get_qha_results(results, eos="vinet", write = True, plot = True, data_dir=os.getcwd().replace("scripts", "data"), savename="qha_results.json", remake=False):
-    qha = QHA(results, eos=eos)
-    qha_dict = qha.qha_dict(write=write, data_dir=data_dir, savename=savename, remake=remake)
-    if plot:
-        qha.plot_gibbs_energy()
-        qha.plot_qha_info()
-
-    
-
 
 def crawl_and_purge(
     head_dir,
