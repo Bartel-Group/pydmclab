@@ -6,8 +6,9 @@ from matplotlib.ticker import MaxNLocator
 
 
 from pydmclab.utils.handy import read_json, write_json
+from pydmclab.core.struc import StrucTools
 
-from phonopy import Phonopy
+from phonopy import Phonopy, PhonopyQHA
 from phonopy.interface.vasp import read_vasp, parse_force_constants
 
 set_rc_params()
@@ -358,3 +359,236 @@ class AnalyzePhonons(object):
         self.band_structure(paths = self._band_structure_paths)
         self.total_dos
         self.phonon.plot_band_structure_and_dos()
+
+
+
+class QHA(object):
+    def __init__(self, results: dict, eos: str = "vinet"):
+        self.results = results
+        self.eos = eos
+        self._parsed_results = None  # Cache for parsed results
+        self._gibbs_dict_cache = None  # Cache for Gibbs free energy dictionary
+        self._qha_cache = {}  # Cache for PhonopyQHA instances
+
+    @property
+    def parse_results(self):
+        """
+        Calls the _parse_results method to parse the results dictionary if not already parsed.
+        """
+        if self._parsed_results is None:  # Only parse if not cached
+            self._parsed_results = self._parse_results
+        return self._parsed_results
+
+    @property
+    def _parse_results(self):
+        """
+        Rearrange the results dictionary to group the data by formula, MPID, and volume scale.
+        """
+        results = self.results
+        parsed_results = {}
+
+        for key in results:
+            # Only proceed with keys that have "dfpt" at the end
+            if key.split("--")[-1].split("-")[-1] != "dfpt":
+                continue
+
+            formula, mpid = key.split("--")[0], key.split("--")[1]
+            scale = mpid.split("_")[-1]
+            mpid_minus_scale = "_".join(mpid.split("_")[:-1])
+
+            phonon_data = results[key]['phonons']
+            structure = results[key]['structure']
+            E_per_at = results[key]['results']['E_per_at']
+            n_atoms = len(structure['sites'])
+            E_electronic = n_atoms * E_per_at
+
+            if formula not in parsed_results:
+                parsed_results[formula] = {}
+
+            if mpid_minus_scale not in parsed_results[formula]:
+                parsed_results[formula][mpid_minus_scale] = {}
+
+            if scale not in parsed_results[formula][mpid_minus_scale]:
+                parsed_results[formula][mpid_minus_scale][scale] = {}
+
+            parsed_results[formula][mpid_minus_scale][scale] = {
+                'phonons': phonon_data,
+                'structure': structure,
+                'E_electronic': E_electronic
+            }
+
+        return parsed_results
+
+    @property
+    def structures(self):
+        """
+        Returns:
+            dictionary where keys are tuples of (formula, mpid) with lists of isotropically strained structures as values,
+            e.g.
+            {('Al1N1', 'mp-661'): [list of strained structures]}
+        """
+        results = self.parse_results
+        structures = {
+            (formula, mpid): [results[formula][mpid][scale]['structure'] for scale in results[formula][mpid]]
+            for formula in results
+            for mpid in results[formula]
+        }
+        return structures
+
+    @property
+    def volumes(self):
+        """
+        Returns:
+            dict: A dictionary where keys are tuples of (formula, mpid)
+                and values are lists of volumes (A**3) for the corresponding strained structures
+                e.g. {('Al1N1', 'mp-661'): [list of volumes]}
+        """
+        structures_dict = self.structures
+        volumes = {
+            key: [StrucTools(structure).structure.volume for structure in structures]
+            for key, structures in structures_dict.items()
+        }
+        return volumes
+
+    def properties_for_one_struc(self, formula, mpid):
+        """
+        Returns:
+            dict: A dictionary where keys are volumes (A**3) and values are dictionaries containing
+                'data', which is a list of dictionaries with temperature (T), Helmholtz free energy (F),
+                entropy (S), heat capacity (Cv), and electronic energy (E_electronic).
+                e.g. {volume(float): {'data': [{'T': 300, 'F': float, 'S': float, 'Cv': float, 'E_electronic': float}, ...]}}
+        """
+        results = self.parse_results
+        volumes_dict = self.volumes  
+
+        properties_dict = {}
+        volume_list = volumes_dict.get((formula, mpid), [])
+        
+        for i, scale in enumerate(results[formula][mpid]):
+            thermal_properties = results[formula][mpid][scale]['phonons']['thermal_properties']
+            E_electronic = results[formula][mpid][scale]['E_electronic']
+            volume = volume_list[i] if i < len(volume_list) else None
+            
+            if volume is not None:
+                if volume not in properties_dict:
+                    properties_dict[volume] = {'data': []}
+                
+                for prop in thermal_properties:
+                    properties_dict[volume]['data'].append({
+                        'T': prop['temperature'],
+                        'F': prop['free_energy'],
+                        'S': prop['entropy'],
+                        'Cv': prop['heat_capacity'],
+                        'E_electronic': E_electronic
+                    })
+
+        return properties_dict
+
+    def get_phonopy_qha(self, formula, mpid):
+        """
+        Get the cached PhonopyQHA object for a specific formula and mpid.
+        """
+        key = (formula, mpid)
+        if key not in self._qha_cache:
+            self._qha_cache[key] = self.phonopy_qha_for_one_struc(formula, mpid)
+        return self._qha_cache[key]
+
+    def phonopy_qha_for_one_struc(self, formula, mpid):
+        """
+        Returns:
+            PhonopyQHA object for a specific formula and mpid.
+        """
+        eos = self.eos
+        volumes = self.volumes[formula, mpid]
+        properties = self.properties_for_one_struc(formula, mpid)
+        temperatures = sorted([item['T'] for item in properties[volumes[0]]['data']])
+
+        free_energies = []
+        entropy = []
+        cv = []
+        E_electronic = []
+
+        for volume in volumes:
+            data = properties[volume]['data']
+            
+            F_vs_T = [entry['F'] for entry in data]
+            S_vs_T = [entry['S'] for entry in data]
+            Cv_vs_T = [entry['Cv'] for entry in data]
+            E_electronic_value = data[0]['E_electronic']
+
+            free_energies.append(F_vs_T)
+            entropy.append(S_vs_T)
+            cv.append(Cv_vs_T)
+            E_electronic.append(E_electronic_value)
+        
+        free_energies = np.array(free_energies).T
+        entropy = np.array(entropy).T
+        cv = np.array(cv).T
+
+        qha = PhonopyQHA(volumes=volumes, electronic_energies=E_electronic, temperatures=temperatures, free_energy=free_energies, cv=cv, entropy=entropy, verbose=True, eos=eos)
+        return qha
+
+    def qha_info_one_struc(self, formula, mpid):
+        """
+        Returns:
+            A list of dictionaries with QHA information for each temperature.
+            e.g. [{'temperature': 300, 'equilibrium_volume': float, 'gibbs_energy': float, 'bulk_modulus': float, 'thermal_expansion': float, 'heat_capacity': float},
+                {'temperature': 310, 'equilibrium_volume': float, 'gibbs_energy': float, 'bulk_modulus': float, 'thermal_expansion': float, 'heat_capacity': float}, ...]
+        """
+        qha = self.get_phonopy_qha(formula, mpid)
+        volumes = self.volumes[(formula, mpid)]
+        equilibrium_volumes = qha.volume_temperature
+        gibbs_energy = qha.gibbs_temperature
+        bulk_modulus = qha.bulk_modulus_temperature
+        thermal_expansion = qha.thermal_expansion
+        cv = qha.heat_capacity_P_polyfit
+        temperatures = qha._qha._temperatures[0:-1]
+
+        out = [{
+            "temperature": temperatures[i],
+            "equilibrium_volume": equilibrium_volumes[i],
+            "gibbs_energy": gibbs_energy[i],
+            "bulk_modulus": bulk_modulus[i],
+            "thermal_expansion": thermal_expansion[i],
+            "heat_capacity": cv[i]
+        } for i in range(len(temperatures))]
+        return out
+
+    def qha_dict(self, write=False, data_dir=os.getcwd().replace("scripts", "data"), savename="qha.json", remake_qha=False):
+        """
+        Returns:
+            A dictionary with QHA information for all structures.
+            e.g. {'Al1N1': {'mp-661': [list of QHA info dictionaries]}}
+        """
+        fjson = os.path.join(data_dir, savename)
+        if not remake_qha and os.path.exists(fjson) and write:
+            return read_json(fjson)
+        
+        qha_dict = {}
+        for formula in self.parse_results:
+            qha_dict[formula] = {}
+            for mpid in self.parse_results[formula]:
+                qha_dict[formula][mpid] = self.qha_info_one_struc(formula, mpid)
+        
+        if write:
+            write_json(qha_dict, fjson)
+            return read_json(fjson)
+        return qha_dict
+
+    def plot_gibbs_energy(self, formula, mpid):
+        qha_info = self.qha_info_one_struc(formula, mpid)
+        temperatures = [item['temperature'] for item in qha_info]
+        gibbs_energy = [item['gibbs_energy'] for item in qha_info]
+        
+        fig = plt.figure()
+        plt.plot(temperatures, gibbs_energy, color = COLORS["red"])
+        plt.xlabel("Temperature (K)", fontsize=16)
+        plt.ylabel("Gibbs Free Energy (eV)", fontsize=16)
+        plt.title(f"Gibbs Free Energy for {formula} {mpid}", fontsize=18)
+        plt.xlim(0, max(temperatures))
+        plt.xticks(fontsize=14)
+        plt.yticks(fontsize=14)
+
+    def plot_qha_info(self, formula, mpid):
+        qha = self.get_phonopy_qha(formula, mpid)
+        qha.plot_qha()
