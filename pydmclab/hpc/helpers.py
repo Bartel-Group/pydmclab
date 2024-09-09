@@ -12,6 +12,7 @@ from pydmclab.core.mag import MagTools
 from pydmclab.core.energies import ChemPots, FormationEnthalpy, MPFormationEnergy
 from pydmclab.utils.handy import read_json, write_json
 from pydmclab.data.configs import load_partition_configs
+from pydmclab.hpc.phonons import QHA
 
 
 def get_vasp_configs(
@@ -1939,6 +1940,15 @@ def get_mp_compatible_Efs(
 
     write_json(out, fjson)
     return read_json(fjson)
+
+def get_qha_results(results, eos="vinet", write = True, plot = True, data_dir=os.getcwd().replace("scripts", "data"), savename="qha_results.json", remake=False):
+    qha = QHA(results, eos=eos)
+    qha_dict = qha.qha_dict(write=write, data_dir=data_dir, savename=savename, remake=remake)
+    if plot:
+        qha.plot_gibbs_energy()
+        qha.plot_qha_info()
+
+    
 
 
 def crawl_and_purge(

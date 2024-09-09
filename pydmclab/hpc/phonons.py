@@ -576,6 +576,9 @@ class QHA(object):
         return qha_dict
 
     def plot_gibbs_energy(self, formula, mpid):
+        """
+        Plots the Gibbs free energy vs. temperature for a specific formula and mpid.
+        """
         qha_info = self.qha_info_one_struc(formula, mpid)
         temperatures = [item['temperature'] for item in qha_info]
         gibbs_energy = [item['gibbs_energy'] for item in qha_info]
@@ -590,5 +593,19 @@ class QHA(object):
         plt.yticks(fontsize=14)
 
     def plot_qha_info(self, formula, mpid):
+        """
+        Plots the QHA information for a specific formula and mpid.
+        """
         qha = self.get_phonopy_qha(formula, mpid)
         qha.plot_qha()
+
+    def plot_all(self):
+        """
+        Plots the Gibbs free energy and QHA information for all structures.
+        """
+        results = self.parse_results
+        for formula in results:
+            for mpid in results[formula]:
+                self.plot_gibbs_energy(formula, mpid)
+                self.plot_qha_info(formula, mpid)
+                plt.show()
