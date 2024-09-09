@@ -11,220 +11,165 @@ import os
 COLORS = get_colors("tab10")
 set_rc_params()
 
-
-class IsoAlloy(object):
-    """THIS DOESNT WORK YET"""
-
-    def __init__(
-        self,
-        energies,
-        kB=8.617e-5,
-        xs=np.linspace(0, 1, 101),
-        Ts=np.linspace(0, 3000, 31),
-    ):
-
+class IsoAlloy:
+    def __init__(self, energies, kB=8.6173e-5, xs=np.linspace(0.00001, 0.99999, 10000), Ts=np.linspace(100, 3000, 1000)):
         self.energies = energies
         self.kB = kB
         self.xs = xs
         self.Ts = Ts
         self.discrete_x = sorted(list(energies.keys()))
+        self.omega = self._calculate_omega()
 
-    @property
-    def E_mix_discrete(self):
-        """
-        Calculates mixing energies from the total or formation energies provided in energies
-            {x (float) : energy per formula unit (float)}
-        """
-        energies = self.energies
-        out = {}
-        for x in energies:
-            out[x] = energies[x] - (1 - x) * energies[0] - x * energies[1]
-        return out
+    def _calculate_omega(self):
+        x = np.array(self.discrete_x)
+        y = np.array([self.energies[k] for k in self.discrete_x])
 
-    @property
-    def omega(self):
-        """
-        Fits the discrete E_mix to a continous function of x
-            H_mix(x) = x * dE_B + omega * x * (1 - x)
-            - omega is a fit parameter, sometimes called the alloy interaction parameter
+        def free_energy_model(x, omega):
+            return x * (1 - x) * omega
 
-        Returns:
-            omega (float): the fit parameter (eV/f.u.)
-        """
-        E_mix_dict = self.E_mix_discrete
-        compositions = sorted(list(E_mix_dict.keys()))
-        E_mix_to_fit = [E_mix_dict[x] for x in compositions]
-
-        def func(x, omega):
-            """
-            Function to optimize during fitting
-
-            Args:
-                x (float): composition in A_{1-x}B_{x}
-                omega (float): parameter to fit
-            """
-            return omega * x * (1 - x)
-
-        popt, pcov = curve_fit(func, compositions, E_mix_to_fit)
+        popt, _ = curve_fit(free_energy_model, x, y)
         return popt[0]
 
-    def H_mix_curve(self, x):
-        """
-        Estimate of mixing enthalpy using the fit parameter omega
+    def deltaG_mix(self, x, T):
+        return self.kB * T * (x * np.log(x) + (1 - x) * np.log(1 - x)) + self.omega * x * (1 - x)
 
-        Args:
-            x (float): composition in A_{1-x}B_{x}
-        Returns:
-            mixing enthalpy (float, eV/fu) at composition x
-        """
-        omega = self.omega
-        return omega * x * (1 - x)
+    def find_tangent_touch_points(self, x, y):
+        x, y = np.array(x), np.array(y)
+        dy = np.diff(y)
+        dx = np.diff(x)
+        derivatives = dy / dx
+        sign_changes = np.sign(derivatives[:-1]) != np.sign(derivatives[1:])
+        touch_indices = np.where(sign_changes)[0] + 1
+        return x[touch_indices], y[touch_indices]
 
-    @property
-    def H_mix(self):
-        """
-        Mixing enthalpies for all x values specified in __init__
+    def find_inflection_points(self, x, y):
+        x, y = np.array(x), np.array(y)
+        dy = np.diff(y)
+        dx = np.diff(x)
+        first_derivatives = dy / dx
+        d2y = np.diff(first_derivatives)
+        d2x = np.diff(x[:-1])
+        second_derivatives = d2y / d2x
+        zero_crossings = np.sign(second_derivatives[:-1]) != np.sign(second_derivatives[1:])
+        zero_values = second_derivatives[:-1] == 0
+        inflection_indices = np.where(zero_crossings | zero_values)[0] + 1
+        return x[inflection_indices + 1], y[inflection_indices + 1]
 
-        Returns:
-            list of mixing enthalpies (eV/fu)
+    def calculate_phase_diagram(self, exclude_center=True, exclude_range=0.005):
+        binodal = []
+        spinodal = []
 
-        """
-        xs = self.xs
-        return [self.H_mix_curve(x) for x in xs]
+        for T in self.Ts:
+            G_mix = self.deltaG_mix(self.xs, T)
 
-    def S_mix(self, x):
-        """
-        Ideal mixing entropy (eV/fu)
+            x_bin, y_bin = self.find_tangent_touch_points(self.xs, G_mix)
+            x_spin, y_spin = self.find_inflection_points(self.xs, G_mix)
 
-        Args:
-            x (float): composition in A_{1-x}B_{x}
+            if len(x_bin) > 1:
+                binodal.append((x_bin[0], T))
+                binodal.append((x_bin[-1], T))
 
-        Returns:
-            mixing entropy (float, eV/fu)
+            if len(x_spin) > 1:
+                spinodal.append((x_spin[0], T))
+                spinodal.append((x_spin[-1], T))
 
-        """
-        return -self.kB * (x * np.log(x) + (1 - x) * np.log(1 - x))
+        binodal = np.array(binodal)
+        spinodal = np.array(spinodal)
 
-    def G_mix(self, x, T):
-        """
-        Gibbs energy of mixing at composition x and temperature T
+        binodal = binodal[np.argsort(binodal[:, 0])]
+        spinodal = spinodal[np.argsort(spinodal[:, 0])]
 
-        Args:
-            x (float): composition in A_{1-x}B_{x}
-            T (float): temperature in K
+        # This is needed to avoid numerical instability near the consolute temperature
+        if exclude_center:
+            binodal = binodal[(binodal[:, 0] < 0.5 - exclude_range) | (binodal[:, 0] > 0.5 + exclude_range)]
+            spinodal = spinodal[(spinodal[:, 0] < 0.5 - exclude_range) | (spinodal[:, 0] > 0.5 + exclude_range)]
 
-        Returns:
-            float (eV/fu)
-        """
-        return self.H_mix_curve(x) - T * self.S_mix(x)
+        return binodal, spinodal
 
-    def G_mix_curve(self, T):
-        """
-        Gibbs energies of mixing at all xs
+    def to_dict(self):
+        binodal, spinodal = self.calculate_phase_diagram()
+        return {
+            "x": list(self.xs),
+            "T": list(self.Ts),
+            "omega": self.omega,
+            "E": [{"x": x, "E": self.energies[x]} for x in self.discrete_x],
+            "binodal": [{"x": float(x), "T": float(T)} for x, T in binodal],
+            "spinodal": [{"x": float(x), "T": float(T)} for x, T in spinodal]
+        }
 
-        Args:
-            T (float): temperature in K
+class IsoAlloyPlotter:
+    def __init__(
+        self,
+        alloy_dict,
+        main_color="blue",
+        spinodal_color="red",
+        A_label="A",
+        B_label="B",
+        temp_unit="C",
+    ):
+        self.alloy_dict = alloy_dict
+        self.main_color = main_color
+        self.spinodal_color = spinodal_color
+        self.A_label = A_label
+        self.B_label = B_label
+        self.temp_unit = temp_unit
 
-        Returns:
-            list of Gibbs energies of mixing (eV/fu)
-        """
-        xs = self.xs
-        return [self.G_mix(x, T) for x in xs]
+    def plot_mixing_enthalpies(self):
+        d = self.alloy_dict
+        A, B = self.A_label, self.B_label
 
-    def dGdx(self, x, T):
-        """
-        First derivative of the G(x) curve
+        discrete_data = d["E"]
+        x_discrete = [data["x"] for data in discrete_data]
+        y_discrete = [data["E"] for data in discrete_data]
 
-        Args:
-            x (float): composition in A_{1-x}B_{x}
-            T (float): temperature in K
+        plt.figure(figsize=(10, 6))
+        plt.scatter(x_discrete, y_discrete, color="white", edgecolor=self.main_color)
+        plt.plot(x_discrete, y_discrete, color=self.main_color, linestyle="--")
 
-        Returns:
-            float
+        plt.xlabel(r"$%s_{1-x}%s_{x}$" % (A, B))
+        plt.ylabel(r"$\Delta H_{mix}\/(\frac{eV}{f.u.})$")
+        plt.title("Mixing Enthalpies")
+        plt.grid(True, linestyle=':', alpha=0.7)
+        plt.tight_layout()
+        plt.show()
 
-        """
-        return self.omega * (1 - 2 * x) + self.kB * T * np.log(x / (1 - x))
+    def plot_phase_diagram(self):
+        d = self.alloy_dict
+        A, B = self.A_label, self.B_label
 
-    def dG2dx2(self, x, T):
-        """
-        Second derivative of the G(x) curve
+        binodal = d["binodal"]
+        spinodal = d["spinodal"]
 
-        Args:
-            x (float): composition in A_{1-x}B_{x}
-            T (float): temperature in K
+        x_bin = [data["x"] for data in binodal]
+        T_bin = [data["T"] for data in binodal]
 
-        Returns:
-            float
-        """
-        return -2 * self.omega + self.kB * T / (x * (1 - x))
+        x_spin = [data["x"] for data in spinodal]
+        T_spin = [data["T"] for data in spinodal]
 
-    def common_tangent(self, T, initial_guess=(0.1, 0.9)):
-        """
-        Performs the common tangent construction to determine the binodal compositions
+        if self.temp_unit == "C":
+            T_bin = [T - 273.15 for T in T_bin]
+            T_spin = [T - 273.15 for T in T_spin]
 
-        Args:
-            T (float): temperature in K
-            initial_guess (tuple): initial guess for the common tangent construction
-                (x1, x2)
-                    x1 is the initial guess for the max x where a solid solution in alpha is stable
-                    x2 is the initial guess for the min x where a solid solution in beta is stable
+        plt.figure(figsize=(10, 8))
 
-        Returns:
-            tuple: (x1, x2)
-                x1 is the max composition where the alpha solid solution is stable
-                x2 is the min composition where the beta solid solution is stable
+        plt.plot(x_bin, T_bin, '-', color=self.main_color, label='Binodal')
+        plt.plot(x_spin, T_spin, '-', color=self.spinodal_color, label='Spinodal')
+        plt.fill_between(x_bin, T_bin, 0, color=self.main_color, alpha=0.1)
+        plt.fill_between(x_spin, T_spin, 0, color=self.spinodal_color, alpha=0.1)
 
-        Note:
-            - a solution should require that G(x) <= 0 at the common tangent points.
-            - if it's not, then we don't have a solid solution in that phase
-            - this is accounted for with if statements after optimization
-        """
+        plt.xlabel(r"$%s_{1-x}%s_{x}$" % (A, B))
+        plt.ylabel("Temperature (°C)" if self.temp_unit == "C" else "Temperature (K)")
+        plt.title("Phase Diagram")
+        plt.legend()
+        plt.grid(True, linestyle=':', alpha=0.7)
+        plt.xlim(0, 1)
+        plt.ylim(bottom=0)
+        plt.tight_layout()
+        plt.show()
 
-        def equations_to_solve(compositions, T):
-            """
-            Equations to optimize
-                - we return the squared sum to penalize non-zero values
-                - eqn1 and eqn2 should go to zero at the common tangent
-            Args:
-                compositions (tuple): (x1, x2)
-                    x1 is the max x where a solid solution in alpha is stable
-                    x2 is the min x where a solid solution in beta is stable
-
-                T (float): temperature in K
-
-            """
-            x1, x2 = compositions
-            eqn1 = self.dGdx(x1, T) - self.dGdx(x2, T)
-            eqn2 = (self.G_mix(x1, T) - self.G_mix(x2, T)) / (x1 - x2) - self.dGdx(
-                x1, T
-            )
-            return eqn1**2 + eqn2**2
-
-        G_mix_curve = self.G_mix_curve(T)
-        d2dGdx2 = [self.dG2dx2(x, T) for x in self.xs]
-        if max(G_mix_curve) <= 0:
-            return "solid solution everywhere"
-
-        elif min(G_mix_curve) >= 0:
-            return "solid solution nowhere"
-        else:
-            # trying to deal with a few cases:
-            # G_mix_curve is a single parabola --> don't need common tangent
-            # G_mix_curve is a double parabola --> need common tangent
-            return
-        result = minimize(
-            fun=equations_to_solve,
-            x0=initial_guess,
-            args=(T,),
-            bounds=((0.00001, 0.99999), (0.00001, 0.99999)),
-        )
-        x1, x2 = result.x
-        if self.G_mix(x1) >= 0:
-            x1 = 0
-        if self.G_mix(x2) >= 0:
-            x2 = 1
-        return x1, x2
-
+    def plot_all(self):
+        self.plot_mixing_enthalpies()
+        self.plot_phase_diagram()
 
 class HeteroAlloy(object):
     """
@@ -1164,6 +1109,26 @@ class HeteroAlloyPlotter(object):
 
 
 def main():
+
+    """
+    Below is an example for IsoAlloy calculation and plotting.
+    """
+    # Create an instance of IsoAlloy
+    energies = {0: 0, 0.25: 0.05, 0.5: 0.1, 0.75: 0.05, 1: 0}
+    iso_alloy = IsoAlloy(energies)
+
+    # Get the phase diagram data
+    phase_diagram_data = iso_alloy.to_dict()
+
+    # Create an instance of IsoAlloyPlotter
+    plotter = IsoAlloyPlotter(phase_diagram_data)
+
+    # Plot the phase diagram
+    plotter.plot_phase_diagram()
+    
+    """
+    Below is an example for HeteroAlloy calculation and plotting.
+    """
     alpha_energies = {0: 0, 0.4: 0.1, 0.6: 0.15, 0.8: 0.2, 1: 0.22}
     beta_energies = {1: 0, 0.8: 0.05, 0.6: 0.09, 0.4: 0.1, 0.2: 0.12, 0: 0.125}
     # beta_energies = alpha_energies.copy()
