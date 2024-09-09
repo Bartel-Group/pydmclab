@@ -554,7 +554,7 @@ class QHA(object):
         } for i in range(len(temperatures))]
         return out
 
-    def qha_dict(self, write=False, data_dir=os.getcwd().replace("scripts", "data"), savename="qha.json", remake_qha=False):
+    def qha_dict(self, write=False, data_dir=os.getcwd().replace("scripts", "data"), savename="qha.json", remake=False):
         """
         Returns:
             A dictionary with QHA information for all structures.
