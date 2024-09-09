@@ -599,13 +599,19 @@ class QHA(object):
         qha = self.get_phonopy_qha(formula, mpid)
         qha.plot_qha()
 
-    def plot_all(self):
+    def plot_all(self, save=False, fig_dir=os.getcwd().replace("scripts", "figures")):
         """
         Plots the Gibbs free energy and QHA information for all structures.
         """
+
         results = self.parse_results
         for formula in results:
             for mpid in results[formula]:
-                self.plot_gibbs_energy(formula, mpid)
-                self.plot_qha_info(formula, mpid)
+                gibbs = self.plot_gibbs_energy(formula, mpid)
                 plt.show()
+                if save:
+                    plt.savefig(os.path.join(fig_dir, f"{formula}_{mpid}_gibbs.png"))
+                qha = self.plot_qha_info(formula, mpid)
+                plt.show()
+                if save:
+                    plt.savefig(os.path.join(fig_dir, f"{formula}_{mpid}_qha.png"))
