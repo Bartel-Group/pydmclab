@@ -592,12 +592,15 @@ class QHA(object):
         plt.xticks(fontsize=14)
         plt.yticks(fontsize=14)
 
+        return fig
+
     def plot_qha_info(self, formula, mpid):
         """
         Plots the QHA information for a specific formula and mpid.
         """
         qha = self.get_phonopy_qha(formula, mpid)
         qha.plot_qha()
+
 
     def plot_all(self, save=False, fig_dir=os.getcwd().replace("scripts", "figures")):
         """
@@ -607,11 +610,12 @@ class QHA(object):
         results = self.parse_results
         for formula in results:
             for mpid in results[formula]:
-                gibbs = self.plot_gibbs_energy(formula, mpid)
+                fig_gibbs = self.plot_gibbs_energy(formula, mpid)
                 plt.show()
                 if save:
-                    plt.savefig(os.path.join(fig_dir, f"{formula}_{mpid}_gibbs.png"))
-                qha = self.plot_qha_info(formula, mpid)
+                    fig_gibbs.savefig(os.path.join(fig_dir, f"{formula}_{mpid}_gibbs.png"))
+                    
+                self.plot_qha_info(formula, mpid)
                 plt.show()
                 if save:
                     plt.savefig(os.path.join(fig_dir, f"{formula}_{mpid}_qha.png"))
