@@ -561,7 +561,7 @@ class QHA(object):
             e.g. {'Al1N1': {'mp-661': [list of QHA info dictionaries]}}
         """
         fjson = os.path.join(data_dir, savename)
-        if not remake_qha and os.path.exists(fjson) and write:
+        if not remake and os.path.exists(fjson) and write:
             return read_json(fjson)
         
         qha_dict = {}
