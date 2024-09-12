@@ -96,8 +96,6 @@ def get_vasp_configs(
         potcar_mods = {}
 
     vasp_configs = {}
-    if dont_relax_cell:
-        incar_mods.update({"all-all": {"ISIF": 2}})
     vasp_configs["standard"] = standard
     vasp_configs["incar_mods"] = incar_mods
     vasp_configs["kpoints_mods"] = kpoints_mods
@@ -111,6 +109,14 @@ def get_vasp_configs(
     )
     vasp_configs["flexible_convergence_criteria"] = flexible_convergence_criteria
     vasp_configs["relax_static_energy_diff_tol"] = compare_static_and_relax_energies
+
+    if dont_relax_cell and not incar_mods:
+        vasp_configs["incar_mods"] = {"all-all": {"ISIF": 2}}
+    elif dont_relax_cell and incar_mods:
+        if vasp_configs["incar_mods"].get("all-all"):
+            vasp_configs["incar_mods"]["all-all"]["ISIF"] = 2
+        else:
+            vasp_configs["incar_mods"]["all-all"] = {"ISIF": 2}
 
     return vasp_configs
 
@@ -1416,9 +1422,12 @@ def get_thermo_results(
     fjson = os.path.join(data_dir, savename)
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
-    
+
     if "lobster" in gs:
-        thermo_results = {calc: {xc: {formula: {} for formula in gs[calc][xc]} for xc in gs[calc]} for calc in gs}
+        thermo_results = {
+            calc: {xc: {formula: {} for formula in gs[calc][xc]} for xc in gs[calc]}
+            for calc in gs
+        }
         gs_original = gs.copy()
     elif "static" in gs:
         thermo_results = {xc: {formula: {} for formula in gs[xc]} for xc in gs}
@@ -1431,7 +1440,7 @@ def get_thermo_results(
         xc = results[key]["meta"]["setup"]["xc"]
         formula = results[key]["results"]["formula"]
         calc = results[key]["meta"]["setup"]["calc"]
-        
+
         ID = "__".join(
             [
                 results[key]["meta"]["setup"]["formula_indicator"],
@@ -1482,7 +1491,7 @@ def get_thermo_results(
             tmp_thermo["Ef"] = None
             tmp_thermo["is_gs"] = False
             tmp_thermo["all_polymorphs_converged"] = False
-        
+
         if "lobster" in thermo_results:
             thermo_results[calc][xc][formula][ID] = tmp_thermo
         else:
@@ -1503,9 +1512,19 @@ def check_thermo_results(thermo):
                     print("formula = %s" % formula)
                     print(
                         "%i polymorphs converged"
-                        % len([k for k in thermo[calc][xc][formula] if thermo[calc][xc][formula][k]["E"]])
+                        % len(
+                            [
+                                k
+                                for k in thermo[calc][xc][formula]
+                                if thermo[calc][xc][formula][k]["E"]
+                            ]
+                        )
                     )
-                    gs_ID = [k for k in thermo[calc][xc][formula] if thermo[calc][xc][formula][k]["is_gs"]]
+                    gs_ID = [
+                        k
+                        for k in thermo[calc][xc][formula]
+                        if thermo[calc][xc][formula][k]["is_gs"]
+                    ]
                     if gs_ID:
                         gs_ID = gs_ID[0]
                         print("%s is the ground-state structure" % gs_ID)
@@ -1532,9 +1551,13 @@ def check_thermo_results(thermo):
                 print("formula = %s" % formula)
                 print(
                     "%i polymorphs converged"
-                    % len([k for k in thermo[xc][formula] if thermo[xc][formula][k]["E"]])
+                    % len(
+                        [k for k in thermo[xc][formula] if thermo[xc][formula][k]["E"]]
+                    )
                 )
-                gs_ID = [k for k in thermo[xc][formula] if thermo[xc][formula][k]["is_gs"]]
+                gs_ID = [
+                    k for k in thermo[xc][formula] if thermo[xc][formula][k]["is_gs"]
+                ]
                 if gs_ID:
                     gs_ID = gs_ID[0]
                     print("%s is the ground-state structure" % gs_ID)
@@ -1632,7 +1655,7 @@ def get_dos_results(
             if xc != only_xc:
                 continue
         av = AnalyzeVASP(calc_dir)
-        
+
         if "lobster" in thermo_results:
             if "tdos" in dos_to_store:
                 pdos = av.pdos(remake=regenerate_dos)
