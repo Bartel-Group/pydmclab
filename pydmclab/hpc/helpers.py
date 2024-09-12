@@ -1425,7 +1425,11 @@ def get_thermo_results(
     
     gs_original = gs.copy()
     if "lobster" in gs:
-        thermo_results = {calc: {xc: {formula: {} for formula in gs[calc][xc]} for xc in gs[calc]} for calc in gs} 
+        thermo_results = {
+            calc: {xc: {formula: {} for formula in gs[calc][xc]} for xc in gs[calc]}
+            for calc in gs
+        }
+        gs_original = gs.copy()
     elif "static" in gs:
         thermo_results = {xc: {formula: {} for formula in gs[xc]} for xc in gs}
     else:
