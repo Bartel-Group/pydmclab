@@ -3,7 +3,7 @@ import subprocess
 import yaml
 from collections import Counter
 from shutil import copyfile, rmtree
-from typing import List, Tuple, Literal
+from typing import List, Tuple, Dict, Literal
 
 import numpy as np
 
@@ -674,10 +674,19 @@ class SiteTools(object):
 
 class SolidSolutionGenerator:
     """
-    Purpose:
-        Generate quasi-random solid solutions (SQS) between two crystal structures.
-        This is accomplished using the sqsgen package. Details can be found here:
-        https://sqsgenerator.readthedocs.io/en/latest/how_to.html
+    Generate quasi-random solid solutions (SQS) between two crystal structures.
+    This is accomplished using the sqsgenerator package.
+
+    Attributes:
+        endmembers (List[Structure]): List of two endmember structures.
+        num_solns (int): Number of solutions to generate.
+        supercell_dim (List[int]): Dimensions of the supercell.
+        element_A (str): Element that differs in the first endmember.
+        element_B (str): Element that differs in the second endmember.
+        disordered_solns (List[Structure]): List of disordered solid solution structures.
+        ordered_solns (List[Structure]): List of ordered solid solution structures.
+        sqs_solns (List[Structure]): List of special quasirandom structures (SQS).
+        dirs (Dict[str, str]): Dictionary of directory paths used in the process.
 
     Example usage:
         struc_A = Structure.from_file('Endmembers/SrRuO3.cif')
@@ -685,7 +694,8 @@ class SolidSolutionGenerator:
         generator = SolidSolutionGenerator(endmembers=[struc_A, struc_B], num_solns=15, supercell_dim=[2, 1, 2])
         disordered, ordered, sqs = generator.run(sqsgen_path='/path/to/sqsgen')
 
-        Where '/path/to/sqsgen' should be replaced with the location of your sqsgen installation.
+    Note:
+        '/path/to/sqsgen' should be replaced with the location of your sqsgen installation.
     """
 
     def __init__(
@@ -694,17 +704,25 @@ class SolidSolutionGenerator:
         num_solns: int = 15,
         supercell_dim: List[int] = [2, 2, 2],
     ):
+        """
+        Initialize the SolidSolutionGenerator.
+
+        Args:
+            endmembers (List[Structure]): List of two endmember structures.
+            num_solns (int, optional): Number of solutions to generate. Defaults to 15.
+            supercell_dim (List[int], optional): Dimensions of the supercell. Defaults to [2, 2, 2].
+        """
         self.endmembers = endmembers
         self.num_solns = num_solns
         self.supercell_dim = supercell_dim
-        self.element_A = None
-        self.element_B = None
-        self.disordered_solns = None
-        self.ordered_solns = None
-        self.sqs_solns = None
+        self.element_A: str = None
+        self.element_B: str = None
+        self.disordered_solns: List[Structure] = None
+        self.ordered_solns: List[Structure] = None
+        self.sqs_solns: List[Structure] = None
 
         # Create necessary directories
-        self.dirs = {
+        self.dirs: Dict[str, str] = {
             "output": "Ordered_Solutions",
             "yaml": "yaml_files",
             "sqs": "SQS",
@@ -714,6 +732,15 @@ class SolidSolutionGenerator:
             os.makedirs(dir_name, exist_ok=True)
 
     def generate_solid_solutions(self) -> List[Structure]:
+        """
+        Generate disordered solid solutions between the two endmember structures.
+
+        Returns:
+            List[Structure]: List of disordered solid solution structures.
+
+        Raises:
+            ValueError: If the endmember structures are incompatible or if more than one element differs between them.
+        """
         struc_A, struc_B = self.endmembers
         assert (
             len(self.endmembers) == 2
@@ -806,6 +833,12 @@ class SolidSolutionGenerator:
         return interp_structs
 
     def generate_ordered_solutions(self) -> List[Structure]:
+        """
+        Generate ordered solid solutions from the disordered solutions.
+
+        Returns:
+            List[Structure]: List of ordered solid solution structures.
+        """
         if self.disordered_solns is None:
             self.generate_solid_solutions()
 
@@ -827,6 +860,16 @@ class SolidSolutionGenerator:
     def _parse_structure(
         self, file_path: str
     ) -> Tuple[List[List[float]], List[List[float]], List[str], Structure]:
+        """
+        Parse a structure file and extract lattice, coordinates, species, and structure object.
+
+        Args:
+            file_path (str): Path to the structure file.
+
+        Returns:
+            Tuple[List[List[float]], List[List[float]], List[str], Structure]: 
+                Lattice matrix, fractional coordinates, species list, and Structure object.
+        """
         structure = Structure.from_file(file_path)
         structure.remove_oxidation_states()
         lattice = structure.lattice.matrix.tolist()
@@ -840,7 +883,16 @@ class SolidSolutionGenerator:
         lattice: List[List[float]],
         coords: List[List[float]],
         species: List[str],
-    ):
+    ) -> None:
+        """
+        Write the structure information to a YAML file for SQS generation.
+
+        Args:
+            output_path (str): Path to write the output YAML file.
+            lattice (List[List[float]]): Lattice matrix.
+            coords (List[List[float]]): Fractional coordinates of sites.
+            species (List[str]): List of species on each site.
+        """
         composition_dict = dict(Counter(species))
         filtered_composition = {
             self.element_A: composition_dict.get(self.element_A, 0),
@@ -865,6 +917,15 @@ class SolidSolutionGenerator:
             yaml.dump(data, file, default_flow_style=False)
 
     def generate_sqs(self, sqsgen_path: str = "path/to/sqsgen") -> List[Structure]:
+        """
+        Generate special quasirandom structures (SQS) from the ordered solutions.
+
+        Args:
+            sqsgen_path (str, optional): Path to the sqsgen executable. Defaults to "path/to/sqsgen".
+
+        Returns:
+            List[Structure]: List of SQS structures.
+        """
         if self.ordered_solns is None:
             self.generate_ordered_solutions()
 
@@ -933,13 +994,27 @@ class SolidSolutionGenerator:
         self.sqs_solns = sqs_solns
         return sqs_solns
 
-    def cleanup(self):
+    def cleanup(self) -> None:
+        """
+        Remove all directories created during the process.
+        """
         for dir_name in self.dirs.values():
             rmtree(dir_name)
 
     def run(
         self, sqsgen_path: str = "path/to/sqsgen", cleanup: bool = True
     ) -> Tuple[List[Structure], List[Structure], List[Structure]]:
+        """
+        Run the entire solid solution generation process.
+
+        Args:
+            sqsgen_path (str, optional): Path to the sqsgen executable. Defaults to "path/to/sqsgen".
+            cleanup (bool, optional): Whether to remove temporary directories after completion. Defaults to True.
+
+        Returns:
+            Tuple[List[Structure], List[Structure], List[Structure]]: 
+                Lists of disordered, ordered, and SQS structures.
+        """
         self.generate_solid_solutions()
         self.generate_ordered_solutions()
         self.generate_sqs(sqsgen_path)
