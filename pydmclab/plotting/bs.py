@@ -11,6 +11,6 @@ def fig_bs(bs_dir, fig_dir, savename):
     fvasprun = os.path.join(bs_dir, "vasprun.xml")
     fkpoints = os.path.join(bs_dir, "KPOINTS")
     bssymline = Fatband(
-        filenames=bs_dir, vasprun=fvasprun, Kpointsfile=fkpoints
+        filenames=bs_dir, vasprun_file=fvasprun, kpoints_file=fkpoints
     ).get_bandstructure()
     BSDOSPlotter(bs_projection="elements").get_plot(bs=bssymline).savefig(fpng)

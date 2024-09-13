@@ -11,62 +11,6 @@ import matplotlib as mpl
 
 import itertools
 
-data_dir = "../data/test_data/ternarypd"
-
-
-def get_data():
-    return read_json(os.path.join(data_dir, "Mg-Cr-S-Na-Cl_query.json"))
-
-
-def get_small_data(remake=False):
-    fjson = os.path.join(data_dir, "Efs.json")
-    if not remake and os.path.exists(fjson):
-        return read_json(fjson)
-
-    d = get_data()
-    out = {k: {"Ef": d[k]["Ef_mp"]} for k in d}
-
-    write_json(out, fjson)
-    return read_json(fjson)
-
-
-def get_hullout(Efs, remake=False):
-    fjson = os.path.join(data_dir, "hullout.json")
-    if not remake and os.path.exists(fjson):
-        return read_json(fjson)
-
-    ghid = GetHullInputData(Efs, "Ef")
-    hullin = ghid.hullin_data()
-    out = {}
-    for space in hullin:
-        hullout = AnalyzeHull(hullin, space).hull_output_data
-        out.update(hullout)
-
-    write_json(out, fjson)
-    return read_json(fjson)
-
-
-def get_mixing(hullout, remake=False):
-    fjson = os.path.join(data_dir, "mixing.json")
-    if not remake and os.path.exists(fjson):
-        return read_json(fjson)
-
-    hullout = {k: hullout[k] for k in ["Cl1Na1", "Cl2Mg1", "Cl4Mg1Na2", "Cl8Mg1Na6"]}
-    print(hullout.keys())
-    mh = MixingHull(
-        hullout,
-        varying_element="Na",
-        end_members=["NaCl", "MgCl2"],
-        shared_element_basis="Cl",
-        energy_key="Ef",
-    )
-
-    print(mh.mixing_energies)
-    out = mh.results
-
-    write_json(out, fjson)
-    return read_json(fjson)
-
 
 class BinaryPD(object):
     def __init__(
@@ -337,7 +281,6 @@ class TernaryPD(object):
                         {'Ef' : formation energy (eV/atom),
                         'stability' : True if on the hull else False}
                         }
-
                 NOTE: MixingHull results not supported (yet) for ternary diagrams
 
             end_members (list):
@@ -646,38 +589,3 @@ def get_label(cmpd, els=None):
         label += "_{%s}" % amt
     label += "$"
     return label
-
-
-def main():
-    set_rc_params()
-    query = get_small_data()
-    hullout = get_hullout(query)
-    mixing = get_mixing(hullout, remake=False)
-    # bpd_ah = BinaryPD(hullout, ["Mg", "Cl"], stability_source="AnalyzeHull")
-    # bpd_ah.ax_pd()
-    bpd_mh = BinaryPD(
-        mixing,
-        ["NaCl", "MgCl2"],
-        polymorph_data={
-            "Cl4Mg1Na2": {"mp-1234": {"dE_gs": 0.05}},
-            "Cl8Mg1Na6": {
-                "mp-4321": {"dE_gs": 0.1},
-            },
-        },
-        stability_source="MixingHull",
-    )
-
-    # tpd = None
-
-    bpd_mh.ax_pd(
-        yticks=(True, [-0.1, 0.1]), ylim=(-0.1, 0.1), el_order=("Na", "Mg", "Cl")
-    )
-
-    # tpd = TernaryPD(hullout, ["S", "Cr", "Mg"])
-    # tpd.ax_pd()
-    tpd = None
-    return query, hullout, mixing, bpd, tpd
-
-
-if __name__ == "__main__":
-    query, hullout, mixing, bpd, tpd = main()
