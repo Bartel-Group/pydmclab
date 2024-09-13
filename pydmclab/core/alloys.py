@@ -6,13 +6,39 @@ from pydmclab.core.comp import CompTools
 from pydmclab.core.energies import FormationEnthalpy, ChemPots
 from pydmclab.utils.handy import read_json, write_json
 
+from typing import Dict, List, Tuple, Union
+
 import os
 
 COLORS = get_colors("tab10")
 set_rc_params()
 
 class IsoAlloy:
-    def __init__(self, energies, kB=8.6173e-5, xs=np.linspace(0.00001, 0.99999, 10000), Ts=np.linspace(100, 3000, 1000)):
+    """
+    A class to model and analyze binary isomorphic alloy systems using the regular
+    solution model (Ideal entropy of mixing + enthalpic interaction parameter).
+
+    Attributes:
+        energies (Dict[float, float]): Dictionary of mixing energies (in eV) for different compositions.
+        kB (float): Boltzmann constant in eV/K.
+        xs (np.ndarray): Array of composition values.
+        Ts (np.ndarray): Array of temperature values.
+        discrete_x (List[float]): Sorted list of compositions from the energies dictionary.
+        omega (float): Interaction parameter (in eV) calculated from the mixing energies.
+    """
+
+    def __init__(self, energies: Dict[float, float], kB: float = 8.6173e-5, 
+                 xs: np.ndarray = np.linspace(0.00001, 0.99999, 10000), 
+                 Ts: np.ndarray = np.linspace(100, 3000, 1000)):
+        """
+        Initialize the IsoAlloy object.
+
+        Args:
+            energies (Dict[float, float]): Dictionary of mixing energies for different compositions.
+            kB (float, optional): Boltzmann constant in eV/K. Defaults to 8.6173e-5.
+            xs (np.ndarray, optional): Array of composition values. Defaults to np.linspace(0.00001, 0.99999, 10000).
+            Ts (np.ndarray, optional): Array of temperature values. Defaults to np.linspace(100, 3000, 1000).
+        """
         self.energies = energies
         self.kB = kB
         self.xs = xs
@@ -20,20 +46,46 @@ class IsoAlloy:
         self.discrete_x = sorted(list(energies.keys()))
         self.omega = self._calculate_omega()
 
-    def _calculate_omega(self):
+    def _calculate_omega(self) -> float:
+        """
+        Calculate the interaction parameter omega using curve fitting.
+
+        Returns:
+            float: The calculated interaction parameter omega.
+        """
         x = np.array(self.discrete_x)
         y = np.array([self.energies[k] for k in self.discrete_x])
 
-        def free_energy_model(x, omega):
+        def free_energy_model(x: np.ndarray, omega: float) -> np.ndarray:
             return x * (1 - x) * omega
 
         popt, _ = curve_fit(free_energy_model, x, y)
         return popt[0]
 
-    def deltaG_mix(self, x, T):
+    def deltaG_mix(self, x: Union[float, np.ndarray], T: float) -> Union[float, np.ndarray]:
+        """
+        Calculate the Gibbs free energy of mixing.
+
+        Args:
+            x (Union[float, np.ndarray]): Composition or array of compositions.
+            T (float): Temperature in Kelvin.
+
+        Returns:
+            Union[float, np.ndarray]: Gibbs free energy of mixing.
+        """
         return self.kB * T * (x * np.log(x) + (1 - x) * np.log(1 - x)) + self.omega * x * (1 - x)
 
-    def find_tangent_touch_points(self, x, y):
+    def find_tangent_touch_points(self, x: np.ndarray, y: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Find the tangent touch points in the Gibbs free energy curve.
+
+        Args:
+            x (np.ndarray): Array of x values.
+            y (np.ndarray): Array of y values.
+
+        Returns:
+            Tuple[np.ndarray, np.ndarray]: x and y coordinates of the tangent touch points.
+        """
         x, y = np.array(x), np.array(y)
         dy = np.diff(y)
         dx = np.diff(x)
@@ -42,7 +94,17 @@ class IsoAlloy:
         touch_indices = np.where(sign_changes)[0] + 1
         return x[touch_indices], y[touch_indices]
 
-    def find_inflection_points(self, x, y):
+    def find_inflection_points(self, x: np.ndarray, y: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Find the inflection points in the Gibbs free energy curve.
+
+        Args:
+            x (np.ndarray): Array of x values.
+            y (np.ndarray): Array of y values.
+
+        Returns:
+            Tuple[np.ndarray, np.ndarray]: x and y coordinates of the inflection points.
+        """
         x, y = np.array(x), np.array(y)
         dy = np.diff(y)
         dx = np.diff(x)
@@ -55,7 +117,17 @@ class IsoAlloy:
         inflection_indices = np.where(zero_crossings | zero_values)[0] + 1
         return x[inflection_indices + 1], y[inflection_indices + 1]
 
-    def calculate_phase_diagram(self, exclude_center=True, exclude_range=0.005):
+    def calculate_phase_diagram(self, exclude_center: bool = True, exclude_range: float = 0.005) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Calculate the phase diagram (binodal and spinodal curves).
+
+        Args:
+            exclude_center (bool, optional): Whether to exclude points near x = 0.5. Defaults to True.
+            exclude_range (float, optional): Range around x = 0.5 to exclude. Defaults to 0.005.
+
+        Returns:
+            Tuple[np.ndarray, np.ndarray]: Arrays containing binodal and spinodal points.
+        """
         binodal = []
         spinodal = []
 
@@ -86,7 +158,13 @@ class IsoAlloy:
 
         return binodal, spinodal
 
-    def to_dict(self):
+    def to_dict(self) -> Dict[str, Union[List[float], List[Dict[str, float]], float]]:
+        """
+        Convert the IsoAlloy object to a dictionary representation.
+
+        Returns:
+            Dict[str, Union[List[float], List[Dict[str, float]], float]]: Dictionary containing the object's data.
+        """
         binodal, spinodal = self.calculate_phase_diagram()
         return {
             "x": list(self.xs),
@@ -98,15 +176,41 @@ class IsoAlloy:
         }
 
 class IsoAlloyPlotter:
+    """
+    A class to plot various diagrams for isomorphic binary alloy systems.
+
+    This class provides methods to plot mixing enthalpies and phase diagrams
+    based on the data from an IsoAlloy object.
+
+    Attributes:
+        alloy_dict (Dict): Dictionary containing the alloy data.
+        main_color (str): Color for the main plot elements.
+        spinodal_color (str): Color for the spinodal curve.
+        A_label (str): Label for component A.
+        B_label (str): Label for component B.
+        temp_unit (str): Temperature unit ('C' or 'K').
+    """
+
     def __init__(
         self,
-        alloy_dict,
-        main_color="blue",
-        spinodal_color="red",
-        A_label="A",
-        B_label="B",
-        temp_unit="C",
+        alloy_dict: Dict[str, Union[List[float], List[Dict[str, float]], float]],
+        main_color: str = "blue",
+        spinodal_color: str = "red",
+        A_label: str = "A",
+        B_label: str = "B",
+        temp_unit: str = "C",
     ):
+        """
+        Initialize the IsoAlloyPlotter object.
+
+        Args:
+            alloy_dict (Dict[str, Union[List[float], List[Dict[str, float]], float]]): Dictionary containing the alloy data.
+            main_color (str, optional): Color for the main plot elements. Defaults to "blue".
+            spinodal_color (str, optional): Color for the spinodal curve. Defaults to "red".
+            A_label (str, optional): Label for component A. Defaults to "A".
+            B_label (str, optional): Label for component B. Defaults to "B".
+            temp_unit (str, optional): Temperature unit ('C' or 'K'). Defaults to "C".
+        """
         self.alloy_dict = alloy_dict
         self.main_color = main_color
         self.spinodal_color = spinodal_color
@@ -114,7 +218,10 @@ class IsoAlloyPlotter:
         self.B_label = B_label
         self.temp_unit = temp_unit
 
-    def plot_mixing_enthalpies(self):
+    def plot_mixing_enthalpies(self) -> None:
+        """
+        Plot the mixing enthalpies diagram.
+        """
         d = self.alloy_dict
         A, B = self.A_label, self.B_label
 
@@ -133,7 +240,10 @@ class IsoAlloyPlotter:
         plt.tight_layout()
         plt.show()
 
-    def plot_phase_diagram(self):
+    def plot_phase_diagram(self) -> None:
+        """
+        Plot the phase diagram.
+        """
         d = self.alloy_dict
         A, B = self.A_label, self.B_label
 
@@ -167,7 +277,10 @@ class IsoAlloyPlotter:
         plt.tight_layout()
         plt.show()
 
-    def plot_all(self):
+    def plot_all(self) -> None:
+        """
+        Plot both the mixing enthalpies diagram and the phase diagram.
+        """
         self.plot_mixing_enthalpies()
         self.plot_phase_diagram()
 
