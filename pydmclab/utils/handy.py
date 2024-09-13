@@ -35,7 +35,7 @@ def read_yaml(fyaml):
         fyaml (str) - file name of yaml to read
 
     Returns:
-        dictionary stored in fjson
+        dictionary stored in fyaml
     """
     with open(fyaml) as f:
         return yaml.safe_load(f)
@@ -63,7 +63,7 @@ class dotdict(dict):
     __delattr__ = dict.__delitem__
 
 
-def is_slurm_job_in_queue(job_name, user_name="cbartel", fqueue="q.o"):
+def is_slurm_job_in_queue(job_name, user_name, fqueue="q.o"):
     with open(fqueue, "w") as f:
         subprocess.call(["squeue", "-u", user_name, "--name=%s" % job_name], stdout=f)
     names_in_q = []
