@@ -298,6 +298,7 @@ class VASPSetUp(object):
         return {
             "tet": [
                 "Tetrahedron method fails for NKPT<4",
+                "tetrahedron method fails for NKPT<4",
                 "Fatal error detecting k-mesh",
                 "Fatal error: unable to match k-point",
                 "Routine TETIRR needs special values",
@@ -628,6 +629,9 @@ class VASPSetUp(object):
         if "coef" in errors:
             if os.path.exists(wavecar):
                 os.remove(wavecar)
+        if "tet" in errors:
+            incar_changes["ISMEAR"] = 0
+            incar_changes["SIGMA"] = 0.05
         return incar_changes
 
 
