@@ -118,14 +118,6 @@ def get_vasp_configs(
         else:
             vasp_configs["incar_mods"]["all-all"] = {"ISIF": 2}
 
-    if dont_relax_cell and not incar_mods:
-        vasp_configs["incar_mods"] = {"all-all": {"ISIF": 2}}
-    elif dont_relax_cell and incar_mods:
-        if vasp_configs["incar_mods"].get("all-all"):
-            vasp_configs["incar_mods"]["all-all"]["ISIF"] = 2
-        else:
-            vasp_configs["incar_mods"]["all-all"] = {"ISIF": 2}
-
     return vasp_configs
 
 
@@ -1430,10 +1422,13 @@ def get_thermo_results(
     fjson = os.path.join(data_dir, savename)
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
-    
+
     gs_original = gs.copy()
     if "lobster" in gs:
-        thermo_results = {calc: {xc: {formula: {} for formula in gs[calc][xc]} for xc in gs[calc]} for calc in gs} 
+        thermo_results = {
+            calc: {xc: {formula: {} for formula in gs[calc][xc]} for xc in gs[calc]}
+            for calc in gs
+        }
     elif "static" in gs:
         thermo_results = {xc: {formula: {} for formula in gs[xc]} for xc in gs}
     else:
@@ -1518,7 +1513,13 @@ def check_thermo_results(thermo):
                     print("     formula = %s" % formula)
                     print(
                         "       %i polymorphs converged"
-                        % len([k for k in thermo[calc][xc][formula] if thermo[calc][xc][formula][k]["E"]])
+                        % len(
+                            [
+                                k
+                                for k in thermo[calc][xc][formula]
+                                if thermo[calc][xc][formula][k]["E"]
+                            ]
+                        )
                     )
                     gs_ID = [
                         k
