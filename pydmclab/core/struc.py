@@ -256,7 +256,7 @@ class StrucTools(object):
             structure = self.structure
 
         # only return one structure if n_strucs = 1
-        return_ranked_list = n_strucs if n_strucs > 1 else False
+        return_ranked_list = n_strucs * 1000 if n_strucs > 1 else False
 
         # generate ordered structure
         if verbose:
@@ -274,7 +274,8 @@ class StrucTools(object):
             # find unique groups of structures
             groups = matcher.group_structures(out)
             out = [groups[i][0] for i in range(len(groups))]
-            return {i: out[i].as_dict() for i in range(len(out))}
+            strucs = {i: out[i].as_dict() for i in range(len(out))}
+            strucs = {i: strucs[i] for i in range(n_strucs) if i in strucs}
         else:
             # if only one structure is made, return in same formation (dict)
             return {0: out.as_dict()}
@@ -867,7 +868,7 @@ class SolidSolutionGenerator:
             file_path (str): Path to the structure file.
 
         Returns:
-            Tuple[List[List[float]], List[List[float]], List[str], Structure]: 
+            Tuple[List[List[float]], List[List[float]], List[str], Structure]:
                 Lattice matrix, fractional coordinates, species list, and Structure object.
         """
         structure = Structure.from_file(file_path)
@@ -1012,7 +1013,7 @@ class SolidSolutionGenerator:
             cleanup (bool, optional): Whether to remove temporary directories after completion. Defaults to True.
 
         Returns:
-            Tuple[List[Structure], List[Structure], List[Structure]]: 
+            Tuple[List[Structure], List[Structure], List[Structure]]:
                 Lists of disordered, ordered, and SQS structures.
         """
         self.generate_solid_solutions()
