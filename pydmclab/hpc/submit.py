@@ -379,8 +379,10 @@ class SubmitTools(object):
             else:
                 raise NotImplementedError("LOBSTER > 4 not on Bridges?")
         else:
-            raise NotImplementedError('dont have LOBSTER path for machine "%s"' % machine)
-    
+            raise NotImplementedError(
+                'dont have LOBSTER path for machine "%s"' % machine
+            )
+
     @property
     def lobster_command(self) -> str:
         """
@@ -498,10 +500,10 @@ class SubmitTools(object):
             if not os.path.exists(calc_dir):
                 os.mkdir(calc_dir)
 
-            if restart_this_one:
-                # if restarting, status = new
-                statuses[xc_calc] = "new"
-                continue
+            # if restart_this_one:
+            #     # if restarting, status = new
+            #     statuses[xc_calc] = "new"
+            #     continue
 
             # (2) check convergence of current calc
             E_per_at = AnalyzeVASP(calc_dir).E_per_at
@@ -542,6 +544,10 @@ class SubmitTools(object):
                     statuses[xc_calc] = "new"
             if (calc_to_run == "prelobster") and os.path.exists(
                 os.path.join(calc_dir, "IBZKPT")
+            ):
+                statuses[xc_calc] = "done"
+            if (calc_to_run == "parchg") and os.path.exists(
+                os.path.join(calc_dir, "PARCHG")
             ):
                 statuses[xc_calc] = "done"
 
@@ -726,7 +732,8 @@ class SubmitTools(object):
 
             for xc_calc in calc_list:
                 status = statuses[xc_calc]
-
+                xc_to_run, calc_to_run = xc_calc.split("-")
+                
                 # write status to status.o
                 f.write('\necho "%s is %s" >> %s\n' % (xc_calc, status, fstatus))
 
@@ -738,6 +745,10 @@ class SubmitTools(object):
                 calc_dir = os.path.join(launch_dir, xc_calc)
 
                 if status == "done":
+                    if calc_to_run in ["lobster", "bs"]:
+                        if not os.path.exists(os.path.join(calc_dir, "lobsterout")):
+                            f.write("\ncd %s\n" % calc_dir)
+                            f.write(self.lobster_command)
                     if not self.collection_status(xc_calc):
                         # execute the collector (writes)
                         f.write("\ncd %s\n" % self.scripts_dir)
@@ -748,7 +759,6 @@ class SubmitTools(object):
                     continue
 
                 # retrieve the incar_mods that pertain to this particular calculation
-                xc_to_run, calc_to_run = xc_calc.split("-")
                 configs["xc_to_run"] = xc_to_run
                 configs["calc_to_run"] = calc_to_run
                 vsu = VASPSetUp(calc_dir=calc_dir, user_configs=configs)

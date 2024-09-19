@@ -118,6 +118,14 @@ def get_vasp_configs(
         else:
             vasp_configs["incar_mods"]["all-all"] = {"ISIF": 2}
 
+    if dont_relax_cell and not incar_mods:
+        vasp_configs["incar_mods"] = {"all-all": {"ISIF": 2}}
+    elif dont_relax_cell and incar_mods:
+        if vasp_configs["incar_mods"].get("all-all"):
+            vasp_configs["incar_mods"]["all-all"]["ISIF"] = 2
+        else:
+            vasp_configs["incar_mods"]["all-all"] = {"ISIF": 2}
+
     return vasp_configs
 
 
@@ -1422,13 +1430,10 @@ def get_thermo_results(
     fjson = os.path.join(data_dir, savename)
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
-
+    
+    gs_original = gs.copy()
     if "lobster" in gs:
-        thermo_results = {
-            calc: {xc: {formula: {} for formula in gs[calc][xc]} for xc in gs[calc]}
-            for calc in gs
-        }
-        gs_original = gs.copy()
+        thermo_results = {calc: {xc: {formula: {} for formula in gs[calc][xc]} for xc in gs[calc]} for calc in gs} 
     elif "static" in gs:
         thermo_results = {xc: {formula: {} for formula in gs[xc]} for xc in gs}
     else:
@@ -1460,7 +1465,7 @@ def get_thermo_results(
         tmp_thermo["calculated_formula"] = calcd_formula
 
         if E:
-            if "lobster" in gs:
+            if "lobster" in gs_original:
                 gs = gs_original[calc]
 
             gs_key = gs[xc][formula]["key"]
@@ -1506,19 +1511,14 @@ def check_thermo_results(thermo):
 
     if "lobster" in thermo:
         for calc in thermo:
+            print("  calc_type = %s" % calc)
             for xc in thermo[calc]:
-                print("\nxc = %s" % xc)
+                print("  xc = %s" % xc)
                 for formula in thermo[calc][xc]:
-                    print("formula = %s" % formula)
+                    print("     formula = %s" % formula)
                     print(
-                        "%i polymorphs converged"
-                        % len(
-                            [
-                                k
-                                for k in thermo[calc][xc][formula]
-                                if thermo[calc][xc][formula][k]["E"]
-                            ]
-                        )
+                        "       %i polymorphs converged"
+                        % len([k for k in thermo[calc][xc][formula] if thermo[calc][xc][formula][k]["E"]])
                     )
                     gs_ID = [
                         k
@@ -1527,12 +1527,12 @@ def check_thermo_results(thermo):
                     ]
                     if gs_ID:
                         gs_ID = gs_ID[0]
-                        print("%s is the ground-state structure" % gs_ID)
+                        print("     %s is the ground-state structure" % gs_ID)
 
         print("\n\n  SUMMARY  ")
         for calc in thermo:
             for xc in thermo[calc]:
-                print("~~%s~~" % xc)
+                print("~~%s-%s~~" % (xc, calc))
                 converged_formulas = []
                 for formula in thermo[calc][xc]:
                     for ID in thermo[calc][xc][formula]:
