@@ -118,6 +118,14 @@ def get_vasp_configs(
         else:
             vasp_configs["incar_mods"]["all-all"] = {"ISIF": 2}
 
+    if dont_relax_cell and not incar_mods:
+        vasp_configs["incar_mods"] = {"all-all": {"ISIF": 2}}
+    elif dont_relax_cell and incar_mods:
+        if vasp_configs["incar_mods"].get("all-all"):
+            vasp_configs["incar_mods"]["all-all"]["ISIF"] = 2
+        else:
+            vasp_configs["incar_mods"]["all-all"] = {"ISIF": 2}
+
     return vasp_configs
 
 
