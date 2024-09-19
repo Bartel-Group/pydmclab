@@ -1422,13 +1422,10 @@ def get_thermo_results(
     fjson = os.path.join(data_dir, savename)
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
-
+    
+    gs_original = gs.copy()
     if "lobster" in gs:
-        thermo_results = {
-            calc: {xc: {formula: {} for formula in gs[calc][xc]} for xc in gs[calc]}
-            for calc in gs
-        }
-        gs_original = gs.copy()
+        thermo_results = {calc: {xc: {formula: {} for formula in gs[calc][xc]} for xc in gs[calc]} for calc in gs} 
     elif "static" in gs:
         thermo_results = {xc: {formula: {} for formula in gs[xc]} for xc in gs}
     else:
