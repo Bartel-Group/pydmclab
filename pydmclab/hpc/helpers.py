@@ -1506,19 +1506,14 @@ def check_thermo_results(thermo):
 
     if "lobster" in thermo:
         for calc in thermo:
+            print("  calc_type = %s" % calc)
             for xc in thermo[calc]:
-                print("\nxc = %s" % xc)
+                print("  xc = %s" % xc)
                 for formula in thermo[calc][xc]:
-                    print("formula = %s" % formula)
+                    print("     formula = %s" % formula)
                     print(
-                        "%i polymorphs converged"
-                        % len(
-                            [
-                                k
-                                for k in thermo[calc][xc][formula]
-                                if thermo[calc][xc][formula][k]["E"]
-                            ]
-                        )
+                        "       %i polymorphs converged"
+                        % len([k for k in thermo[calc][xc][formula] if thermo[calc][xc][formula][k]["E"]])
                     )
                     gs_ID = [
                         k
@@ -1527,12 +1522,12 @@ def check_thermo_results(thermo):
                     ]
                     if gs_ID:
                         gs_ID = gs_ID[0]
-                        print("%s is the ground-state structure" % gs_ID)
+                        print("     %s is the ground-state structure" % gs_ID)
 
         print("\n\n  SUMMARY  ")
         for calc in thermo:
             for xc in thermo[calc]:
-                print("~~%s~~" % xc)
+                print("~~%s-%s~~" % (xc, calc))
                 converged_formulas = []
                 for formula in thermo[calc][xc]:
                     for ID in thermo[calc][xc][formula]:
