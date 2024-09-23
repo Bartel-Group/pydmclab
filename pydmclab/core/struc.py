@@ -1024,3 +1024,70 @@ class SolidSolutionGenerator:
             self.cleanup()
 
         return self.disordered_solns, self.ordered_solns, self.sqs_solns
+
+
+class SlabTools(object):
+    """
+    A class for manipulating slabs and computing their properties.
+    """
+
+    def init(
+        self,
+        structure: Structure | dict | str,
+        e_per_at: float,
+        miller_index: tuple(int, int, int),
+    ) -> None:
+        """
+        Initialize the SlabTools object.
+
+        Args:
+            structure (Structure | dict | str): pymatgen Structure object, Structure.as_dict(), or path to structure file.
+            e_per_at (float): Energy per atom of the slab.
+            miller_index (tuple(int, int, int)): Miller index of the slab.
+        """
+        if isinstance(structure, dict):
+            structure = Structure.from_dict(structure)
+        elif isinstance(structure, str):
+            if os.path.exists(structure):
+                structure = Structure.from_file(structure)
+            else:
+                raise ValueError("The path to the structure file does not exist.")
+
+        self.structure = structure
+        self.e_per_at = e_per_at
+        self.miller_index = miller_index
+
+    @property
+    def surface_area(
+        self, vacuum_axis: Literal["a", "b", "c", "auto"] = "auto", verbose: bool = True
+    ) -> float:
+        """
+        Returns the surface area of the slab.
+        """
+        lattice_mattrix = self.structure.lattice.matrix
+
+        if not isinstance(vacuum_axis, str) or vacuum_axis not in [
+            "a",
+            "b",
+            "c",
+            "auto",
+        ]:
+            raise ValueError("vacuum_axis must be one of 'a', 'b', 'c', or 'auto'.")
+
+        if vacuum_axis == "a":
+            lattice_mattrix = np.delete(lattice_mattrix, 0, axis=0)
+        elif vacuum_axis == "b":
+            lattice_mattrix = np.delete(lattice_mattrix, 1, axis=0)
+        elif vacuum_axis == "c":
+            lattice_mattrix = np.delete(lattice_mattrix, 2, axis=0)
+        elif vacuum_axis == "auto":
+            if verbose:
+                print("Auto selected - Vacuum axis will be set to the largest axis...")
+            index_of_largest_axis = np.argmax(
+                [np.linalg.norm(axis) for axis in lattice_mattrix]
+            )
+            lattice_mattrix = np.delete(lattice_mattrix, index_of_largest_axis, axis=0)
+
+        surface_area = np.linalg.norm(np.cross(lattice_mattrix[0], lattice_mattrix[1]))
+
+        return surface_area
