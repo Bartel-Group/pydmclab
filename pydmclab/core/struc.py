@@ -1031,7 +1031,7 @@ class SlabTools(object):
     A class for manipulating slabs and computing their properties.
     """
 
-    def init(
+    def __init__(
         self,
         structure: Structure | dict | str,
         e_per_at: float,
