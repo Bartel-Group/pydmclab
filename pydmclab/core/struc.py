@@ -1035,7 +1035,7 @@ class SlabTools(object):
         self,
         structure: Structure | dict | str,
         e_per_at: float,
-        miller_index: tuple(int, int, int),
+        miller_index: tuple(int),
     ) -> None:
         """
         Initialize the SlabTools object.
