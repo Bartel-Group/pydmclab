@@ -1057,7 +1057,6 @@ class SlabTools(object):
         self.e_per_at = e_per_at
         self.miller_index = miller_index
 
-    @property
     def surface_area(
         self, vacuum_axis: Literal["a", "b", "c", "auto"] = "auto", verbose: bool = True
     ) -> float:
