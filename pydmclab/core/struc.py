@@ -19,6 +19,7 @@ from pymatgen.analysis.structure_matcher import StructureMatcher
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
 from pydmclab.core import struc as pydmc_struc
+from pydmclab.core import _check_structure_type
 from pydmclab.core.comp import CompTools
 
 
@@ -1045,17 +1046,24 @@ class SlabTools(object):
             e_per_at (float): Energy per atom of the slab.
             miller_index (tuple(int, int, int)): Miller index of the slab.
         """
-        if isinstance(structure, dict):
-            structure = Structure.from_dict(structure)
-        elif isinstance(structure, str):
-            if os.path.exists(structure):
-                structure = Structure.from_file(structure)
-            else:
-                raise ValueError("The path to the structure file does not exist.")
+
+        structure = _check_structure_type(structure)
 
         self.structure = structure
         self.e_per_at = e_per_at
         self.miller_index = miller_index
+
+    def is_stoich(self, bulk_structure: Structure | dict | str) -> bool:
+        """
+        Check if the slab is stoichiometric with respect to the bulk structure.
+        """
+
+        bulk_structure = _check_structure_type(bulk_structure)
+
+        return (
+            self.structure.composition.reduced_formula
+            == bulk_structure.composition.reduced_formula
+        )
 
     def surface_area(
         self, vacuum_axis: Literal["a", "b", "c", "auto"] = "auto", verbose: bool = True
@@ -1090,3 +1098,45 @@ class SlabTools(object):
         surface_area = np.linalg.norm(np.cross(lattice_mattrix[0], lattice_mattrix[1]))
 
         return surface_area
+
+    def surface_energy(
+        self,
+        bulk_structure: Structure | dict | str,
+        bulk_e_per_at: float,
+        *,
+        vacuum_axis: Literal["a", "b", "c", "auto"] = "auto",
+    ) -> float:
+
+        bulk_structure = _check_structure_type(bulk_structure)
+
+        slab_e_tot = self.e_per_at * len(self.structure)
+        slab_reduced_composition_and_factor = (
+            self.structure.composition.get_reduced_composition_and_factor()
+        )
+        slab_reduced_composition, slab_reduced_factor = (
+            slab_reduced_composition_and_factor[0],
+            slab_reduced_composition_and_factor[1],
+        )
+
+        bulk_e_tot = bulk_e_per_at * len(bulk_structure)
+        bulk_reduced_composition_and_factor = (
+            bulk_structure.composition.get_reduced_composition_and_factor()
+        )
+        bulk_reduced_composition, bulk_reduced_factor = (
+            bulk_reduced_composition_and_factor[0],
+            bulk_reduced_composition_and_factor[1],
+        )
+
+        is_stoich = self.is_stoich(bulk_structure)
+
+        surface_area = self.surface_area(vacuum_axis=vacuum_axis, verbose=False)
+
+        if is_stoich:
+            ratio = slab_reduced_factor / bulk_reduced_factor
+            surface_energy = (slab_e_tot - ratio * bulk_e_tot) / (2 * surface_area)
+        elif not is_stoich:
+            raise NotImplementedError(
+                "Surface energy calculation for non-stoichiometric slabs is not yet implemented."
+            )
+
+        return surface_energy

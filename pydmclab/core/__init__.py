@@ -1,17 +1,18 @@
-# from pydmclab.core.comp import CompTools as CompTools
+import os
+from pymatgen.core.structure import Structure
 
-# from pydmclab.core.struc import StrucTools as StrucTools
-# from pydmclab.core.struc import SiteTools as SiteTools
 
-# from pydmclab.core.query import MPQuery as MPQuery
-# from pydmclab.core.query import MPLegacyQuery as MPLegacyQuery
-
-# from pydmclab.core.energies import ChemPots as ChemPots
-# from pydmclab.core.energies import ReactionEnergy as ReactionEnergy
-# from pydmclab.core.energies import FormationEnergy as FormationEnergy
-# from pydmclab.core.energies import FormationEnthalpy as FormationEnthalpy
-
-# from pydmclab.core.mag import MagTools as MagTools
-
-# from pydmclab.core.hulls import AnalyzeHull as AnalyzeHull
-# from pydmclab.core.hulls import GetHullInputData as GetHullInputData
+def _check_structure_type(structure: Structure | dict | str) -> Structure:
+    """
+    Check if the structure is a pymatgen Structure object, Structure.as_dict(), or path to structure file and return a Structure object.
+    """
+    if isinstance(structure, dict):
+        structure = Structure.from_dict(structure)
+    elif isinstance(structure, str):
+        if os.path.exists(structure):
+            structure = Structure.from_file(structure)
+        else:
+            raise ValueError(
+                "The given path (string) to the structure file does not exist."
+            )
+    return structure
