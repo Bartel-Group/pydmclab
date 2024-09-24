@@ -833,6 +833,83 @@ class SolidSolutionGenerator:
         self.disordered_solns = interp_structs
         return interp_structs
 
+    def order_disordered_structure(self, disordered_structure: Structure) -> Structure:
+        """
+        Convert a disordered pymatgen Structure object to an ordered one
+        by assigning species to sites according to their fractional occupancies.
+
+        For this class, the precise ordering does not matter. But the sqsgen
+        package requires the structure to be ordered. All that matters is the
+        relative number of each species on the sites to be disordered, which is
+        automatically determined by the fractional occupancies in disordered_structure.
+
+        Args:
+            disordered_structure (Structure): The input disordered structure.
+
+        Returns:
+            Structure: An ordered version of the input structure.
+        """
+        # Initialize an empty structure with the same lattice
+        ordered_structure: Structure = Structure(disordered_structure.lattice, [], [])
+
+        disordered_sites: List[PeriodicSite] = []
+        total_occupancy: Dict[str, float] = defaultdict(float)
+
+        # Separate ordered and disordered sites
+        for site in disordered_structure:
+            if site.is_ordered:
+                # Ordered site: add directly to the new structure
+                ordered_structure.append(site.species, site.frac_coords)
+            else:
+                # Disordered site: collect for processing
+                disordered_sites.append(site)
+                for specie, occupancy in site.species.items():
+                    total_occupancy[str(specie)] += occupancy
+
+        # Total number of disordered sites
+        num_disordered_sites: int = len(disordered_sites)
+
+        # Calculate the number of each species to assign
+        n_specie: Dict[str, int] = {}
+        fractional_part: Dict[str, float] = {}
+        for specie, total_occ in total_occupancy.items():
+            n_specie[specie] = int(total_occ)
+            fractional_part[specie] = total_occ - n_specie[specie]
+
+        total_assigned: int = sum(n_specie.values())
+        diff: int = num_disordered_sites - total_assigned
+
+        # Adjust the counts to match the total number of disordered sites
+        if diff > 0:
+            # Need to add species
+            for _ in range(diff):
+                # Find specie with the largest fractional part
+                specie: str = max(fractional_part, key=fractional_part.get)
+                n_specie[specie] += 1
+                fractional_part[specie] = 0  # Avoid selecting again
+        elif diff < 0:
+            # Need to remove species
+            for _ in range(-diff):
+                # Find specie with the smallest fractional part and positive count
+                specie_candidates: List[str] = [s for s in fractional_part if n_specie[s] > 0]
+                specie: str = min(specie_candidates, key=lambda s: fractional_part[s])
+                n_specie[specie] -= 1
+                fractional_part[specie] = 1  # Avoid selecting again
+
+        # Create a list of species according to the counts
+        species_list: List[str] = []
+        for specie, count in n_specie.items():
+            species_list.extend([specie] * count)
+
+        # Shuffle the list to distribute species randomly
+        random.shuffle(species_list)
+
+        # Assign species to the disordered sites
+        for site, specie in zip(disordered_sites, species_list):
+            ordered_structure.append({specie: 1.0}, site.frac_coords)
+
+        return ordered_structure
+
     def generate_ordered_solutions(self) -> List[Structure]:
         """
         Generate ordered solid solutions from the disordered solutions.
@@ -846,10 +923,8 @@ class SolidSolutionGenerator:
         ordered_solns = []
         for i, interp_struc in enumerate(self.disordered_solns):
             interp_struc.make_supercell(self.supercell_dim)
-            interp_struc = interp_struc.add_oxidation_state_by_guess()
-            struc_tools = pydmc_struc.StrucTools(interp_struc)
-            ordered_struc = struc_tools.get_ordered_structures()[0]
-            ordered_struc = Structure.from_dict(ordered_struc)
+            inerp_struc = interp_struc.remove_oxidation_states()
+            ordered_struc = self.order_disordered_structure(interp_struc)
             ordered_solns.append(ordered_struc)
             ordered_struc.to(
                 filename=os.path.join(self.dirs["output"], f"{i}.vasp"), fmt="poscar"
