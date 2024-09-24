@@ -584,7 +584,7 @@ class QHA(object):
         gibbs_energy = [item['gibbs_energy'] for item in qha_info]
         
         fig = plt.figure()
-        plt.plot(temperatures, gibbs_energy, color = COLORS["red"])
+        plt.plot(temperatures, gibbs_energy, color=COLORS['red'])
         plt.xlabel("Temperature (K)", fontsize=16)
         plt.ylabel("Gibbs Free Energy (eV)", fontsize=16)
         plt.title(f"Gibbs Free Energy for {formula} {mpid}", fontsize=18)
@@ -619,3 +619,63 @@ class QHA(object):
                 plt.show()
                 if save:
                     plt.savefig(os.path.join(fig_dir, f"{formula}_{mpid}_qha.png"))
+
+
+    def plot_all_gibbs_for_one_cmpd(self, formula, save=False, fig_dir=os.getcwd().replace("scripts", "figures")):
+        """
+        Plots the Gibbs free energy for all structures of a specific compound (formula) in the same plot.
+        """
+        results = self.parse_results
+        fig = plt.figure()
+        
+        # Loop through each mpid for the given formula and plot all on the same figure
+        for mpid in results[formula]:
+            qha_info = self.qha_info_one_struc(formula, mpid)
+            temperatures = [item['temperature'] for item in qha_info]
+            gibbs_energy = [item['gibbs_energy'] for item in qha_info]
+            
+            # Plot the Gibbs free energy for this mpid on the same figure
+            plt.plot(temperatures, gibbs_energy, label=mpid, linewidth=0.5)
+
+        # Set the plot labels, title, and legend
+        plt.xlabel("Temperature (K)", fontsize=16)
+        plt.ylabel("Gibbs Free Energy (eV)", fontsize=16)
+        plt.title(f"Gibbs Free Energy for {formula}", fontsize=18)
+        plt.xlim(0, max(temperatures))
+        plt.xticks(fontsize=14)
+        plt.yticks(fontsize=14)
+        plt.legend(fontsize=12, loc='best')
+
+        # Show the plot only once, after all lines have been added
+        plt.show()
+        
+        # Save the figure if requested
+        if save:
+            fig.savefig(os.path.join(fig_dir, f"{formula}_all_gibbs.png"))
+
+        return fig
+
+
+    def plot_entropy_contributions(self, formula):
+        """
+        Plots the entropy contributions for a specific formula and mpid.
+        """
+
+        results = self.parse_results
+        fig = plt.figure()
+        for mpid in results[formula]:
+            qha_info = self.qha_info_one_struc(formula, mpid)
+            temperatures = [item['temperature'] for item in qha_info]
+            gibbs_energies = [item['gibbs_energy'] for item in qha_info]
+            entropy_contributions = [gibbs-gibbs_energies[0] for gibbs in gibbs_energies]
+        
+            plt.plot(temperatures, entropy_contributions, label=mpid)
+            
+        plt.xlabel("Temperature (K)", fontsize=16)
+        plt.ylabel("-ST (eV)", fontsize=16)
+        plt.title(f"-ST term for {formula}", fontsize=18)
+        plt.legend()
+        plt.xlim(0, max(temperatures))
+        plt.xticks(fontsize=14)
+        plt.yticks(fontsize=14)
+
