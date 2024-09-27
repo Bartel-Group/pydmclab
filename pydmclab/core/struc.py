@@ -1105,6 +1105,7 @@ class SlabTools(object):
         bulk_e_per_at: float,
         *,
         vacuum_axis: Literal["a", "b", "c", "auto"] = "auto",
+        verbose: bool = True,
     ) -> float:
 
         bulk_structure = _check_structure_type(bulk_structure)
@@ -1129,7 +1130,7 @@ class SlabTools(object):
 
         is_stoich = self.is_stoich(bulk_structure)
 
-        surface_area = self.surface_area(vacuum_axis=vacuum_axis, verbose=False)
+        surface_area = self.surface_area(vacuum_axis=vacuum_axis, verbose=verbose)
 
         if is_stoich:
             ratio = slab_reduced_factor / bulk_reduced_factor
