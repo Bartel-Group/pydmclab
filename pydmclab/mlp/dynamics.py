@@ -25,6 +25,8 @@ from pymatgen.io.ase import AseAtomsAdaptor
 
 from torch import Tensor
 
+from pydmclab.mlp import convert_numpy_to_native
+
 if TYPE_CHECKING:
     from pydmclab.mlp import Versions, Devices, PredTask
     from typing_extensions import Self
@@ -342,7 +344,10 @@ class CHGNetRelaxer:
         if isinstance(atoms, Filter):
             atoms = atoms.atoms
 
-        struct = AseAtomsAdaptor.get_structure(atoms)
+        np_struct = AseAtomsAdaptor.get_structure(atoms)
+        struct_as_dict = np_struct.as_dict()
+        native_struct = convert_numpy_to_native(struct_as_dict)
+        struct = Structure.from_dict(native_struct)
 
         return {
             "final_structure": struct,
