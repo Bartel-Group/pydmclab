@@ -529,7 +529,7 @@ class AnalyzeMD:
         ax2 = plt.plot(times, temps, label="T", color="orange")
         ax2 = plt.ylabel("T (K)")
         ax2 = plt.xlabel("time (ps)")
-        ax2 = plt.legend()
+        # ax2 = plt.legend()
 
 
 def main():
