@@ -188,21 +188,39 @@ class CHGNetObserver:
         """The number of steps in the trajectory."""
         return len(self.energies)
 
+    def as_dict(self) -> dict[str, list]:
+        """Return the trajectory as a dictionary."""
+        return {
+            "atoms": self.atoms.todict(),
+            "energies": self.energies,
+            "forces": self.forces,
+            "stresses": self.stresses,
+            "magmoms": self.magmoms,
+            "atomic_numbers": self.atomic_numbers,
+            "atom_positions": self.atom_positions,
+            "cells": self.cells,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, list]) -> Self:
+        """Create a TrajectoryObserver from a dictionary."""
+        obs = cls(Atoms.fromdict(data["atoms"]))
+        obs.energies = data["energies"]
+        obs.forces = data["forces"]
+        obs.stresses = data["stresses"]
+        obs.magmoms = data["magmoms"]
+        obs.atomic_numbers = data["atomic_numbers"]
+        obs.atom_positions = data["atom_positions"]
+        obs.cells = data["cells"]
+        return obs
+
     def save(self, filename: str) -> None:
         """Save the trajectory to file.
 
         Args:
             filename (str): filename to save the trajectory
         """
-        out_pkl = {
-            "energy": self.energies,
-            "forces": self.forces,
-            "stresses": self.stresses,
-            "magmoms": self.magmoms,
-            "atomic_number": self.atomic_numbers,
-            "atom_positions": self.atom_positions,
-            "cell": self.cells,
-        }
+        out_pkl = self.as_dict()
         with open(filename, "wb") as file:
             pkl.dump(out_pkl, file)
 
@@ -303,6 +321,7 @@ class CHGNetRelaxer:
         traj_path: str | None = None,
         interval: int | None = 1,
         verbose: bool = True,
+        convert_to_native_types: bool = True,
         **kwargs,
     ) -> dict[str, Structure | CHGNetObserver]:
         """Relax the Structure/Atoms until maximum force is smaller than fmax."""
@@ -344,13 +363,17 @@ class CHGNetRelaxer:
         if isinstance(atoms, Filter):
             atoms = atoms.atoms
 
-        np_struct = AseAtomsAdaptor.get_structure(atoms)
-        struct_as_dict = np_struct.as_dict()
-        native_struct = convert_numpy_to_native(struct_as_dict)
-        struct = Structure.from_dict(native_struct)
+        struc = AseAtomsAdaptor.get_structure(atoms)
+
+        if convert_to_native_types:
+            native_struc = convert_numpy_to_native(struc.as_dict())
+            struc = Structure.from_dict(native_struc)
+
+            native_obs = convert_numpy_to_native(obs.as_dict())
+            obs = CHGNetObserver.from_dict(native_obs)
 
         return {
-            "final_structure": struct,
-            "final_energy": float(obs.energies[-1]),
+            "final_structure": struc,
+            "final_energy": obs.energies[-1],
             "trajectory": obs,
         }
