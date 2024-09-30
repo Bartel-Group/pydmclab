@@ -25,7 +25,7 @@ from pymatgen.io.ase import AseAtomsAdaptor
 
 from torch import Tensor
 
-from pydmclab.mlp import convert_numpy_to_native
+from pydmclab.utils.handy import convert_numpy_to_native
 
 if TYPE_CHECKING:
     from pydmclab.mlp import Versions, Devices, PredTask
