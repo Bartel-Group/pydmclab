@@ -440,9 +440,7 @@ class CHGNetMD:
                 stress_weight=stress_weight,
                 on_isolated_atoms=on_isolated_atoms,
             )
-            structure = self.relaxer.relax(
-                structure, convert_to_native_types=True, **kwargs
-            )["final_structure"]
+            structure = self.relaxer.relax(structure, **kwargs)["final_structure"]
 
         if isinstance(structure, Structure):
             self.structure = structure
