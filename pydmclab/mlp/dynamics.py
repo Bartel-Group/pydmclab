@@ -21,21 +21,19 @@ from ase import filters
 from ase.filters import Filter
 from ase.calculators.calculator import Calculator, all_changes, all_properties
 from ase.io.trajectory import Trajectory
+from ase.io.jsonio import encode, decode
 
 from pymatgen.core.structure import Structure
 from pymatgen.io.ase import AseAtomsAdaptor
 
 from torch import Tensor
 
-<<<<<<< HEAD
 import matplotlib.pyplot as plt
 from pydmclab.plotting.utils import set_rc_params
 
-set_rc_params()
-
-=======
 from pydmclab.utils.handy import convert_numpy_to_native
->>>>>>> 807c16e49b399c651decf86311bd3a24dff0155d
+
+set_rc_params()
 
 if TYPE_CHECKING:
     from pydmclab.mlp import Versions, Devices, PredTask
@@ -201,7 +199,7 @@ class CHGNetObserver:
     def as_dict(self) -> dict[str, list]:
         """Return the trajectory as a dictionary."""
         return {
-            "atoms": self.atoms.todict(),
+            "atoms": encode(self.atoms),
             "energies": self.energies,
             "forces": self.forces,
             "stresses": self.stresses,
@@ -214,7 +212,7 @@ class CHGNetObserver:
     @classmethod
     def from_dict(cls, data: dict[str, list]) -> Self:
         """Create a TrajectoryObserver from a dictionary."""
-        obs = cls(Atoms.fromdict(data["atoms"]))
+        obs = cls(decode(data["atoms"]))
         obs.energies = data["energies"]
         obs.forces = data["forces"]
         obs.stresses = data["stresses"]
@@ -393,7 +391,8 @@ class CHGNetMD:
     def __init__(
         self,
         structure: Structure | Atoms,
-        model: CHGNet | CHGNetCalculator,
+        *,
+        model: CHGNet | CHGNetCalculator | Versions | None = None,
         relax_first: bool = False,
         temperature: int = 300,
         pressure: float = 1.01325e-4,
@@ -404,8 +403,8 @@ class CHGNetMD:
         check_cuda_mem: bool = False,
         stress_weight: float | None = 1 / 160.21766208,
         on_isolated_atoms: Literal["ignore", "warn", "error"] = "warn",
-        logfile: str | None = None,
-        trajectory: str | None = None,
+        logfile: str = "md.log",
+        trajfile: str = "md.traj",
         loginterval: int = 10,
         **kwargs,
     ) -> None:
@@ -428,36 +427,48 @@ class CHGNetMD:
             loginterval (int): The interval to log the simulation.
             **kwargs: Additional keyword arguments.
         """
-        if isinstance(structure, Structure):
-            structure = AseAtomsAdaptor().get_atoms(structure)
-        structure.calc = model
-        if isinstance(model, CHGNetCalculator):
-            calculator = model
-        else:
-            calculator = CHGNetCalculator(
-                model=model,
-                use_device=use_device,
-                check_cuda_mem=check_cuda_mem,
-                stress_weight=stress_weight,
-                on_isolated_atoms=on_isolated_atoms,
-            )
-            model = calculator.model
-        if relax_first:
-            relaxer = CHGNetRelaxer(
-                model=model,
-                use_device=use_device,
-                check_cuda_mem=check_cuda_mem,
-                stress_weight=stress_weight,
-                on_isolated_atoms=on_isolated_atoms,
-            )
-            structure = relaxer.relax(structure, **kwargs)["final_structure"]
 
-        self.structure = structure
-        self.logfile = logfile if logfile else "md.log"
-        self.trajectory = trajectory if trajectory else "md.traj"
+        self.relaxer: CHGNetRelaxer | None = None
+
+        if relax_first:
+            self.relaxer = CHGNetRelaxer(
+                model=model,
+                use_device=use_device,
+                check_cuda_mem=check_cuda_mem,
+                stress_weight=stress_weight,
+                on_isolated_atoms=on_isolated_atoms,
+            )
+            structure = self.relaxer.relax(
+                structure, convert_to_native_types=True, **kwargs
+            )["final_structure"]
+
+        if isinstance(structure, Structure):
+            self.structure = structure
+            self.atoms = AseAtomsAdaptor().get_atoms(structure)
+        else:
+            self.atoms = structure
+            self.structure = AseAtomsAdaptor().get_structure(structure)
+
+        if isinstance(model, CHGNetCalculator):
+            self.calculator = model
+            self.model = self.calculator.model
+        else:
+            self.calculator = CHGNetCalculator(
+                model=model,
+                use_device=use_device,
+                check_cuda_mem=check_cuda_mem,
+                stress_weight=stress_weight,
+                on_isolated_atoms=on_isolated_atoms,
+            )
+            self.model = self.calculator.model
+
+        self.atoms.calc = self.calculator
+
+        self.logfile = logfile
+        self.trajectory = trajfile
         self.md = MolecularDynamics(
-            atoms=structure,
-            model=model,
+            atoms=self.atoms,
+            model=self.model,
             ensemble=ensemble,
             temperature=temperature,
             thermostat=thermostat,
@@ -480,7 +491,7 @@ class CHGNetMD:
 
 
 class AnalyzeMD:
-    def __init__(self, logfile, trajfile):
+    def __init__(self, logfile: str = "md.log", trajfile: str = "md.traj"):
         """
         Args:
             logfile (str): The filename for the log file.
@@ -490,14 +501,14 @@ class AnalyzeMD:
         self.trajfile = trajfile
 
     @property
-    def log_summary(self):
+    def log_summary(self) -> list[dict]:
         """
         Returns:
             list[dict]: A summary of the log file.
         """
         data = []
-        with open(self.logfile, "r") as f:
-            for line in f:
+        with open(self.logfile, "r") as logf:
+            for line in logf:
                 line = line[:-1]
                 if "Time" in line:
                     continue
@@ -514,7 +525,7 @@ class AnalyzeMD:
         return data
 
     @property
-    def traj_summary(self):
+    def traj_summary(self) -> list[dict]:
         """
         Returns:
             list[dict]: A summary of the trajectory file.
@@ -525,7 +536,7 @@ class AnalyzeMD:
         return [AseAtomsAdaptor.get_structure(atoms).as_dict() for atoms in traj]
 
     @property
-    def full_summary(self):
+    def full_summary(self) -> list[dict]:
         """
         Returns:
             list[dict]: A summary of the log and trajectory files.
