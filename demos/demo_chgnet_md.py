@@ -13,6 +13,13 @@ SAVE_LOG = os.path.join("output", "mlp-md", "chgnet_md.log")
 
 
 def main():
+
+    # Remove trajectory and log files if they exist otherwise they will be appended
+    if os.path.exists(SAVE_TRAJ):
+        os.remove(SAVE_TRAJ)
+    if os.path.exists(SAVE_LOG):
+        os.remove(SAVE_LOG)
+
     # Load structure
     initial_structure = StrucTools(TEST_STRUC).structure
 
