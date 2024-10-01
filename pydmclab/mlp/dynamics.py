@@ -11,6 +11,7 @@ from collections.abc import Sequence
 from typing import TYPE_CHECKING, Literal
 
 from chgnet.model import CHGNet
+from chgnet.model.dynamics import MolecularDynamics
 from chgnet.utils import determine_device
 
 import numpy as np
@@ -19,13 +20,20 @@ from ase import Atoms
 from ase import filters
 from ase.filters import Filter
 from ase.calculators.calculator import Calculator, all_changes, all_properties
+from ase.io.trajectory import Trajectory
+from ase.io.jsonio import encode, decode
 
 from pymatgen.core.structure import Structure
 from pymatgen.io.ase import AseAtomsAdaptor
 
 from torch import Tensor
 
+import matplotlib.pyplot as plt
+from pydmclab.plotting.utils import set_rc_params
+
 from pydmclab.utils.handy import convert_numpy_to_native
+
+set_rc_params()
 
 if TYPE_CHECKING:
     from pydmclab.mlp import Versions, Devices, PredTask
@@ -191,7 +199,9 @@ class CHGNetObserver:
     def as_dict(self) -> dict[str, list]:
         """Return the trajectory as a dictionary."""
         return {
-            "atoms": self.atoms.todict(),
+            "atoms": encode(
+                self.atoms
+            ),  # returns the atoms object as a str representation
             "energies": self.energies,
             "forces": self.forces,
             "stresses": self.stresses,
@@ -204,7 +214,7 @@ class CHGNetObserver:
     @classmethod
     def from_dict(cls, data: dict[str, list]) -> Self:
         """Create a TrajectoryObserver from a dictionary."""
-        obs = cls(Atoms.fromdict(data["atoms"]))
+        obs = cls(decode(data["atoms"]))
         obs.energies = data["energies"]
         obs.forces = data["forces"]
         obs.stresses = data["stresses"]
@@ -377,3 +387,189 @@ class CHGNetRelaxer:
             "final_energy": obs.energies[-1],
             "trajectory": obs,
         }
+
+
+class CHGNetMD:
+    def __init__(
+        self,
+        structure: Structure | Atoms,
+        *,
+        model: CHGNet | CHGNetCalculator | Versions | None = None,
+        relax_first: bool = False,
+        temperature: int = 300,
+        pressure: float = 1.01325e-4,
+        ensemble: str = "nvt",
+        thermostat: str = "Berendsen_inhomogeneous",
+        timestep: float = 2.0,
+        use_device: Devices | None = None,
+        check_cuda_mem: bool = False,
+        stress_weight: float | None = 1 / 160.21766208,
+        on_isolated_atoms: Literal["ignore", "warn", "error"] = "warn",
+        logfile: str = "md.log",
+        trajfile: str = "md.traj",
+        loginterval: int = 10,
+        **kwargs,
+    ) -> None:
+        """
+        Args:
+            structure (Structure | Atoms): The initial structure to simulate.
+            model (CHGNet | CHGNetCalculator): The CHGNet model to use.
+            relax_first (bool): Whether to relax the structure before running the MD.
+            temperature (int): The temperature of the simulation.
+            pressure (float): The pressure of the simulation.
+            ensemble (str): The ensemble to use for the simulation.
+            thermostat (str): The thermostat to use for the simulation.
+            timestep (float): The timestep for the simulation.
+            use_device (Devices | None): The device to run the simulation on.
+            check_cuda_mem (bool): Whether to check the available CUDA memory.
+            stress_weight (float | None): The weight of the stress in the loss function.
+            on_isolated_atoms (Literal["ignore", "warn", "error"]): How to handle isolated atoms.
+            logfile (str | None): The filename for the log file.
+            trajectory (str | None): The filename for the trajectory file.
+            loginterval (int): The interval to log the simulation.
+            **kwargs: Additional keyword arguments.
+        """
+
+        self.relaxer: CHGNetRelaxer | None = None
+
+        if relax_first:
+            self.relaxer = CHGNetRelaxer(
+                model=model,
+                use_device=use_device,
+                check_cuda_mem=check_cuda_mem,
+                stress_weight=stress_weight,
+                on_isolated_atoms=on_isolated_atoms,
+            )
+            structure = self.relaxer.relax(structure, **kwargs)["final_structure"]
+
+        if isinstance(structure, Structure):
+            self.structure = structure
+            self.atoms = AseAtomsAdaptor().get_atoms(structure)
+        else:
+            self.atoms = structure
+            self.structure = AseAtomsAdaptor().get_structure(structure)
+
+        if isinstance(model, CHGNetCalculator):
+            self.calculator = model
+            self.model = self.calculator.model
+        else:
+            self.calculator = CHGNetCalculator(
+                model=model,
+                use_device=use_device,
+                check_cuda_mem=check_cuda_mem,
+                stress_weight=stress_weight,
+                on_isolated_atoms=on_isolated_atoms,
+            )
+            self.model = self.calculator.model
+
+        self.atoms.calc = self.calculator
+
+        self.logfile = logfile
+        self.trajectory = trajfile
+        self.md = MolecularDynamics(
+            atoms=self.atoms,
+            model=self.model,
+            ensemble=ensemble,
+            temperature=temperature,
+            thermostat=thermostat,
+            timestep=timestep,
+            pressure=pressure,
+            use_device=use_device,
+            on_isolated_atoms=on_isolated_atoms,
+            logfile=self.logfile,
+            trajectory=self.trajectory,
+            loginterval=loginterval,
+        )
+
+    def run(self, steps: int = 1000):
+        """
+        Args:
+            steps (int): The number of steps to run the simulation.
+
+        """
+        self.md.run(steps=steps)
+
+
+class AnalyzeMD:
+    def __init__(self, logfile: str = "md.log", trajfile: str = "md.traj"):
+        """
+        Args:
+            logfile (str): The filename for the log file.
+            trajfile (str): The filename for the trajectory
+        """
+        self.logfile = logfile
+        self.trajfile = trajfile
+
+    @property
+    def log_summary(self) -> list[dict]:
+        """
+        Returns:
+            list[dict]: A summary of the log file.
+        """
+        data = []
+        with open(self.logfile, "r") as logf:
+            for line in logf:
+                line = line[:-1]
+                if "Time" in line:
+                    continue
+                t, Etot, Epot, Ekin, T = line.split()
+                data.append(
+                    {
+                        "t": float(t),
+                        "T": float(T),
+                        "Etot": float(Etot),
+                        "Epot": float(Epot),
+                        "Ekin": float(Ekin),
+                    }
+                )
+        return data
+
+    @property
+    def traj_summary(self) -> list[dict]:
+        """
+        Returns:
+            list[dict]: A summary of the trajectory file.
+                each item of the list is a Structure.as_dict()
+                corresponds with the log_summary dict
+        """
+        traj = Trajectory(self.trajfile)
+        return [AseAtomsAdaptor.get_structure(atoms).as_dict() for atoms in traj]
+
+    @property
+    def full_summary(self) -> list[dict]:
+        """
+        Returns:
+            list[dict]: A summary of the log and trajectory files.
+                each item of the list is a dict with the log_summary and corresponding structure at that time step
+        """
+        log_summary = self.log_summary
+        traj_summary = self.traj_summary
+
+        for i, structure in enumerate(traj_summary):
+            log_summary[i]["structure"] = structure
+
+        return log_summary
+
+    @property
+    def plot_E_T_t(self):
+        """
+        Returns:
+            plots E vs t and T vs t
+        """
+        data = self.log_summary
+
+        times = [d["t"] for d in data]
+        temps = [d["T"] for d in data]
+        Epots = [d["Epot"] for d in data]
+
+        fig = plt.figure()
+        ax1 = plt.subplot(211)
+        ax1 = plt.plot(times, Epots, label="E")
+        ax1 = plt.ylabel("E (eV)")
+        ax1 = plt.gca().xaxis.set_ticklabels([])
+        # ax1 = plt.legend()
+        ax2 = plt.subplot(212)
+        ax2 = plt.plot(times, temps, label="T", color="orange")
+        ax2 = plt.ylabel("T (K)")
+        ax2 = plt.xlabel("time (ps)")
+        # ax2 = plt.legend()
