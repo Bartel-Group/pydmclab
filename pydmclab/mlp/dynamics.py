@@ -544,8 +544,10 @@ class AnalyzeMD:
         """
         log_summary = self.log_summary
         traj_summary = self.traj_summary
-        for i in range(len(log_summary)):
-            log_summary[i]["structure"] = traj_summary[i]
+
+        for i, structure in enumerate(traj_summary):
+            log_summary[i]["structure"] = structure
+
         return log_summary
 
     @property
