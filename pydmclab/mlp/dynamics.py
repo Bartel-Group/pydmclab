@@ -199,7 +199,9 @@ class CHGNetObserver:
     def as_dict(self) -> dict[str, list]:
         """Return the trajectory as a dictionary."""
         return {
-            "atoms": encode(self.atoms),
+            "atoms": encode(
+                self.atoms
+            ),  # returns the atoms object as a str representation
             "energies": self.energies,
             "forces": self.forces,
             "stresses": self.stresses,
@@ -571,41 +573,3 @@ class AnalyzeMD:
         ax2 = plt.ylabel("T (K)")
         ax2 = plt.xlabel("time (ps)")
         # ax2 = plt.legend()
-
-
-def main():
-    rerun_MD = False
-    ftraj = "/Users/cbartel/Downloads/md.traj"
-    flog = "/Users/cbartel/Downloads/md.log"
-    if rerun_MD:
-        from pydmclab.core.struc import StrucTools
-        import os
-
-        if os.path.exists(ftraj):
-            os.remove(ftraj)
-        if os.path.exists(flog):
-            os.remove(flog)
-
-        s = StrucTools(
-            os.path.join("..", "data", "test_data", "launch", "Mn1O1.vasp")
-        ).structure
-
-        T, nsteps, loginterval = 1800, 10000, 100
-        md = CHGNetMD(
-            structure=s,
-            model="0.3.0",
-            temperature=T,
-            relax_first=False,
-            trajectory=ftraj,
-            logfile=flog,
-            loginterval=loginterval,
-        )
-        md.run(steps=nsteps)
-
-    amd = AnalyzeMD(flog, ftraj)
-
-    return amd
-
-
-if __name__ == "__main__":
-    amd = main()
