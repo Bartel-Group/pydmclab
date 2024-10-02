@@ -279,7 +279,11 @@ class AnalyzePhonons(object):
 
         Returns:
             Dictionary with the specified information
-            {'force_constants': array of force constances, 'mesh': mesh array, 'thermal_properties': dictionary of thermal properties, 'band_structure': band structure data, 'total_dos': dos data}
+            {'force_constants': array of force constants, 
+                                'mesh': mesh array, 
+                                'thermal_properties': dictionary of thermal properties, 
+                                'band_structure': band structure data, 
+                                'total_dos': dos data}
 
         """
         
