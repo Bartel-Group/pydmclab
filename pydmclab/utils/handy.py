@@ -1,4 +1,5 @@
 import json, os, yaml, subprocess
+import numpy as np
 from pydmclab.core.mag import MagTools
 from pydmclab.core.comp import CompTools
 
@@ -136,3 +137,21 @@ def eVat_to_kJmol(formula, eV_per_at):
 
 def kJmol_to_eVat(formula, kJ_per_mol):
     return kJ_per_mol / (96.485 * CompTools(formula).n_atoms)
+
+
+def convert_numpy_to_native(obj):
+    """
+    Convert numpy types to native (JSON serializable) types
+    """
+    if isinstance(obj, np.float32) or isinstance(obj, np.float64):
+        return float(obj)
+    elif isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, dict):
+        return {k: convert_numpy_to_native(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_numpy_to_native(i) for i in obj]
+    else:
+        return obj

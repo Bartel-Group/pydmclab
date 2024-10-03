@@ -1,46 +1,62 @@
 import os
 from pydmclab.core.struc import StrucTools
-from pydmclab.mlp.dynamics import CHGNetRelaxer
+from pydmclab.mlp.dynamics import CHGNetMD, AnalyzeMD
 
 
-DATA_DIR = os.path.join("output", "mlp-relaxation")
+DATA_DIR = os.path.join("output", "mlp-md")
 if not os.path.exists(DATA_DIR):
     os.makedirs(DATA_DIR)
 
 TEST_STRUC = os.path.join("cifs", "mp-18767-LiMnO2.cif")
-SAVE_TRAJ = os.path.join("output", "mlp-relaxation", "chgnet_traj.traj")
+SAVE_TRAJ = os.path.join("output", "mlp-md", "chgnet_md.traj")
+SAVE_LOG = os.path.join("output", "mlp-md", "chgnet_md.log")
 
 
 def main():
+
+    # Remove trajectory and log files if they exist otherwise they will be appended
+    if os.path.exists(SAVE_TRAJ):
+        os.remove(SAVE_TRAJ)
+    if os.path.exists(SAVE_LOG):
+        os.remove(SAVE_LOG)
+
     # Load structure
     initial_structure = StrucTools(TEST_STRUC).structure
 
     # Perturb structure
     perturbed_structure = initial_structure.perturb(0.3)
 
-    # Initialize relaxer
-    relaxer = CHGNetRelaxer(model="0.3.0", use_device="mps")
+    # Initialize our simulation temperature (in K), number of steps, and log interval
+    # Setting low number of steps for demo purposes
+    T, nsteps, loginterval = 1800, 100, 10
 
-    # Relax structure
-    results = relaxer.relax(
-        perturbed_structure,
-        fmax=0.1,
-        steps=50,
-        traj_path=SAVE_TRAJ,
-        verbose=True,
+    # Initialize MD object with the perturbed structure
+    md = CHGNetMD(
+        structure=perturbed_structure,
+        model="0.3.0",
+        temperature=T,
+        relax_first=True,
+        trajfile=SAVE_TRAJ,
+        logfile=SAVE_LOG,
+        loginterval=loginterval,
+        # **kwargs can be used to pass additional arguments to the relaxer object
+        # see pydmclab.mlp.dynamics.CHGNetRelaxer for more details
     )
 
-    # Get results from the observer
-    observer = results["trajectory"]
-    final_energy = results["final_energy"]
-    print("CHGNet took {} steps to converge.".format(len(observer)))
+    # Set the number of steps for the MD simulation and run (takes a bit of time)
+    md.run(steps=nsteps)
 
-    # Get initial and final energies
-    print("Initial energy: {:.3f} eV".format(observer.energies[0]))
-    print("Final energy: {:.3f} eV".format(final_energy))
+    # Analyze the MD trajectory files and log files
+    amd = AnalyzeMD(SAVE_LOG, SAVE_TRAJ)
 
-    return observer
+    # amd contains the results of the MD simulation and can be accessed through the following methods:
+    # amd.log_summary
+    # amd.traj_summary
+    # amd.full_summary
+    # amd.plot_E_T_t
+
+    return amd
 
 
 if __name__ == "__main__":
-    obs = main()
+    amd = main()
