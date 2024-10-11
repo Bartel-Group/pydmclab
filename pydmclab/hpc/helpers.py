@@ -485,6 +485,7 @@ def get_query(
             write (True) or just read (False) fjson
     Returns:
         {ID (str) : {'structure' : Pymatgen Structure as dict,
+                    'cmpd': formula string
                     '<other property>' : whatever you queried for}}
         e.g.,
             {'mp-1234' : {'structure' : Structure.as_dict,
