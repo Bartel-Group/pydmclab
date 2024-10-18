@@ -392,17 +392,24 @@ class QHA(object):
         parsed_results = {}
 
         for key in results:
-            # Only proceed with keys that have "dfpt" at the end
+            # Only proceed with keys that have "dfpt" at the end and obtain the E_per_at from static calculations
             if key.split("--")[-1].split("-")[-1] != "dfpt":
                 continue
-
             formula, mpid = key.split("--")[0], key.split("--")[1]
+            xc = key.split("--")[-1].split("-")[0]
             scale = mpid.split("_")[-1]
             mpid_minus_scale = "_".join(mpid.split("_")[:-1])
 
             phonon_data = results[key]['phonons']
             structure = results[key]['structure']
-            E_per_at = results[key]['results']['E_per_at']
+
+            # What if there's a case where someone does the static calculation with a different functional?
+            static_key = "--".join(key.split("--")[:-1] + [f"{xc}-static"])
+            if static_key not in results:
+                print(f"Warning: Static key {static_key} not found in results. Skipping.")
+                continue
+            
+            E_per_at = results[static_key]['results']['E_per_at']
             n_atoms = len(structure['sites'])
             E_electronic = n_atoms * E_per_at
 
