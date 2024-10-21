@@ -403,12 +403,11 @@ class QHA(object):
             phonon_data = results[key]['phonons']
             structure = results[key]['structure']
 
-            # What if there's a case where someone does the static calculation with a different functional?
             static_key = "--".join(key.split("--")[:-1] + [f"{xc}-static"])
             if static_key not in results:
                 print(f"Warning: Static key {static_key} not found in results. Skipping.")
                 continue
-            
+
             E_per_at = results[static_key]['results']['E_per_at']
             n_atoms = len(structure['sites'])
             E_electronic = n_atoms * E_per_at
