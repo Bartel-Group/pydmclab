@@ -725,7 +725,7 @@ def get_qha_strucs(info: dict, dict_type='strucs',
         return read_json(fjson)
 
     QHA_strucs = {}
-
+    
     # Helper function to scale structures and update the dictionary
     def scale_and_update(mpid, s):
         st = StrucTools(s)
