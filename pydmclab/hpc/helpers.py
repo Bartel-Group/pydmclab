@@ -680,42 +680,45 @@ def check_strucs(strucs):
             struc = strucs[formula][ID]
             print("\tstructure formula: %s" % StrucTools(struc).formula)
 
-def get_qha_strucs(strucs,
-    scale = np.linspace(0.96, 1.04, 5),
-    write=False,
-    data_dir=os.getcwd().replace("scripts", "data"),
-    savename="QHA_strucs.json",
-    remake=False,
-):
+def get_qha_strucs(info: dict, dict_type='strucs',
+                   scale=np.linspace(0.96, 1.04, 5),
+                   write=True,
+                   data_dir=os.getcwd().replace("scripts", "data"),
+                   savename="QHA_strucs.json",
+                   remake=False):
+    """
+    Scales the structures' volumes for Quasi-Harmonic Approximation (QHA) and returns a strained structures dictionary.
+    Can write the strained structures to a json file if needed.
 
-    '''                                                                                            
-     Use this if you are running phonon DFPT calculations for Quasi-Harmonic Approximation (QHA).
-     Takes the structures from the strucs dictionary, scales their volume to the specified range and returns the strained structures in a dictionary.
-     Can use this inside your get_strucs function by feeding it your custom strucs dictionary and return as the strucs variable to feed in the launcher.                                    
-                                                                                                   
-    Args:                                                                                          
-       strucs (dict)
-            {<formula indicator> (e.g., Cl3Cs1Pb1) :
-                <unique structure indicator> (e.g., MP ID) :
-                    {'structure' : Pymatgen Structure as dict,
-        scale (list)
-            list of scale factors to apply to the structure volume. For QHA, you need at least 5 volume points.
-        write (bool)
-            if write is True, writes the strained structures to a json file in DATA_DIR, otherwise just returns the strained structures dictionary
-        data_dir (str)                                                                             
-            directory to save fjson                                                                
-        savename (str)                                                                             
-            filename for fjson in DATA_DIR                                                         
-        remake (bool)                                                                              
-            write (True) or just read (False) fjson                                                
-                                                                                                   
+    Args:
+        info (dict): Structures or query info containing Pymatgen structures as dict.
+                    strucs (dict)
+                        {<formula indicator> (e.g., Cl3Cs1Pb1) :
+                            <unique structure indicator> (e.g., MP ID) :
+                                {'structure' : Pymatgen Structure as dict,
+                or  query (dict)
+                        {ID (str) : {'structure' : Pymatgen Structure as dict,
+                                    '<other property>' : whatever you queried for}}
+        dict_type (str): 
+            Type of dictionary ('strucs' or 'query') you are feeding for info.
+        scale (list): 
+            List of scale factors to apply to the structure volume. For QHA, you need at least 5 volume points.
+        write (bool): 
+            If True, writes the scaled structures to a JSON file.
+        data_dir (str): 
+            Directory to save the JSON file.
+        savename (str): 
+            filename for fjson in DATA_DIR  
+        remake (bool): 
+            write (True) or just read (False) fjson  
+
     Returns:
         {formula_indicator (str) :
             {struc_indicator (str) with scale factor as suffix:
                 Pymatgen Structure object as dict}}
         e.g., if you got some MP data, this might return something like:
             {'Cl3Cs1Pb1' : {'mp-1234_1.02' : Structure.as_dict}, {'mp-1234_1.04' : Structure.as_dict}, ...} 
-   '''
+    """
 
     fjson = os.path.join(data_dir, savename)
     if os.path.exists(fjson) and not remake and write:
@@ -723,21 +726,26 @@ def get_qha_strucs(strucs,
 
     QHA_strucs = {}
 
-    for cmpd in strucs:
-        for mpid in strucs[cmpd]:
-            s = strucs[cmpd][mpid]
-            st = StrucTools(s)
+    # Helper function to scale structures and update the dictionary
+    def scale_and_update(mpid, s):
+        st = StrucTools(s)
+        formula = st.compact_formula
+        
+        for i in scale:
+            scaled_st = st.scale_structure(i)  # Scale the structure
+            new_mpid = f"{mpid}_{i}"
+            QHA_strucs.setdefault(formula, {})[new_mpid] = scaled_st.as_dict()
 
-            for i in scale:                
-                scaled_st = st.scale_structure(i) #returns scaled pymatgen structure                   
-                formula = st.compact_formula
-                new_mpid = f"{mpid}_{i}"
+    # Loop over structures
+    if dict_type == 'strucs':
+        for cmpd in info:
+            for mpid in info[cmpd]:
+                scale_and_update(mpid, info[cmpd][mpid])
+    elif dict_type == 'query':
+        for mpid in info:
+            scale_and_update(mpid, info[mpid]['structure'])
 
-                if formula in QHA_strucs:
-                    QHA_strucs[formula][new_mpid] = scaled_st.as_dict()
-                else:
-                    QHA_strucs[formula] = {new_mpid:scaled_st.as_dict()}
-
+    # Write to JSON if needed
     if write:
         write_json(QHA_strucs, fjson)
         return read_json(fjson)
