@@ -1,7 +1,8 @@
 import os
 import subprocess
 import yaml
-from collections import Counter
+import random
+from collections import Counter, defaultdict
 from shutil import copyfile, rmtree
 from typing import List, Tuple, Dict, Literal
 
@@ -892,7 +893,9 @@ class SolidSolutionGenerator:
             # Need to remove species
             for _ in range(-diff):
                 # Find specie with the smallest fractional part and positive count
-                specie_candidates: List[str] = [s for s in fractional_part if n_specie[s] > 0]
+                specie_candidates: List[str] = [
+                    s for s in fractional_part if n_specie[s] > 0
+                ]
                 specie: str = min(specie_candidates, key=lambda s: fractional_part[s])
                 n_specie[specie] -= 1
                 fractional_part[specie] = 1  # Avoid selecting again

@@ -408,6 +408,7 @@ class CHGNetMD:
         logfile: str = "md.log",
         trajfile: str = "md.traj",
         loginterval: int = 10,
+        append_trajectory: bool = False,
         **kwargs,
     ) -> None:
         """
@@ -479,6 +480,7 @@ class CHGNetMD:
             logfile=self.logfile,
             trajectory=self.trajectory,
             loginterval=loginterval,
+            append_trajectory=append_trajectory,
         )
 
     def run(self, steps: int = 1000):
