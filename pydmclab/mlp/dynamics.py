@@ -428,6 +428,7 @@ class CHGNetMD:
             logfile (str | None): The filename for the log file.
             trajectory (str | None): The filename for the trajectory file.
             loginterval (int): The interval to log the simulation.
+            append_trajectory (bool): Whether to append to the trajectory file.
             **kwargs: Additional keyword arguments.
         """
 
@@ -483,6 +484,52 @@ class CHGNetMD:
             append_trajectory=append_trajectory,
         )
 
+    @classmethod
+    def continue_from_traj(
+        cls,
+        *,
+        model: CHGNet | CHGNetCalculator | Versions | None = None,
+        relax_first: bool = False,
+        temperature: int = 300,
+        pressure: float = 1.01325e-4,
+        ensemble: str = "nvt",
+        thermostat: str = "Berendsen_inhomogeneous",
+        timestep: float = 2.0,
+        use_device: Devices | None = None,
+        check_cuda_mem: bool = False,
+        stress_weight: float | None = 1 / 160.21766208,
+        on_isolated_atoms: Literal["ignore", "warn", "error"] = "warn",
+        trajfile: str = "md.traj",
+        logfile: str = "md.log",
+        loginterval: int = 10,
+        append_trajectory: bool = True,
+        **kwargs,
+    ) -> Self:
+        """Continue an MD simulation from a trajectory file."""
+        if not os.path.exists(trajfile):
+            raise FileNotFoundError(f"{trajfile} not found")
+        traj = Trajectory(trajfile)
+        starting_structure = traj[-1]
+        return cls(
+            structure=starting_structure,
+            model=model,
+            relax_first=relax_first,
+            temperature=temperature,
+            pressure=pressure,
+            ensemble=ensemble,
+            thermostat=thermostat,
+            timestep=timestep,
+            use_device=use_device,
+            check_cuda_mem=check_cuda_mem,
+            stress_weight=stress_weight,
+            on_isolated_atoms=on_isolated_atoms,
+            logfile=logfile,
+            trajfile=trajfile,
+            loginterval=loginterval,
+            append_trajectory=append_trajectory,
+            **kwargs,
+        )
+
     def run(self, steps: int = 1000):
         """
         Args:
@@ -510,18 +557,29 @@ class AnalyzeMD:
         """
         data = []
         with open(self.logfile, "r") as logf:
+            run_count = 0
+            t_adj = 0.0
+            change_time_adjust = False
             for line in logf:
                 line = line[:-1]
                 if "Time" in line:
+                    run_count += 1
+                    if run_count > 1:
+                        change_time_adjust = True
+                    continue
+                if change_time_adjust:
+                    t_adj = data[-1]["t"]
+                    change_time_adjust = False
                     continue
                 t, Etot, Epot, Ekin, T = line.split()
                 data.append(
                     {
-                        "t": float(t),
+                        "t": float(t) + t_adj,
                         "T": float(T),
                         "Etot": float(Etot),
                         "Epot": float(Epot),
                         "Ekin": float(Ekin),
+                        "run": run_count,
                     }
                 )
         return data
@@ -534,8 +592,17 @@ class AnalyzeMD:
                 each item of the list is a Structure.as_dict()
                 corresponds with the log_summary dict
         """
-        traj = Trajectory(self.trajfile)
-        return [AseAtomsAdaptor.get_structure(atoms).as_dict() for atoms in traj]
+        with Trajectory(self.trajfile) as traj:
+            traj_as_struc = [
+                AseAtomsAdaptor.get_structure(atoms).as_dict() for atoms in traj
+            ]
+        summary = self.log_summary
+        prev_run = summary[0]["run"]
+        for i, data in enumerate(summary):
+            if data["run"] != prev_run:
+                del traj_as_struc[i]
+            prev_run = data["run"]
+        return traj_as_struc
 
     @property
     def full_summary(self) -> list[dict]:
