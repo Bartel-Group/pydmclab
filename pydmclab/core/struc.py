@@ -1159,6 +1159,19 @@ class SlabTools(object):
         ]:
             raise ValueError("vacuum_axis must be one of 'a', 'b', 'c', or 'auto'.")
 
+        axis_lengths = {
+            "a": np.linalg.norm(lattice_mattrix[0]),
+            "b": np.linalg.norm(lattice_mattrix[1]),
+            "c": np.linalg.norm(lattice_mattrix[2]),
+        }
+
+        if vacuum_axis != "auto" and axis_lengths[vacuum_axis] != max(
+            axis_lengths.values()
+        ):
+            raise UserWarning(
+                f"The specified vacuum axis '{vacuum_axis}' is not the longest axis in the lattice."
+            )
+
         if vacuum_axis == "a":
             lattice_mattrix = np.delete(lattice_mattrix, 0, axis=0)
         elif vacuum_axis == "b":
