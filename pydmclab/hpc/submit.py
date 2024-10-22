@@ -60,6 +60,10 @@ class SubmitTools(object):
             ID_specific_vasp_configs (dict)
                 any configs that pertain to a particular structure for a particular formula
                     usually passed here from your launch_dirs.json file (just like magmom)
+                Should be formatted as:
+                    {(kpoint, incar, potcar)_mods: {param: value}}
+                    xc-calc is assumed to be 'all-all' in every case and should not be specified (as it is now)
+                    e.g., {'incar_mods': {'ISMEAR': 0, 'SIGMA': 0.05}} or {'kpoints_mods': {'grid': [6, 6, 6]}}
 
             user_configs (dict)
                 any non-default parameters you want to pass
@@ -84,12 +88,21 @@ class SubmitTools(object):
 
         if ID_specific_vasp_configs:
             for input_file in ["incar", "kpoints", "potcar"]:
-                key = "%s_mods" % input_file
+                key = f"{input_file}_mods"
                 if key in ID_specific_vasp_configs:
-                    if "all-all" in configs[key]:
-                        configs[key]["all-all"].update(ID_specific_vasp_configs[key])
-                    else:
-                        configs[key].update({"all-all": ID_specific_vasp_configs[key]})
+
+                    if not isinstance(ID_specific_vasp_configs[key], dict):
+                        raise ValueError(
+                            f"{key} should be a dictionary of modifications, not {type(ID_specific_vasp_configs[key])}."
+                        )
+
+                    for sub_key, sub_value in ID_specific_vasp_configs[key].items():
+                        if isinstance(sub_value, dict):
+                            raise ValueError(
+                                f"{key} is more than 2 layers deep. Avoid specifying 'xc-calc' as 'all-all' is assumed."
+                            )
+
+                    configs[key].update({"all-all": ID_specific_vasp_configs[key]})
 
         # set mag based on launch_dir
         configs["mag"] = mag
@@ -733,7 +746,7 @@ class SubmitTools(object):
             for xc_calc in calc_list:
                 status = statuses[xc_calc]
                 xc_to_run, calc_to_run = xc_calc.split("-")
-                
+
                 # write status to status.o
                 f.write('\necho "%s is %s" >> %s\n' % (xc_calc, status, fstatus))
 
