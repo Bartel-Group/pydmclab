@@ -2,7 +2,7 @@ import os
 from pymatgen.core.structure import Structure
 
 
-def _check_structure_type(structure: Structure | dict | str) -> Structure:
+def _to_pymatgen_structure(structure: Structure | dict | str) -> Structure:
     """
     Check if the structure is a pymatgen Structure object, Structure.as_dict(), or path to structure file and return a Structure object.
     """

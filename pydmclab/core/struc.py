@@ -20,7 +20,7 @@ from pymatgen.analysis.structure_matcher import StructureMatcher
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
 from pydmclab.core import struc as pydmc_struc
-from pydmclab.core import _check_structure_type
+from pydmclab.core import _to_pymatgen_structure
 from pydmclab.core.comp import CompTools
 
 
@@ -41,18 +41,7 @@ class StrucTools(object):
                 - or None
 
         """
-        # convert Structure.as_dict() to Structure
-        if isinstance(structure, dict):
-            structure = Structure.from_dict(structure)
-
-        # convert file into Structure
-        if isinstance(structure, str):
-            if os.path.exists(structure):
-                structure = Structure.from_file(structure)
-            else:
-                raise ValueError(
-                    "you passed a string to StrucTools > this means a path to a structure > but the path is empty ..."
-                )
+        structure = _to_pymatgen_structure(structure)
         self.structure = structure
         self.ox_states = ox_states
 
@@ -549,7 +538,7 @@ class SiteTools(object):
         Returns:
             pymatgen Site object
         """
-        structure = StrucTools(structure).structure
+        structure = _to_pymatgen_structure(structure)
         self.site = structure[index]
 
     @property
@@ -1125,7 +1114,7 @@ class SlabTools(object):
             miller_index (tuple(int, int, int)): Miller index of the slab.
         """
 
-        structure = _check_structure_type(structure)
+        structure = _to_pymatgen_structure(structure)
 
         self.structure = structure
         self.e_per_at = e_per_at
@@ -1136,7 +1125,7 @@ class SlabTools(object):
         Check if the slab is stoichiometric with respect to the bulk structure.
         """
 
-        bulk_structure = _check_structure_type(bulk_structure)
+        bulk_structure = _to_pymatgen_structure(bulk_structure)
 
         return (
             self.structure.composition.reduced_formula
@@ -1199,7 +1188,7 @@ class SlabTools(object):
         verbose: bool = True,
     ) -> float:
 
-        bulk_structure = _check_structure_type(bulk_structure)
+        bulk_structure = _to_pymatgen_structure(bulk_structure)
 
         slab_e_tot = self.e_per_at * len(self.structure)
         slab_reduced_composition_and_factor = (
