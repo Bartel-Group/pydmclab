@@ -8,7 +8,9 @@ from typing import List, Tuple, Dict, Literal
 
 import numpy as np
 
-from pymatgen.core import Structure, PeriodicSite
+from math import gcd
+
+from pymatgen.core import Structure, PeriodicSite, Composition
 from pymatgen.core.surface import SlabGenerator
 from pymatgen.transformations.standard_transformations import (
     OrderDisorderedStructureTransformation,
@@ -22,6 +24,7 @@ from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from pydmclab.core import struc as pydmc_struc
 from pydmclab.core import _to_pymatgen_structure
 from pydmclab.core.comp import CompTools
+from pydmclab.core.energies import ChemPots
 
 
 class StrucTools(object):
@@ -1179,6 +1182,51 @@ class SlabTools(object):
 
         return surface_area
 
+    def calculate_excess_or_deficient_amts(
+        self,
+        slab_reduced_amts: Composition | dict,
+        bulk_reduced_amts: Composition | dict,
+    ) -> dict(str, int):
+
+        if isinstance(slab_reduced_amts, Composition):
+            slab_reduced_amts = slab_reduced_amts.get_el_amt_dict()
+        if isinstance(bulk_reduced_amt, Composition):
+            bulk_reduced_amts = bulk_reduced_amts.get_el_amt_dict()
+
+        all_els = set(slab_reduced_amts.keys()).union(set(bulk_reduced_amts.keys()))
+
+        scaling_factors = {}
+        for el in all_els:
+            slab_amt = slab_reduced_amts.get(el, 0)
+            bulk_amt = bulk_reduced_amts.get(el, 0)
+
+            if slab_amt > 0 and bulk_amt > 0:
+                scaling_factors[el] = abs(slab_amt * bulk_amt) // gcd(
+                    slab_amt, bulk_amt
+                )
+            elif slab_amt > 0 and bulk_amt == 0:
+                scaling_factors[el] = slab_amt
+            elif slab_amt == 0 and bulk_amt > 0:
+                scaling_factors[el] = bulk_amt
+
+        slab_scale = max(
+            scaling_factors[el] // slab_reduced_amts.get(el, 1)
+            for el in slab_reduced_amts
+        )
+        bulk_scale = max(
+            scaling_factors[el] // bulk_reduced_amts.get(el, 1)
+            for el in bulk_reduced_amts
+        )
+
+        slab_scaled = {el: slab_reduced_amts.get(el, 0) * slab_scale for el in all_els}
+        bulk_scaled = {el: bulk_reduced_amts.get(el, 0) * bulk_scale for el in all_els}
+
+        excess_or_deficient_amts = {
+            el: slab_scaled[el] - bulk_scaled[el] for el in all_els
+        }
+
+        return excess_or_deficient_amts
+
     def surface_energy(
         self,
         bulk_structure: Structure | dict | str,
@@ -1216,8 +1264,13 @@ class SlabTools(object):
             ratio = slab_reduced_factor / bulk_reduced_factor
             surface_energy = (slab_e_tot - ratio * bulk_e_tot) / (2 * surface_area)
         elif not is_stoich:
-            raise NotImplementedError(
-                "Surface energy calculation for non-stoichiometric slabs is not yet implemented."
+            excess_or_deficient_amts = self.calculate_excess_or_deficient_amts(
+                slab_reduced_composition, bulk_reduced_composition
             )
+            return excess_or_deficient_amts
+
+            # raise NotImplementedError(
+            #     "Surface energy calculation for non-stoichiometric slabs is not yet implemented."
+            # )
 
         return surface_energy
