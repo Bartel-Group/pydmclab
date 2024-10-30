@@ -1,14 +1,19 @@
+from __future__ import annotations
+
 import os
 import subprocess
 import yaml
 import random
+import warnings
+
+from typing import TYPE_CHECKING
 from collections import Counter, defaultdict
 from shutil import copyfile, rmtree
 from typing import List, Tuple, Dict, Literal
 
 import numpy as np
 
-from math import gcd
+from math import lcm
 
 from pymatgen.core import Structure, PeriodicSite, Composition
 from pymatgen.core.surface import SlabGenerator
@@ -24,7 +29,9 @@ from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from pydmclab.core import struc as pydmc_struc
 from pydmclab.core import _to_pymatgen_structure
 from pydmclab.core.comp import CompTools
-from pydmclab.core.energies import ChemPots
+
+if TYPE_CHECKING:
+    from pydmclab.core.energies import ChemPots
 
 
 class StrucTools(object):
@@ -1160,8 +1167,9 @@ class SlabTools(object):
         if vacuum_axis != "auto" and axis_lengths[vacuum_axis] != max(
             axis_lengths.values()
         ):
-            raise UserWarning(
-                f"The specified vacuum axis '{vacuum_axis}' is not the longest axis in the lattice."
+            warnings.warn(
+                f"The specified vacuum axis '{vacuum_axis}' is not the longest axis in the lattice.",
+                category=UserWarning,
             )
 
         if vacuum_axis == "a":
@@ -1172,7 +1180,7 @@ class SlabTools(object):
             lattice_mattrix = np.delete(lattice_mattrix, 2, axis=0)
         elif vacuum_axis == "auto":
             if verbose:
-                print("Auto selected - Vacuum axis will be set to the largest axis...")
+                print("Auto selected - Vacuum axis will be set to the largest axis.")
             index_of_largest_axis = np.argmax(
                 [np.linalg.norm(axis) for axis in lattice_mattrix]
             )
@@ -1184,48 +1192,134 @@ class SlabTools(object):
 
     def calculate_excess_or_deficient_amts(
         self,
-        slab_reduced_amts: Composition | dict,
-        bulk_reduced_amts: Composition | dict,
-    ) -> dict(str, int):
+        slab_reduced_comp: Composition,
+        bulk_reduced_comp: Composition,
+        *,
+        cations: List[str] | str = None,
+        anions: List[str] | str = None,
+        verbose: bool = True,
+    ) -> dict[str, int]:
 
-        if isinstance(slab_reduced_amts, Composition):
-            slab_reduced_amts = slab_reduced_amts.get_el_amt_dict()
-        if isinstance(bulk_reduced_amt, Composition):
-            bulk_reduced_amts = bulk_reduced_amts.get_el_amt_dict()
+        slab_reduced_amts = slab_reduced_comp.get_el_amt_dict()
+        bulk_reduced_amts = bulk_reduced_comp.get_el_amt_dict()
+
+        if slab_reduced_amts.keys() != bulk_reduced_amts.keys():
+            raise NotImplementedError(
+                "Having different elements in the slab and bulk compositions is not yet supported."
+            )
 
         all_els = set(slab_reduced_amts.keys()).union(set(bulk_reduced_amts.keys()))
 
-        scaling_factors = {}
-        for el in all_els:
-            slab_amt = slab_reduced_amts.get(el, 0)
-            bulk_amt = bulk_reduced_amts.get(el, 0)
+        if isinstance(cations, str):
+            cations = [cations]
+        elif isinstance(cations, list) and not all(
+            isinstance(el, str) for el in cations
+        ):
+            raise ValueError(
+                "Cations must be a list of strings, a single string, or None."
+            )
 
-            if slab_amt > 0 and bulk_amt > 0:
-                scaling_factors[el] = abs(slab_amt * bulk_amt) // gcd(
-                    slab_amt, bulk_amt
+        if isinstance(anions, str):
+            anions = [anions]
+        elif isinstance(anions, list) and not all(isinstance(el, str) for el in anions):
+            raise ValueError(
+                "Anions must be a list of strings, a single string, or None."
+            )
+
+        undetermined = None
+
+        if not cations and not anions:
+            undetermined = "cations/anions"
+        elif not cations:
+            undetermined = "cations"
+        elif not anions:
+            undetermined = "anions"
+
+        if undetermined:
+            if verbose:
+                print(
+                    f"No {undetermined} specified - {undetermined} will be determined based on most probable oxidation states."
                 )
-            elif slab_amt > 0 and bulk_amt == 0:
-                scaling_factors[el] = slab_amt
-            elif slab_amt == 0 and bulk_amt > 0:
-                scaling_factors[el] = bulk_amt
+            oxi_state_guesses = slab_reduced_comp.oxi_state_guesses()
 
-        slab_scale = max(
-            scaling_factors[el] // slab_reduced_amts.get(el, 1)
-            for el in slab_reduced_amts
-        )
-        bulk_scale = max(
-            scaling_factors[el] // bulk_reduced_amts.get(el, 1)
-            for el in bulk_reduced_amts
+            if not oxi_state_guesses:
+                warnings.warn(
+                    "Initial guess failed. Expanding possible allowed oxidation states.",
+                    category=UserWarning,
+                )
+                oxi_state_guesses = slab_reduced_comp.oxi_state_guesses(
+                    all_oxi_states=True
+                )
+
+            if not oxi_state_guesses:
+                raise ValueError(
+                    "Failed to find possible oxidation states. Please provide specific {undetermined}."
+                )
+
+            oxi_state_guesses = oxi_state_guesses[0]
+
+            if not cations:
+                cations = [
+                    el for el in oxi_state_guesses.keys() if oxi_state_guesses[el] > 0
+                ]
+            if not anions:
+                anions = [
+                    el for el in oxi_state_guesses.keys() if oxi_state_guesses[el] < 0
+                ]
+
+        if not all(el in all_els for el in cations):
+            raise ValueError(
+                "Cations must be elements in the slab and bulk compositions."
+            )
+        if not all(el in all_els for el in anions):
+            raise ValueError(
+                "Anions must be elements in the slab and bulk compositions."
+            )
+
+        if verbose:
+            print(f"Cations: {cations}\nAnions: {anions}")
+
+        bulk_cation_to_anion_ratio = sum(bulk_reduced_amts[el] for el in cations) / sum(
+            bulk_reduced_amts[el] for el in anions
         )
 
-        slab_scaled = {el: slab_reduced_amts.get(el, 0) * slab_scale for el in all_els}
-        bulk_scaled = {el: bulk_reduced_amts.get(el, 0) * bulk_scale for el in all_els}
+        slab_cation_to_anion_ratio = sum(slab_reduced_amts[el] for el in cations) / sum(
+            slab_reduced_amts[el] for el in anions
+        )
+
+        if verbose:
+            print(
+                f"Bulk cation:anion ratio: {bulk_cation_to_anion_ratio}\nSlab cation:anion ratio: {slab_cation_to_anion_ratio}"
+            )
+
+        if bulk_cation_to_anion_ratio > slab_cation_to_anion_ratio:
+            # Slab has an excess of anions
+            scaling_factor = min(
+                (
+                    slab_reduced_amts[el] // bulk_reduced_amts[el]
+                    if slab_reduced_amts[el] > 0
+                    else 1
+                )
+                for el in bulk_reduced_amts
+            )
+        elif bulk_cation_to_anion_ratio < slab_cation_to_anion_ratio:
+            # Slab has a deficiency of anions
+            scaling_factor = max(
+                (
+                    slab_reduced_amts[el] // bulk_reduced_amts[el]
+                    if slab_reduced_amts[el] > 0
+                    else 1
+                )
+                for el in bulk_reduced_amts
+            )
+
+        bulk_scaled = {el: bulk_reduced_amts[el] * scaling_factor for el in all_els}
 
         excess_or_deficient_amts = {
-            el: slab_scaled[el] - bulk_scaled[el] for el in all_els
+            el: slab_reduced_amts[el] - bulk_scaled[el] for el in all_els
         }
 
-        return excess_or_deficient_amts
+        return anions, cations, excess_or_deficient_amts, scaling_factor
 
     def surface_energy(
         self,
@@ -1233,7 +1327,12 @@ class SlabTools(object):
         bulk_e_per_at: float,
         *,
         vacuum_axis: Literal["a", "b", "c", "auto"] = "auto",
+        cations: List[str] | str = None,
+        anions: List[str] | str = None,
+        ref_potentials: ChemPots | dict = None,
+        only_consider_anion_mu: bool = False,
         verbose: bool = True,
+        **kwargs,
     ) -> float:
 
         bulk_structure = _to_pymatgen_structure(bulk_structure)
@@ -1260,17 +1359,43 @@ class SlabTools(object):
 
         surface_area = self.surface_area(vacuum_axis=vacuum_axis, verbose=verbose)
 
+        ratio = slab_reduced_factor / bulk_reduced_factor
+
         if is_stoich:
-            ratio = slab_reduced_factor / bulk_reduced_factor
             surface_energy = (slab_e_tot - ratio * bulk_e_tot) / (2 * surface_area)
         elif not is_stoich:
-            excess_or_deficient_amts = self.calculate_excess_or_deficient_amts(
-                slab_reduced_composition, bulk_reduced_composition
-            )
-            return excess_or_deficient_amts
 
-            # raise NotImplementedError(
-            #     "Surface energy calculation for non-stoichiometric slabs is not yet implemented."
-            # )
+            from pydmclab.core.energies import ChemPots
+
+            anions, cations, excess_or_deficient_amts, scaling_factor = (
+                self.calculate_excess_or_deficient_amts(
+                    slab_reduced_composition,
+                    bulk_reduced_composition,
+                    cations=cations,
+                    anions=anions,
+                    verbose=verbose,
+                )
+            )
+
+            if not ref_potentials:
+                mus = ChemPots(**kwargs)
+                ref_potentials = mus.chempots
+                print(ref_potentials)
+            elif isinstance(ref_potentials, ChemPots):
+                ref_potentials = ref_potentials.chempots
+
+            if only_consider_anion_mu:
+                delta_mu_sum = sum(
+                    excess_or_deficient_amts[el] * ref_potentials[el] for el in anions
+                )
+            else:
+                delta_mu_sum = sum(
+                    excess_or_deficient_amts[el] * ref_potentials[el]
+                    for el in excess_or_deficient_amts
+                )
+
+            surface_energy = (
+                (slab_e_tot + delta_mu_sum) - (ratio * scaling_factor * bulk_e_tot)
+            ) / (2 * surface_area)
 
         return surface_energy
