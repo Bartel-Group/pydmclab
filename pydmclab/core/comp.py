@@ -1,5 +1,9 @@
 from pymatgen.core.composition import Composition
 import numpy as np
+import warnings
+
+
+from typing import Literal
 
 
 class CompTools(object):
@@ -196,9 +200,65 @@ class CompTools(object):
         label += "$"
         return label
 
+    def guess_ions_from_oxi_states(self, return_only_most_probable: bool = True):
+        """
+        Returns:
+            dict with lists of cations and anions (str) based on the assumed oxidation states of the elements
+        """
+        ions = {}
+
+        composition = Composition(self.formula)
+
+        oxi_state_guesses = composition.oxi_state_guesses()
+
+        if not oxi_state_guesses:
+            warnings.warn(
+                "Initial guess failed. Expanding possible allowed oxidation states.",
+                category=UserWarning,
+            )
+            oxi_state_guesses = composition.oxi_state_guesses(all_oxi_states=True)
+
+        if not oxi_state_guesses:
+            raise ValueError("Failed to find possible oxidation states.")
+
+        if return_only_most_probable:
+            oxi_state_guesses = oxi_state_guesses[0]
+
+            ions["cations"] = [
+                el for el in oxi_state_guesses.keys() if oxi_state_guesses[el] > 0
+            ]
+            ions["anions"] = [
+                el for el in oxi_state_guesses.keys() if oxi_state_guesses[el] < 0
+            ]
+
+        else:
+            for i, oxi_state_guess in enumerate(oxi_state_guesses):
+                ions[i] = {}
+                ions[i]["cations"] = [
+                    el for el in oxi_state_guess.keys() if oxi_state_guess[el] > 0
+                ]
+                ions[i]["anions"] = [
+                    el for el in oxi_state_guess.keys() if oxi_state_guess[el] < 0
+                ]
+
+        return ions
+
+    def get_reduced_comp_and_factor(self):
+        """
+        Returns:
+            reduced formula (str) and factor (float) of the formula
+        """
+
+        reduced_comp_and_factor = Composition(
+            self.formula
+        ).get_reduced_composition_and_factor()
+        reduced_comp, factor = reduced_comp_and_factor[0], reduced_comp_and_factor[1]
+
+        return reduced_comp, factor
+
 
 def main():
-    return
+    return None
 
 
 if __name__ == "__main__":

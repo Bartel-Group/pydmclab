@@ -1113,7 +1113,6 @@ class SlabTools(object):
         self,
         structure: Structure | dict | str,
         e_per_at: float,
-        miller_index: tuple[int, int, int] = None,
     ) -> None:
         """
         Initialize the SlabTools object.
@@ -1121,14 +1120,12 @@ class SlabTools(object):
         Args:
             structure (Structure | dict | str): pymatgen Structure object, Structure.as_dict(), or path to structure file.
             e_per_at (float): Energy per atom of the slab.
-            miller_index (tuple(int, int, int)): Miller index of the slab.
         """
 
         structure = _to_pymatgen_structure(structure)
 
         self.structure = structure
         self.e_per_at = e_per_at
-        self.miller_index = miller_index
 
     def is_stoich(self, bulk_structure: Structure | dict | str) -> bool:
         """
@@ -1226,46 +1223,10 @@ class SlabTools(object):
                 "Anions must be a list of strings, a single string, or None."
             )
 
-        undetermined = None
-
-        if not cations and not anions:
-            undetermined = "cations/anions"
-        elif not cations:
-            undetermined = "cations"
-        elif not anions:
-            undetermined = "anions"
-
-        if undetermined:
-            if verbose:
-                print(
-                    f"No {undetermined} specified - {undetermined} will be determined based on most probable oxidation states."
-                )
-            oxi_state_guesses = slab_reduced_comp.oxi_state_guesses()
-
-            if not oxi_state_guesses:
-                warnings.warn(
-                    "Initial guess failed. Expanding possible allowed oxidation states.",
-                    category=UserWarning,
-                )
-                oxi_state_guesses = slab_reduced_comp.oxi_state_guesses(
-                    all_oxi_states=True
-                )
-
-            if not oxi_state_guesses:
-                raise ValueError(
-                    "Failed to find possible oxidation states. Please provide specific {undetermined}."
-                )
-
-            oxi_state_guesses = oxi_state_guesses[0]
-
-            if not cations:
-                cations = [
-                    el for el in oxi_state_guesses.keys() if oxi_state_guesses[el] > 0
-                ]
-            if not anions:
-                anions = [
-                    el for el in oxi_state_guesses.keys() if oxi_state_guesses[el] < 0
-                ]
+        if not cations or not anions:
+            ions = CompTools(slab_reduced_comp.formula).guess_ions_from_oxi_states()
+            cations = cations or ions["cations"]
+            anions = anions or ions["anions"]
 
         if not all(el in all_els for el in cations):
             raise ValueError(
@@ -1275,9 +1236,6 @@ class SlabTools(object):
             raise ValueError(
                 "Anions must be elements in the slab and bulk compositions."
             )
-
-        if verbose:
-            print(f"Cations: {cations}\nAnions: {anions}")
 
         bulk_cation_to_anion_ratio = sum(bulk_reduced_amts[el] for el in cations) / sum(
             bulk_reduced_amts[el] for el in anions
@@ -1319,7 +1277,7 @@ class SlabTools(object):
             el: slab_reduced_amts[el] - bulk_scaled[el] for el in all_els
         }
 
-        return anions, cations, excess_or_deficient_amts, scaling_factor
+        return excess_or_deficient_amts, scaling_factor
 
     def surface_energy(
         self,
@@ -1330,7 +1288,6 @@ class SlabTools(object):
         cations: List[str] | str = None,
         anions: List[str] | str = None,
         ref_potentials: ChemPots | dict = None,
-        only_consider_anion_mu: bool = False,
         verbose: bool = True,
         **kwargs,
     ) -> float:
@@ -1338,22 +1295,14 @@ class SlabTools(object):
         bulk_structure = _to_pymatgen_structure(bulk_structure)
 
         slab_e_tot = self.e_per_at * len(self.structure)
-        slab_reduced_composition_and_factor = (
-            self.structure.composition.get_reduced_composition_and_factor()
-        )
-        slab_reduced_composition, slab_reduced_factor = (
-            slab_reduced_composition_and_factor[0],
-            slab_reduced_composition_and_factor[1],
-        )
+        slab_reduced_composition, slab_reduced_factor = CompTools(
+            self.structure.formula
+        ).get_reduced_comp_and_factor()
 
         bulk_e_tot = bulk_e_per_at * len(bulk_structure)
-        bulk_reduced_composition_and_factor = (
-            bulk_structure.composition.get_reduced_composition_and_factor()
-        )
-        bulk_reduced_composition, bulk_reduced_factor = (
-            bulk_reduced_composition_and_factor[0],
-            bulk_reduced_composition_and_factor[1],
-        )
+        bulk_reduced_composition, bulk_reduced_factor = CompTools(
+            bulk_structure.formula
+        ).get_reduced_comp_and_factor()
 
         is_stoich = self.is_stoich(bulk_structure)
 
@@ -1367,7 +1316,12 @@ class SlabTools(object):
 
             from pydmclab.core.energies import ChemPots
 
-            anions, cations, excess_or_deficient_amts, scaling_factor = (
+            if not cations or not anions:
+                ions = CompTools(self.structure.formula).guess_ions_from_oxi_states()
+                cations = cations or ions["cations"]
+                anions = anions or ions["anions"]
+
+            excess_or_deficient_amts, scaling_factor = (
                 self.calculate_excess_or_deficient_amts(
                     slab_reduced_composition,
                     bulk_reduced_composition,
@@ -1376,26 +1330,21 @@ class SlabTools(object):
                     verbose=verbose,
                 )
             )
+            print(excess_or_deficient_amts)
 
             if not ref_potentials:
                 mus = ChemPots(**kwargs)
                 ref_potentials = mus.chempots
-                print(ref_potentials)
             elif isinstance(ref_potentials, ChemPots):
                 ref_potentials = ref_potentials.chempots
 
-            if only_consider_anion_mu:
-                delta_mu_sum = sum(
-                    excess_or_deficient_amts[el] * ref_potentials[el] for el in anions
-                )
-            else:
-                delta_mu_sum = sum(
-                    excess_or_deficient_amts[el] * ref_potentials[el]
-                    for el in excess_or_deficient_amts
-                )
+            delta_mu_sum = sum(
+                excess_or_deficient_amts[el] * ref_potentials[el]
+                for el in excess_or_deficient_amts
+            )
 
             surface_energy = (
-                (slab_e_tot + delta_mu_sum) - (ratio * scaling_factor * bulk_e_tot)
+                (slab_e_tot) - (ratio * scaling_factor * bulk_e_tot) - delta_mu_sum
             ) / (2 * surface_area)
 
         return surface_energy
