@@ -1985,6 +1985,127 @@ def make_sub_for_launcher():
         f.write("\npython launcher.py\n")
 
 
+def get_struc_from_cif(
+    filepath: str | os.PathLike | list[str | os.PathLike],
+    *,
+    ids: str | list[str] = "None",
+    data_dir: str | os.PathLike = os.getcwd().replace("scripts", "data"),
+    savename: str = "strucs.json",
+    remake: bool = False,
+    force_supercell: bool = False,
+    grid: list[int] = [2, 2, 2],
+    **kwargs,
+) -> dict[str, dict[str, dict]]:
+    """
+    Convert CIF files to Pymatgen Structure objects and save as a dictionary in the typical strucs format
+
+    Returns:
+        {formula_indicator (str) :
+            {ids (str) :
+                Pymatgen Structure object as dict}}
+
+    """
+
+    fjson = os.path.join(data_dir, savename)
+    if os.path.exists(fjson) and not remake:
+        return read_json(fjson)
+
+    if isinstance(cif_files, str):
+        cif_files = [cif_files]
+    if isinstance(mpids, str):
+        mpids = [mpids]
+
+    zipped = zip(cif_files, mpids)
+
+    data = {}
+    for cif_file, mpid in zipped:
+        st = StrucTools(cif_file)
+        struc = st.structure
+
+        if data.get(st.compact_formula) is None:
+            data[st.compact_formula] = {}
+
+        if len(struc) == 1 or force_supercell:
+            supercell = StrucTools(struc).make_supercell(grid=grid, **kwargs)
+            data[st.compact_formula][mpid] = supercell.as_dict()
+        else:
+            data[st.compact_formula][mpid] = struc.as_dict()
+
+    write_json(data, fjson)
+    return read_json(fjson)
+
+
+def get_slabs(
+    strucs: dict[str, dict[str, dict]],
+    miller_indices: list[list[int]],
+    *,
+    min_slab_sizes: list[int] = [10],
+    vacuum_sizes: list[int] = [10],
+    data_dir: str | os.PathLike = os.getcwd().replace("scripts", "data"),
+    savename: str = "slabs.json",
+    generate_reoriented_bulk: bool = True,
+    remake: bool = False,
+):
+    fjson = os.path.join(data_dir, savename)
+    if os.path.exists(fjson.replace(".json", "_formatted.json")) and not remake:
+        return read_json(fjson.replace(".json", "_formatted.json"))
+
+    data = {}
+    struc_format = {}
+
+    if generate_reoriented_bulk:
+        bjson = os.path.join(data_dir, "reoriented_bulks.json")
+        if os.path.exists(bjson) and not remake:
+            generate_reoriented_bulk = False
+        bulks_format = {}
+
+    for cmpd in strucs:
+        data[cmpd] = {}
+        struc_format[cmpd] = {}
+        for mpid in strucs[cmpd]:
+            data[cmpd][mpid] = {}
+            st = StrucTools(strucs[cmpd][mpid])
+            for m in miller_indices:
+                miller_str = "".join([str(h) for h in m])
+                data[cmpd][mpid][miller_str] = []
+                for s in min_slab_sizes:
+                    for v in vacuum_sizes:
+                        temp_slabs = st.get_slabs(
+                            miller=m,
+                            min_slab_size=s,
+                            min_vacuum_size=v,
+                            in_unit_planes=True,
+                        )
+                        for slab_dict in temp_slabs[miller_str].values():
+                            data[cmpd][mpid][miller_str].append(slab_dict)
+
+                        for i, slab in enumerate(temp_slabs[miller_str].values()):
+                            slab_id = f"{mpid}_{miller_str}_s{s}_v{v}_{i}"
+                            struc_format[cmpd][slab_id] = slab["slab"]
+
+                            if generate_reoriented_bulk:
+                                if not bulks_format.get(cmpd):
+                                    bulks_format[cmpd] = {}
+
+                                bulk_id = f"{mpid}_reoriented-bulk_{miller_str}"
+
+                                if not bulks_format[cmpd].get(bulk_id):
+                                    oriented_slab = Slab.from_dict(slab["slab"])
+                                    oriented_bulk = oriented_slab.oriented_unit_cell
+                                    bulks_format[cmpd][
+                                        bulk_id
+                                    ] = oriented_bulk.as_dict()
+
+                            write_json(bulks_format, bjson)
+
+            data[cmpd][mpid]["bulk_structure"] = strucs[cmpd][mpid]
+
+    write_json(data, fjson)
+    write_json(struc_format, fjson.replace(".json", "_formatted.json"))
+
+    return read_json(fjson.replace(".json", "_formatted.json"))
+
+
 def main():
     return
 
