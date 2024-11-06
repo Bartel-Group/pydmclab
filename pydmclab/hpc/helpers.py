@@ -13,6 +13,9 @@ from pydmclab.core.energies import ChemPots, FormationEnthalpy, MPFormationEnerg
 from pydmclab.utils.handy import read_json, write_json
 from pydmclab.data.configs import load_partition_configs
 
+from pymatgen.core.surface import Slab, get_symmetrically_distinct_miller_indices
+from pymatgen.electronic_structure.core import Magmom
+
 
 def get_vasp_configs(
     standard="dmc",
@@ -308,7 +311,6 @@ def get_launch_configs(
         override_mag (str or bool):
             if False, do nothing
             if str, set mag to override_mag (rather than letting pydmclab.core.mag.MagTools figure out if it might be magnetic)
-                NOTE: not sure if this is working
         ID_specific_vasp_configs (dict):
             use this to modify VASP configs for a subset of the structures you're calculating
                 {<formula_indicator>_<struc_indicator> : {'incar_mods' : {<INCAR tag> : <value>}, {'kpoints' : <kpoints value>}, {'potcar' : <potcar value>}}
@@ -1985,10 +1987,10 @@ def make_sub_for_launcher():
         f.write("\npython launcher.py\n")
 
 
-def get_struc_from_cif(
-    filepath: str | os.PathLike | list[str | os.PathLike],
+def get_strucs_from_cifs(
+    filepaths: str | os.PathLike | list[str | os.PathLike],
     *,
-    ids: str | list[str] = "None",
+    struc_ids: str | list[str] = "None",
     data_dir: str | os.PathLike = os.getcwd().replace("scripts", "data"),
     savename: str = "strucs.json",
     remake: bool = False,
@@ -2001,7 +2003,7 @@ def get_struc_from_cif(
 
     Returns:
         {formula_indicator (str) :
-            {ids (str) :
+            {struc_ids (str) :
                 Pymatgen Structure object as dict}}
 
     """
@@ -2010,26 +2012,35 @@ def get_struc_from_cif(
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
 
-    if isinstance(cif_files, str):
-        cif_files = [cif_files]
-    if isinstance(mpids, str):
-        mpids = [mpids]
+    if isinstance(filepaths, str):
+        filepaths = [filepaths]
+    if isinstance(struc_ids, str):
+        struc_ids = [struc_ids]
 
-    zipped = zip(cif_files, mpids)
+    zipped = zip(filepaths, struc_ids)
 
     data = {}
-    for cif_file, mpid in zipped:
+    for cif_file, struc_id in zipped:
         st = StrucTools(cif_file)
         struc = st.structure
+
+        if cif_file.endswith(".mcif"):
+            projected_magmoms = []
+            for magmom in struc.site_properties["magmom"]:
+                if isinstance(magmom, Magmom):
+                    projected_magmoms.append(magmom.projection)
+                else:
+                    projected_magmoms.append(magmom)
+            struc.add_site_property("magmom", projected_magmoms)
 
         if data.get(st.compact_formula) is None:
             data[st.compact_formula] = {}
 
         if len(struc) == 1 or force_supercell:
             supercell = StrucTools(struc).make_supercell(grid=grid, **kwargs)
-            data[st.compact_formula][mpid] = supercell.as_dict()
+            data[st.compact_formula][struc_id] = supercell.as_dict()
         else:
-            data[st.compact_formula][mpid] = struc.as_dict()
+            data[st.compact_formula][struc_id] = struc.as_dict()
 
     write_json(data, fjson)
     return read_json(fjson)
@@ -2037,73 +2048,182 @@ def get_struc_from_cif(
 
 def get_slabs(
     strucs: dict[str, dict[str, dict]],
-    miller_indices: list[list[int]],
+    miller_indices: list[list[int] | int] | list[list[int]] | list[int] | int,
     *,
-    min_slab_sizes: list[int] = [10],
-    vacuum_sizes: list[int] = [10],
+    min_slab_sizes: list[int] | int = 10,
+    vacuum_sizes: list[int] | int = 3,
     data_dir: str | os.PathLike = os.getcwd().replace("scripts", "data"),
     savename: str = "slabs.json",
-    generate_reoriented_bulk: bool = True,
+    metadata_savename: str = "slabs_metadata.json",
+    generate_reference_bulks: bool = True,
     remake: bool = False,
+    **kwargs,
 ):
     fjson = os.path.join(data_dir, savename)
-    if os.path.exists(fjson.replace(".json", "_formatted.json")) and not remake:
-        return read_json(fjson.replace(".json", "_formatted.json"))
+    if os.path.exists(fjson) and not remake:
+        return read_json(fjson)
 
-    data = {}
-    struc_format = {}
+    mjson = os.path.join(data_dir, metadata_savename)
 
-    if generate_reoriented_bulk:
-        bjson = os.path.join(data_dir, "reoriented_bulks.json")
-        if os.path.exists(bjson) and not remake:
-            generate_reoriented_bulk = False
-        bulks_format = {}
+    # Error checking for miller_indices, min_slab_sizes, and vacuum_sizes
+    if isinstance(miller_indices, list):
+        if (
+            all(isinstance(m, int) for m in miller_indices)
+            and not len(miller_indices) == 3
+        ):
+            raise ValueError(
+                "Passing a list of integers means specifying a single miller index and must have length 3."
+            )
+        elif all(
+            isinstance(m, list)
+            for m in miller_indices and not all(len(m) == 3 for m in miller_indices)
+        ):
+            raise ValueError("All specified miller indices must have length 3.")
+        elif not any(
+            not (
+                isinstance(m, int)
+                or (
+                    isinstance(m, list)
+                    and len(m) == 3
+                    and all(isinstance(x, int) for x in m)
+                )
+            )
+            for m in miller_indices
+        ):
+            raise ValueError(
+                "All miller indices must be specified by a max integer or lists of integers with length 3."
+            )
+    elif isinstance(miller_indices, int):
+        pass
+    else:
+        raise ValueError(
+            "miller_indices must be an integer, list of integers, or combination of both."
+        )
+
+    if isinstance(min_slab_sizes, int):
+        min_slab_sizes = [min_slab_sizes]
+    elif isinstance(min_slab_sizes, list) and not all(
+        isinstance(s, int) for s in min_slab_sizes
+    ):
+        raise ValueError("min_slab_sizes must be an integer or list of integers.")
+    else:
+        raise ValueError("min_slab_sizes must be an integer or list of integers.")
+
+    if isinstance(vacuum_sizes, int):
+        vacuum_sizes = [vacuum_sizes]
+    elif isinstance(vacuum_sizes, list) and not all(
+        isinstance(v, int) for v in vacuum_sizes
+    ):
+        raise ValueError("vacuum_sizes must be an integer or list of integers.")
+    else:
+        raise ValueError("vacuum_sizes must be an integer or list of integers.")
+
+    slabs = {}
+    metadata = {}
+
+    if generate_reference_bulks:
+        bjson = os.path.join(data_dir, "reference_bulks.json")
+        reference_bulks = {}
 
     for cmpd in strucs:
-        data[cmpd] = {}
-        struc_format[cmpd] = {}
-        for mpid in strucs[cmpd]:
-            data[cmpd][mpid] = {}
-            st = StrucTools(strucs[cmpd][mpid])
+        slabs[cmpd] = {}
+        metadata[cmpd] = {}
+        for struc_id in strucs[cmpd]:
+            metadata[cmpd][struc_id] = {}
+            st = StrucTools(strucs[cmpd][struc_id])
+
+            evaluated_miller_indices = set()
             for m in miller_indices:
-                miller_str = "".join([str(h) for h in m])
-                data[cmpd][mpid][miller_str] = []
+                if isinstance(m, int):
+                    distinct_miller_indices = get_symmetrically_distinct_miller_indices(
+                        st.structure, m
+                    )
+                    evaluated_miller_indices.update(distinct_miller_indices)
+                else:
+                    evaluated_miller_indices.add(tuple(m))
+            evaluated_miller_indices = sorted(list(evaluated_miller_indices))
+
+            for em in evaluated_miller_indices:
+                miller_str = "".join([str(h) for h in em])
+                metadata[cmpd][struc_id][miller_str] = []
                 for s in min_slab_sizes:
                     for v in vacuum_sizes:
                         temp_slabs = st.get_slabs(
-                            miller=m,
+                            miller=em,
                             min_slab_size=s,
                             min_vacuum_size=v,
-                            in_unit_planes=True,
+                            **kwargs,
                         )
-                        for slab_dict in temp_slabs[miller_str].values():
-                            data[cmpd][mpid][miller_str].append(slab_dict)
 
-                        for i, slab in enumerate(temp_slabs[miller_str].values()):
-                            slab_id = f"{mpid}_{miller_str}_s{s}_v{v}_{i}"
-                            struc_format[cmpd][slab_id] = slab["slab"]
+                        for termination_idx, slab in enumerate(
+                            temp_slabs[miller_str].values()
+                        ):
 
-                            if generate_reoriented_bulk:
-                                if not bulks_format.get(cmpd):
-                                    bulks_format[cmpd] = {}
+                            metadata[cmpd][struc_id][miller_str].append(slab)
 
-                                bulk_id = f"{mpid}_reoriented-bulk_{miller_str}"
+                            slab_id = (
+                                f"{struc_id}_{miller_str}_s{s}_v{v}_{termination_idx}"
+                            )
+                            slabs[cmpd][slab_id] = slab["slab"]
 
-                                if not bulks_format[cmpd].get(bulk_id):
+                            if generate_reference_bulks:
+                                if not reference_bulks.get(cmpd):
+                                    reference_bulks[cmpd] = {}
+
+                                bulk_id = f"{struc_id}_reference-bulk_{miller_str}"
+
+                                if not reference_bulks[cmpd].get(bulk_id):
                                     oriented_slab = Slab.from_dict(slab["slab"])
                                     oriented_bulk = oriented_slab.oriented_unit_cell
-                                    bulks_format[cmpd][
+                                    reference_bulks[cmpd][
                                         bulk_id
                                     ] = oriented_bulk.as_dict()
 
-                            write_json(bulks_format, bjson)
+            metadata[cmpd][struc_id]["template_bulk_structure"] = strucs[cmpd][struc_id]
 
-            data[cmpd][mpid]["bulk_structure"] = strucs[cmpd][mpid]
+    if generate_reference_bulks:
+        write_json(reference_bulks, bjson)
 
-    write_json(data, fjson)
-    write_json(struc_format, fjson.replace(".json", "_formatted.json"))
+    write_json(metadata, mjson)
+    write_json(slabs, fjson)
 
-    return read_json(fjson.replace(".json", "_formatted.json"))
+    return read_json(fjson)
+
+
+def check_slabs(slabs: dict[str, dict[str, dict]]):
+    for cmpd in slabs.keys():
+        for slab_id in slabs[cmpd].keys():
+            struc_id, miller_str, s, v, termination_idx = slab_id.split("_")
+            print(f"\nFormula: {cmpd}")
+            print(f"\tMiller index: {miller_str}")
+            print(
+                f"\tSlab size: {s.replace('s', '')}, Vacuum size: {v.replace('v', '')}"
+            )
+            print(f"\tStructure formula: {StrucTools(slabs[cmpd][slab_id]).formula}")
+
+
+def set_magmoms_from_template(
+    strucs: dict[str, dict[str, dict]],
+    *,
+    data_dir: str | os.PathLike = os.getcwd().replace("scripts", "data"),
+    savename: str = "magmoms.json",
+    remake: bool = False,
+) -> dict[str, dict[str, dict]]:
+
+    fjson = os.path.join(data_dir, savename)
+    if os.path.exists(fjson) and not remake:
+        return read_json(fjson)
+
+    magmoms = {}
+    for cmpd in strucs:
+        magmoms[cmpd] = {}
+        for struc_id in strucs[cmpd]:
+            st = StrucTools(strucs[cmpd][struc_id])
+            magmoms = {"0": st.structure.site_properties.get("magmom")}
+            magmoms[cmpd][struc_id] = magmoms
+
+    write_json(magmoms, fjson)
+    return read_json(fjson)
 
 
 def main():

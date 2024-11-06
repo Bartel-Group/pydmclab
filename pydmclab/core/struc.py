@@ -443,7 +443,7 @@ class StrucTools(object):
         min_slab_size: int = 10,
         min_vacuum_size: int = 10,
         center_slab: bool = True,
-        in_unit_planes: bool = False,
+        in_unit_planes: bool = True,
         reorient_lattice: bool = True,
         symmetrize: bool = True,
         max_normal_search: int | None = None,
