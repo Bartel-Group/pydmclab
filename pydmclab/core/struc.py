@@ -1304,6 +1304,11 @@ class SlabTools(object):
             bulk_structure.formula
         ).get_reduced_comp_and_factor()
 
+        if verbose:
+            print(
+                f"Slab reduced composition: {slab_reduced_composition}\nBulk reduced composition: {bulk_reduced_composition}"
+            )
+
         is_stoich = self.is_stoich(bulk_structure)
 
         surface_area = self.surface_area(vacuum_axis=vacuum_axis, verbose=verbose)
