@@ -1121,33 +1121,60 @@ class SlabTools(object):
 
     def __init__(
         self,
-        structure: Structure | dict | str,
-        e_per_at: float,
+        slab_structure: Structure | dict | str,
+        slab_e_per_at: float,
+        *,
+        unreduced_bulk_composition: Composition | dict | str = None,
+        bulk_e_per_at: float = None,
     ) -> None:
         """
         Initialize the SlabTools object.
 
         Args:
-            structure (Structure | dict | str): pymatgen Structure object, Structure.as_dict(), or path to structure file.
-            e_per_at (float): Energy per atom of the slab.
+            slab_structure (Structure | dict | str): pymatgen Structure object, Structure.as_dict(), or path to structure file.
+            slab_e_per_at (float): Energy per atom of the slab.
+            unreduced_bulk_composition (Composition | dict | str, optional): Unreduced bulk composition. This is the full composition of the bulk from which the slab was cleaved.
+                (e.g., if the slab was cleaved from SrTiO3 and is 10 layers thick, the unreduced bulk composition would be Sr10Ti10O30).
+            bulk_e_per_at (float, optional): Energy per atom of the bulk. Defaults to None.
         """
 
-        structure = StrucTools(structure).structure
+        slab_structure = StrucTools(slab_structure).structure
 
-        self.structure = structure
-        self.e_per_at = e_per_at
+        self.slab_structure = slab_structure
+        self.slab_e_per_at = slab_e_per_at
 
-    def is_stoich(self, bulk_structure: Structure | dict | str) -> bool:
+        if isinstance(unreduced_bulk_composition, (dict, str)):
+            unreduced_bulk_composition = Composition(unreduced_bulk_composition)
+
+        self.unreduced_bulk_composition = unreduced_bulk_composition
+        self.bulk_e_per_at = bulk_e_per_at
+
+    @property
+    def is_stoich(self) -> bool:
         """
-        Check if the slab is stoichiometric with respect to the bulk structure.
+        Check if the slab is stoichiometric with respect to the bulk composition.
         """
+        if not self.unreduced_bulk_composition:
+            raise ValueError(
+                "Unreduced bulk composition must be provided to check stoichiometry."
+            )
 
-        bulk_structure = StrucTools(bulk_structure).structure
+        return self.slab_structure.composition == self.unreduced_bulk_composition
 
-        return (
-            self.structure.composition.reduced_formula
-            == bulk_structure.composition.reduced_formula
-        )
+    @property
+    def off_stoichiometry(self) -> dict[str, float]:
+        """
+        Calculate the off-stoichiometry of the slab with respect to the bulk composition.
+        """
+        if not self.unreduced_bulk_composition:
+            raise ValueError(
+                "Unreduced bulk composition must be provided to calculate off-stoichiometry."
+            )
+
+        unreduced_slab_composition = self.slab_structure.composition
+        unreduced_slab_composition.allow_negative = True
+
+        return (unreduced_slab_composition - self.unreduced_bulk_composition).as_dict()
 
     def surface_area(
         self, vacuum_axis: Literal["a", "b", "c", "auto"] = "auto", verbose: bool = True
@@ -1155,7 +1182,7 @@ class SlabTools(object):
         """
         Returns the surface area of the slab.
         """
-        lattice_mattrix = self.structure.lattice.matrix
+        lattice_mattrix = self.slab_structure.lattice.matrix
 
         if not isinstance(vacuum_axis, str) or vacuum_axis not in [
             "a",
@@ -1199,8 +1226,6 @@ class SlabTools(object):
 
     def surface_energy(
         self,
-        unreduced_bulk_composition: Composition | dict | str,
-        bulk_e_per_at: float,
         *,
         vacuum_axis: Literal["a", "b", "c", "auto"] = "auto",
         ref_potentials: ChemPots | dict = None,
@@ -1208,25 +1233,20 @@ class SlabTools(object):
         **kwargs,
     ) -> float:
 
-        if isinstance(unreduced_bulk_composition, (dict, str)):
-            unreduced_bulk_composition = Composition(unreduced_bulk_composition)
+        if not (self.unreduced_bulk_composition and self.bulk_e_per_at):
+            raise ValueError(
+                "Unreduced bulk composition and bulk energy per atom must be provided to calculate surface energy."
+            )
 
-        unreduced_slab_composition = self.structure.composition
-        unreduced_slab_composition.allow_negative = True
-
-        excess_or_deficient_amts = (
-            unreduced_slab_composition - unreduced_bulk_composition
-        ).as_dict()
-
-        slab_e_tot = self.e_per_at * len(self.structure)
-        bulk_e_tot = bulk_e_per_at * unreduced_bulk_composition.num_atoms
+        slab_e_tot = self.slab_e_per_at * len(self.slab_structure)
+        bulk_e_tot = self.bulk_e_per_at * self.unreduced_bulk_composition.num_atoms
 
         surface_area = self.surface_area(vacuum_axis=vacuum_axis, verbose=verbose)
 
-        if not excess_or_deficient_amts:
-            surface_energy = (slab_e_tot - bulk_e_tot) / (2 * surface_area)
-        else:
+        if not self.is_stoich:
             from pydmclab.core.energies import ChemPots
+
+            excess_or_deficient_amts = self.off_stoichiometry
 
             if not ref_potentials:
                 mus = ChemPots(**kwargs)
@@ -1234,13 +1254,17 @@ class SlabTools(object):
             elif isinstance(ref_potentials, ChemPots):
                 ref_potentials = ref_potentials.chempots
 
+            missing_refs = set(excess_or_deficient_amts) - set(ref_potentials)
+            if missing_refs:
+                raise ValueError(
+                    f"Reference potentials are missing for the following elements: {missing_refs}."
+                )
+
             delta_mu_sum = sum(
                 excess_or_deficient_amts[el] * ref_potentials[el]
                 for el in excess_or_deficient_amts
             )
 
-            surface_energy = (slab_e_tot - bulk_e_tot - delta_mu_sum) / (
-                2 * surface_area
-            )
+            return (slab_e_tot - bulk_e_tot - delta_mu_sum) / (2 * surface_area)
 
-        return surface_energy
+        return (slab_e_tot - bulk_e_tot) / (2 * surface_area)
