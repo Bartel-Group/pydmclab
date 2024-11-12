@@ -15,7 +15,7 @@ from ase.phonons import Phonons
 from ase.thermochemistry import CrystalThermo
 
 from pymatgen.io.ase import AseAtomsAdaptor
-from pymatgen.analysis.eos import Murnaghan
+from pymatgen.analysis.eos import Murnaghan, Vinet
 
 set_rc_params()
 COLORS = get_colors(palette="tab10")
@@ -597,7 +597,7 @@ class QHA(object):
 
         return out
     
-    def gibbs_one_struc(self, formula, mpid):
+    def gibbs_one_struc(self, formula, mpid, eos="vinet"):
             """
             Returns:
                 {'data' :
@@ -616,7 +616,12 @@ class QHA(object):
                 T = temperatures[i]
                 F = [Fs[vol]["data"][i]["F"] for vol in volumes]
                 V = [float(vol) for vol in volumes]
-                eos = Murnaghan(V, F)
+
+                if eos == "vinet":
+                    eos = Vinet(V, F)
+                elif eos == "murnaghan":
+                    eos = Murnaghan(V, F)
+                    
                 try:
                     eos.fit()
                     min_F = eos.e0
