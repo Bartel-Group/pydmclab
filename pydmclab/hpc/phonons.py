@@ -489,15 +489,18 @@ class QHA(object):
                 # Initialize the main dictionary for each (formula, mpid) pair
                 dos_data[(formula, mpid)] = {}
                 for scale, data in results[formula][mpid].items():
-                    phonons_data = data['phonons']
+                    phonons_data = data['phonons']['total_dos']
                     frequency_points = phonons_data.get('frequency_points')
                     total_dos = phonons_data.get('total_dos')
                     
-                    # Populate each scaling factor entry with E0 and dos list
+                # Ensure that both frequency_points and total_dos are not None
+                if frequency_points is not None and total_dos is not None:
                     dos_data[(formula, mpid)][float(scale)] = {
                         'E0': data['E_electronic'],
                         'dos': [{'E': E, 'dos': d} for E, d in zip(frequency_points, total_dos)]
                     }
+                else:
+                    print(f"Warning: Missing 'frequency_points' or 'total_dos' for formula {formula}, mpid {mpid}, scale {scale}")
 
         return dos_data
 
