@@ -545,9 +545,7 @@ class QHA(object):
         Returns:
             list: A list of temperatures (K) from the thermal properties data
         """
-        props = self.properties_for_one_struc(*list(self.parse_results.keys())[0])
-        volumes = list(props.keys())
-        temperatures = [i['T'] for i in props[volumes[0]]['data']]
+        temperatures = np.linspace(0, 2000, 201)
         return temperatures
     
     def thermo_one_struc_scale(self, formula, mpid, scale):
