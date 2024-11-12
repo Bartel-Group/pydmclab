@@ -621,13 +621,13 @@ class QHA(object):
                     eos = Vinet(V, F)
                 elif eos == "murnaghan":
                     eos = Murnaghan(V, F)
-                    
+
                 try:
                     eos.fit()
                     min_F = eos.e0
                     Gs.append({"T": T, "G": min_F})
                 except:
-                    print("Failed to fit Murnaghan EOS at T = %s K" % T)
+                    print(f"Failed to fit {eos} EOS at T = {T} K")
                     continue
             out = {"data": Gs}
             # write_json(out, fjson)
