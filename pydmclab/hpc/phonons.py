@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from pydmclab.plotting.utils import get_colors, set_rc_params
 from matplotlib.ticker import MaxNLocator
-
+from scipy.constants import hbar
 
 from pydmclab.utils.handy import read_json, write_json
 from pydmclab.core.struc import StrucTools
@@ -497,7 +497,7 @@ class QHA(object):
                 if frequency_points is not None and total_dos is not None:
                     dos_data[(formula, mpid)][float(scale)] = {
                         'E0': data['E_electronic'],
-                        'dos': [{'E': E, 'dos': d} for E, d in zip(frequency_points, total_dos)]
+                        'dos': [{'E': E, 'dos': d} for E, d in zip(frequency_points*hbar, total_dos)]
                     }
                 else:
                     print(f"Warning: Missing 'frequency_points' or 'total_dos' for formula {formula}, mpid {mpid}, scale {scale}")
