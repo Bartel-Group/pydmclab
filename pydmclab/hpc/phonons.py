@@ -11,6 +11,12 @@ from pydmclab.core.struc import StrucTools
 from phonopy import Phonopy, PhonopyQHA
 from phonopy.interface.vasp import read_vasp, parse_force_constants
 
+from ase.phonons import Phonons
+from ase.thermochemistry import CrystalThermo
+
+from pymatgen.io.ase import AseAtomsAdaptor
+from pymatgen.analysis.eos import Murnaghan
+
 set_rc_params()
 COLORS = get_colors(palette="tab10")
 
@@ -467,9 +473,12 @@ class QHA(object):
             dict: A dictionary where keys are tuples of (formula, mpid), second key is volume key, and values are dictionaries containing
                 'frequency_points' and 'total_dos'.
                 e.g. dict[('Al1N1', 'mp-661')] = {
-                    'scale1': {'frequency_points': array_for_vol1, 'total_dos': array_for_vol1},
-                    'scale2': {'frequency_points': array_for_vol2, 'total_dos': array_for_vol2},
-                    ...
+                                {scaling (float) :
+                                    {'E0' : 0 K internal energy (eV/cell),
+                                    'dos' :
+                                        [{'E' : energy level (eV),
+                                        'dos' : phonon DOS at E (float)}]
+                                    }
                 }
         """
         results = self.parse_results
@@ -477,22 +486,20 @@ class QHA(object):
 
         for formula in results:
             for mpid in results[formula]:
-                # Initialize the dictionary with electronic energy and an empty dos sub-dictionary
-                dos_data[(formula, mpid)] = {'E0': results[formula][mpid]['E_electronic'], 'dos': {}}
-                for scale in results[formula][mpid]:
-                    phonons_data = results[formula][mpid][scale]['phonons']
+                # Initialize the main dictionary for each (formula, mpid) pair
+                dos_data[(formula, mpid)] = {}
+                for scale, data in results[formula][mpid].items():
+                    phonons_data = data['phonons']
                     frequency_points = phonons_data.get('frequency_points')
                     total_dos = phonons_data.get('total_dos')
-                    volume_key = scale  # Using scale as a unique key for each volume
-
-                    # Populate the 'dos' dictionary for each volume key
-                    dos_data[(formula, mpid)]['dos'][volume_key] = {
-                        'frequency': frequency_points,
-                        'dos': total_dos
+                    
+                    # Populate each scaling factor entry with E0 and dos list
+                    dos_data[(formula, mpid)][float(scale)] = {
+                        'E0': data['E_electronic'],
+                        'dos': [{'E': E, 'dos': d} for E, d in zip(frequency_points, total_dos)]
                     }
 
         return dos_data
-
 
 
     def properties_for_one_struc(self, formula, mpid):
@@ -528,6 +535,99 @@ class QHA(object):
                     })
 
         return properties_dict
+    
+    @property
+    def temperatures(self):
+        """
+        Returns:
+            list: A list of temperatures (K) from the thermal properties data
+        """
+        props = self.properties_for_one_struc(*list(self.parse_results.keys())[0])
+        volumes = list(props.keys())
+        temperatures = [i['T'] for i in props[volumes[0]]['data']]
+        return temperatures
+    
+    def thermo_one_struc_scale(self, formula, mpid, scale):
+        """
+        Returns:
+            ase CrystalThermo object
+        """
+        phonon_dos = self.phonon_dos[formula, mpid][scale]
+        self.E0 = phonon_dos["E0"]
+
+        self.phonon_energies = [
+            phonon_dos["dos"][i]["E"] for i in range(len(phonon_dos["dos"]))
+        ]
+        self.phonon_dos = [
+            phonon_dos["dos"][i]["dos"] for i in range(len(phonon_dos["dos"]))
+        ]
+        return CrystalThermo(
+            phonon_energies=self.phonon_energies,
+            phonon_DOS=self.phonon_dos,
+            potentialenergy=self.E0,
+            formula_units=self.formula_units,
+        )
+
+    def helmholtz_one_struc(self, formula, mpid):
+        """
+        Returns:
+            dict
+                {volume (A**3) :
+                    {'data' :
+                        [{'T' : temperature (K),
+                        'F' : Helmholtz free energy (eV/cell)}]
+                    }
+                }
+
+        """
+        props = self.properties_for_one_struc(formula, mpid)
+        volumes = self.volumes[(formula, mpid)]
+        temperatures = self.temperatures
+        out = {}
+
+        for idx, scale in enumerate(props):
+            volume = volumes[idx]  # Use the corresponding volume for each scale
+            out[volume] = {}  # Set volume as the key
+            thermo = self.thermo_one_struc_scale(formula, mpid, scale)
+            Fs = [thermo.get_helmholtz_energy(temperature=T) for T in temperatures]
+            Fs[0] = self.E0
+            out[volume]['data'] = [
+                {"T": temperatures[i], "F": Fs[i]} for i in range(len(temperatures))
+            ]
+
+        return out
+    
+    def gibbs_one_struc(self, formula, mpid):
+            """
+            Returns:
+                {'data' :
+                    [{'T' : temperature (K),
+                    'G' : Gibbs free energy (eV/cell)}]
+                }
+            """
+            # fjson = self.fjson_gibbs
+            # if not self.remake_gibbs and os.path.exists(fjson):
+            #     return read_json(fjson)
+            temperatures = self.temperatures
+            volumes = self.volumes
+            Fs = self.helmholtz_one_struc(formula, mpid)
+            Gs = []
+            for i in range(len(temperatures)):
+                T = temperatures[i]
+                F = [Fs[vol]["data"][i]["F"] for vol in volumes]
+                V = [float(vol) for vol in volumes]
+                eos = Murnaghan(V, F)
+                try:
+                    eos.fit()
+                    min_F = eos.e0
+                    Gs.append({"T": T, "G": min_F})
+                except:
+                    print("Failed to fit Murnaghan EOS at T = %s K" % T)
+                    continue
+            out = {"data": Gs}
+            # write_json(out, fjson)
+            return out
+
 
     def get_phonopy_qha(self, formula, mpid):
         """
