@@ -459,6 +459,41 @@ class QHA(object):
             for key, structures in structures_dict.items()
         }
         return volumes
+    
+    @property
+    def phonon_dos(self):
+        """
+        Returns:
+            dict: A dictionary where keys are tuples of (formula, mpid), second key is volume key, and values are dictionaries containing
+                'frequency_points' and 'total_dos'.
+                e.g. dict[('Al1N1', 'mp-661')] = {
+                    'scale1': {'frequency_points': array_for_vol1, 'total_dos': array_for_vol1},
+                    'scale2': {'frequency_points': array_for_vol2, 'total_dos': array_for_vol2},
+                    ...
+                }
+        """
+        results = self.parse_results
+        dos_data = {}
+
+        for formula in results:
+            for mpid in results[formula]:
+                # Initialize the dictionary with electronic energy and an empty dos sub-dictionary
+                dos_data[(formula, mpid)] = {'E0': results[formula][mpid]['E_electronic'], 'dos': {}}
+                for scale in results[formula][mpid]:
+                    phonons_data = results[formula][mpid][scale]['phonons']
+                    frequency_points = phonons_data.get('frequency_points')
+                    total_dos = phonons_data.get('total_dos')
+                    volume_key = scale  # Using scale as a unique key for each volume
+
+                    # Populate the 'dos' dictionary for each volume key
+                    dos_data[(formula, mpid)]['dos'][volume_key] = {
+                        'frequency': frequency_points,
+                        'dos': total_dos
+                    }
+
+        return dos_data
+
+
 
     def properties_for_one_struc(self, formula, mpid):
         """
