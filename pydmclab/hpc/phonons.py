@@ -491,13 +491,14 @@ class QHA(object):
                 for scale, data in results[formula][mpid].items():
                     phonons_data = data['phonons']['total_dos']
                     frequency_points = phonons_data.get('frequency_points')
+                    enerqy_points = np.array(frequency_points)*hbar
                     total_dos = phonons_data.get('total_dos')
                     
                 # Ensure that both frequency_points and total_dos are not None
                 if frequency_points is not None and total_dos is not None:
                     dos_data[(formula, mpid)][float(scale)] = {
                         'E0': data['E_electronic'],
-                        'dos': [{'E': E, 'dos': d} for E, d in zip(frequency_points*hbar, total_dos)]
+                        'dos': [{'E': E, 'dos': d} for E, d in zip(enerqy_points, total_dos)]
                     }
                 else:
                     print(f"Warning: Missing 'frequency_points' or 'total_dos' for formula {formula}, mpid {mpid}, scale {scale}")
