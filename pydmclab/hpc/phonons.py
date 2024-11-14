@@ -466,47 +466,43 @@ class QHA(object):
         }
         return volumes
     
-    @property
-    def phonon_dos(self):
-        """
-        Returns:
-            dict: A dictionary where keys are tuples of (formula, mpid), second key is volume key, and values are dictionaries containing
-                'frequency_points' and 'total_dos'.
-                e.g. dict[('Al1N1', 'mp-661')] = {
-                                {scaling (float) :
-                                    {'E0' : 0 K internal energy (eV/cell),
-                                    'dos' :
-                                        [{'E' : energy level (eV),
-                                        'dos' : phonon DOS at E (float)}]
-                                    }
-                }
-        """
-        results = self.parse_results
-        dos_data = {}
+@property
+def phonon_dos(self):
+    """
+    Returns:
+        dict: A dictionary where keys are tuples of (formula, mpid), second key is volume key, and values are dictionaries containing
+            'frequency_points' and 'total_dos'.
+            e.g. dict[('Al1N1', 'mp-661')] = {
+                            {scaling (float) :
+                                {'E0' : 0 K internal energy (eV/cell),
+                                'dos' :
+                                    [{'E' : energy level (eV),
+                                    'dos' : phonon DOS at E (float)}]
+                                }
+            }
+    """
+    results = self.parse_results
+    dos_data = {}
 
-        for formula in results:
-            for mpid in results[formula]:
-                # Initialize the main dictionary for each (formula, mpid) pair
-                dos_data[(formula, mpid)] = {}
-                for scale, data in results[formula][mpid].items():
-                    phonons_data = data['phonons']['total_dos']
-                    frequency_points = phonons_data.get('frequency_points')
-                    enerqy_points = np.array(frequency_points)*hbar
-                    total_dos = phonons_data.get('total_dos')
-                    
+    for formula in results:
+        for mpid in results[formula]:
+            dos_data[(formula, mpid)] = {}
+            for scale, data in results[formula][mpid].items():
+                phonons_data = data['phonons']['total_dos']
+                frequency_points = phonons_data.get('frequency_points')
+                total_dos = phonons_data.get('total_dos')
+                
                 # Ensure that both frequency_points and total_dos are not None
                 if frequency_points is not None and total_dos is not None:
-                    if float(scale)not in dos_data[(formula, mpid)]:
-                        dos_data[(formula, mpid)][float(scale)] = {}
-                    else:
-                        dos_data[(formula, mpid)][float(scale)] = {
+                    energy_points = np.array(frequency_points) * hbar
+                    dos_data[(formula, mpid)][float(scale)] = {
                         'E0': data['E_electronic'],
-                        'dos': [{'E': E, 'dos': d} for E, d in zip(enerqy_points, total_dos)]
+                        'dos': [{'E': E, 'dos': d} for E, d in zip(energy_points, total_dos)]
                     }
                 else:
                     print(f"Warning: Missing 'frequency_points' or 'total_dos' for formula {formula}, mpid {mpid}, scale {scale}")
 
-        return dos_data
+    return dos_data
 
 
     def properties_for_one_struc(self, formula, mpid):
