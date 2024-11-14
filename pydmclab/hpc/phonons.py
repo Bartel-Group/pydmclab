@@ -582,7 +582,7 @@ class QHA(object):
                 }
 
         """
-        props = self.properties_for_one_struc(formula, mpid)
+        props = self.parse_results[formula][mpid]
         volumes = self.volumes[(formula, mpid)]
         temperatures = self.temperatures
         out = {}
