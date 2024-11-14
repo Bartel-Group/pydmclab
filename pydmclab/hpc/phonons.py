@@ -495,7 +495,7 @@ class QHA(object):
                     # Ensure that both frequency_points and total_dos are not None
                     if frequency_points is not None and total_dos is not None:
                         energy_points = np.array(frequency_points) * hbar
-                        dos_data[(formula, mpid)][float(scale)] = {
+                        dos_data[(formula, mpid)][str(scale)] = {
                             'E0': data['E_electronic'],
                             'dos': [{'E': E, 'dos': d} for E, d in zip(energy_points, total_dos)]
                         }
