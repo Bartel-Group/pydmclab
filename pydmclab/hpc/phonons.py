@@ -496,7 +496,10 @@ class QHA(object):
                     
                 # Ensure that both frequency_points and total_dos are not None
                 if frequency_points is not None and total_dos is not None:
-                    dos_data[(formula, mpid)][float(scale)] = {
+                    if float(scale)not in dos_data[(formula, mpid)]:
+                        dos_data[(formula, mpid)][float(scale)] = {}
+                    else:
+                        dos_data[(formula, mpid)][float(scale)] = {
                         'E0': data['E_electronic'],
                         'dos': [{'E': E, 'dos': d} for E, d in zip(enerqy_points, total_dos)]
                     }
