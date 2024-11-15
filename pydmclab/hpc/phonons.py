@@ -560,7 +560,7 @@ class QHA(object):
             phonon_dos["dos"][i]["E"] for i in range(len(phonon_dos["dos"]))
         ]
         phonon_dos_values = [
-            phonon_dos["dos"][i]["dos"] for i in range(len(phonon_dos_values["dos"]))
+            phonon_dos["dos"][i]["dos"] for i in range(len(phonon_dos["dos"]))
         ]
         return CrystalThermo(
             phonon_energies=phonon_energies,
