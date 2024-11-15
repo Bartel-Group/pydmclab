@@ -556,12 +556,12 @@ class QHA(object):
         phonon_dos = self.phonon_dos[formula, mpid][scale]
         self.E0 = phonon_dos["E0"]
 
-        phonon_energies = [
+        phonon_energies = np.array([
             phonon_dos["dos"][i]["E"] for i in range(len(phonon_dos["dos"]))
-        ]
-        phonon_dos_values = [
+        ])
+        phonon_dos_values = np.array([
             phonon_dos["dos"][i]["dos"] for i in range(len(phonon_dos["dos"]))
-        ]
+        ])
         return CrystalThermo(
             phonon_energies=phonon_energies,
             phonon_DOS=phonon_dos_values,
