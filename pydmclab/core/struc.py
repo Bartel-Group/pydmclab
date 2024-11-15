@@ -496,7 +496,7 @@ class StrucTools(object):
 
         miller_str = "".join([str(i) for i in miller])
 
-        out = {miller_str: {}, "bulk_structure": bulk.as_dict()}
+        out = {miller_str: {}, "bulk_template": bulk.as_dict()}
         for i, slab in enumerate(slabs):
             out[miller_str][i] = {}
             out[miller_str][i]["slab"] = slab.as_dict()
@@ -505,6 +505,10 @@ class StrucTools(object):
             out[miller_str][i]["center_slab"] = center_slab
             out[miller_str][i]["in_unit_planes"] = in_unit_planes
             out[miller_str][i]["reorient_lattice"] = reorient_lattice
+            out[miller_str][i]["symmetrize"] = symmetrize
+            out[miller_str][i]["tolerance"] = tolerance
+            out[miller_str][i]["ftolerance"] = ftolerance
+            out[miller_str][i]["max_normal_search"] = max_normal_search
 
         return out
 

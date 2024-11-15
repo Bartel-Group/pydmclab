@@ -2179,8 +2179,6 @@ def get_slabs(
                                         bulk_id
                                     ] = oriented_bulk.as_dict()
 
-            metadata[cmpd][struc_id]["template_bulk_structure"] = strucs[cmpd][struc_id]
-
     if generate_reference_bulks:
         write_json(reference_bulks, bjson)
 
