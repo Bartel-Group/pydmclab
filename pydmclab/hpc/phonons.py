@@ -548,7 +548,7 @@ class QHA(object):
         temperatures = np.linspace(0, 2000, 201)
         return temperatures
     
-    def thermo_one_struc_scale(self, formula, mpid, scale):
+    def thermo_one_struc_scale(self, formula, mpid, scale, formula_units=1):
         """
         Returns:
             ase CrystalThermo object
@@ -556,17 +556,17 @@ class QHA(object):
         phonon_dos = self.phonon_dos[formula, mpid][scale]
         self.E0 = phonon_dos["E0"]
 
-        self.phonon_energies = [
+        phonon_energies = [
             phonon_dos["dos"][i]["E"] for i in range(len(phonon_dos["dos"]))
         ]
-        self.phonon_dos = [
-            phonon_dos["dos"][i]["dos"] for i in range(len(phonon_dos["dos"]))
+        phonon_dos_values = [
+            phonon_dos["dos"][i]["dos"] for i in range(len(phonon_dos_values["dos"]))
         ]
         return CrystalThermo(
-            phonon_energies=self.phonon_energies,
-            phonon_DOS=self.phonon_dos,
+            phonon_energies=phonon_energies,
+            phonon_DOS=phonon_dos_values,
             potentialenergy=self.E0,
-            formula_units=self.formula_units,
+            formula_units=formula_units,
         )
 
     def helmholtz_one_struc(self, formula, mpid):
