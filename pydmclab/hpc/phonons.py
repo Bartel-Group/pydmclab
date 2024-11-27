@@ -3,10 +3,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 from pydmclab.plotting.utils import get_colors, set_rc_params
 from matplotlib.ticker import MaxNLocator
-from scipy.constants import hbar
+from scipy.constants import hbar, e
 
 from pydmclab.utils.handy import read_json, write_json
 from pydmclab.core.struc import StrucTools
+from pydmclab.core.comp import CompTools
 
 from phonopy import Phonopy, PhonopyQHA
 from phonopy.interface.vasp import read_vasp, parse_force_constants
@@ -215,7 +216,7 @@ class AnalyzePhonons(object):
         """
         Returns the total density of states for the phonon object in a dictionary.
         Returns:
-            {'frequency_points ': array of frequency points, 'total_dos': array of total density of states}
+            {'frequency_points ': array of frequency points (THz), 'total_dos': array of total density of states}
         """
         if not hasattr(self, '_total_dos'):
             print("Calculating total density of states...")
@@ -489,15 +490,33 @@ class QHA(object):
                 dos_data[(formula, mpid)] = {}
                 for scale, data in results[formula][mpid].items():
                     phonons_data = data['phonons']['total_dos']
-                    frequency_points = phonons_data.get('frequency_points')
-                    total_dos = phonons_data.get('total_dos')
-                    
-                    # Ensure that both frequency_points and total_dos are not None
+                    frequency_points = np.array(phonons_data.get('frequency_points'))
+                    total_dos = np.array(phonons_data.get('total_dos'))
+
                     if frequency_points is not None and total_dos is not None:
-                        energy_points = np.array(frequency_points) * hbar
+                        # Filter out imaginary frequencies with zero DOS
+                        valid_indices = [
+                            i for i, freq in enumerate(frequency_points)
+                            if np.real(freq) > 0 or (np.real(freq) <= 0 and total_dos[i] != 0)
+                        ]
+                        filtered_frequencies = frequency_points[valid_indices]
+                        filtered_dos = total_dos[valid_indices]
+
+                        # Warning for removed imaginary frequencies
+                        n_removed = len(frequency_points) - len(filtered_frequencies)
+                        if n_removed > 0:
+                            print(
+                                f"Warning: Removed {n_removed} imaginary frequencies with zero DOS for "
+                                f"formula {formula}, mpid {mpid}, scale {scale}"
+                            )
+
+                        # Convert frequencies to energy in eV
+                        energy_points = filtered_frequencies * 10e12 * hbar / e  # in eV (output from phonopy is in THz)
+
+                        # Store the processed DOS data
                         dos_data[(formula, mpid)][str(scale)] = {
                             'E0': data['E_electronic'],
-                            'dos': [{'E': E, 'dos': d} for E, d in zip(energy_points, total_dos)]
+                            'dos': [{'E': E, 'dos': d} for E, d in zip(energy_points, filtered_dos)]
                         }
                     else:
                         print(f"Warning: Missing 'frequency_points' or 'total_dos' for formula {formula}, mpid {mpid}, scale {scale}")
@@ -548,13 +567,19 @@ class QHA(object):
         temperatures = np.linspace(0, 2000, 201)
         return temperatures
     
-    def thermo_one_struc_scale(self, formula, mpid, scale, formula_units=1):
+    def thermo_one_struc_scale(self, formula, mpid, scale):
         """
         Returns:
             ase CrystalThermo object
         """
         phonon_dos = self.phonon_dos[formula, mpid][scale]
         self.E0 = phonon_dos["E0"]
+
+        struc = self.parse_results[formula][mpid][scale]["structure"]
+        st = StrucTools(struc)
+        comp = st.structure.composition
+        ct = CompTools(comp)
+        _, formula_units = ct.get_reduced_comp_and_factor()
 
         phonon_energies = np.array([
             phonon_dos["dos"][i]["E"] for i in range(len(phonon_dos["dos"]))
@@ -590,10 +615,12 @@ class QHA(object):
             volume = volumes[idx]  # Use the corresponding volume for each scale
             out[volume] = {}  # Set volume as the key
             thermo = self.thermo_one_struc_scale(formula, mpid, scale)
+            
+            S = [thermo.get_entropy(temperature=T) for T in temperatures]
             Fs = [thermo.get_helmholtz_energy(temperature=T) for T in temperatures]
             Fs[0] = self.E0
             out[volume]['data'] = [
-                {"T": temperatures[i], "F": Fs[i]} for i in range(len(temperatures))
+                {"T": temperatures[i], "F": Fs[i], "S": S[i]} for i in range(len(temperatures))
             ]
 
         return out
@@ -610,13 +637,18 @@ class QHA(object):
             # if not self.remake_gibbs and os.path.exists(fjson):
             #     return read_json(fjson)
             temperatures = self.temperatures
-            volumes = self.volumes
+            volumes = self.volumes[formula, mpid]
+
             Fs = self.helmholtz_one_struc(formula, mpid)
+
             Gs = []
             for i in range(len(temperatures)):
                 T = temperatures[i]
                 F = [Fs[vol]["data"][i]["F"] for vol in volumes]
+                print(f"T = {T}, F = {F}")
                 V = [float(vol) for vol in volumes]
+                print(V)
+
 
                 if eos == "vinet":
                     eos = Vinet(V, F)
@@ -627,6 +659,8 @@ class QHA(object):
                     eos.fit()
                     min_F = eos.e0
                     Gs.append({"T": T, "G": min_F})
+                    print(f"T = {T}, eos.e0 = {eos.e0}, parameters = {eos.parameters}")
+
                 except:
                     print(f"Failed to fit {eos} EOS at T = {T} K")
                     continue
