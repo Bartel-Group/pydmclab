@@ -33,20 +33,20 @@ We'll define a few global variables here ####
 SCRIPTS_DIR = os.getcwd()
 
 # where are my calculations going to live
-CALCS_DIR = SCRIPTS_DIR.replace('scripts', 'calcs')
+CALCS_DIR = SCRIPTS_DIR.replace("scripts", "calcs")
 
 # where is my data going to live
-DATA_DIR = SCRIPTS_DIR.replace('scripts', 'data')
+DATA_DIR = SCRIPTS_DIR.replace("scripts", "data")
 
 for d in [CALCS_DIR, DATA_DIR]:
     if not os.path.exists(d):
         os.makedirs(d)
 
 # if you need data from MP as a starting point (often the case), you need your API key
-API_KEY = '***REMOVED***'
+API_KEY = "__API_KEY__"
 
 # lets put a tag on all the files we save
-FILE_TAG = 'mp-hulls'
+FILE_TAG = "mp-hulls"
 
 ############### QUERYING MP ################
 
@@ -57,7 +57,7 @@ One of the main things you must provide for this workflow is a starting crystal 
     - or we manipulate them to make new structures
     
 If we want MP data, we use pydmc.core.query.MPQuery
-""" 
+"""
 
 """
 One of the main things you must provide for this workflow is a starting crystal structure
@@ -66,7 +66,7 @@ One of the main things you must provide for this workflow is a starting crystal 
     - or we manipulate them to make new structures
     
 If we want MP data, we use pydmc.core.query.MPQuery
-""" 
+"""
 
 """
 Query example:
@@ -77,47 +77,55 @@ Query example:
         - excluding elemental phases (Li1, Mn1, O1)
     - this might be a query if you were doing the convex hull analysis
 """
-def get_query(comp='Li-Mn-Cl-F',
-              only_gs=False,
-              max_Ehull=0.02,
-              max_strucs_per_cmpd=3,
-              max_sites_per_structure=50,
-              criteria={'nelements' : {'$gte' : 2}},
-              include_structure=True,
-              supercell_structure=False,
-              savename='query_%s.json' % FILE_TAG,
-              remake=False):
-    
+
+
+def get_query(
+    comp="Li-Mn-Cl-F",
+    only_gs=False,
+    max_Ehull=0.02,
+    max_strucs_per_cmpd=3,
+    max_sites_per_structure=50,
+    criteria={"nelements": {"$gte": 2}},
+    include_structure=True,
+    supercell_structure=False,
+    savename="query_%s.json" % FILE_TAG,
+    remake=False,
+):
+
     fjson = os.path.join(DATA_DIR, savename)
     if os.path.exists(fjson) and not remake:
-       return read_json(fjson)
-    
+        return read_json(fjson)
+
     mpq = MPQuery(api_key=API_KEY)
-    
-    data = mpq.get_data_for_comp(comp=comp,
-                                 only_gs=only_gs,
-                                 max_Ehull=max_Ehull,
-                                 max_strucs_per_cmpd=max_strucs_per_cmpd,
-                                 max_sites_per_structure=max_sites_per_structure,
-                                 criteria=criteria,
-                                 include_structure=include_structure,
-                                 supercell_structure=supercell_structure)
-    
-    write_json(data, fjson)   
+
+    data = mpq.get_data_for_comp(
+        comp=comp,
+        only_gs=only_gs,
+        max_Ehull=max_Ehull,
+        max_strucs_per_cmpd=max_strucs_per_cmpd,
+        max_sites_per_structure=max_sites_per_structure,
+        criteria=criteria,
+        include_structure=include_structure,
+        supercell_structure=supercell_structure,
+    )
+
+    write_json(data, fjson)
     return read_json(fjson)
+
 
 def check_query(query):
     for mpid in query:
-        print('\nmpid: %s' % mpid)
-        print('\tcmpd: %s' % query[mpid]['cmpd'])
-        print('\tEhull: %.2f eV/atom' % query[mpid]['Ehull_mp'])
-        
+        print("\nmpid: %s" % mpid)
+        print("\tcmpd: %s" % query[mpid]["cmpd"])
+        print("\tEhull: %.2f eV/atom" % query[mpid]["Ehull_mp"])
+
+
 ############### MAGMOMS ################
 """
 MP sometimes does AFM, but generally they use FM... we'll just use FM for this example
     
-"""        
-            
+"""
+
 ############### LAUNCHING ################
 """
 We have our structures and we have their MAGMOMs (because it's AFM)
@@ -154,30 +162,35 @@ Note on user_configs:
     - set these in main()
 """
 
-def get_launch_dirs(query,
-                    user_configs,
-                    magmoms=None,
-                    make_launch_dirs=True,
-                    savename='launch_dirs_%s.json' % FILE_TAG,
-                    remake=False):
-    
+
+def get_launch_dirs(
+    query,
+    user_configs,
+    magmoms=None,
+    make_launch_dirs=True,
+    savename="launch_dirs_%s.json" % FILE_TAG,
+    remake=False,
+):
+
     fjson = os.path.join(DATA_DIR, savename)
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
-    
+
     all_launch_dirs = {}
     for mpid in query:
 
-        structure = query[mpid]['structure']
-        top_level = query[mpid]['cmpd']
+        structure = query[mpid]["structure"]
+        top_level = query[mpid]["cmpd"]
         ID = mpid
-        
-        launch = LaunchTools(calcs_dir=CALCS_DIR,
-                             structure=structure,
-                             magmoms=magmoms,
-                             top_level=top_level,
-                             unique_ID=ID,
-                             user_configs=user_configs)
+
+        launch = LaunchTools(
+            calcs_dir=CALCS_DIR,
+            structure=structure,
+            magmoms=magmoms,
+            top_level=top_level,
+            unique_ID=ID,
+            user_configs=user_configs,
+        )
 
         launch_dirs = launch.launch_dirs_to_tags
 
@@ -186,14 +199,16 @@ def get_launch_dirs(query,
 
         all_launch_dirs = {**all_launch_dirs, **launch_dirs}
 
-    write_json(all_launch_dirs, fjson)   
-    return read_json(fjson)   
+    write_json(all_launch_dirs, fjson)
+    return read_json(fjson)
+
 
 def check_launch_dirs(launch_dirs):
-    print('\nanalyzing launch directories')
+    print("\nanalyzing launch directories")
     for d in launch_dirs:
-        print('\nlaunching from %s' % d)
-        print('   these calcs: %s' % launch_dirs[d])
+        print("\nlaunching from %s" % d)
+        print("   these calcs: %s" % launch_dirs[d])
+
 
 ############### SUBMISSION ################
 """
@@ -212,25 +227,23 @@ Note on user_configs:
     - set these in main()
 """
 
-def submit_calcs(launch_dirs,
-                 user_configs,
-                 magmoms=None,
-                 ready_to_launch=True):
+
+def submit_calcs(launch_dirs, user_configs, magmoms=None, ready_to_launch=True):
     for launch_dir in launch_dirs:
 
         # these are calcs that should be chained in this launch directory
         valid_calcs = launch_dirs[launch_dir]
 
         # these are some configurations we'll extract from the launch directory name
-        top_level, ID, standard, final_xc, mag = launch_dir.split('/')[-5:]
-        user_configs['standard'] = standard
-        user_configs['xc'] = final_xc
-        user_configs['mag'] = mag
-        user_configs['job-name'] = '.'.join([top_level, ID, standard, final_xc, mag])
+        top_level, ID, standard, final_xc, mag = launch_dir.split("/")[-5:]
+        user_configs["standard"] = standard
+        user_configs["xc"] = final_xc
+        user_configs["mag"] = mag
+        user_configs["job-name"] = ".".join([top_level, ID, standard, final_xc, mag])
 
         # we need to pass the right MAGMOM if the calc is AFM
-        if 'afm' in mag:
-            idx = mag.split('_')[1]
+        if "afm" in mag:
+            idx = mag.split("_")[1]
             if ID in magmoms:
                 magmom = magmoms[ID][idx]
             elif top_level in magmoms:
@@ -238,22 +251,22 @@ def submit_calcs(launch_dirs,
         else:
             magmom = None
 
-        user_configs['magmom'] = magmom
-        
+        user_configs["magmom"] = magmom
+
         # now we'll prep the VASP directories and write the submission script
-        sub = SubmitTools(launch_dir=launch_dir,
-                          valid_calcs=valid_calcs,
-                          user_configs=user_configs)
+        sub = SubmitTools(
+            launch_dir=launch_dir, valid_calcs=valid_calcs, user_configs=user_configs
+        )
 
         sub.write_sub
-        
+
         # if we're "ready to launch", let's launch
         if ready_to_launch:
-            sub.launch_sub    
-            
-def check_subs(launch_dirs,
-                fsub='sub.sh'):
-    print('\nanalyzing submission scripts')
+            sub.launch_sub
+
+
+def check_subs(launch_dirs, fsub="sub.sh"):
+    print("\nanalyzing submission scripts")
     launch_dirs_to_check = list(launch_dirs.keys())
     if len(launch_dirs_to_check) > 6:
         launch_dirs_to_check = launch_dirs_to_check[:3] + launch_dirs_to_check[-3:]
@@ -261,14 +274,14 @@ def check_subs(launch_dirs,
     for d in launch_dirs_to_check:
         submission_file = os.path.join(d, fsub)
         with open(submission_file) as f:
-            print('\nanalyzing %s' % submission_file)
+            print("\nanalyzing %s" % submission_file)
             for line in f:
-                if 'working' in line:
+                if "working" in line:
                     print(line)
-                    
-                    
+
+
 ############### ANALYSIS ################
-    
+
 """
 The last step is to analyze the calculations as they run
 
@@ -288,22 +301,22 @@ Note on user_configs:
     - set these in main()
 """
 
-def analyze_calcs(launch_dirs,
-                  user_configs,
-                  savename='results_%s.json' % FILE_TAG,
-                  remake=False):
-    
+
+def analyze_calcs(
+    launch_dirs, user_configs, savename="results_%s.json" % FILE_TAG, remake=False
+):
+
     fjson = os.path.join(DATA_DIR, savename)
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
-    
-    analyzer = AnalyzeBatch(launch_dirs,
-                            user_configs=user_configs)
+
+    analyzer = AnalyzeBatch(launch_dirs, user_configs=user_configs)
 
     data = analyzer.results
 
-    write_json(data, fjson)   
-    return read_json(fjson)    
+    write_json(data, fjson)
+    return read_json(fjson)
+
 
 def check_results(results):
 
@@ -311,53 +324,56 @@ def check_results(results):
 
     converged = 0
     for key in keys_to_check:
-        top_level, ID, standard, xc, mag, xc_calc = key.split('.')
+        top_level, ID, standard, xc, mag, xc_calc = key.split(".")
         data = results[key]
-        convergence = results[key]['results']['convergence']
-        print('\n%s' % key)
-        print('convergence = %s' % convergence)
+        convergence = results[key]["results"]["convergence"]
+        print("\n%s" % key)
+        print("convergence = %s" % convergence)
         if convergence:
             converged += 1
-            print('E (static) = %.2f' % data['results']['E_per_at'])
-            print('E (relax) = %.2f' % data['meta']['E_relax'])
-            #print(data['structure'])
-    
-    print('\n\n %i/%i converged' % (converged, len(keys_to_check)))       
-            
+            print("E (static) = %.2f" % data["results"]["E_per_at"])
+            print("E (relax) = %.2f" % data["meta"]["E_relax"])
+            # print(data['structure'])
+
+    print("\n\n %i/%i converged" % (converged, len(keys_to_check)))
+
+
 def main():
     """
     It's generally a good idea to set True/False statements at the top
         - this will allow you to quickly toggle whether or not to repeat certain steps
-    """    
+    """
     remake_sub_launch = False
-    
+
     remake_query = False
-    print_query_check = True 
-    
+    print_query_check = True
+
     remake_launch_dirs = False
     print_launch_dirs_check = True
-    
+
     remake_subs = True
     ready_to_launch = True
     print_subs_check = True
-    
+
     remake_results = True
     print_results_check = True
-    
+
     """
     Sometimes we'll need to run our launch script on a compute node if generating magmoms or analyzing directories takes a while
         here, we'll create a file called sub_launch.sh
         you can then execute this .py file on a compute node with:
             $ sbatch sub_launchs.h
-    """   
-    if remake_sub_launch or not os.path.exists(os.path.join(os.getcwd(), 'sub_launch.sh')):
+    """
+    if remake_sub_launch or not os.path.exists(
+        os.path.join(os.getcwd(), "sub_launch.sh")
+    ):
         make_sub_for_launcher()
 
     query = get_query(remake=remake_query)
 
     if print_query_check:
         check_query(query=query)
-    
+
     """
     Here, I'll specify the user_configs pertaining to setting up the launch directories
         - no AFM
@@ -367,17 +383,19 @@ def main():
         - and we want to compare_to_mp
             - this means we will *additionally* do MP-consistent GGA+U         
     """
-    launch_configs = {'n_afm_configs' : 0,
-                      'standards' : ['dmc'],
-                      'final_xcs' : ['metagga'],
-                      'compare_to_mp' : True}
-    
-    launch_dirs = get_launch_dirs(query=query,
-                                  user_configs=launch_configs,
-                                  remake=remake_launch_dirs)
+    launch_configs = {
+        "n_afm_configs": 0,
+        "standards": ["dmc"],
+        "final_xcs": ["metagga"],
+        "compare_to_mp": True,
+    }
+
+    launch_dirs = get_launch_dirs(
+        query=query, user_configs=launch_configs, remake=remake_launch_dirs
+    )
     if print_launch_dirs_check:
         check_launch_dirs(launch_dirs=launch_dirs)
-        
+
     """
     Now, we need to specify any configurations relevant to VASP set up or our submission scripts
     For this example, we'll do the following (on top of the defaults):
@@ -387,25 +405,25 @@ def main():
         - turn off symmetry in our loose, relax, and static calculations
         
     """
-    user_configs = {'ntasks' : 8,
-                    'time' : int(48*60),
-                    'lobster_static' : False}
-    
+    user_configs = {"ntasks": 8, "time": int(48 * 60), "lobster_static": False}
+
     if remake_subs:
-        submit_calcs(launch_dirs=launch_dirs,
-                     user_configs=user_configs,
-                     ready_to_launch=ready_to_launch)
- 
+        submit_calcs(
+            launch_dirs=launch_dirs,
+            user_configs=user_configs,
+            ready_to_launch=ready_to_launch,
+        )
+
     if print_subs_check:
         check_subs(launch_dirs=launch_dirs)
-    
-    analysis_configs = {'n_procs' : 4}
-    results = analyze_calcs(launch_dirs=launch_dirs,
-                            user_configs=analysis_configs,
-                            remake=remake_results)
+
+    analysis_configs = {"n_procs": 4}
+    results = analyze_calcs(
+        launch_dirs=launch_dirs, user_configs=analysis_configs, remake=remake_results
+    )
     if print_results_check:
         check_results(results)
 
-if __name__ == '__main__':
-    main()
 
+if __name__ == "__main__":
+    main()

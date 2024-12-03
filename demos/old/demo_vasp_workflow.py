@@ -22,13 +22,13 @@ We'll define a few global variables here ####
 SCRIPTS_DIR = os.getcwd()
 
 # where are my calculations going to live
-CALCS_DIR = SCRIPTS_DIR.replace('scripts', 'calcs')
+CALCS_DIR = SCRIPTS_DIR.replace("scripts", "calcs")
 
 # where is my data going to live
-DATA_DIR = SCRIPTS_DIR.replace('scripts', 'data')
+DATA_DIR = SCRIPTS_DIR.replace("scripts", "data")
 
 # if you need data from MP as a starting point (often the case), you need your API key
-API_KEY = 'YOUR_API_KEY'
+API_KEY = "YOUR_API_KEY"
 
 ############### QUERYING MP ################
 
@@ -39,40 +39,53 @@ One of the main things you must provide for this workflow is a starting crystal 
     - or we manipulate them to make new structures
     
 If we want MP data, we use pydmc.core.query.MPQuery
-""" 
+"""
 
 """
 Query example #1:
     - we want a 2x2x2 supercell of the ground-state polymorphs of LiMn2O4 and LiCoO2
 """
-def get_query_example_1(comp=['LiMn2O4', 'LiCoO2'],
-                        only_gs=True,
-                        include_structure=True,
-                        supercell_structure=[2,2,2],
-                        savename='query1.json',
-                        remake=False):
-    
+
+
+def get_query_example_1(
+    comp=["LiMn2O4", "LiCoO2"],
+    only_gs=True,
+    include_structure=True,
+    supercell_structure=[2, 2, 2],
+    savename="query1.json",
+    remake=False,
+):
+
     fjson = os.path.join(DATA_DIR, savename)
     if os.path.exists(fjson) and not remake:
-       return read_json(fjson)
-    
+        return read_json(fjson)
+
     mpq = MPQuery(api_key=API_KEY)
-    
-    data = mpq.get_data_for_comp(comp=comp,
-                                 only_gs=only_gs,
-                                 include_structure=include_structure,
-                                 supercell_structure=supercell_structure)
-    
-    return write_json(data, fjson) 
+
+    data = mpq.get_data_for_comp(
+        comp=comp,
+        only_gs=only_gs,
+        include_structure=include_structure,
+        supercell_structure=supercell_structure,
+    )
+
+    return write_json(data, fjson)
+
 
 """
 It's generally a good idea to write a quick "check" function to make sure each function does what you want
 """
+
+
 def check_query_example_1(query):
     for mpid in query:
-        print('\nmpid: %s' % mpid)
-        print('\tcmpd: %s' % query[mpid]['cmpd'])
-        print('\tstructure has %i sites' % len(StrucTools(query[mpid]['structure']).structure))
+        print("\nmpid: %s" % mpid)
+        print("\tcmpd: %s" % query[mpid]["cmpd"])
+        print(
+            "\tstructure has %i sites"
+            % len(StrucTools(query[mpid]["structure"]).structure)
+        )
+
 
 """
 Query example #2:
@@ -83,40 +96,48 @@ Query example #2:
         - excluding elemental phases (Li1, Mn1, O1)
     - this might be a query if you were doing the convex hull analysis
 """
-def get_query_example_2(comp='Li-Mn-O',
-                        only_gs=False,
-                        max_Ehull=0.05,
-                        max_strucs_per_cmpd=5,
-                        max_sites_per_cmpd=100,
-                        criteria={'nelements' : {'$gte' : 2}},
-                        include_structure=True,
-                        supercell_structure=False,
-                        savename='query2.json',
-                        remake=False):
-    
+
+
+def get_query_example_2(
+    comp="Li-Mn-O",
+    only_gs=False,
+    max_Ehull=0.05,
+    max_strucs_per_cmpd=5,
+    max_sites_per_cmpd=100,
+    criteria={"nelements": {"$gte": 2}},
+    include_structure=True,
+    supercell_structure=False,
+    savename="query2.json",
+    remake=False,
+):
+
     fjson = os.path.join(DATA_DIR, savename)
     if os.path.exists(fjson) and not remake:
-       return read_json(fjson)
-    
+        return read_json(fjson)
+
     mpq = MPQuery(api_key=API_KEY)
-    
-    data = mpq.get_data_for_comp(comp=comp,
-                                 only_gs=only_gs,
-                                 max_Ehull=max_Ehull,
-                                 max_strucs_per_cmpd=max_strucs_per_cmpd,
-                                 max_sites_per_cmpd=max_sites_per_cmpd,
-                                 criteria=criteria,
-                                 include_structure=include_structure,
-                                 supercell_structure=supercell_structure)
-    
-    return write_json(data, fjson) 
+
+    data = mpq.get_data_for_comp(
+        comp=comp,
+        only_gs=only_gs,
+        max_Ehull=max_Ehull,
+        max_strucs_per_cmpd=max_strucs_per_cmpd,
+        max_sites_per_cmpd=max_sites_per_cmpd,
+        criteria=criteria,
+        include_structure=include_structure,
+        supercell_structure=supercell_structure,
+    )
+
+    return write_json(data, fjson)
+
 
 def check_query_example_2(query):
     for mpid in query:
-        print('\nmpid: %s' % mpid)
-        print('\tcmpd: %s' % query[mpid]['cmpd'])
-        print('\tEhull: %.2f eV/atom' % query[mpid]['Ehull_mp'])
-    
+        print("\nmpid: %s" % mpid)
+        print("\tcmpd: %s" % query[mpid]["cmpd"])
+        print("\tEhull: %.2f eV/atom" % query[mpid]["Ehull_mp"])
+
+
 ############### MAGMOMS ################
 """
 Oftentimes we're interested in magnetic (spin-polarized) calculations
@@ -142,48 +163,50 @@ If we want to run VASP on N configurations, it's probably a good idea to set
     - for this example, let's say our goal is 5 AFM configurations per structure
 """
 
-def get_magmoms_example_1(query,
-                          max_afm_combos=15,
-                          savename='magmoms_1.json',
-                          remake=False):
-                          
+
+def get_magmoms_example_1(
+    query, max_afm_combos=15, savename="magmoms_1.json", remake=False
+):
+
     fjson = os.path.join(DATA_DIR, savename)
     if not remake and os.path.exists(fjson):
         return read_json(fjson)
-    
+
     magmoms = {}
     for mpid in query:
         magmoms[mpid] = {}
-        structure = query[mpid]['structure']
-        magtools = MagTools(structure=structure,
-                            max_afm_combos=max_afm_combos,
-                            treat_as_nm=treat_as_nm)
+        structure = query[mpid]["structure"]
+        magtools = MagTools(
+            structure=structure, max_afm_combos=max_afm_combos, treat_as_nm=treat_as_nm
+        )
         curr_magmoms = magtools.get_afm_magmoms
         magmoms[mpid] = curr_magmoms
 
-    return write_json(magmoms, fjson)    
+    return write_json(magmoms, fjson)
+
 
 def main():
     """
     It's generally a good idea to set True/False statements at the top
         - this will allow you to quickly toggle whether or not to repeat certain steps
-    """    
+    """
     remake_sub_launch = False
-    
+
     remake_query1 = True
     print_query1_check = True
-    
+
     remake_query2 = True
     print_query2_check = True
-    
-    
+
     """
     Sometimes we'll need to run our launch script on a compute node if generating magmoms or analyzing directories takes a while
         here, we'll create a file called sub_launch.sh
         you can then execute this .py file on a compute node with:
             $ sbatch sub_launchs.h
-    """   
-    if remake_sub_launch or not os.path.exists(os.path.join(os.getcwd(), 'sub_launch.sh')):
+    """
+    if remake_sub_launch or not os.path.exists(
+        os.path.join(os.getcwd(), "sub_launch.sh")
+    ):
         make_sub_for_launcher()
 
     """
@@ -192,12 +215,10 @@ def main():
     query1 = get_query_example_1(remake=remake_query1)
     if print_query1_check:
         check_query_example_1(query1)
-        
+
     query2 = get_query_example_2(remake=remake_query1)
     if print_query2_check:
         check_query_example_2(query2)
- 
-    
 
 
 ################### specify configurations ####################
@@ -213,5 +234,3 @@ vasp_configs = {}
 
 ##### SUBMIT configurations #####
 # see https://github.umn.edu/bartel-group/pydmc/blob/main/pydmc/data/data/_sub_configs.yaml for default values
-
-
