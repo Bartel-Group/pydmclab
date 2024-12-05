@@ -2056,6 +2056,7 @@ def get_slabs(
     savename: str = "slabs.json",
     metadata_savename: str = "slabs_metadata.json",
     generate_reference_bulks: bool = True,
+    sort_slab_strucs: bool = True,
     remake: bool = False,
     **kwargs,
 ):
@@ -2162,6 +2163,12 @@ def get_slabs(
                             slab_id = (
                                 f"{struc_id}_{miller_str}_s{s}_v{v}_{termination_idx}"
                             )
+
+                            if sort_slab_strucs:
+                                sst = StrucTools(slab["slab"])
+                                sorted_slab = sst.structure.sort()
+                                slab["slab"] = sorted_slab.as_dict()
+
                             slabs[cmpd][slab_id] = slab["slab"]
 
                             if generate_reference_bulks:
