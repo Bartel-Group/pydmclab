@@ -2165,8 +2165,8 @@ def get_slabs(
                             )
 
                             if sort_slab_strucs:
-                                sst = StrucTools(slab["slab"])
-                                sorted_slab = sst.structure.sort()
+                                unsorted_slab = Slab.from_dict(slab["slab"])
+                                sorted_slab = unsorted_slab.sort()
                                 slab["slab"] = sorted_slab.as_dict()
 
                             slabs[cmpd][slab_id] = slab["slab"]
