@@ -2066,14 +2066,15 @@ def get_slabs(
     mjson = os.path.join(data_dir, metadata_savename)
 
     # Error checking for miller_indices, min_slab_sizes, and vacuum_sizes
+    single_miller_index = False
     if isinstance(miller_indices, list):
-        if (
-            all(isinstance(m, int) for m in miller_indices)
-            and not len(miller_indices) == 3
-        ):
-            raise ValueError(
-                "Passing a list of integers means specifying a single miller index and must have length 3."
-            )
+        if all(isinstance(m, int) for m in miller_indices):
+            if not len(miller_indices) == 3:
+                raise ValueError(
+                    "Passing a list of integers means specifying a single miller index and must have length 3."
+                )
+            else:
+                single_miller_index = True
         elif all(isinstance(m, list) for m in miller_indices):
             if not all(len(m) == 3 for m in miller_indices):
                 raise ValueError("All specified miller indices must have length 3.")
@@ -2130,16 +2131,19 @@ def get_slabs(
             metadata[cmpd][struc_id] = {}
             st = StrucTools(strucs[cmpd][struc_id])
 
-            evaluated_miller_indices = set()
-            for m in miller_indices:
-                if isinstance(m, int):
-                    distinct_miller_indices = get_symmetrically_distinct_miller_indices(
-                        st.structure, m
-                    )
-                    evaluated_miller_indices.update(distinct_miller_indices)
-                else:
-                    evaluated_miller_indices.add(tuple(m))
-            evaluated_miller_indices = sorted(list(evaluated_miller_indices))
+            if not single_miller_index:
+                evaluated_miller_indices = set()
+                for m in miller_indices:
+                    if isinstance(m, int):
+                        distinct_miller_indices = (
+                            get_symmetrically_distinct_miller_indices(st.structure, m)
+                        )
+                        evaluated_miller_indices.update(distinct_miller_indices)
+                    else:
+                        evaluated_miller_indices.add(tuple(m))
+                evaluated_miller_indices = sorted(list(evaluated_miller_indices))
+            else:
+                evaluated_miller_indices = miller_indices
 
             for em in evaluated_miller_indices:
                 miller_str = "".join([str(h) for h in em])
