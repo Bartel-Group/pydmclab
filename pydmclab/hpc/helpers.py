@@ -2074,11 +2074,9 @@ def get_slabs(
             raise ValueError(
                 "Passing a list of integers means specifying a single miller index and must have length 3."
             )
-        elif all(
-            isinstance(m, list)
-            for m in miller_indices and not all(len(m) == 3 for m in miller_indices)
-        ):
-            raise ValueError("All specified miller indices must have length 3.")
+        elif all(isinstance(m, list) for m in miller_indices):
+            if not all(len(m) == 3 for m in miller_indices):
+                raise ValueError("All specified miller indices must have length 3.")
         elif not any(
             not (
                 isinstance(m, int)
