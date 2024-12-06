@@ -2217,15 +2217,15 @@ def set_magmoms_from_template(
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
 
-    magmoms = {}
+    magmoms_dict = {}
     for cmpd in strucs:
-        magmoms[cmpd] = {}
+        magmoms_dict[cmpd] = {}
         for struc_id in strucs[cmpd]:
             st = StrucTools(strucs[cmpd][struc_id])
             magmoms = {"0": st.structure.site_properties.get("magmom")}
-            magmoms[cmpd][struc_id] = magmoms
+            magmoms_dict[cmpd][struc_id] = magmoms
 
-    write_json(magmoms, fjson)
+    write_json(magmoms_dict, fjson)
     return read_json(fjson)
 
 
