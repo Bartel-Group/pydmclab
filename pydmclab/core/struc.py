@@ -1249,10 +1249,29 @@ class SlabTools(object):
             excess_or_deficient_amts = self.off_stoichiometry
 
             if not ref_potentials:
-                mus = ChemPots(**kwargs)
-                ref_potentials = mus.chempots
+                temperature = kwargs.pop("temperature", None)
+                if not temperature:
+                    mus = ChemPots(**kwargs)
+                    ref_potentials = mus.chempots
+                    ref_potentials = {
+                        k: v
+                        for k, v in ref_potentials.items()
+                        if k in excess_or_deficient_amts
+                    }
+                else:
+                    mus_at_0K = ChemPots(temperature=0, **kwargs)
+                    ref_pots_at_0K = mus_at_0K.chempots
+                    mus_at_temp = ChemPots(temperature=temperature, **kwargs)
+                    ref_pots_at_temp = mus_at_temp.chempots
+                    ref_potentials = {
+                        el: ref_pots_at_0K[el] + ref_pots_at_temp[el]
+                        for el in excess_or_deficient_amts
+                    }
+
             elif isinstance(ref_potentials, ChemPots):
                 ref_potentials = ref_potentials.chempots
+
+            print(ref_potentials["O"])
 
             missing_refs = set(excess_or_deficient_amts) - set(ref_potentials)
             if missing_refs:
