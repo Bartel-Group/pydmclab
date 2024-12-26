@@ -3,7 +3,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from pydmclab.plotting.utils import get_colors, set_rc_params
 from matplotlib.ticker import MaxNLocator
-from scipy.constants import hbar, e
+# from scipy.constants import hbar, e
+from scipy.constants import physical_constants
+
 
 from pydmclab.utils.handy import read_json, write_json
 from pydmclab.core.struc import StrucTools
@@ -162,6 +164,7 @@ class AnalyzePhonons(object):
         A list of dictionaries where each dictionary corresponds to a specific temperature point.
         e.g. [{'temperature': 300, 'free_energy': float, 'entropy': float, 'heat_capacity': float},
                 {'temperature': 310, 'free_energy': float, 'entropy': float, 'heat_capacity': float}, ...]
+        Units: free_energy (kJ/mol), entropy (J/mol/K), heat_capacity (J/mol/K). These are PHONON free energies!
         """
         if force_rerun or not hasattr(self, '_thermal_properties'):
             print("Calculating thermal properties...")
@@ -216,7 +219,7 @@ class AnalyzePhonons(object):
         """
         Returns the total density of states for the phonon object in a dictionary.
         Returns:
-            {'frequency_points ': array of frequency points (THz), 'total_dos': array of total density of states}
+            {'frequency_points ': array of frequency points (THz is the deafault), 'total_dos': array of total density of states per cell per unit of the horizontal axis (THz^-1 is default)}
         """
         if not hasattr(self, '_total_dos'):
             print("Calculating total density of states...")
@@ -235,7 +238,7 @@ class AnalyzePhonons(object):
             return {key: self.make_json_serializable(value) for key, value in data.items()}
         elif isinstance(data, list):
             return [self.make_json_serializable(item) for item in data]
-        elif isinstance(data, np.ndarray):
+        elif isinstance(data, np.ndarray): 
             return data.tolist() 
         else:
             return data
@@ -408,13 +411,14 @@ class QHA(object):
             mpid_minus_scale = "_".join(mpid.split("_")[:-1])
 
             phonon_data = results[key]['phonons']
-            structure = results[key]['structure']
+            
 
             static_key = "--".join(key.split("--")[:-1] + [f"{xc}-static"])
             if static_key not in results:
                 print(f"Warning: Static key {static_key} not found in results. Skipping.")
                 continue
-
+            
+            structure = results[static_key]['structure']
             E_per_at = results[static_key]['results']['E_per_at']
             n_atoms = len(structure['sites'])
             E_electronic = n_atoms * E_per_at
@@ -500,7 +504,7 @@ class QHA(object):
                             if np.real(freq) > 0 or (np.real(freq) <= 0 and total_dos[i] != 0)
                         ]
                         filtered_frequencies = frequency_points[valid_indices]
-                        filtered_dos = total_dos[valid_indices]
+                        filtered_dos = total_dos[valid_indices]/.0041356
 
                         # Warning for removed imaginary frequencies
                         n_removed = len(frequency_points) - len(filtered_frequencies)
@@ -509,9 +513,11 @@ class QHA(object):
                                 f"Warning: Removed {n_removed} imaginary frequencies with zero DOS for "
                                 f"formula {formula}, mpid {mpid}, scale {scale}"
                             )
-
+                        
+                        h = physical_constants['Planck constant in eV/Hz'][0]
+                        hbar = h / (2 * np.pi)
                         # Convert frequencies to energy in eV
-                        energy_points = filtered_frequencies * 10e12 * hbar / e  # in eV (output from phonopy is in THz)
+                        energy_points = filtered_frequencies * 10e12 * hbar  # in eV (output from phonopy is in THz)
 
                         # Store the processed DOS data
                         dos_data[(formula, mpid)][str(scale)] = {
@@ -590,7 +596,7 @@ class QHA(object):
         return CrystalThermo(
             phonon_energies=phonon_energies,
             phonon_DOS=phonon_dos_values,
-            potentialenergy=self.E0,
+            # potentialenergy=self.E0,
             formula_units=formula_units,
         )
 
@@ -612,13 +618,19 @@ class QHA(object):
         out = {}
 
         for idx, scale in enumerate(props):
+            struc = self.parse_results[formula][mpid][scale]["structure"]
+            st = StrucTools(struc)
+            comp = st.structure.composition
+            ct = CompTools(comp)
+            _, formula_units = ct.get_reduced_comp_and_factor()
+        
             volume = volumes[idx]  # Use the corresponding volume for each scale
             out[volume] = {}  # Set volume as the key
             thermo = self.thermo_one_struc_scale(formula, mpid, scale)
             
             S = [thermo.get_entropy(temperature=T) for T in temperatures]
             Fs = [thermo.get_helmholtz_energy(temperature=T) for T in temperatures]
-            Fs[0] = self.E0
+            Fs[0] = self.E0/formula_units  # Set F(T=0) = E0/N to have in a per formula unit basis
             out[volume]['data'] = [
                 {"T": temperatures[i], "F": Fs[i], "S": S[i]} for i in range(len(temperatures))
             ]
@@ -651,19 +663,23 @@ class QHA(object):
 
 
                 if eos == "vinet":
-                    eos = Vinet(V, F)
+                    current_eos = Vinet(V, F)
                 elif eos == "murnaghan":
-                    eos = Murnaghan(V, F)
+                    current_eos = Murnaghan(V, F)
+                else:
+                    print(f"Invalid EOS: {eos}. Using Vinet EOS instead.")
+                    current_eos = Vinet(V, F)
 
                 try:
-                    eos.fit()
-                    min_F = eos.e0
+                    current_eos.fit()
+                    min_F = current_eos.e0
                     Gs.append({"T": T, "G": min_F})
-                    print(f"T = {T}, eos.e0 = {eos.e0}, parameters = {eos.parameters}")
-
-                except:
-                    print(f"Failed to fit {eos} EOS at T = {T} K")
+                    print(f"T = {T}, eos.e0 = {current_eos.e0}, parameters = {current_eos.eos_params}")
+                    
+                except Exception as e:
+                    print(f"Failed to fit {eos} EOS at T = {T} K: {e}")
                     continue
+
             out = {"data": Gs}
             # write_json(out, fjson)
             return out
