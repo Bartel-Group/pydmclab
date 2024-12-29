@@ -596,7 +596,7 @@ class QHA(object):
         return CrystalThermo(
             phonon_energies=phonon_energies,
             phonon_DOS=phonon_dos_values,
-            # potentialenergy=self.E0,
+            potentialenergy=self.E0,
             formula_units=formula_units,
         )
 
