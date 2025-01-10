@@ -5,6 +5,8 @@ from pydmclab.plotting.utils import get_colors, set_rc_params
 from matplotlib.ticker import MaxNLocator
 # from scipy.constants import hbar, e
 from scipy.constants import physical_constants
+from scipy.integrate import trapezoid
+
 
 
 from pydmclab.utils.handy import read_json, write_json
@@ -376,6 +378,184 @@ class AnalyzePhonons(object):
 
 
 
+class Helmholtz():
+
+    def __init__(self, phonon_dos, temperatures=np.linspace(0, 2000, 100), formula_units = None):
+        self.phonon_dos = phonon_dos
+        self.temperatures = temperatures
+        self.formula_units = formula_units
+        self.E0 = phonon_dos["E0"]
+
+        """
+            Args:
+                phonon_dos (Usually obtained from the phonon_dos method of the QHA class, which gets it from AnalyzePhonons.total_dos, parses it and converts it to units of eV):
+                    {'E0' : 0 K internal energy (eV/cell),
+                    'dos' :
+                        [{'E' : energy level (eV),
+                        'dos' : phonon DOS at E (float)}]
+                        }
+
+                temperatures (np.array)
+                    list of temperatures (K)
+
+                formula_units (int)
+                    number of formula units in the cell. If None is given, the energy will be in eV/cell. 
+                    If a number is given, the energy will be in eV/formula unit.
+        """
+        
+
+    def thermo(self):
+        phonon_dos = self.phonon_dos
+        E0 = self.E0
+        formula_units = self.formula_units
+
+        phonon_energies = np.array([
+            phonon_dos["dos"][i]["E"] for i in range(len(phonon_dos["dos"]))
+        ])
+        phonon_dos_values = np.array([
+            phonon_dos["dos"][i]["dos"] for i in range(len(phonon_dos["dos"]))
+        ])
+        return CrystalThermo(
+            phonon_energies=phonon_energies,
+            phonon_DOS=phonon_dos_values,
+            potentialenergy=self.E0,
+            formula_units=formula_units,
+        )
+
+    def zero_point_energy(self):
+        phonon_dos = self.phonon_dos
+        formula_units = self.formula_units
+        E0 = self.E0
+        phonon_energies = np.array([
+            phonon_dos["dos"][i]["E"] for i in range(len(phonon_dos["dos"]))
+        ])
+        dos_values = np.array([
+            phonon_dos["dos"][i]["dos"] for i in range(len(phonon_dos["dos"]))
+        ])
+        zpe_list = phonon_energies / 2.
+        zpe = trapezoid(zpe_list * dos_values, phonon_energies)
+        if formula_units is None:
+            return (zpe + E0)
+        else:
+            return (zpe + E0)/formula_units
+    
+
+    def helmholtz(self):
+        """
+        Returns:
+            list
+                [{'T': temperature (K), 'F': Helmholtz free energy (eV/cell or eV/formula unit), 'S': entropy (J/mol/K)}]
+        """
+        thermo = self.thermo()
+        temperatures = self.temperatures
+        S = [thermo.get_entropy(temperature=T) for T in temperatures]
+        Fs = [thermo.get_helmholtz_energy(temperature=T) for T in temperatures]
+        Fs[0] = self.zero_point_energy()
+        out = {
+            "data": [
+                {"T": temperatures[i], "F": Fs[i], "S": S[i]} for i in range(len(temperatures))
+            ]
+        }
+        return out    
+    
+class Gibbs():
+    def __init__(self, phonon_dos_dict, eos="vinet", temperatures=np.linspace(0, 2000, 100), formula_units = None):
+        self.eos = eos
+        self.phonon_dos_dict = phonon_dos_dict
+        self.temperatures = temperatures
+        self.formula_units = formula_units
+
+        '''
+        Args:
+            phonon_dos_dict (dict):
+                {volume (float) :
+                    {'E0' : 0 K internal energy (eV/cell),
+                    'dos' :
+                        [{'E' : energy level (eV),
+                        'dos' : phonon DOS at E (float)}]
+                    }
+                }
+            eos (str):
+                equation of state to use for fitting the data. Default is "vinet".
+            temperatures (np.array):
+                list of temperatures (K)
+            formula_units (int):
+                number of formula units in the cell. If None is given, the energy will be in eV/cell. 
+                If a number is given, the energy will be in eV/formula unit.
+        '''
+
+    @property
+    def volumes(self):
+        return list(self.phonon_dos_dict.keys())
+    
+    def helmholtz(self):
+        """
+        Returns:
+            dict
+                {volume (A**3) :
+                    {'data' :
+                        [{'T' : temperature (K),
+                        'F' : Helmholtz free energy (eV/cell or eV/formula unit)},
+                        'S' : entropy (eV/formula unit/K)]
+                    }
+                }
+        """
+        volumes = self.volumes
+        dos = self.phonon_dos_dict
+        formula_units = self.formula_units
+        return {
+            volumes[i]: Helmholtz(
+                phonon_dos=dos[volumes[i]],
+                temperatures=self.temperatures,
+                formula_units=formula_units
+            ).helmholtz()
+            for i in range(len(volumes))
+        }
+    
+    def gibbs(self):
+        """
+        Returns:
+            dict
+                {volume (A**3) :
+                    {'data' :
+                        [{'T' : temperature (K),
+                        'G' : Gibbs free energy (eV/cell or eV/formula unit)}]
+                    }
+                }
+        """
+        eos = self.eos
+        volumes = self.volumes
+        temperatures = self.temperatures
+        Fs = self.helmholtz()
+        Gs = []
+        for i in range(len(temperatures)):
+            T = temperatures[i]
+            F = [Fs[vol]["data"][i]["F"] for vol in volumes]
+            print(f"T = {T}, F = {F}")
+            V = [float(vol) for vol in volumes]
+            print(V)
+
+
+            if eos == "vinet":
+                current_eos = Vinet(V, F)
+            elif eos == "murnaghan":
+                current_eos = Murnaghan(V, F)
+            else:
+                print(f"Invalid EOS: {eos}. Using Vinet EOS instead.")
+                current_eos = Vinet(V, F)
+
+            try:
+                current_eos.fit()
+                min_F = current_eos.e0
+                Gs.append({"T": T, "G": min_F})
+                print(f"T = {T}, eos.e0 = {current_eos.e0}, parameters = {current_eos.eos_params}")
+                
+            except Exception as e:
+                print(f"Failed to fit {eos} EOS at T = {T} K: {e}")
+                continue
+
+        return {"data": Gs}
+    
 class QHA(object):
     def __init__(self, results: dict, eos: str = "vinet"):
         self.results = results
@@ -472,6 +652,30 @@ class QHA(object):
         return volumes
     
     @property
+    def temperatures(self):
+        """
+        Returns:
+            list: A list of temperatures (K) from the thermal properties data
+        """
+        temperatures = np.linspace(0, 2000, 201)
+        return temperatures
+    
+    def formula_units(self, formula, mpid):
+        """
+        Returns:
+            int: Number of formula units in the cell.
+        """
+        props = self.parse_results[formula][mpid]
+        random_scale = list(props.keys())[0]
+        structure = props[random_scale]['structure']
+        st = StrucTools(structure)
+        comp = st.structure.composition
+        ct = CompTools(comp)
+        _, formula_units = ct.get_reduced_comp_and_factor()
+        return formula_units
+
+
+    @property
     def phonon_dos(self):
         """
         Returns:
@@ -482,7 +686,7 @@ class QHA(object):
                                     {'E0' : 0 K internal energy (eV/cell),
                                     'dos' :
                                         [{'E' : energy level (eV),
-                                        'dos' : phonon DOS at E (float)}]
+                                        'dos' : phonon DOS at E (float) (normalized to 1/eV)]}]
                                     }
                 }
         """
@@ -496,6 +700,9 @@ class QHA(object):
                     phonons_data = data['phonons']['total_dos']
                     frequency_points = np.array(phonons_data.get('frequency_points'))
                     total_dos = np.array(phonons_data.get('total_dos'))
+                    struc = data['structure']
+                    st = StrucTools(struc)
+                    vol = st.structure.volume
 
                     if frequency_points is not None and total_dos is not None:
                         # Filter out imaginary frequencies with zero DOS
@@ -504,7 +711,7 @@ class QHA(object):
                             if np.real(freq) > 0 or (np.real(freq) <= 0 and total_dos[i] != 0)
                         ]
                         filtered_frequencies = frequency_points[valid_indices]
-                        filtered_dos = total_dos[valid_indices]/.0041356
+                        filtered_dos = total_dos[valid_indices]/0.0041356655 #This is to normalize the DOS to 1/eV (phonopy default is 1/THz)
 
                         # Warning for removed imaginary frequencies
                         n_removed = len(frequency_points) - len(filtered_frequencies)
@@ -520,7 +727,7 @@ class QHA(object):
                         energy_points = filtered_frequencies * 10e12 * hbar  # in eV (output from phonopy is in THz)
 
                         # Store the processed DOS data
-                        dos_data[(formula, mpid)][str(scale)] = {
+                        dos_data[(formula, mpid)][str(vol)] = {
                             'E0': data['E_electronic'],
                             'dos': [{'E': E, 'dos': d} for E, d in zip(energy_points, filtered_dos)]
                         }
@@ -528,78 +735,7 @@ class QHA(object):
                         print(f"Warning: Missing 'frequency_points' or 'total_dos' for formula {formula}, mpid {mpid}, scale {scale}")
 
         return dos_data
-
-
-    def properties_for_one_struc(self, formula, mpid):
-        """
-        Returns:
-            dict: A dictionary where keys are volumes (A**3) and values are dictionaries containing
-                'data', which is a list of dictionaries with temperature (T), Helmholtz free energy (F),
-                entropy (S), heat capacity (Cv), and electronic energy (E_electronic).
-                e.g. {volume(float): {'data': [{'T': 300, 'F': float, 'S': float, 'Cv': float, 'E_electronic': float}, ...]}}
-        """
-        results = self.parse_results
-        volumes_dict = self.volumes  
-
-        properties_dict = {}
-        volume_list = volumes_dict.get((formula, mpid), [])
-        
-        for i, scale in enumerate(results[formula][mpid]):
-            thermal_properties = results[formula][mpid][scale]['phonons']['thermal_properties']
-            E_electronic = results[formula][mpid][scale]['E_electronic']
-            volume = volume_list[i] if i < len(volume_list) else None
-            
-            if volume is not None:
-                if volume not in properties_dict:
-                    properties_dict[volume] = {'data': []}
-                
-                for prop in thermal_properties:
-                    properties_dict[volume]['data'].append({
-                        'T': prop['temperature'],
-                        'F': prop['free_energy'],
-                        'S': prop['entropy'],
-                        'Cv': prop['heat_capacity'],
-                        'E_electronic': E_electronic
-                    })
-
-        return properties_dict
     
-    @property
-    def temperatures(self):
-        """
-        Returns:
-            list: A list of temperatures (K) from the thermal properties data
-        """
-        temperatures = np.linspace(0, 2000, 201)
-        return temperatures
-    
-    def thermo_one_struc_scale(self, formula, mpid, scale):
-        """
-        Returns:
-            ase CrystalThermo object
-        """
-        phonon_dos = self.phonon_dos[formula, mpid][scale]
-        self.E0 = phonon_dos["E0"]
-
-        struc = self.parse_results[formula][mpid][scale]["structure"]
-        st = StrucTools(struc)
-        comp = st.structure.composition
-        ct = CompTools(comp)
-        _, formula_units = ct.get_reduced_comp_and_factor()
-
-        phonon_energies = np.array([
-            phonon_dos["dos"][i]["E"] for i in range(len(phonon_dos["dos"]))
-        ])
-        phonon_dos_values = np.array([
-            phonon_dos["dos"][i]["dos"] for i in range(len(phonon_dos["dos"]))
-        ])
-        return CrystalThermo(
-            phonon_energies=phonon_energies,
-            phonon_DOS=phonon_dos_values,
-            potentialenergy=self.E0,
-            formula_units=formula_units,
-        )
-
     def helmholtz_one_struc(self, formula, mpid):
         """
         Returns:
@@ -612,30 +748,13 @@ class QHA(object):
                 }
 
         """
-        props = self.parse_results[formula][mpid]
-        volumes = self.volumes[(formula, mpid)]
         temperatures = self.temperatures
-        out = {}
+        phonon_dos = self.phonon_dos[(formula, mpid)]
+        formula_units = self.formula_units(formula, mpid)
 
-        for idx, scale in enumerate(props):
-            struc = self.parse_results[formula][mpid][scale]["structure"]
-            st = StrucTools(struc)
-            comp = st.structure.composition
-            ct = CompTools(comp)
-            _, formula_units = ct.get_reduced_comp_and_factor()
-        
-            volume = volumes[idx]  # Use the corresponding volume for each scale
-            out[volume] = {}  # Set volume as the key
-            thermo = self.thermo_one_struc_scale(formula, mpid, scale)
-            
-            S = [thermo.get_entropy(temperature=T) for T in temperatures]
-            Fs = [thermo.get_helmholtz_energy(temperature=T) for T in temperatures]
-            Fs[0] = self.E0/formula_units  # Set F(T=0) = E0/N to have in a per formula unit basis
-            out[volume]['data'] = [
-                {"T": temperatures[i], "F": Fs[i], "S": S[i]} for i in range(len(temperatures))
-            ]
+        F = Gibbs(phonon_dos, eos=self.eos, temperatures=temperatures, formula_units=formula_units).helmholtz()
 
-        return out
+        return F
     
     def gibbs_one_struc(self, formula, mpid, eos="vinet"):
             """
@@ -645,115 +764,13 @@ class QHA(object):
                     'G' : Gibbs free energy (eV/cell)}]
                 }
             """
-            # fjson = self.fjson_gibbs
-            # if not self.remake_gibbs and os.path.exists(fjson):
-            #     return read_json(fjson)
             temperatures = self.temperatures
             volumes = self.volumes[formula, mpid]
 
-            Fs = self.helmholtz_one_struc(formula, mpid)
-
-            Gs = []
-            for i in range(len(temperatures)):
-                T = temperatures[i]
-                F = [Fs[vol]["data"][i]["F"] for vol in volumes]
-                print(f"T = {T}, F = {F}")
-                V = [float(vol) for vol in volumes]
-                print(V)
-
-
-                if eos == "vinet":
-                    current_eos = Vinet(V, F)
-                elif eos == "murnaghan":
-                    current_eos = Murnaghan(V, F)
-                else:
-                    print(f"Invalid EOS: {eos}. Using Vinet EOS instead.")
-                    current_eos = Vinet(V, F)
-
-                try:
-                    current_eos.fit()
-                    min_F = current_eos.e0
-                    Gs.append({"T": T, "G": min_F})
-                    print(f"T = {T}, eos.e0 = {current_eos.e0}, parameters = {current_eos.eos_params}")
-                    
-                except Exception as e:
-                    print(f"Failed to fit {eos} EOS at T = {T} K: {e}")
-                    continue
-
-            out = {"data": Gs}
-            # write_json(out, fjson)
-            return out
-
-
-    def get_phonopy_qha(self, formula, mpid):
-        """
-        Get the cached PhonopyQHA object for a specific formula and mpid.
-        """
-        key = (formula, mpid)
-        if key not in self._qha_cache:
-            self._qha_cache[key] = self.phonopy_qha_for_one_struc(formula, mpid)
-        return self._qha_cache[key]
-
-    def phonopy_qha_for_one_struc(self, formula, mpid):
-        """
-        Returns:
-            PhonopyQHA object for a specific formula and mpid.
-        """
-        eos = self.eos
-        volumes = self.volumes[formula, mpid]
-        properties = self.properties_for_one_struc(formula, mpid)
-        temperatures = sorted([item['T'] for item in properties[volumes[0]]['data']])
-
-        free_energies = []
-        entropy = []
-        cv = []
-        E_electronic = []
-
-        for volume in volumes:
-            data = properties[volume]['data']
-            
-            F_vs_T = [entry['F'] for entry in data]
-            S_vs_T = [entry['S'] for entry in data]
-            Cv_vs_T = [entry['Cv'] for entry in data]
-            E_electronic_value = data[0]['E_electronic']
-
-            free_energies.append(F_vs_T)
-            entropy.append(S_vs_T)
-            cv.append(Cv_vs_T)
-            E_electronic.append(E_electronic_value)
-        
-        free_energies = np.array(free_energies).T
-        entropy = np.array(entropy).T
-        cv = np.array(cv).T
-
-        qha = PhonopyQHA(volumes=volumes, electronic_energies=E_electronic, temperatures=temperatures, free_energy=free_energies, cv=cv, entropy=entropy, verbose=True, eos=eos)
-        return qha
-
-    def qha_info_one_struc(self, formula, mpid):
-        """
-        Returns:
-            A list of dictionaries with QHA information for each temperature.
-            e.g. [{'temperature': 300, 'equilibrium_volume': float, 'gibbs_energy': float, 'bulk_modulus': float, 'thermal_expansion': float, 'heat_capacity': float},
-                {'temperature': 310, 'equilibrium_volume': float, 'gibbs_energy': float, 'bulk_modulus': float, 'thermal_expansion': float, 'heat_capacity': float}, ...]
-        """
-        qha = self.get_phonopy_qha(formula, mpid)
-        volumes = self.volumes[(formula, mpid)]
-        equilibrium_volumes = qha.volume_temperature
-        gibbs_energy = qha.gibbs_temperature
-        bulk_modulus = qha.bulk_modulus_temperature
-        thermal_expansion = qha.thermal_expansion
-        cv = qha.heat_capacity_P_polyfit
-        temperatures = qha._qha._temperatures[0:-1]
-
-        out = [{
-            "temperature": temperatures[i],
-            "equilibrium_volume": equilibrium_volumes[i],
-            "gibbs_energy": gibbs_energy[i],
-            "bulk_modulus": bulk_modulus[i],
-            "thermal_expansion": thermal_expansion[i],
-            "heat_capacity": cv[i]
-        } for i in range(len(temperatures))]
-        return out
+            phonon_dos = self.phonon_dos[formula, mpid]
+            formula_units = self.formula_units(formula, mpid)
+            G = Gibbs(phonon_dos, eos=eos, temperatures=temperatures, formula_units=formula_units).gibbs()
+            return G
 
     def qha_dict(self, write=False, data_dir=os.getcwd().replace("scripts", "data"), savename="qha.json", remake=False):
         """
@@ -765,118 +782,148 @@ class QHA(object):
         if not remake and os.path.exists(fjson) and write:
             return read_json(fjson)
         
+        results = self.parse_results
         qha_dict = {}
-        for formula in self.parse_results:
+        for formula in results  :
             qha_dict[formula] = {}
-            for mpid in self.parse_results[formula]:
-                qha_dict[formula][mpid] = self.qha_info_one_struc(formula, mpid)
-        
+            for mpid in results[formula]:
+                F = self.helmholtz_one_struc(formula, mpid)
+                G = self.gibbs_one_struc(formula, mpid)
+                qha_dict[formula][mpid] = {"F": F, "G": G}    
+
         if write:
             write_json(qha_dict, fjson)
             return read_json(fjson)
         return qha_dict
 
-    def plot_gibbs_energy(self, formula, mpid):
+    def plot_helmholtz_free_energy(self, formula, mpid, temp_cutoff=None):
         """
-        Plots the Gibbs free energy vs. temperature for a specific formula and mpid.
-        """
-        qha_info = self.qha_info_one_struc(formula, mpid)
-        temperatures = [item['temperature'] for item in qha_info]
-        gibbs_energy = [item['gibbs_energy'] for item in qha_info]
-        
-        fig = plt.figure()
-        plt.plot(temperatures, gibbs_energy, color=COLORS['red'])
-        plt.xlabel("Temperature (K)", fontsize=16)
-        plt.ylabel("Gibbs Free Energy (eV)", fontsize=16)
-        plt.title(f"Gibbs Free Energy for {formula} {mpid}", fontsize=18)
-        plt.xlim(0, max(temperatures))
-        plt.xticks(fontsize=14)
-        plt.yticks(fontsize=14)
+        Plot Temperature vs Helmholtz Free Energy at Different Volumes.
 
-        return fig
-
-    def plot_qha_info(self, formula, mpid):
-        """
-        Plots the QHA information for a specific formula and mpid.
-        """
-        qha = self.get_phonopy_qha(formula, mpid)
-        qha.plot_qha()
-
-
-    def plot_all(self, save=False, fig_dir=os.getcwd().replace("scripts", "figures")):
-        """
-        Plots the Gibbs free energy and QHA information for all structures.
+        Args:
+            F (dict): Dictionary containing Helmholtz free energy data for different volumes.
+            temp_cutoff (tuple): Optional temperature range (min_temp, max_temp) for filtering.
         """
 
-        results = self.parse_results
-        for formula in results:
-            for mpid in results[formula]:
-                fig_gibbs = self.plot_gibbs_energy(formula, mpid)
-                plt.show()
-                if save:
-                    fig_gibbs.savefig(os.path.join(fig_dir, f"{formula}_{mpid}_gibbs.png"))
+        F = self.helmholtz_one_struc(formula, mpid)
 
-                self.plot_qha_info(formula, mpid)
-                plt.show()
-                if save:
-                    plt.savefig(os.path.join(fig_dir, f"{formula}_{mpid}_qha.png"))
+        plt.figure(figsize=(10, 6))  
 
+        volumes = list(F.keys())  
 
-    def plot_all_gibbs_for_one_cmpd(self, formula, save=False, fig_dir=os.getcwd().replace("scripts", "figures")):
-        """
-        Plots the Gibbs free energy for all structures of a specific compound (formula) in the same plot.
-        """
-        results = self.parse_results
-        fig = plt.figure()
-        
-        # Loop through each mpid for the given formula and plot all on the same figure
-        for mpid in results[formula]:
-            qha_info = self.qha_info_one_struc(formula, mpid)
-            temperatures = [item['temperature'] for item in qha_info]
-            gibbs_energy = [item['gibbs_energy'] for item in qha_info]
-            
-            # Plot the Gibbs free energy for this mpid on the same figure
-            plt.plot(temperatures, gibbs_energy, label=mpid, linewidth=0.5)
+        for vol in volumes:
+            # Extract Helmholtz free energies and temperatures
+            data = F[vol]['data']
+            if temp_cutoff:
+                data = [d for d in data if temp_cutoff[0] <= d['T'] <= temp_cutoff[1]]
 
-        # Set the plot labels, title, and legend
-        plt.xlabel("Temperature (K)", fontsize=16)
-        plt.ylabel("Gibbs Free Energy (eV)", fontsize=16)
-        plt.title(f"Gibbs Free Energy for {formula}", fontsize=18)
-        plt.xlim(0, max(temperatures))
-        plt.xticks(fontsize=14)
-        plt.yticks(fontsize=14)
-        plt.legend(fontsize=12, loc='best')
+            Fs = [i['F'] for i in data]
+            Ts = [i['T'] for i in data]
 
-        # Show the plot only once, after all lines have been added
+            plt.plot(Ts, Fs, label=f"{vol:.2f}")  # Format volume label to 2 decimals
+
+        # Add title and axis labels
+        plt.title("Temperature vs Helmholtz Free Energy at Different Volumes", fontsize=14)
+        plt.xlabel("Temperature (K)", fontsize=12)
+        plt.ylabel("Helmholtz Free Energy (eV/f.u.)" if self.formula_units else "Helmholtz Free Energy (eV/cell)", fontsize=12)
+
+        # Add legend and grid
+        plt.legend(title="Volumes", loc="best", fontsize=10)
+        plt.grid(True)
+
+        # Display the plot
         plt.show()
-        
-        # Save the figure if requested
-        if save:
-            fig.savefig(os.path.join(fig_dir, f"{formula}_all_gibbs.png"))
 
-        return fig
-
-
-    def plot_entropy_contributions(self, formula):
+    def plot_gibbs_free_energy(self, formula, mpid, temp_cutoff=None):
         """
-        Plots the entropy contributions for a specific formula and mpid.
+        Plot Temperature vs Gibbs Free Energy at Different Volumes.
+
+        Args:
+            G (dict): Dictionary containing Gibbs free energy data.
+            volumes (list): List of volume values.
+            temp_cutoff (tuple): Optional temperature range (min_temp, max_temp) for filtering.
         """
+        G = self.gibbs_one_struc(formula, mpid)
 
-        results = self.parse_results
-        fig = plt.figure()
-        for mpid in results[formula]:
-            qha_info = self.qha_info_one_struc(formula, mpid)
-            temperatures = [item['temperature'] for item in qha_info]
-            gibbs_energies = [item['gibbs_energy'] for item in qha_info]
-            entropy_contributions = [gibbs-gibbs_energies[0] for gibbs in gibbs_energies]
-        
-            plt.plot(temperatures, entropy_contributions, label=mpid)
-            
-        plt.xlabel("Temperature (K)", fontsize=16)
-        plt.ylabel("-ST (eV)", fontsize=16)
-        plt.title(f"-ST term for {formula}", fontsize=18)
-        plt.legend()
-        plt.xlim(0, max(temperatures))
-        plt.xticks(fontsize=14)
-        plt.yticks(fontsize=14)
+        plt.figure(figsize=(10, 6))  # Create a new figure with a specified size
 
+        data = G['data']
+        if temp_cutoff:
+            data = [d for d in data if temp_cutoff[0] <= d['T'] <= temp_cutoff[1]]
+
+        Gs = [i['G'] for i in data]
+        Ts = [i['T'] for i in data]
+
+        plt.plot(Ts, Gs, label=f"{formula}, {mpid}") 
+
+        # Add title and axis labels
+        plt.title("Temperature vs Gibbs Free Energy at Different Volumes", fontsize=14)
+        plt.xlabel("Temperature (K)", fontsize=12)
+        plt.ylabel("Gibbs Free Energy (eV/f.u.)" if self.formula_units else "Gibbs Free Energy (eV/cell)", fontsize=12)
+
+        # Add legend and grid
+        plt.legend(title="Volumes", loc="best", fontsize=10)
+        plt.grid(True)
+
+        # Display the plot
+        plt.show()
+    
+    def plot_volumes_vs_helmholtz(self, formula, mpid, skip=1, temp_cutoff=None, normalize_298K=False):
+        """
+        Plot Helmholtz Free Energy vs Volume at different temperatures.
+        Optionally subtract the energy at 298K for normalization.
+
+        Args:
+            F (dict): Dictionary containing Helmholtz free energy data for different volumes.
+            skip (int): Step size for skipping temperatures. Default is 1 (no skipping).
+            temp_cutoff (tuple): Optional temperature range (min_temp, max_temp) for filtering.
+            normalize_298K (bool): If True, subtract the energy at 298K for normalization. Default is True.
+        """
+        F = self.helmholtz_one_struc(formula, mpid)
+        G = self.gibbs_one_struc(formula, mpid)
+        # Extract all temperature points (assuming consistent across volumes)
+        temperatures = [entry['T'] for entry in next(iter(F.values()))['data']]
+        if temp_cutoff:
+            temperatures = [T for T in temperatures if temp_cutoff[0] <= T <= temp_cutoff[1]]
+
+        plt.figure(figsize=(10, 6))  # Prepare the figure
+
+
+        # Loop over temperatures with the specified skip step
+        for T in temperatures[1::skip]: 
+            print(f"Temperature: {T} K")
+            vols = []  # List to store volumes
+            Fs = []  # List to store free energy values
+            for vol, data in F.items():
+                # Find the corresponding F for the current temperature
+                for entry in data['data']:
+                    if entry['T'] == T:
+                        F_value = entry['F']
+                        if normalize_298K:
+                            G_at_T300 = next(item['G'] for item in G['data'] if item['T'] == 300)
+                            F_value -= G_at_T300
+                            # print(F_value)
+                        vols.append(vol)
+                        Fs.append(F_value)
+                        break
+
+            # Plot F vs Volume for the current temperature
+            plt.plot(vols, Fs, marker='o', label=f"T = {T:.1f} K")
+
+        # Add axis labels and title
+        plt.xlabel("Volume ($\mathrm{Å}^3$)", fontsize=12)
+        plt.ylabel("Helmholtz Free Energy (eV/f.u.)", fontsize=12)
+        plt.title(
+            "Helmholtz Free Energy vs Volume at Different Temperatures" +
+            (" (Normalized to 298K)" if normalize_298K else ""),
+            fontsize=14
+        )
+
+        # Add legend
+        plt.legend(title="Temperatures", loc="best", fontsize=10)
+
+        # Add grid for better readability
+        plt.grid(True)
+
+        # Show the plot
+        plt.show()
