@@ -925,12 +925,14 @@ class QHA(object):
 
         plt.figure(figsize=(10, 6))  # Prepare the figure
 
-
+        equil_vols_F = []  # List to store equilibrium volumes
         # Loop over temperatures with the specified skip step
         for T in temperatures[1::skip]: 
             print(f"Temperature: {T} K")
             vols = []  # List to store volumes
             Fs = []  # List to store free energy values
+            equil_vol_F = G['data'][temperatures.index(T)]['V']
+            equil_vols_F.append(equil_vol_F)
             for vol, data in F.items():
                 # Find the corresponding F for the current temperature
                 for entry in data['data']:
@@ -945,7 +947,9 @@ class QHA(object):
                         break
 
             # Plot F vs Volume for the current temperature
-            plt.plot(vols, Fs, marker='o', label=f"T = {T:.1f} K")
+            plt.plot(vols, Fs, marker='o', color='black', label=f"T = {T:.1f} K")
+        
+        plt.plot(equil_vols_F, temperatures, marker='x', color='blue', linestyle='None', label="Equilibrium Volume")
 
         # Add axis labels and title
         plt.xlabel("Volume ($\mathrm{Å}^3$)", fontsize=12)
