@@ -12,6 +12,7 @@ from scipy.integrate import trapezoid
 from pydmclab.utils.handy import read_json, write_json
 from pydmclab.core.struc import StrucTools
 from pydmclab.core.comp import CompTools
+from pymatgen.core.composition import Composition
 
 from phonopy import Phonopy, PhonopyQHA
 from phonopy.interface.vasp import read_vasp, parse_force_constants
@@ -675,7 +676,10 @@ class QHA(object):
         st = StrucTools(structure)
         comp = st.structure.composition
         ct = CompTools(comp)
-        _, formula_units = ct.get_reduced_comp_and_factor()
+        reduced_comp_and_factor = Composition(
+                formula
+                ).get_reduced_composition_and_factor()
+        formula_units = reduced_comp_and_factor[1]
         return formula_units
 
 
