@@ -195,6 +195,19 @@ class CompTools(object):
                         label += el + "_{%.1f}" % float(n_el)
         label += "$"
         return label
+    
+    def get_reduced_comp_and_factor(self):
+        """
+        Returns:
+            reduced formula (str) and factor (float) of the formula
+        """
+
+        reduced_comp_and_factor = Composition(
+            self.formula
+        ).get_reduced_composition_and_factor()
+        reduced_comp, factor = reduced_comp_and_factor[0], reduced_comp_and_factor[1]
+
+        return reduced_comp, factor
 
 
 def main():
