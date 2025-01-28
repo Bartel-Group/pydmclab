@@ -519,7 +519,8 @@ class Gibbs():
                 {volume (A**3) :
                     {'data' :
                         [{'T' : temperature (K),
-                        'G' : Gibbs free energy (eV/cell or eV/formula unit)}]
+                        'G' : Gibbs free energy (eV/cell or eV/formula unit)},
+                        'V' : equilibrium volume (A**3)]
                     }
                 }
         """
@@ -547,7 +548,8 @@ class Gibbs():
             try:
                 current_eos.fit()
                 min_F = current_eos.e0
-                Gs.append({"T": T, "G": min_F})
+                V_eq = current_eos.v0
+                Gs.append({"T": T, "G": min_F, "V": V_eq})
                 print(f"T = {T}, eos.e0 = {current_eos.e0}, parameters = {current_eos.eos_params}")
                 
             except Exception as e:
@@ -591,7 +593,9 @@ class QHA(object):
             mpid_minus_scale = "_".join(mpid.split("_")[:-1])
 
             phonon_data = results[key]['phonons']
-            
+            if phonon_data is None:
+                print(f"Warning: Phonon data not found for key {key}. Skipping.")
+                continue
 
             static_key = "--".join(key.split("--")[:-1] + [f"{xc}-static"])
             if static_key not in results:
@@ -675,8 +679,7 @@ class QHA(object):
         return formula_units
 
 
-    @property
-    def phonon_dos(self):
+    def phonon_dos(self, remove_imaginary=True):
         """
         Returns:
             dict: A dictionary where keys are tuples of (formula, mpid), second key is volume key, and values are dictionaries containing
@@ -705,11 +708,19 @@ class QHA(object):
                     vol = st.structure.volume
 
                     if frequency_points is not None and total_dos is not None:
-                        # Filter out imaginary frequencies with zero DOS
-                        valid_indices = [
-                            i for i, freq in enumerate(frequency_points)
-                            if np.real(freq) > 0 or (np.real(freq) <= 0 and total_dos[i] != 0)
-                        ]
+                        if remove_imaginary:
+                            # Remove all DOS values and frequencies where there are imaginary frequencies
+                            valid_indices = [
+                                i for i, freq in enumerate(frequency_points)
+                                if np.real(freq) > 0
+                            ]
+                        else:
+                            # Remove only imaginary frequencies where DOS values are zero
+                            valid_indices = [
+                                i for i, freq in enumerate(frequency_points)
+                                if np.real(freq) > 0 or (np.real(freq) <= 0 and total_dos[i] != 0)
+                            ]
+
                         filtered_frequencies = frequency_points[valid_indices]
                         filtered_dos = total_dos[valid_indices]/0.0041356655 #This is to normalize the DOS to 1/eV (phonopy default is 1/THz)
 
@@ -718,6 +729,8 @@ class QHA(object):
                         if n_removed > 0:
                             print(
                                 f"Warning: Removed {n_removed} imaginary frequencies with zero DOS for "
+                                f"formula {formula}, mpid {mpid}, scale {scale}" if not remove_imaginary
+                                else f"Warning: Removed {n_removed} imaginary frequencies for " 
                                 f"formula {formula}, mpid {mpid}, scale {scale}"
                             )
                         
@@ -735,8 +748,8 @@ class QHA(object):
                         print(f"Warning: Missing 'frequency_points' or 'total_dos' for formula {formula}, mpid {mpid}, scale {scale}")
 
         return dos_data
-    
-    def helmholtz_one_struc(self, formula, mpid):
+
+    def helmholtz_one_struc(self, formula, mpid, remove_imaginary=True):
         """
         Returns:
             dict
@@ -749,7 +762,7 @@ class QHA(object):
 
         """
         temperatures = self.temperatures
-        phonon_dos = self.phonon_dos[(formula, mpid)]
+        phonon_dos = self.phonon_dos(remove_imaginary=remove_imaginary)[(formula, mpid)]
         formula_units = self.formula_units(formula, mpid)
 
         F = Gibbs(phonon_dos, eos=self.eos, temperatures=temperatures, formula_units=formula_units).helmholtz()
@@ -767,7 +780,7 @@ class QHA(object):
             temperatures = self.temperatures
             volumes = self.volumes[formula, mpid]
 
-            phonon_dos = self.phonon_dos[formula, mpid]
+            phonon_dos = self.phonon_dos(remove_imaginary=True)[formula, mpid]
             formula_units = self.formula_units(formula, mpid)
             G = Gibbs(phonon_dos, eos=eos, temperatures=temperatures, formula_units=formula_units).gibbs()
             return G
@@ -796,6 +809,26 @@ class QHA(object):
             return read_json(fjson)
         return qha_dict
 
+    def plot_phonon_dos(self, formula, mpid, volume, remove_imaginary=False):
+        """
+        Plot phonon density of states for a specific volume.
+        Args:
+            formula (str): Chemical formula of the material.
+            mpid (str): Materials Project ID.
+            volume (float): Volume of the structure.
+            remove_imaginary (bool): Whether to remove imaginary frequencies. Default is False.
+        """
+        phonon_dos = self.phonon_dos(remove_imaginary=remove_imaginary)[(formula, mpid)][str(volume)]
+
+        frequency_points = np.array([d['E'] for d in phonon_dos['dos']])
+        total_dos = np.array([d['dos'] for d in phonon_dos['dos']])
+
+        plt.figure(figsize=(10, 6))
+        plt.plot(frequency_points, total_dos, label=f"{mpid} - {volume:.2f} A^3")
+        plt.xlabel("Energy (eV)", fontsize=12)
+        plt.ylabel("Phonon DOS (1/eV)", fontsize=12)
+        plt.title(f"Phonon Density of States for {mpid} - {volume:.2f} A^3", fontsize=14)
+   
     def plot_helmholtz_free_energy(self, formula, mpid, temp_cutoff=None):
         """
         Plot Temperature vs Helmholtz Free Energy at Different Volumes.
@@ -820,7 +853,7 @@ class QHA(object):
             Fs = [i['F'] for i in data]
             Ts = [i['T'] for i in data]
 
-            plt.plot(Ts, Fs, label=f"{vol:.2f}")  # Format volume label to 2 decimals
+            plt.plot(Ts, Fs, label=f"{float(vol):.2f}")  # Format volume label to 2 decimals
 
         # Add title and axis labels
         plt.title("Temperature vs Helmholtz Free Energy at Different Volumes", fontsize=14)
@@ -854,7 +887,7 @@ class QHA(object):
         Gs = [i['G'] for i in data]
         Ts = [i['T'] for i in data]
 
-        plt.plot(Ts, Gs, label=f"{formula}, {mpid}") 
+        plt.plot(Ts, Gs, label=mpid) 
 
         # Add title and axis labels
         plt.title("Temperature vs Gibbs Free Energy at Different Volumes", fontsize=14)
@@ -913,6 +946,7 @@ class QHA(object):
         # Add axis labels and title
         plt.xlabel("Volume ($\mathrm{Å}^3$)", fontsize=12)
         plt.ylabel("Helmholtz Free Energy (eV/f.u.)", fontsize=12)
+        plt.xticks(fontsize=10)
         plt.title(
             "Helmholtz Free Energy vs Volume at Different Temperatures" +
             (" (Normalized to 298K)" if normalize_298K else ""),
@@ -927,3 +961,113 @@ class QHA(object):
 
         # Show the plot
         plt.show()
+
+    def plot_equilibrium_volume_vs_temperature(self, formula, mpid, eos="vinet", temp_cutoff=None):
+        """
+        Plot Equilibrium Volume vs Temperature.
+
+        Args:
+            G (dict): Dictionary containing Gibbs free energy data.
+            volumes (list): List of volume values.
+            temp_cutoff (tuple): Optional temperature range (min_temp, max_temp) for filtering.
+        """
+        G = self.gibbs_one_struc(formula, mpid, eos=eos)
+
+        plt.figure(figsize=(10, 6))
+
+        data = G['data']
+        if temp_cutoff:
+            data = [d for d in data if temp_cutoff[0] <= d['T'] <= temp_cutoff[1]]
+        
+        Ts = [i['T'] for i in data]
+        Vs = [i['V'] for i in data]
+
+        plt.plot(Ts, Vs, label=mpid)
+        plt.title("Equilibrium Volume vs Temperature", fontsize=14)
+        plt.xlabel("Temperature (K)", fontsize=12)
+        plt.ylabel("Equilibrium Volume ($\mathrm{Å}^3$)", fontsize=12)
+        plt.legend(loc="best", fontsize=10)
+
+
+    def plot_relative_gibbs(self, formula=None, mpids=None, temp_cutoff=None):
+        """
+        Plot Relative Gibbs Free Energy (compared to the ground state) vs Temperature.
+
+        Args:
+            formula (str): Formula to filter MPIDs by. If None, uses all available formulas.
+            mpids (list): Specific MPIDs to compare. If None, uses all MPIDs under the given formula.
+            temp_cutoff (tuple): Optional temperature range (min_temp, max_temp) for filtering.
+        """
+        import matplotlib.pyplot as plt
+
+        # Get phonon DOS data
+        p_dos = self.phonon_dos(remove_imaginary=True)
+
+        # Filter by formula and MPIDs
+        if formula:
+            relevant_keys = [key for key in p_dos if key[0] == formula]
+        else:
+            relevant_keys = list(p_dos.keys())
+
+        if mpids:
+            relevant_keys = [key for key in relevant_keys if key[1] in mpids]
+
+        # Collect Gibbs free energy data
+        gibbs_data = {}
+        for key in relevant_keys:
+            formula, mpid = key
+            G = self.gibbs_one_struc(formula, mpid)
+            data = G['data']
+            Ts = [i['T'] for i in data]
+            Gs = [i['G'] for i in data]
+
+            # Apply temperature cutoff if specified
+            if temp_cutoff:
+                filtered_data = [(T, G) for T, G in zip(Ts, Gs) if temp_cutoff[0] <= T <= temp_cutoff[1]]
+                Ts, Gs = zip(*filtered_data) if filtered_data else ([], [])
+
+            gibbs_data[mpid] = {'T': Ts, 'G': Gs}
+
+        # Ensure there are at least two datasets for comparison
+        if len(gibbs_data) < 2:
+            print("Error: At least two MPIDs are required for comparison.")
+            return
+
+        # Determine the ground state (lowest energy at 0K)
+        ground_state_mpid = min(
+            gibbs_data.keys(), key=lambda mpid: gibbs_data[mpid]['G'][0] if gibbs_data[mpid]['G'] else float('inf')
+        )
+
+        ground_state_data = gibbs_data.pop(ground_state_mpid)
+        T_ref, G_ref = ground_state_data['T'], ground_state_data['G']
+
+        fig = plt.figure(figsize=(10, 6))
+        # Ensure temperature points align
+        for mpid, data in gibbs_data.items():
+            if data['T'] != T_ref:
+                print(f"Error: Temperature points do not align for MPID {mpid}. Skipping.")
+                continue
+
+            # Calculate relative Gibbs free energy
+            G_diff = [g - g_ref for g, g_ref in zip(data['G'], G_ref)]
+
+            # Plot the difference
+            plt.plot(
+                T_ref, G_diff, label=f"ΔG: {mpid} - {ground_state_mpid}"
+            )
+
+        # Customize the plot
+        plt.title(
+            f"Relative Gibbs Free Energy vs Temperature\n(Reference: {ground_state_mpid})",
+            fontsize=14,
+        )
+        plt.xlabel("Temperature (K)", fontsize=12)
+        plt.ylabel("ΔG (eV/f.u.)", fontsize=12)
+        plt.axhline(0, color="black", linestyle="--", linewidth=0.8)
+        plt.legend(loc="best", fontsize=10)
+        plt.grid(True)
+
+        # Display the plot
+        plt.show()
+
+
