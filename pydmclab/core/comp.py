@@ -200,6 +200,7 @@ class CompTools(object):
         """
         Returns:
             reduced formula (str) and factor (float) of the formula
+            
         """
 
         reduced_comp_and_factor = Composition(
