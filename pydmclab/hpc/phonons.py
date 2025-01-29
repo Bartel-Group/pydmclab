@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import matplotlib.pyplot as plt
-from pydmclab.plotting.utils import get_colors, set_rc_params
+from pydmclab.plotting.utils import get_colors, set_rc_params, get_label
 from matplotlib.ticker import MaxNLocator
 # from scipy.constants import hbar, e
 from scipy.constants import physical_constants
@@ -24,7 +24,7 @@ from pymatgen.io.ase import AseAtomsAdaptor
 from pymatgen.analysis.eos import Murnaghan, Vinet
 
 set_rc_params()
-COLORS = get_colors(palette="tab10")
+# COLORS = get_colors(palette="tab10")
 
 class AnalyzePhonons(object):
     def __init__(self, calc_dir: str, 
@@ -909,68 +909,72 @@ class QHA(object):
         """
         Plot Helmholtz Free Energy vs Volume at different temperatures.
         Optionally subtract the energy at 298K for normalization.
-
-        Args:
-            F (dict): Dictionary containing Helmholtz free energy data for different volumes.
-            skip (int): Step size for skipping temperatures. Default is 1 (no skipping).
-            temp_cutoff (tuple): Optional temperature range (min_temp, max_temp) for filtering.
-            normalize_298K (bool): If True, subtract the energy at 298K for normalization. Default is True.
         """
         F = self.helmholtz_one_struc(formula, mpid)
         G = self.gibbs_one_struc(formula, mpid)
+
         # Extract all temperature points (assuming consistent across volumes)
         temperatures = [entry['T'] for entry in next(iter(F.values()))['data']]
         if temp_cutoff:
             temperatures = [T for T in temperatures if temp_cutoff[0] <= T <= temp_cutoff[1]]
 
-        plt.figure(figsize=(10, 6))  # Prepare the figure
+        plt.figure(figsize=(3, 6))  # Prepare the figure
 
-        equil_vols_F = []  # List to store equilibrium volumes
+        equil_vols = []  # List to store equilibrium volumes
+        equil_F_values = []  # List to store F value (Gibbs) at equilibrium volume
+
         # Loop over temperatures with the specified skip step
-        for T in temperatures[1::skip]: 
-            print(f"Temperature: {T} K")
+        for i, T in enumerate(temperatures[1::skip]): 
             vols = []  # List to store volumes
             Fs = []  # List to store free energy values
-            equil_vol_F = G['data'][temperatures.index(T)]['V']
-            equil_vols_F.append(equil_vol_F)
+            equil_vol = next(item['V'] for item in G['data'] if item['T'] == T)  # Get the equilibrium volume
+            equil_vol_F = next(item['G'] for item in G['data'] if item['T'] == T)  # Get the Gibbs free energy at the equilibrium volume
+
+            equil_vols.append(equil_vol)  # Add equilibrium volumes
+            equil_F_values.append(equil_vol_F)  # Add equilibrium Gibbs free energies
+
             for vol, data in F.items():
-                # Find the corresponding F for the current temperature
                 for entry in data['data']:
                     if entry['T'] == T:
                         F_value = entry['F']
                         if normalize_298K:
                             G_at_T300 = next(item['G'] for item in G['data'] if item['T'] == 300)
                             F_value -= G_at_T300
-                            # print(F_value)
-                        vols.append(vol)
+                        vols.append(float(vol))
                         Fs.append(F_value)
                         break
 
-            # Plot F vs Volume for the current temperature
-            plt.plot(vols, Fs, marker='o', color='black', label=f"T = {T:.1f} K")
-        
-        plt.plot(equil_vols_F, temperatures, marker='x', color='blue', linestyle='None', label="Equilibrium Volume")
+            # Plot Helmholtz Free Energy vs Volume for the current temperature
+            line = plt.plot(vols, Fs, marker='o', color='black')
 
-        # Add axis labels and title
-        plt.xlabel("Volume ($\mathrm{Å}^3$)", fontsize=12)
-        plt.ylabel("Helmholtz Free Energy (eV/f.u.)", fontsize=12)
-        plt.xticks(fontsize=10)
-        plt.title(
-            "Helmholtz Free Energy vs Volume at Different Temperatures" +
-            (" (Normalized to 298K)" if normalize_298K else ""),
-            fontsize=14
-        )
 
-        # Add legend
-        plt.legend(title="Temperatures", loc="best", fontsize=10)
+        print("Equilibrium Volumes: ", equil_vols)
+        print("Equilibrium Free Energy Values: ", equil_F_values)
 
-        # Add grid for better readability
-        plt.grid(True)
+        # Now plot the equilibrium volumes and Gibbs free energies at each temperature
+        plt.plot(equil_vols, equil_F_values, color='red', marker='x', label="Equilibrium Volume")
+
+        # Add legend for first and last temperature
+        plt.text(488, -123.5, f"T = {temperatures[1::skip][0]} K", fontsize=10,
+                 color='black', ha='center', va='center')
+        plt.text(450, -151, f"T = {temperatures[1::skip][-1]} K", fontsize=10,
+                 color='black', ha='center', va='center')
+
+        plt.xlabel("Volume ($\mathrm{Å}^3$)", fontsize=14)
+        plt.ylabel("Helmholtz Free Energy (eV/f.u.)", fontsize=14)
+        plt.yticks(fontsize=12)
+        plt.xticks(fontsize=12)
+        # plt.title(
+        #     "Helmholtz Free Energy vs Volume at Different Temperatures" +
+        #     (" (Normalized to 298K)" if normalize_298K else ""),
+        #     fontsize=14
+        # )
 
         # Show the plot
         plt.show()
 
-    def plot_equilibrium_volume_vs_temperature(self, formula, mpid, eos="vinet", temp_cutoff=None):
+
+    def plot_equilibrium_volume_vs_temperature(self, formula, mpid, temp_cutoff=None):
         """
         Plot Equilibrium Volume vs Temperature.
 
@@ -979,9 +983,9 @@ class QHA(object):
             volumes (list): List of volume values.
             temp_cutoff (tuple): Optional temperature range (min_temp, max_temp) for filtering.
         """
-        G = self.gibbs_one_struc(formula, mpid, eos=eos)
+        G = self.gibbs_one_struc(formula, mpid)
 
-        plt.figure(figsize=(10, 6))
+        plt.figure(figsize=(2, 6))
 
         data = G['data']
         if temp_cutoff:
@@ -991,13 +995,15 @@ class QHA(object):
         Vs = [i['V'] for i in data]
 
         plt.plot(Ts, Vs, label=mpid)
-        plt.title("Equilibrium Volume vs Temperature", fontsize=14)
+        # plt.title("Equilibrium Volume vs Temperature", fontsize=14)
         plt.xlabel("Temperature (K)", fontsize=12)
         plt.ylabel("Equilibrium Volume ($\mathrm{Å}^3$)", fontsize=12)
-        plt.legend(loc="best", fontsize=10)
+        plt.xticks(fontsize=12)
+        plt.yticks(fontsize=12)
+        # plt.legend(loc="best", fontsize=10)
 
 
-    def plot_relative_gibbs(self, formula=None, mpids=None, temp_cutoff=None):
+    def plot_relative_gibbs(self, formula=None, mpids=None, temp_cutoff=None, experimental=None):
         """
         Plot Relative Gibbs Free Energy (compared to the ground state) vs Temperature.
 
@@ -1020,6 +1026,7 @@ class QHA(object):
         if mpids:
             relevant_keys = [key for key in relevant_keys if key[1] in mpids]
 
+        plt.figure(figsize=(8, 4))
         # Collect Gibbs free energy data
         gibbs_data = {}
         for key in relevant_keys:
@@ -1060,22 +1067,79 @@ class QHA(object):
             G_diff = [g - g_ref for g, g_ref in zip(data['G'], G_ref)]
 
             # Plot the difference
+            formula_pretty = get_label(formula, element_order) if element_order else formula
+
+            label = f"ΔG: {'_'.join(mpid.split('_')[1:])} - {'_'.join(ground_state_mpid.split('_')[1:])}"
+
             plt.plot(
-                T_ref, G_diff, label=f"ΔG: {mpid} - {ground_state_mpid}"
+                T_ref, G_diff, label=label,
             )
 
+        if experimental:
+            plt.scatter(experimental, 0, marker='x', color='red', label="Experimental phase transition temperature", s=100)
         # Customize the plot
-        plt.title(
-            f"Relative Gibbs Free Energy vs Temperature\n(Reference: {ground_state_mpid})",
-            fontsize=14,
-        )
-        plt.xlabel("Temperature (K)", fontsize=12)
-        plt.ylabel("ΔG (eV/f.u.)", fontsize=12)
+        # plt.title(
+        #     f"Relative Gibbs Free Energy vs Temperature\n(Reference: {ground_state_mpid})",
+        #     fontsize=14,
+        # )
+        plt.xlabel("Temperature (K)", fontsize=14)
+        plt.ylabel("ΔG (eV/f.u.)", fontsize=14)
+        plt.xticks(fontsize=12)
+        plt.yticks(fontsize=12)
         plt.axhline(0, color="black", linestyle="--", linewidth=0.8)
-        plt.legend(loc="best", fontsize=10)
-        plt.grid(True)
+        plt.legend(loc="best", fontsize=14)
+        # plt.grid(True)
 
         # Display the plot
         plt.show()
 
+def get_cations():
+    return {
+        "A_site": ["Ba", "Sr", "Ca", "Mg", "Cu", "Sn", "Pb"],
+        "B_site": ["Pb", "Sn", "V", "Ti", "Nb", "Zr", "Hf"],
+    }
 
+def sort_elements(compound, two_component=True):
+    '''Function to sort elements based on A_site, B_site, and Sulfur. Cations are provided in the get_cations function.
+    Args:
+        compound (str): Chemical formula of the compound.
+        two_component (bool): Default is True.
+            Whether the list of sorted elements has two or three instances in the special case of a compound that only contains two elements.
+            e.g. Sn2S3 could be sorted as ['Sn', 'Sn', 'S'] or ['Sn', 'S'].
+
+    Returns:
+        list: List of sorted elements with A_site element first, B_site element second, and Sulfur last.
+    '''
+
+    cations = get_cations()
+    A_site = cations["A_site"]
+    B_site = cations["B_site"]
+
+    # Extract elements and element count
+    elements = CompTools(compound).els
+    n_els = CompTools(compound).n_els
+
+    # Extract the non-S elements to check for ambiguous cases
+    non_s_elements = [el for el in elements if el != 'S']
+
+    if not two_component:
+        if n_els == 2:
+            elements.append(non_s_elements[0]) #Hacky method of handling Sn2S3, need to find a better way to handle this
+
+    sorted_elements = []
+    for el in elements:
+        if el in A_site and el in B_site:
+            # If element is in both A_site and B_site, assign based on other elements
+            if any(other_el in A_site for other_el in non_s_elements if other_el != el):
+                sorted_elements.append((1, el))
+            else:
+                sorted_elements.append((0, el))
+        elif el in A_site:
+            sorted_elements.append((0, el))
+        elif el in B_site:
+            sorted_elements.append((1, el))
+        elif el == 'S':
+            sorted_elements.append((2, el))
+
+    sorted_elements.sort()
+    return [el for _, el in sorted_elements]
