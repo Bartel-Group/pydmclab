@@ -24,7 +24,7 @@ from pymatgen.io.ase import AseAtomsAdaptor
 from pymatgen.analysis.eos import Murnaghan, Vinet
 
 set_rc_params()
-# COLORS = get_colors(palette="tab10")
+COLORS = get_colors(palette="tab10")
 
 class AnalyzePhonons(object):
     def __init__(self, calc_dir: str, 
@@ -530,6 +530,7 @@ class Gibbs():
         temperatures = self.temperatures
         Fs = self.helmholtz()
         Gs = []
+        fitted_F_values = {}
         for i in range(len(temperatures)):
             T = temperatures[i]
             F = [Fs[vol]["data"][i]["F"] for vol in volumes]
@@ -552,12 +553,16 @@ class Gibbs():
                 V_eq = current_eos.v0
                 Gs.append({"T": T, "G": min_F, "V": V_eq})
                 print(f"T = {T}, eos.e0 = {current_eos.e0}, parameters = {current_eos.eos_params}")
-                
+
+                # Generate a smooth range of volumes
+                smooth_volumes = np.linspace(min(V), max(V), 500) 
+                fitted_F_values[T] = current_eos.func(smooth_volumes) 
+
             except Exception as e:
                 print(f"Failed to fit {eos} EOS at T = {T} K: {e}")
                 continue
 
-        return {"data": Gs}
+        return {"data": Gs, "fitted_F_values": fitted_F_values, "volumes_for_fitting": smooth_volumes}
     
 class QHA(object):
     def __init__(self, results: dict, eos: str = "vinet"):
@@ -683,8 +688,12 @@ class QHA(object):
         return formula_units
 
 
-    def phonon_dos(self, remove_imaginary=True):
+    def phonon_dos(self, remove_imaginary=True, move_imaginary=False):
         """
+        Args:
+            remove_imaginary (bool): If True, remove all DOS values and frequencies where there are imaginary frequencies. 
+                                    If False, remove only imaginary frequencies where DOS values are zero.
+            move_imaginary (bool): If True, move imaginary frequencies to the real axis by taking the absolute value of the frequency.
         Returns:
             dict: A dictionary where keys are tuples of (formula, mpid), second key is volume key, and values are dictionaries containing
                 'frequency_points' and 'total_dos'.
@@ -726,6 +735,9 @@ class QHA(object):
                             ]
 
                         filtered_frequencies = frequency_points[valid_indices]
+                        if move_imaginary:
+                            filtered_frequencies = np.abs(filtered_frequencies)
+
                         filtered_dos = total_dos[valid_indices]/0.0041356655 #This is to normalize the DOS to 1/eV (phonopy default is 1/THz)
 
                         # Warning for removed imaginary frequencies
@@ -945,7 +957,10 @@ class QHA(object):
                         break
 
             # Plot Helmholtz Free Energy vs Volume for the current temperature
-            line = plt.plot(vols, Fs, marker='o', color='black')
+            plt.scatter(vols, Fs, marker='o', color='black')
+                    # Plot the smooth fitted line for this temperature
+            if T in G['fitted_F_values']:
+                plt.plot(G['volumes_for_fitting'], G['fitted_F_values'][T], color='black')
 
 
         print("Equilibrium Volumes: ", equil_vols)
@@ -955,15 +970,15 @@ class QHA(object):
         plt.plot(equil_vols, equil_F_values, color='red', marker='x', label="Equilibrium Volume")
 
         # Add legend for first and last temperature
-        plt.text(488, -123.5, f"T = {temperatures[1::skip][0]} K", fontsize=10,
+        plt.text(484, -123.5, f"T = {temperatures[1::skip][0]} K", fontsize=14,
                  color='black', ha='center', va='center')
-        plt.text(450, -151, f"T = {temperatures[1::skip][-1]} K", fontsize=10,
+        plt.text(448, -151, f"T = {temperatures[1::skip][-1]} K", fontsize=14,
                  color='black', ha='center', va='center')
 
-        plt.xlabel("Volume ($\mathrm{Å}^3$)", fontsize=14)
-        plt.ylabel("Helmholtz Free Energy (eV/f.u.)", fontsize=14)
-        plt.yticks(fontsize=12)
-        plt.xticks(fontsize=12)
+        plt.xlabel("Volume ($\mathrm{Å}^3$)", fontsize=18)
+        plt.ylabel("F (eV/f.u.)", fontsize=18)
+        plt.yticks(fontsize=14)
+        plt.xticks(fontsize=14)
         # plt.title(
         #     "Helmholtz Free Energy vs Volume at Different Temperatures" +
         #     (" (Normalized to 298K)" if normalize_298K else ""),
@@ -1015,7 +1030,7 @@ class QHA(object):
         import matplotlib.pyplot as plt
 
         # Get phonon DOS data
-        p_dos = self.phonon_dos(remove_imaginary=True)
+        p_dos = self.phonon_dos(remove_imaginary=False, move_imaginary=True)
 
         # Filter by formula and MPIDs
         if formula:
@@ -1067,27 +1082,33 @@ class QHA(object):
             G_diff = [g - g_ref for g, g_ref in zip(data['G'], G_ref)]
 
             # Plot the difference
-            formula_pretty = get_label(formula, element_order) if element_order else formula
-
-            label = f"ΔG: {'_'.join(mpid.split('_')[1:])} - {'_'.join(ground_state_mpid.split('_')[1:])}"
+            label = f"$\Delta G: G_{{{mpid.split('_')[-1]}}} - G_{{{ground_state_mpid.split('_')[-1]}}}$"
 
             plt.plot(
-                T_ref, G_diff, label=label,
+                T_ref, G_diff, label=label, color=COLORS['black']
             )
+            
+            # Find the temperature where G_diff crosses 0 (ΔG = 0)
+            for i in range(1, len(G_diff)):
+                if (G_diff[i-1] > 0 and G_diff[i] < 0) or (G_diff[i-1] < 0 and G_diff[i] > 0):
+                    # Interpolate between the points to get the temperature where ΔG = 0
+                    T_cross = T_ref[i-1] + (0 - G_diff[i-1]) * (T_ref[i] - T_ref[i-1]) / (G_diff[i] - G_diff[i-1])
+                    plt.vlines(T_cross, ymin=min(G_diff), ymax=max(G_diff), linestyle='--', color=COLORS['blue'], label="Computed transition T")
 
         if experimental:
-            plt.scatter(experimental, 0, marker='x', color='red', label="Experimental phase transition temperature", s=100)
+            plt.vlines(experimental, ymin=min(G_diff), ymax=max(G_diff), linestyles='--', color=COLORS['red'], label="Experimental transition T")
+
         # Customize the plot
         # plt.title(
         #     f"Relative Gibbs Free Energy vs Temperature\n(Reference: {ground_state_mpid})",
         #     fontsize=14,
         # )
-        plt.xlabel("Temperature (K)", fontsize=14)
-        plt.ylabel("ΔG (eV/f.u.)", fontsize=14)
-        plt.xticks(fontsize=12)
-        plt.yticks(fontsize=12)
+        plt.xlabel("Temperature (K)", fontsize=18)
+        plt.ylabel("ΔG (eV/f.u.)", fontsize=18)
+        plt.xticks(fontsize=14)
+        plt.yticks(fontsize=14)
         plt.axhline(0, color="black", linestyle="--", linewidth=0.8)
-        plt.legend(loc="best", fontsize=14)
+        plt.legend(loc="best", fontsize=14, facecolor='white', edgecolor='black', frameon=True, framealpha=1)
         # plt.grid(True)
 
         # Display the plot
