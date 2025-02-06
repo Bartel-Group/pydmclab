@@ -286,7 +286,7 @@ class StrucTools(object):
             groups = matcher.group_structures(out)
             out = [groups[i][0] for i in range(len(groups))]
             strucs = {i: out[i].as_dict() for i in range(len(out))}
-            strucs = {i: strucs[i] for i in range(n_strucs) if i in strucs}
+            return {i: strucs[i] for i in range(n_strucs) if i in strucs}
         else:
             # if only one structure is made, return in same formation (dict)
             return {0: out.as_dict()}

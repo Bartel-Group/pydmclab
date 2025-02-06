@@ -437,19 +437,35 @@ class SubmitTools(object):
         job_name = self.job_name
 
         # create a temporary file w/ jobs in queue with my username and this job_name
+        # also double-checks if this job is in the msidmc partition
         scripts_dir = os.getcwd()
         fqueue = os.path.join(scripts_dir, "_".join(["q", job_name]) + ".o")
         with open(fqueue, "w", encoding="utf-8") as f:
             subprocess.call(
-                ["squeue", "-u", "%s" % os.getlogin(), "--name=%s" % job_name], stdout=f
+                [
+                    "squeue",
+                    f"--user={os.getlogin()}",
+                    "--noheader",
+                    f"--name={job_name}",
+                ],
+                stdout=f,
+            )
+            subprocess.call(
+                [
+                    "squeue",
+                    f"--user={os.getlogin()}",
+                    "--partition=msidmc",
+                    "--noheader",
+                    f"--name={job_name}",
+                ],
+                stdout=f,
             )
 
         # get the job names I have in the queue
         names_in_q = []
         with open(fqueue, "r", encoding="utf-8") as f:
             for line in f:
-                if "PARTITION" not in line:
-                    names_in_q.append([v for v in line.split(" ") if len(v) > 0][2])
+                names_in_q.append([v for v in line.split(" ") if len(v) > 0][2])
 
         # delete the file I wrote w/ the queue output
         os.remove(fqueue)

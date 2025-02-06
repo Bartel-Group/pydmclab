@@ -29,7 +29,7 @@ for d in [CALCS_DIR, DATA_DIR]:
         os.makedirs(d)
 
 # if you need data from MP as a starting point (often the case), you need your API key
-API_KEY = "***REMOVED***"
+API_KEY = "__API_KEY__"
 
 # lets put a tag on all the files we save
 FILE_TAG = CALCS_DIR.split("/")[-2]
@@ -391,7 +391,6 @@ def check_launch_dirs(launch_dirs):
 
 
 def submit_one_calc(submit_args):
-
     """
     Prepares VASP inputs, writes submission script, and launches job for one launch_dir
 
