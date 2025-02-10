@@ -7,12 +7,15 @@ import json
 from shutil import copyfile
 import numpy as np
 import traceback
+from scipy import integrate   ##### parchg #####
 
 from pymatgen.io.vasp.inputs import Incar, Poscar, Kpoints
+from pymatgen.io.vasp.outputs import Vasprun
 from pymatgen.io.vasp.sets import get_structure_from_prev_run
 
 from pydmclab.hpc.analyze import AnalyzeVASP, VASPOutputs
 from pydmclab.core.struc import StrucTools
+from pydmclab.core.comp import CompTools   ##### parchg #####
 
 if TYPE_CHECKING:
     from pymatgen.core.structure import Structure
@@ -62,6 +65,11 @@ class Passer(object):
         self.incar_mods = passer_dict["incar_mods"]
         self.launch_dir = passer_dict["launch_dir"]
         self.struc_src_for_hse = passer_dict["struc_src_for_hse"]
+        
+        # # self.electron_interval = passer_dict["electron_interval"] ## for energy_interval_for_parchg   ##### parchg #####
+        # # self.electron_interval = passer_dict["electron_interval"] ## for electron_interval_for_parchg   ##### parchg #####
+        # # self.charging_family = passer_dict["charging_family"] ## for electron_interval_for_parchg   ##### parchg #####
+        # # self.intercalating_ion = passer_dict["intercalating_ion"] ## for electron_interval_for_parchg   ##### parchg #####
 
     @property
     def prev_xc_calc(self) -> str:
@@ -625,7 +633,200 @@ class Passer(object):
 
         adjustments = {"KPAR": kpar}
         return adjustments
+    
+    # @property   ##### parchg #####
+    # def electron_interval_for_parchg(self) -> list | None:
+    #     """
+    #     Returns:
+    #         parent's electon interval (list) if parent is ready to pass else None
+    #     """
+        
+    #     electron_interval = self.electron_interval
+    #     charging_family = self.charging_family
+    #     intercalating_ion = self.intercalating_ion
+    #     formula = AnalyzeVASP(self.prev_calc_dir).formula
+        
+    #     for key in charging_family:
+    #         if formula in charging_family[key]:
+    #             dischg_formula = key
+        
+    #     n_intercalating_ion_formula = CompTools(formula).atms[intercalating_ion]
+    #     n_intercalating_ion_dischg_formula = CompTools(dischg_formula).atms[intercalating_ion]
+    #     delta_n_intercalating_ion = n_intercalating_ion_formula - n_intercalating_ion_dischg_formula
+        
+    #     n_interval = n_intercalating_ion_dischg_formula / electron_interval
+    #     electron_interval = []
+    #     # fully discharged state
+    #     if delta_n_intercalating_ion == 0:
+    #         for i in range(n_interval):
+    #             electron_interval.append([i * electron_interval, (i + 1) * electron_interval])
+    #     # fully charged state
+    #     elif n_intercalating_ion_formula == 0:
+    #         for i in range(n_interval):
+    #             electron_interval.append([-i * electron_interval, -(i + 1) * electron_interval])
+    #     # partially charged state
+    #     else:
+    #         for i in range(n_interval):
+    #             electron_interval.append([i * electron_interval + delta_n_intercalating_ion, (i + 1) * electron_interval + delta_n_intercalating_ion])
+    #     return electron_interval
+        
+    @property   ##### parchg #####
+    def correct_EF(self) -> float | None:
+        """
+        Returns:
+            the correct Fermi level (float) if parent is ready to pass else None
+        """
+        
+        tdos = AnalyzeVASP(self.prev_calc_dir).tdos()
+        Efermi = 0.0
+        
+        n_sites = AnalyzeVASP(self.prev_calc_dir).nsites
+        formula = AnalyzeVASP(self.prev_calc_dir).formula
+        n_atoms = CompTools(formula).n_atoms
+        normalization = n_sites/n_atoms
+        
+        energies = tdos["E"]
+        populations =  np.array(tdos["total"])/normalization
+        occ_energies = []
+        occ_populations = []
+        
+        for idx, E in enumerate(energies):
+            if E == Efermi:
+                occ_energies.append(energies[idx])
+                occ_populations.append(populations[idx])
+            if E < Efermi:
+                occ_energies.append(energies[idx])
+                occ_populations.append(populations[idx])
+        occ_energies = occ_energies[::-1]     
+        occ_populations = occ_populations[::-1]
 
+        for idx, E in enumerate(occ_populations):
+            if occ_populations[idx]:
+                new_EF = occ_energies[idx]
+                break
+        print("new_EF", new_EF, "normalization", normalization)
+        return new_EF, normalization
+
+    @property   ##### parchg #####
+    def adjust_E_and_normalize_tdos(self) -> dict:
+        """
+        Returns:
+            the correct tdos (dict) if parent is ready to pass else None
+        """
+
+        # adjust the energies of the tdos to the correct Fermi level 
+        tdos = AnalyzeVASP(self.prev_calc_dir).tdos()
+        new_EF, normalization = self.correct_EF
+        
+        adjust_tdos = {}
+        energies = tdos["E"].copy()
+        for idx, E in enumerate(energies):
+            energies[idx] = E - new_EF
+        adjust_tdos["E"] = energies
+        for key in tdos:
+            if key == "total":
+                populations = np.array(tdos[key])
+                adjust_tdos[key] = populations/normalization
+
+        print("tdos", tdos["E"][0], "adjust_tdos", adjust_tdos["E"][0])
+        return adjust_tdos
+        
+    def energy_interval_for_parchg(self, electron_interval) -> list | None:
+        """
+        Returns:
+            parent's energy interval (list) if parent is ready to pass else None
+        """   
+        
+        adjust_tdos = self.adjust_E_and_normalize_tdos
+        new_EF, normalization = self.correct_EF
+        Efermi = 0.0
+        
+        # Load the vasprun.xml file
+        Efermi_from_vasp = Vasprun(os.path.join(self.prev_calc_dir, "vasprun.xml")).efermi
+        print("Efermi_from_vasp", Efermi_from_vasp)
+        
+        integrate_to_list = [electron_interval[0], electron_interval[1]]
+        print("integrate_to_list", integrate_to_list)
+        # for electron_interval_pair in electron_interval:
+        # if (electron_interval_pair[0] < 0) or (electron_interval_pair[1] < 0):
+        #     integrate_to_list.append(electron_interval_pair[0])
+        # else:
+        #     integrate_to_list.append(electron_interval_pair[1])
+        
+        energies = adjust_tdos["E"]
+        populations = adjust_tdos["total"]
+        occ_energies = []
+        occ_populations = []
+        unocc_energies = []
+        unocc_populations = []
+
+        for idx, E in enumerate(energies):
+            if E == Efermi:
+                occ_energies.append(energies[idx])
+                occ_populations.append(populations[idx])
+                unocc_energies.append(energies[idx])
+                unocc_populations.append(populations[idx])
+            if E < Efermi:
+                occ_energies.append(energies[idx])
+                occ_populations.append(populations[idx])
+            elif E > Efermi:
+                unocc_energies.append(energies[idx])
+                unocc_populations.append(populations[idx])
+        occ_energies = occ_energies[::-1]
+        occ_populations = occ_populations[::-1]
+        
+        occ_area = integrate.cumulative_trapezoid(occ_populations, occ_energies, initial=0)
+        unocc_area = integrate.cumulative_trapezoid(unocc_populations, unocc_energies, initial=0)
+        
+        energy_list = []
+        for integrate_to in integrate_to_list:
+            integrate_to_float = float(integrate_to)
+            # occupied states
+            if integrate_to_float > 0:
+                for i in range(len(occ_area)):
+                    if occ_area[i] < -integrate_to_float:
+                        energy_list.append(occ_energies[i])
+                        break
+            # unoccupied states
+            elif integrate_to_float < 0:
+                for i in range(len(occ_area)):
+                    if unocc_area[i] > integrate_to_float:
+                        energy_list.append(unocc_energies[i])
+                        break
+            elif integrate_to_float == 0:
+                energy_list.append(0)
+        print("energy_list", energy_list)
+        print("new_EF", new_EF)
+        
+        energy_interval = []
+        for idx, E in enumerate(energy_list):
+            energy_interval.append(energy_list[idx] + new_EF + Efermi_from_vasp)
+            # if E == 0:
+            #     energy_interval.append([energies[idx+1] + new_EF])
+            # elif energies[idx+1] == 0:
+            #     energy_interval.append([E + new_EF])
+            # else:
+            #     energy_interval.append([E + new_EF, energies[idx+1] + new_EF])
+        
+        print("energy_interval", energy_interval)
+        return energy_interval
+        
+    @property   ##### parchg #####
+    def parchg_based_incar_adjustments(self) -> dict:
+        """
+        Returns:
+            a dictionary of INCAR adjustments based on parchg settings
+                EINT
+        """    
+        
+        # find the electron interval for parchg, assuming that the launch directory is structured as /.../calcs/{formula}/parchg_{initial_electron_interval}_{final_electron_interval}
+        launch_dir = self.launch_dir
+        id = launch_dir.split('/')[launch_dir.split('/').index("calcs") + 2]
+        electron_interval = [id.split("_")[1], id.split("_")[2]]
+        
+        energy_interval = self.energy_interval_for_parchg(electron_interval=electron_interval)
+        return {"EINT": energy_interval}
+    
     @property
     def nelect_from_neutral_calc_dir(self) -> dict:
         """
@@ -765,6 +966,8 @@ class Passer(object):
 
         if parchg_out:
             incar_adjustments["ICHARG"] = 1
+            parchg_based_incar_adjustments = self.parchg_based_incar_adjustments    ##### parchg #####
+            incar_adjustments.update(parchg_based_incar_adjustments)    ##### parchg #####
 
         # make sure we don't override user-defined INCAR modifications
         user_incar_mods = self.incar_mods

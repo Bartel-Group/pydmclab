@@ -220,9 +220,10 @@ class GetSet(object):
             new_settings["LSEPB"] = False
             new_settings["LSEPK"] = False
             new_settings["LWAVE"] = False
-            new_settings["NBMOD"] = -3
+            new_settings["NBMOD"] = -2
+            print("WARNING: We now set NBMOD = -2 in PARCHG calcs, which is using the absolute energy interval (instead of the eneries relative to the Fermi level) to select contributing bands")
             if "EINT" not in user_passed_settings:
-                print("WARNING: PARCH analysis but no EINT set. Setting to Ef - 2 eV")
+                print("WARNING: PARCHG analysis but no EINT set. Setting to Ef - 2 eV")
                 new_settings["EINT"] = " ".join([str(v) for v in [-2.0, 0]])
 
         # for LOBSTER --> set explicit requirements
