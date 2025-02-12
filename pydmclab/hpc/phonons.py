@@ -389,7 +389,8 @@ class Helmholtz():
 
         """
             Args:
-                phonon_dos (Usually obtained from the phonon_dos method of the QHA class, which gets it from AnalyzePhonons.total_dos, parses it and converts it to units of eV):
+                phonon_dos (Usually obtained from the phonon_dos method of the QHA class, 
+                which gets it from AnalyzePhonons.total_dos, parses it and converts it to units of eV):
                     {'E0' : 0 K internal energy (eV/cell),
                     'dos' :
                         [{'E' : energy level (eV),
@@ -569,8 +570,6 @@ class QHA(object):
         self.results = results
         self.eos = eos
         self._parsed_results = None  # Cache for parsed results
-        self._gibbs_dict_cache = None  # Cache for Gibbs free energy dictionary
-        self._qha_cache = {}  # Cache for PhonopyQHA instances
 
     @property
     def parse_results(self):
