@@ -52,8 +52,8 @@ class MACECalculator(Calculator):
     args:
         models (list[torch.nn.Module] | torch.nn.Module | list[str] | str): path to model or models if a committee is produced
             To make a committee use multiple models, paths, or a wild card notation like mace_*.model
-        device (Literal["cpu", "mps", "cuda"]): device to run on
-            Defaults to "mps"
+        device (Literal["cpu", "cuda"]): device to run on
+            Defaults to "cpu"
         default_dtype (Literal["float32", "float64", "auto"]): default dtype to use
             Defaults to "auto" which will match the model dtype
         model_type (Literal["MACE", "DipoleMACE", "EnergyDipoleMACE"]): type of model to load
@@ -79,7 +79,7 @@ class MACECalculator(Calculator):
         self,
         models: list[torch.nn.Module] | torch.nn.Module | list[str] | str,
         *,
-        device: Literal["cpu", "mps", "cuda"] = "mps",
+        device: Literal["cpu", "cuda"] = "cpu",
         default_dtype: Literal["float32", "float64", "auto"] = "auto",
         model_type: Literal["MACE", "DipoleMACE", "EnergyDipoleMace"] = "MACE",
         energy_units_to_eV: float = 1.0,
@@ -581,7 +581,7 @@ class MACELoader(object):
         self,
         models: list[torch.nn.Module] | torch.nn.Module | list[str] | str,
         *,
-        device: Literal["cpu", "mps", "cuda"] = "mps",
+        device: Literal["cpu", "cuda"] = "cpu",
         default_dtype: Literal["float32", "float64", "auto"] = "auto",
         model_type: Literal["MACE", "DipoleMACE", "EnergyDipoleMace"] = "MACE",
         energy_units_to_eV: float = 1.0,
