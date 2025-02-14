@@ -1081,7 +1081,7 @@ class QHA(object):
             G_diff = [g - g_ref for g, g_ref in zip(data['G'], G_ref)]
 
             # Plot the difference
-            label = f"$\Delta G: G_{{{mpid.split('_')[-1]}}} - G_{{{ground_state_mpid.split('_')[-1]}}}$"
+            label = f"$\Delta G: |G_{{{mpid.split('_')[-1]}}}| - |G_{{{ground_state_mpid.split('_')[-1]}}}|$"
 
             plt.plot(
                 T_ref, G_diff, label=label, color=COLORS['black']
