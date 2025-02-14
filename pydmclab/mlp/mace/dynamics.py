@@ -543,7 +543,7 @@ class MACELoader(object):
 
     def _check_model_cache(self, model: str) -> bool:
         """Check if the model is cached"""
-        return os.path.exists(os.path.join(self.cache_dir, model, ".model"))
+        return os.path.exists(os.path.join(self.cache_dir, f"{model}.model"))
 
     def _cache_pretrained_model(self, model: str) -> os.PathLike:
         """Cache the specified pretrained model if not already cached"""
@@ -577,9 +577,9 @@ class MACELoader(object):
 
         return cached_model_path
 
-    def load_calulator(
+    def load_calculator(
         self,
-        models: list[Module] | Module | list[str] | str,
+        models: list[torch.nn.Module] | torch.nn.Module | list[str] | str,
         *,
         device: Literal["cpu", "mps", "cuda"] = "mps",
         default_dtype: Literal["float32", "float64", "auto"] = "auto",
