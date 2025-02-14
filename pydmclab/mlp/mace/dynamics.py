@@ -548,7 +548,7 @@ class MACELoader(object):
     def _cache_pretrained_model(self, model: str) -> os.PathLike:
         """Cache the specified pretrained model if not already cached"""
 
-        cached_model_path = os.path.join(self.cache_dir, model, ".model")
+        cached_model_path = os.path.join(self.cache_dir, f"{model}.model")
 
         if not self._check_model_cache(model):
             model_url = MACECHECKPOINTS[model].value
