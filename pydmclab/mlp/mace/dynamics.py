@@ -1,16 +1,12 @@
 from __future__ import annotations
 
 import os
-import logging
-import urllib.request
-from enum import Enum
 from glob import glob
 from typing import TYPE_CHECKING, Literal
 
 import torch
 import numpy as np
 
-from ase import Atoms
 from ase.calculators.calculator import Calculator, all_changes
 from ase.stress import full_3x3_to_voigt_6_stress
 from e3nn import o3
