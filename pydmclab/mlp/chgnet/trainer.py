@@ -16,8 +16,8 @@ from torch import Tensor, nn
 from chgnet.model import CHGNet
 from chgnet.utils import AverageMeter, determine_device, mae, write_json
 
-from pydmclab.mlp import LogEachEpoch, LogEachBatch
-from pydmclab.mlp.enums import TorchOptimizerEnum, TorchLrSchedulerEnum
+from pydmclab.mlp.chgnet import LogEachEpoch, LogEachBatch
+from pydmclab.mlp.chgnet.enums import TorchOptimizerEnum, TorchLrSchedulerEnum
 
 try:
     import wandb
@@ -29,7 +29,7 @@ if TYPE_CHECKING:
     from torch.utils.data import DataLoader
     from torch.optim.optimizer import Optimizer as TorchOptimizer
     from torch.optim.lr_scheduler import LRScheduler as TorchLrScheduler
-    from pydmclab.mlp import Devices, TrainTask, PredTask, LogFreq
+    from pydmclab.mlp.chgnet import Devices, TrainTask, PredTask, LogFreq
 
 
 class OPTIMIZERS(TorchOptimizerEnum):

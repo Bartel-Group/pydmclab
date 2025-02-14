@@ -36,7 +36,7 @@ from pydmclab.utils.handy import convert_numpy_to_native
 set_rc_params()
 
 if TYPE_CHECKING:
-    from pydmclab.mlp import Versions, Devices, PredTask
+    from pydmclab.mlp.chgnet import Versions, Devices, PredTask
     from typing_extensions import Self
     from ase.optimize.optimize import Optimizer as ASEOptimizer
 
