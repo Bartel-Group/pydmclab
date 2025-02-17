@@ -531,7 +531,7 @@ class MACELoader(object):
     def __init__(self, remake_cache: bool = False) -> None:
         self.pretrained_models = [model.name for model in MACECHECKPOINTS]
 
-        self.cache_dir = os.path.expanduser("~/.mace/cache")
+        self.cache_dir = os.path.expanduser("~/.cache/mace")
         if remake_cache and os.path.exists(self.cache_dir):
             warnings.warn(
                 "Remake cache was set to True. The contents of the cache directory have been deleted."
