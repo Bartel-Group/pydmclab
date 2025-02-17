@@ -1,8 +1,13 @@
 from __future__ import annotations
 
 import os
+import io
+import sys
+import inspect
 import warnings
+import contextlib
 import urllib.request
+import pickle as pkl
 from enum import Enum
 from glob import glob
 from typing import TYPE_CHECKING, Literal
@@ -10,10 +15,14 @@ from typing import TYPE_CHECKING, Literal
 import torch
 import numpy as np
 
+import ase.optimize as opt
 from ase import units
+from ase import filters
+from ase.filters import Filter
 from ase.calculators.mixing import SumCalculator
 from ase.calculators.calculator import Calculator, all_changes
 from ase.stress import full_3x3_to_voigt_6_stress
+from ase.io.jsonio import encode, decode
 from e3nn import o3
 
 from mace import data
@@ -23,12 +32,31 @@ from mace.tools import torch_geometric, torch_tools, utils
 from mace.tools.compile import prepare
 from mace.tools.scripts_utils import extract_model
 
+from pymatgen.core.structure import Structure
+from pymatgen.io.ase import AseAtomsAdaptor
+
 from pydmclab.mlp.mace.utils import get_model_dtype
+from pydmclab.utils.handy import convert_numpy_to_native
 
 if TYPE_CHECKING:
     from ase import Atoms
+    from typing_extensions import Self
+    from ase.optimize.optimize import Optimizer as ASEOptimizer
 
 os.environ["TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD"] = "1"
+
+
+class OPTIMIZERS(Enum):
+    """An enumeration of optimizers available in ASE."""
+
+    fire = opt.fire.FIRE
+    bfgs = opt.bfgs.BFGS
+    lbfgs = opt.lbfgs.LBFGS
+    lbfgslinesearch = opt.lbfgs.LBFGSLineSearch
+    mdmin = opt.mdmin.MDMin
+    scipyfmincg = opt.sciopt.SciPyFminCG
+    scipyfminbfgs = opt.sciopt.SciPyFminBFGS
+    bfgslinesearch = opt.bfgslinesearch.BFGSLineSearch
 
 
 class MACECHECKPOINTS(Enum):
@@ -541,6 +569,11 @@ class MACELoader(object):
 
         os.makedirs(self.cache_dir, exist_ok=True)
 
+        self.models = None
+        self.d3_calc = None
+        self.mace_calculator = None
+        self.calculator = None
+
     def _check_model_cache(self, model: str) -> bool:
         """Check if the model is cached"""
         return os.path.exists(os.path.join(self.cache_dir, f"{model}.model"))
@@ -576,6 +609,11 @@ class MACELoader(object):
             )
 
         return cached_model_path
+
+    def cache_all_pretrained_models(self) -> None:
+        """Cache all pretrained models"""
+        for model in self.pretrained_models:
+            self._cache_pretrained_model(model)
 
     def load_calculator(
         self,
@@ -659,3 +697,209 @@ class MACELoader(object):
 
         self.calculator = self.mace_calculator
         return self.mace_calculator
+
+
+class MACEObserver:
+    """Trajectory observer is a hook in the relaxation process that saves the
+    intermediate structures.
+    """
+
+    def __init__(self, atoms: Atoms) -> None:
+        """Create a TrajectoryObserver from an Atoms object.
+
+        Args:
+            atoms (Atoms): the structure to observe.
+        """
+        self.atoms = atoms
+        self.energies: list[float] = []
+        self.forces: list[np.ndarray] = []
+        self.stresses: list[np.ndarray] = []
+        self.magmoms: list[np.ndarray] = []
+        self.atomic_numbers: list[int] = []
+        self.atom_positions: list[np.ndarray] = []
+        self.cells: list[np.ndarray] = []
+
+    def __call__(self) -> None:
+        """The logic for saving the properties of an Atoms during the relaxation."""
+        self.energies.append(self.atoms.get_potential_energy())
+        self.forces.append(self.atoms.get_forces())
+        self.stresses.append(self.atoms.get_stress())
+        self.magmoms.append(self.atoms.get_magnetic_moments())
+        self.atomic_numbers.append(self.atoms.get_atomic_numbers())
+        self.atom_positions.append(self.atoms.get_positions())
+        self.cells.append(self.atoms.get_cell()[:])
+
+    def __len__(self) -> int:
+        """The number of steps in the trajectory."""
+        return len(self.energies)
+
+    def as_dict(self) -> dict[str, list]:
+        """Return the trajectory as a dictionary."""
+        return {
+            "atoms": encode(
+                self.atoms
+            ),  # returns the atoms object as a str representation
+            "energies": self.energies,
+            "forces": self.forces,
+            "stresses": self.stresses,
+            "magmoms": self.magmoms,
+            "atomic_numbers": self.atomic_numbers,
+            "atom_positions": self.atom_positions,
+            "cells": self.cells,
+        }
+
+    @classmethod
+    def from_dict(cls, data_dict: dict[str, list]) -> Self:
+        """Create a TrajectoryObserver from a dictionary."""
+        obs = cls(decode(data_dict["atoms"]))
+        obs.energies = data_dict["energies"]
+        obs.forces = data_dict["forces"]
+        obs.stresses = data_dict["stresses"]
+        obs.magmoms = data_dict["magmoms"]
+        obs.atomic_numbers = data_dict["atomic_numbers"]
+        obs.atom_positions = data_dict["atom_positions"]
+        obs.cells = data_dict["cells"]
+        return obs
+
+    def save(self, filename: str) -> None:
+        """Save the trajectory to file.
+
+        Args:
+            filename (str): filename to save the trajectory
+        """
+        out_pkl = self.as_dict()
+        with open(filename, "wb") as file:
+            pkl.dump(out_pkl, file)
+
+
+class MACERelaxer:
+    """Wrapper class for structural relaxation."""
+
+    def __init__(
+        self,
+        models: (
+            MACECalculator | list[torch.nn.Module] | torch.nn.Module | list[str] | str
+        ),
+        device: Literal["cpu", "cuda"] = "cpu",
+        default_dtype: Literal["float32", "float64", "auto"] = "auto",
+        model_type: Literal["MACE", "DipoleMACE", "EnergyDipoleMace"] = "MACE",
+        energy_units_to_eV: float = 1.0,
+        length_units_to_A: float = 1.0,
+        charges_key: str = "Qs",
+        compile_mode: (
+            Literal[
+                "default",
+                "reduce-overhead",
+                "max-autotune",
+                "max-autotune-no-cudagraphs",
+            ]
+            | None
+        ) = None,
+        fullgraph: bool = True,
+        enable_cueq: bool = False,
+        include_dispersion: bool = False,
+        damping_function: Literal["zero", "bj", "zerom", "bjm"] = "bj",
+        dispersion_xc: str = "pbe",
+        dispersion_cutoff: float = 40.0 * units.Bohr,
+        remake_cache: bool = False,
+        optimizer: ASEOptimizer | str = "FIRE",
+        **kwargs,
+    ) -> None:
+
+        self.optimizer: ASEOptimizer = (
+            OPTIMIZERS[optimizer.lower()].value
+            if isinstance(optimizer, str)
+            else optimizer
+        )
+
+        if isinstance(models, MACECalculator):
+            self.calculator = models
+            self.model = self.calculator.models
+        else:
+            self.calculator = MACELoader(remake_cache=remake_cache).load_calculator(
+                models=models,
+                device=device,
+                default_dtype=default_dtype,
+                model_type=model_type,
+                energy_units_to_eV=energy_units_to_eV,
+                length_units_to_A=length_units_to_A,
+                charges_key=charges_key,
+                compile_mode=compile_mode,
+                fullgraph=fullgraph,
+                enable_cueq=enable_cueq,
+                include_dispersion=include_dispersion,
+                damping_function=damping_function,
+                dispersion_xc=dispersion_xc,
+                dispersion_cutoff=dispersion_cutoff,
+                **kwargs,
+            )
+            self.model = self.calculator.models
+
+    def relax(
+        self,
+        atoms: Structure | Atoms,
+        *,
+        fmax: float | None = 0.1,
+        steps: int | None = 500,
+        relax_cell: bool | None = True,
+        ase_filter: str | None = "FrechetCellFilter",
+        params_asefilter: dict | None = None,
+        traj_path: str | None = None,
+        interval: int | None = 1,
+        verbose: bool = True,
+        convert_to_native_types: bool = True,
+        **kwargs,
+    ) -> dict[str, Structure | MACEObserver]:
+        """Relax the Structure/Atoms until maximum force is smaller than fmax."""
+
+        valid_filter_names = [
+            name
+            for name, cls in inspect.getmembers(filters, inspect.isclass)
+            if issubclass(cls, Filter)
+        ]
+
+        if isinstance(ase_filter, str):
+            if ase_filter in valid_filter_names:
+                ase_filter = getattr(filters, ase_filter)
+            else:
+                raise ValueError(
+                    f"Invalid {ase_filter=}, must be one of {valid_filter_names}. "
+                )
+
+        if isinstance(atoms, Structure):
+            atoms = AseAtomsAdaptor().get_atoms(atoms)
+        atoms.calc = self.calculator
+
+        stream = sys.stdout if verbose else io.StringIO()
+        params_asefilter = params_asefilter or {}
+        with contextlib.redirect_stdout(stream):
+            obs = MACEObserver(atoms)
+
+            if relax_cell:
+                atoms = ase_filter(atoms, **params_asefilter)
+
+            optimizer: ASEOptimizer = self.optimizer(atoms, **kwargs)
+            optimizer.attach(obs, interval=interval)
+            optimizer.run(fmax=fmax, steps=steps)
+            obs()
+
+        if traj_path is not None:
+            obs.save(traj_path)
+
+        if isinstance(atoms, Filter):
+            atoms = atoms.atoms
+
+        struc = AseAtomsAdaptor.get_structure(atoms)
+
+        if convert_to_native_types:
+            native_struc = convert_numpy_to_native(struc.as_dict())
+            struc = Structure.from_dict(native_struc)
+
+            native_obs = convert_numpy_to_native(obs.as_dict())
+            obs = MACEObserver.from_dict(native_obs)
+
+        return {
+            "final_structure": struc,
+            "final_energy": obs.energies[-1],
+            "trajectory": obs,
+        }

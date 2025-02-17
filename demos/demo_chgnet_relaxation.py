@@ -1,6 +1,6 @@
 import os
 from pydmclab.core.struc import StrucTools
-from pydmclab.mlp.dynamics import CHGNetRelaxer
+from pydmclab.mlp.chgnet.dynamics import CHGNetRelaxer
 
 
 DATA_DIR = os.path.join("output", "mlp-relaxation")
