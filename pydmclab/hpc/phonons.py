@@ -1026,8 +1026,6 @@ class QHA(object):
             mpids (list): Specific MPIDs to compare. If None, uses all MPIDs under the given formula.
             temp_cutoff (tuple): Optional temperature range (min_temp, max_temp) for filtering.
         """
-        import matplotlib.pyplot as plt
-
         # Get phonon DOS data
         p_dos = self.phonon_dos(remove_imaginary=False, move_imaginary=True)
 
@@ -1081,7 +1079,7 @@ class QHA(object):
             G_diff = [g - g_ref for g, g_ref in zip(data['G'], G_ref)]
 
             # Plot the difference
-            label = f"$\Delta G: |G_{{{mpid.split('_')[-1]}}}| - |G_{{{ground_state_mpid.split('_')[-1]}}}|$"
+            label = f"$\Delta G: |G_{{{ground_state_mpid.split('_')[-1]}}}| - |G_{{{mpid.split('_')[-1]}}}|$"
 
             plt.plot(
                 T_ref, G_diff, label=label, color=COLORS['black']
