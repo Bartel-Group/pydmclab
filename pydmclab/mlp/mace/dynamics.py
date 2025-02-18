@@ -20,7 +20,7 @@ from ase import units
 from ase import filters
 from ase.filters import Filter
 from ase.calculators.mixing import SumCalculator
-from ase.calculators.calculator import Calculator, all_changes
+from ase.calculators.calculator import Calculator, all_changes, all_properties
 from ase.stress import full_3x3_to_voigt_6_stress
 from ase.io.jsonio import encode, decode
 from e3nn import o3
@@ -370,7 +370,7 @@ class MACECalculator(Calculator):
         self,
         atoms: Atoms | None = None,
         properties: list | None = None,
-        system_changes: list | None = all_changes,
+        system_changes: list | None = None,
     ) -> None:
         """Calculate various properties of the atoms.
 
@@ -382,7 +382,13 @@ class MACECalculator(Calculator):
                 Default is all changes.
         """
         # call to base-class to set atoms attribute
-        super().calculate(self, atoms)
+        properties = properties or all_properties
+        system_changes = system_changes or all_changes
+        super().calculate(
+            atoms=atoms,
+            properties=properties,
+            system_changes=system_changes,
+        )
 
         batch_base = self._atoms_to_batch(atoms)
 
@@ -714,7 +720,6 @@ class MACEObserver:
         self.energies: list[float] = []
         self.forces: list[np.ndarray] = []
         self.stresses: list[np.ndarray] = []
-        self.magmoms: list[np.ndarray] = []
         self.atomic_numbers: list[int] = []
         self.atom_positions: list[np.ndarray] = []
         self.cells: list[np.ndarray] = []
@@ -724,7 +729,6 @@ class MACEObserver:
         self.energies.append(self.atoms.get_potential_energy())
         self.forces.append(self.atoms.get_forces())
         self.stresses.append(self.atoms.get_stress())
-        self.magmoms.append(self.atoms.get_magnetic_moments())
         self.atomic_numbers.append(self.atoms.get_atomic_numbers())
         self.atom_positions.append(self.atoms.get_positions())
         self.cells.append(self.atoms.get_cell()[:])
@@ -742,7 +746,6 @@ class MACEObserver:
             "energies": self.energies,
             "forces": self.forces,
             "stresses": self.stresses,
-            "magmoms": self.magmoms,
             "atomic_numbers": self.atomic_numbers,
             "atom_positions": self.atom_positions,
             "cells": self.cells,
@@ -755,7 +758,6 @@ class MACEObserver:
         obs.energies = data_dict["energies"]
         obs.forces = data_dict["forces"]
         obs.stresses = data_dict["stresses"]
-        obs.magmoms = data_dict["magmoms"]
         obs.atomic_numbers = data_dict["atomic_numbers"]
         obs.atom_positions = data_dict["atom_positions"]
         obs.cells = data_dict["cells"]
@@ -834,6 +836,24 @@ class MACERelaxer:
                 **kwargs,
             )
             self.model = self.calculator.models
+
+    def predict_structure(
+        self,
+        atoms: Structure | Atoms,
+    ) -> dict[str, Structure]:
+
+        if isinstance(atoms, Structure):
+            atoms = AseAtomsAdaptor().get_atoms(atoms)
+
+        atoms.calc = self.calculator
+
+        results = {
+            "energy": atoms.get_potential_energy(),
+            "forces": atoms.get_forces(),
+            "stresses": atoms.get_stress(),
+        }
+
+        return results
 
     def relax(
         self,
