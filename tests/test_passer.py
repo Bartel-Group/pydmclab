@@ -22,6 +22,8 @@ class UnitTestPasser(unittest.TestCase):
         self.metagga_static_incar_path = os.path.join("..", "pydmclab", "data", "test_data", "hpc", "passer", "calcs", "Co1Li1O2", "mp-22526", "fm", "metagga-static", "INCAR")
         self.metagga_static_incar_backup_path = os.path.join("..", "pydmclab", "data", "test_data", "hpc", "passer", "calcs", "Co1Li1O2", "mp-22526", "fm", "metagga-static", "INCAR_backup")
         self.metagga_static_wavecar_path = os.path.join("..", "pydmclab", "data", "test_data", "hpc", "passer", "calcs", "Co1Li1O2", "mp-22526", "fm", "metagga-static", "WAVECAR")
+        self.metagga_static_chgcar_path = os.path.join("..", "pydmclab", "data", "test_data", "hpc", "passer", "calcs", "Co1Li1O2", "mp-22526", "fm", "metagga-static", "CHGCAR")
+        self.metagga_static_errors_path = os.path.join("..", "pydmclab", "data", "test_data", "hpc", "passer", "calcs", "Co1Li1O2", "mp-22526", "fm", "metagga-static", "errors.o")
 
         self.hse06_preggastatic_poscar_path = os.path.join("..", "pydmclab", "data", "test_data", "hpc", "passer", "calcs", "Co1Li1O2", "mp-22526", "fm", "hse06-preggastatic", "POSCAR")
         self.hse06_preggastatic_wavecar_path = os.path.join("..", "pydmclab", "data", "test_data", "hpc", "passer", "calcs", "Co1Li1O2", "mp-22526", "fm", "hse06-preggastatic", "WAVECAR")
@@ -115,6 +117,14 @@ class UnitTestPasser(unittest.TestCase):
         if os.path.exists(self.metagga_static_wavecar_path):
             os.remove(self.metagga_static_wavecar_path)
             print(f"\nDeleted {self.metagga_static_wavecar_path}")
+        
+        if os.path.exists(self.metagga_static_chgcar_path):
+            os.remove(self.metagga_static_chgcar_path)
+            print(f"Deleted {self.metagga_static_chgcar_path}")
+        
+        if os.path.exists(self.metagga_static_errors_path):
+            os.remove(self.metagga_static_errors_path)
+            print(f"Deleted {self.metagga_static_errors_path}")
         
         if os.path.exists(self.hse06_preggastatic_poscar_path):
             os.remove(self.hse06_preggastatic_poscar_path)
@@ -252,6 +262,20 @@ class UnitTestPasser(unittest.TestCase):
         self.passer_hse06_preggastatic.copy_wavecar
         self.assertTrue(os.path.exists(self.hse06_preggastatic_wavecar_path), f"{self.hse06_preggastatic_wavecar_path} does not exist")
 
+    def test_copy_chgcar(self):
+        """
+        Test the copy_chgcar method of the Passer class
+        """
+        if os.path.exists(self.metagga_static_wavecar_path):
+            os.remove(self.metagga_static_wavecar_path)
+        self.assertEqual(self.passer_metagga_static.copy_chgcar, None)
+        errors_path = os.path.join(self.passer_metagga_static.calc_dir, "errors.o")
+        with open(errors_path, "w", encoding="utf-8") as f:
+            f.write("eddrmm")
+        self.assertEqual(self.passer_metagga_static.copy_chgcar, "copied chgcar")
+        if os.path.exists(errors_path):
+            os.remove(errors_path)
+    
     def test_pass_kpoints_for_lobster(self):
         """
         Test the pass_kpoints_for_lobster method of the Passer class
@@ -331,11 +355,13 @@ class UnitTestPasser(unittest.TestCase):
             wavecar_out=self.passer_hse06_lobster.copy_wavecar,
             prelobster_out=self.passer_hse06_lobster.setup_prelobster,
             parchg_out=self.passer_hse06_lobster.setup_parchg,
+            chgcar_out=self.passer_hse06_lobster.copy_chgcar
             ), "updated incar")
         self.passer_hse06_lobster.update_incar(
             wavecar_out=self.passer_hse06_lobster.copy_wavecar,
             prelobster_out=self.passer_hse06_lobster.setup_prelobster,
             parchg_out=self.passer_hse06_lobster.setup_parchg,
+            chgcar_out=self.passer_hse06_lobster.copy_chgcar
             )
         self.assertEqual(Incar.from_file(os.path.join(self.passer_hse06_lobster.calc_dir, "INCAR"))["ISMEAR"], -5)
         self.assertEqual(Incar.from_file(os.path.join(self.passer_hse06_lobster.calc_dir, "INCAR"))["NBANDS"], 32)
