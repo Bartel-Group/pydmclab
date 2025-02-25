@@ -1191,7 +1191,7 @@ class AnalyzeVASP(object):
         
         slab_dir = slab_dir + '/' + 'data'
 
-        metadata = read_json(os.path.join(slab_dir, "metadata.json"))
+        metadata = read_json(os.path.join(slab_dir, "slab_metadata.json"))
         components = self.calc_dir.split(os.sep)
 
         # Find the index of the component that starts with "dmc"
