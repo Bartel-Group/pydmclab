@@ -2,11 +2,15 @@ import os
 import numpy as np
 import multiprocessing as multip
 import json
+import glob
+
 
 from pymatgen.io.vasp.outputs import Vasprun, Outcar, Eigenval, Oszicar
 from pymatgen.core.structure import Structure
 from pymatgen.io.vasp.inputs import Kpoints, Incar
 from pymatgen.io.lobster.outputs import Doscar, Cohpcar, Charge, MadelungEnergies
+from pymatgen.core.surface import Slab
+from pymatgen.io.vasp.outputs import Vasprun
 
 from pydmclab.core.struc import StrucTools, SiteTools
 from pydmclab.core.comp import CompTools
@@ -454,7 +458,7 @@ class AnalyzeVASP(object):
             return None
         else:
             return None
-
+         
     def pdos(self, fjson=None, remake=False):
         """
         @TODO: add demo/test
@@ -1171,6 +1175,80 @@ class AnalyzeVASP(object):
             return None
 
         return ap.summary()
+    
+    def get_slab_object(self):
+        
+        # Replacing the word "calc" with data and deleting everything after data
+        slab_dir = self.calc_dir.replace("calc", "data")
+        
+        metadata = read_json(os.path.join(slab_dir, "metadata.json"))
+        components = self.calc_dir.split(os.sep)
+
+        # Find the index of the component that starts with "dmc"
+        dmc_index = next(i for i, part in enumerate(components) if part.startswith("dmc"))
+
+        # Extract the chemical identity (component before "dmc")
+        chemical_identity = components[dmc_index - 1]
+
+        # Extract the "dmc" component
+        dmc_component = components[dmc_index]
+
+        # Split the "dmc" component by underscores
+        dmc_parts = dmc_component.split("_")
+
+        # Extract the slab identity (part before the first underscore)
+        slab_identity = dmc_parts[0]
+
+        # Extract the miller index (part between the first and second underscore)
+        miller_index = dmc_parts[1]
+
+        # Extract the surface termination (last digit of the "dmc" component)
+        surface_termination = int(dmc_component[-1])
+
+        slab_data = metadata[chemical_identity][slab_identity][miller_index][surface_termination]["slab"]
+
+        # magmoms = read_json(os.join(slab_dir, "magmoms.json"))
+
+        # if magmoms[chemical_identity][dmc_component].keys() == '0':
+        #     magnetic = 'False'
+        # else:
+        #     magnetic = 'True'  #Not sure what it would look like if i had ran with magnetic moments. Could be changed
+
+        # # vasprun = Vasprun(os.path.join(self.calc_dir,magnetic,'*static','vasprun.xml'))
+        # vasp_path = os.path.join(self.calc_dir, magnetic)
+        # pattern = os.path.join(vasp_path, "*-static")
+        # static_folder = glob.glob(pattern)[0]  # Assumes one match exists
+        vasp = Vasprun(os.path.join(self.calc_dir, "vasprun.xml"))
+        final_structure = vasp.final_structure
+
+        lattice = final_structure.lattice
+        species = [site.specie for site in final_structure.sites]
+        coords = final_structure.cart_coords
+
+
+        shift = slab_data.get("shift")
+        scale_factor = np.array(slab_data.get("scale_factor"))
+        miller_index_tuple = slab_data.get("miller_index")
+        oriented_unit_cell = slab_data.get("oriented_unit_cell")
+
+        slab = Slab(
+            lattice = lattice,
+            species = species,
+            coords = coords,
+            miller_index = miller_index_tuple,
+            oriented_unit_cell = oriented_unit_cell,
+            shift = shift,
+            scale_factor = scale_factor,
+            reorient_lattice = False,
+            validate_proximity = False,
+            to_unit_cell = False,
+            reconstruction = None,
+            coords_are_cartesian = True,
+            site_properties = None,
+            energy = None
+        )
+        slab_dict = slab.as_dict()
+        return slab_dict
 
     def summary(
         self,
@@ -1192,6 +1270,7 @@ class AnalyzeVASP(object):
         include_pcobi=False,
         include_entry=False,
         include_phonons=False,
+        include_slab = False,
     ):
         """
         Returns all desired data for post-processing DFT calculations
@@ -1214,6 +1293,11 @@ class AnalyzeVASP(object):
         data["results"] = self.basic_info
 
         convergence = data["results"]["convergence"]
+        if include_slab:
+            if convergence:
+                data["slab"] = self.get_slab_object(self)
+            else:
+                data["slab"] = None
 
         if include_meta:
             data["meta"] = self.metadata
@@ -1496,6 +1580,7 @@ def _results_for_calc_dir(calc_dir, configs):
     include_phonons = configs["include_phonons"]
     check_relax = configs["check_relax_energy"]
     create_cif = configs["create_cif"]
+    include_slab = configs["include_slab"]
 
     if verbose:
         print("analyzing %s" % calc_dir)
@@ -1518,6 +1603,7 @@ def _results_for_calc_dir(calc_dir, configs):
         include_pcobi=include_pcobi,
         include_entry=include_entry,
         include_phonons=include_phonons,
+        include_slab = include_slab,
     )
 
     # store the relax energy if we asked to

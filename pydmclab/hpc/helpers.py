@@ -17,6 +17,7 @@ from pymatgen.core.surface import Slab, get_symmetrically_distinct_miller_indice
 from pymatgen.electronic_structure.core import Magmom
 
 
+
 def get_vasp_configs(
     standard="dmc",
     dont_relax_cell=False,
@@ -341,6 +342,7 @@ def get_analysis_configs(
     analyze_dos=False,
     analyze_bonding=False,
     analyze_phonons=False,
+    analyze_slab = False,
     exclude=None,
     remake_results=False,
     verbose=False,
@@ -386,6 +388,10 @@ def get_analysis_configs(
     analysis_configs = {}
 
     includes = []
+
+    if analyze_slab:
+        includes.append("slab")
+
     if analyze_structure:
         includes.append("structure")
 
@@ -2203,7 +2209,6 @@ def check_slabs(slabs: dict[str, dict[str, dict]]):
                 f"\tSlab size: {s.replace('s', '')}, Vacuum size: {v.replace('v', '')}"
             )
             print(f"\tStructure formula: {StrucTools(slabs[cmpd][slab_id]).formula}")
-
 
 def set_magmoms_from_template(
     strucs: dict[str, dict[str, dict]],
