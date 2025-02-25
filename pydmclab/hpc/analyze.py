@@ -1179,7 +1179,15 @@ class AnalyzeVASP(object):
     def get_slab_object(self):
         
         # Replacing the word "calc" with data and deleting everything after data
-        slab_dir = self.calc_dir.replace("calc", "data")
+
+        dir_comp = self.calc_dir.split("/")
+        del dir_comp[3:]
+        del dir_comp[-5:]
+
+        slab_dir = '~'
+
+        for i in range(len(dir_comp)):
+            slab_dir = slab_dir + '/' + dir_comp[i]
         
         metadata = read_json(os.path.join(slab_dir, "metadata.json"))
         components = self.calc_dir.split(os.sep)
