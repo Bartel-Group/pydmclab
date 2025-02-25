@@ -1189,6 +1189,8 @@ class AnalyzeVASP(object):
         for i in range(len(dir_comp)):
             slab_dir = slab_dir + '/' + dir_comp[i]
         
+        slab_dir = slab_dir + '/' + 'data'
+
         metadata = read_json(os.path.join(slab_dir, "metadata.json"))
         components = self.calc_dir.split(os.sep)
 
