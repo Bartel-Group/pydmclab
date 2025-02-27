@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import os
+
+os.environ["TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD"] = "1"
+
 import io
 import sys
 import inspect
@@ -42,8 +45,6 @@ if TYPE_CHECKING:
     from ase import Atoms
     from typing_extensions import Self
     from ase.optimize.optimize import Optimizer as ASEOptimizer
-
-os.environ["TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD"] = "1"
 
 
 class OPTIMIZERS(Enum):
