@@ -690,6 +690,8 @@ def check_strucs(strucs):
 def get_magmoms(
     strucs,
     max_afm_combos=50,
+    afm_spins=(-5, 5),
+    fm_spins=(0.6, 5),
     treat_as_nm=None,
     data_dir=os.getcwd().replace("scripts", "data"),
     savename="magmoms.json",
@@ -703,6 +705,10 @@ def get_magmoms(
             usually generated with get_strucs (or similar custom function)
         max_afm_combos (int)
             maximum number of AFM configurations to generate
+        afm_spins (tuple)
+            low and high spin for AFM initialization
+        fm_spins (tuple)
+            zero and non-zero spin for FM initialization
         treat_as_nm (list)
             any normally mag els you'd like to treat as nonmagnetic for AFM enumeration
                 e.g., if you know Ti won't be magnetic, you could set to ['Ti']
@@ -739,6 +745,8 @@ def get_magmoms(
             magtools = MagTools(
                 structure=structure,
                 max_afm_combos=max_afm_combos,
+                afm_spins=afm_spins,
+                fm_spins=fm_spins,
                 treat_as_nm=treat_as_nm,
             )
             curr_magmoms = magtools.get_afm_magmoms
