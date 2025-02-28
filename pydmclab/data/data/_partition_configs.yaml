@@ -20,11 +20,11 @@ RM-512:
   max_nodes: 2
   proc: cpu
 msidmc:
-  cores_per_node: 64
+  cores_per_node: 128
   sharing: True
   max_wall: 96:00:00
   mem_per_core: 4GB
-  max_nodes: 2
+  max_nodes: 5
   proc: cpu
 agsmall:
   cores_per_node: 128
