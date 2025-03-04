@@ -43,6 +43,6 @@ site = ads_sites["all"][0]
 adsorbate = Molecule("O", [[0, 0, 0]])
 
 # Add the adsorbate to the slab at the chosen site
-adsorbed_structure = asf_ru_001_slab.add_adsorbate(adsorbate, site)
+adsorbed_structure = asf_ru_001_slab.add_adsorbate(adsorbate, site,repeat = [2,2,1])
 
 adsorbed_structure.to(fmt="cif", filename="/users/christopherakiki/scratch/adsorbed_structure.cif")

@@ -21,6 +21,7 @@ from pydmclab.hpc.helpers import (
     get_vasp_configs,
     get_analysis_configs,
     make_sub_for_launcher,
+    get_results_with_slabs,
 )
 
 from pydmclab.utils.handy import read_json, write_json
@@ -327,9 +328,12 @@ def main():
     thermo = get_thermo_results(
         results=results, gs=gs, data_dir=DATA_DIR, remake=remake_thermo_results
     )
+
+    slab_result = get_results_with_slabs(data_dir = DATA_DIR)
+    
     if print_thermo_results_check:
         check_thermo_results(thermo)
-
+        
     return
 
 

@@ -1,6 +1,8 @@
 import multiprocessing as multip
 import os
+import re
 import warnings
+import numpy as np 
 
 from pydmclab.hpc.launch import LaunchTools
 from pydmclab.hpc.submit import SubmitTools
@@ -13,8 +15,11 @@ from pydmclab.core.energies import ChemPots, FormationEnthalpy, MPFormationEnerg
 from pydmclab.utils.handy import read_json, write_json
 from pydmclab.data.configs import load_partition_configs
 
+from pymatgen.analysis.adsorption import AdsorbateSiteFinder
 from pymatgen.core.surface import Slab, get_symmetrically_distinct_miller_indices
 from pymatgen.electronic_structure.core import Magmom
+from pymatgen.core.structure import Structure, Molecule
+
 
 
 
@@ -2198,7 +2203,6 @@ def get_slabs(
 
     return read_json(fjson)
 
-
 def check_slabs(slabs: dict[str, dict[str, dict]]):
     for cmpd in slabs.keys():
         for slab_id in slabs[cmpd].keys():
@@ -2232,6 +2236,124 @@ def set_magmoms_from_template(
 
     write_json(magmoms_dict, fjson)
     return read_json(fjson)
+
+def get_results_with_slabs(data_dir, remake = False, ref_dir = None):
+    
+    """
+    Function that builds a slab object out of the result of a slab relaxation.
+
+    Args:
+        data_dir (str): The directory where your slab data is being stored
+        ref_dir (str): The directory where your data of your re-oriented relaxed bulk relaxation is being stored
+    
+    Returns:
+        A new results json file named results_with_slabs.json that contains the relaxed slab object as a dictionary
+    """
+
+    results  = read_json(os.path.join(data_dir,'results.json'))
+    slab_metadata =   read_json(os.path.join(data_dir,'slab_metadata.json'))
+
+    if ref_dir == None:
+        ref_dir = os.path.join('..','..','bulk-references/data')
+    else:
+        ref_dir = ref_dir
+
+    ref_results = read_json(os.path.join(ref_dir,'results.json'))
+
+    for key in results.keys():
+        structure = Structure.from_dict(results[key]['structure'])
+
+        key_split = re.split(r'--|_', key)
+
+        lattice, species, coords = structure.lattice, structure.species, structure.frac_coords
+        
+        ref_key = key_split[0] + '--' + key_split[1] + '_' + 'reference-bulk_' + key_split[2] + '--' + key_split[-2] + '--' + key_split[-1]
+
+        # Data we get from the reference relaxed bulk result dictionary:
+        oriented_unit_cell = Structure.from_dict(ref_results[ref_key]['structure'])
+
+        # Data we get from slab_metadata.json
+        miller_index = tuple(slab_metadata[key_split[0]][key_split[1]][key_split[2]][int(key_split[-3])]['slab']['miller_index'])
+        shift = slab_metadata[key_split[0]][key_split[1]][key_split[2]][int(key_split[-3])]['slab']['shift']
+        scale_factor = np.array(slab_metadata[key_split[0]][key_split[1]][key_split[2]][int(key_split[-3])]['slab']['scale_factor'])
+
+        slab = Slab(
+            lattice = lattice,
+            species = species,
+            coords = coords,
+            miller_index = miller_index,
+            oriented_unit_cell = oriented_unit_cell,
+            shift = shift,
+            scale_factor = scale_factor,
+            reorient_lattice = False,
+        )
+
+        results[key]['slab'] = slab.as_dict()
+    return write_json(results,os.path.join(data_dir,'results_with_slabs.json'))
+
+
+def get_adsorbed_slabs(adsorbate_type,
+                       data_dir, 
+                       slab_dir = None,
+                       selective_dynamics: bool = True,
+                       height: float = 0.9,
+                       super_cell = None,
+                       ):
+    
+    if slab_dir == None:
+        slab_dir = os.path.join('..','..','slabs','data')
+
+    else:
+        slab_dir = slab_dir
+
+    slab_results = read_json(os.path.join(slab_dir,'results_with_slabs.json'))
+    
+    key_splitting = re.split(r'--|_', list(slab_results.keys())[0])
+    chemID = key_splitting[0]
+
+    for key in slab_results.keys():
+        slab_dict = slab_results[key]['slab']
+        slab = Slab.from_dict(slab_dict)
+
+        ads = AdsorbateSiteFinder(slab, selective_dynamics, height)
+        ads_sites_dict = ads.find_adsorption_sites()
+        ads_sites = ads_sites_dict['all']
+
+        slab_results[key]['adsorbed_slabs'] = {}
+
+        if isinstance(adsorbate_type,str):
+            slab_results[key]['adsorbed_slabs'][adsorbate_type] = {}
+            for i in range(len(ads_sites)):
+                adsorbate = Molecule(adsorbate_type,[[0,0,0]])
+                adsorbed_slab = ads.add_adsorbate(adsorbate,ads_sites[i],super_cell)
+
+                slab_results[key]['adsorbed_slabs'][adsorbate_type][str(i)] = adsorbed_slab.as_dict()
+        
+        elif isinstance(adsorbate_type,(list,np.ndarray)):
+            for k in range(len(adsorbate_type)):
+                adsorbate = Molecule(adsorbate_type[k],[[0,0,0]])
+
+                slab_results[key]['adsorbed_slabs'][adsorbate_type[k]] = {}
+
+                for j in range(len(ads_sites)):
+                    adsorbed_slab = ads.add_adsorbate(adsorbate,ads_sites[j],super_cell)
+
+                    slab_results[key]['adsorbed_slabs'][adsorbate_type[k]][str(j)] = adsorbed_slab.as_dict()
+    
+    ads_slabs = {}
+    ads_slabs[chemID] = {}
+
+    for key in slab_results.keys():
+        key_split = re.split(r'--|_', key)
+        strucID, millerID, sizeID, vacuumID,termID = key_split[1],key_split[2], key_split[3], key_split[4], key_split[5]
+        for molecule in slab_results[key]['adsorbed_slabs'].keys():
+            adsorbID = molecule
+            for index in slab_results[key]['adsorbed_slabs'][molecule].keys():
+                indexID = index
+                new_key = strucID + '_' + millerID + '_' + sizeID + '_' + vacuumID + '_' + termID + '_' + adsorbID + '_' + indexID
+                ads_slabs[chemID][new_key] = slab_results[key]['adsorbed_slabs'][molecule][index]
+    
+    return write_json(ads_slabs,os.path.join(data_dir,'ads_slabs.json'))
 
 
 def main():
