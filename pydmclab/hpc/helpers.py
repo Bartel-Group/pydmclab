@@ -2237,7 +2237,10 @@ def set_magmoms_from_template(
     write_json(magmoms_dict, fjson)
     return read_json(fjson)
 
-def get_results_with_slabs(data_dir, remake = False, ref_dir = None):
+def get_results_with_slabs(data_dir, 
+                           remake = False, 
+                           ref_dir = None,
+                           savename = 'results_with_slabs.json'):
     
     """
     Function that builds a slab object out of the result of a slab relaxation.
@@ -2249,6 +2252,9 @@ def get_results_with_slabs(data_dir, remake = False, ref_dir = None):
     Returns:
         A new results json file named results_with_slabs.json that contains the relaxed slab object as a dictionary
     """
+    fjson = os.path.join(data_dir,savename)
+    if os.path.exists(fjson) and not remake:
+        return read_json(fjson)
 
     results  = read_json(os.path.join(data_dir,'results.json'))
     slab_metadata =   read_json(os.path.join(data_dir,'slab_metadata.json'))
@@ -2261,35 +2267,40 @@ def get_results_with_slabs(data_dir, remake = False, ref_dir = None):
     ref_results = read_json(os.path.join(ref_dir,'results.json'))
 
     for key in results.keys():
-        structure = Structure.from_dict(results[key]['structure'])
-
         key_split = re.split(r'--|_', key)
-
-        lattice, species, coords = structure.lattice, structure.species, structure.frac_coords
-        
         ref_key = key_split[0] + '--' + key_split[1] + '_' + 'reference-bulk_' + key_split[2] + '--' + key_split[-2] + '--' + key_split[-1]
+        
+        if ref_results[ref_key]['results']['convergence'] == False:
+            pass
+        
+        else:
+            structure = Structure.from_dict(results[key]['structure'])
 
-        # Data we get from the reference relaxed bulk result dictionary:
-        oriented_unit_cell = Structure.from_dict(ref_results[ref_key]['structure'])
+            lattice, species, coords = structure.lattice, structure.species, structure.frac_coords
+            
+            # Data we get from the reference relaxed bulk result dictionary:
+            oriented_unit_cell = Structure.from_dict(ref_results[ref_key]['structure'])
 
-        # Data we get from slab_metadata.json
-        miller_index = tuple(slab_metadata[key_split[0]][key_split[1]][key_split[2]][int(key_split[-3])]['slab']['miller_index'])
-        shift = slab_metadata[key_split[0]][key_split[1]][key_split[2]][int(key_split[-3])]['slab']['shift']
-        scale_factor = np.array(slab_metadata[key_split[0]][key_split[1]][key_split[2]][int(key_split[-3])]['slab']['scale_factor'])
+            # Data we get from slab_metadata.json
+            miller_index = tuple(slab_metadata[key_split[0]][key_split[1]][key_split[2]][int(key_split[-3])]['slab']['miller_index'])
+            shift = slab_metadata[key_split[0]][key_split[1]][key_split[2]][int(key_split[-3])]['slab']['shift']
+            scale_factor = np.array(slab_metadata[key_split[0]][key_split[1]][key_split[2]][int(key_split[-3])]['slab']['scale_factor'])
 
-        slab = Slab(
-            lattice = lattice,
-            species = species,
-            coords = coords,
-            miller_index = miller_index,
-            oriented_unit_cell = oriented_unit_cell,
-            shift = shift,
-            scale_factor = scale_factor,
-            reorient_lattice = False,
-        )
+            slab = Slab(
+                lattice = lattice,
+                species = species,
+                coords = coords,
+                miller_index = miller_index,
+                oriented_unit_cell = oriented_unit_cell,
+                shift = shift,
+                scale_factor = scale_factor,
+                reorient_lattice = False,
+            )
 
-        results[key]['slab'] = slab.as_dict()
-    return write_json(results,os.path.join(data_dir,'results_with_slabs.json'))
+            results[key]['slab'] = slab.as_dict()
+
+    write_json(results,fjson)
+    return read_json(fjson)
 
 
 def get_adsorbed_slabs(adsorbate_type,
