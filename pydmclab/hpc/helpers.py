@@ -2272,6 +2272,9 @@ def get_results_with_slabs(data_dir,
         
         if ref_results[ref_key]['results']['convergence'] == False:
             pass
+                
+        elif results[key]['results']['convergence'] == False:
+            pass
         
         else:
             structure = Structure.from_dict(results[key]['structure'])
