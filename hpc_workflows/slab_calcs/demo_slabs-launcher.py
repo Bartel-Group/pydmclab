@@ -225,6 +225,9 @@ def main():
     remake_thermo_results = True
     print_thermo_results_check = True
 
+    # remake results with slab?
+    remake_results_with_slabs = True
+
     # remake submission script for launcher?
     # make one if it doesn't exist
     if (
@@ -329,11 +332,15 @@ def main():
         results=results, gs=gs, data_dir=DATA_DIR, remake=remake_thermo_results
     )
 
-    slab_result = get_results_with_slabs(data_dir = DATA_DIR)
+    get_results_with_slabs(data_dir = DATA_DIR,
+                           remake = remake_results_with_slabs,
+                           ref_dir=None,
+                           savename = 'results_with_slabs.json',
+                           )
     
     if print_thermo_results_check:
         check_thermo_results(thermo)
-        
+
     return
 
 
