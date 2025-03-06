@@ -2264,20 +2264,21 @@ def get_results_with_slabs(data_dir,
     else:
         ref_dir = ref_dir
 
-    ref_results = read_json(os.path.join(ref_dir,'results.json'))
-
     for key in results.keys():
         key_split = re.split(r'--|_', key)
         ref_key = key_split[0] + '--' + key_split[1] + '_' + 'reference-bulk_' + key_split[2] + '--' + key_split[-2] + '--' + key_split[-1]
         
-        if os.path.exists(ref_dir) and ref_results[ref_key]['results']['convergence'] == False:
+        refs = os.path.join(ref_dir,'results.json')
+
+        if os.path.exists(refs) and ref_results[ref_key]['results']['convergence'] == False:
             pass
-        elif not os.path.exists(ref_dir):
+        elif not os.path.exists(refs):
             pass
         elif results[key]['results']['convergence'] == False:
             pass
         
         else:
+            ref_results = read_json(os.path.join(ref_dir,'results.json'))
             structure = Structure.from_dict(results[key]['structure'])
 
             lattice, species, coords = structure.lattice, structure.species, structure.frac_coords
