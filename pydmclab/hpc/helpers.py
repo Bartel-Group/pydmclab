@@ -2263,14 +2263,14 @@ def get_results_with_slabs(data_dir,
         ref_dir = os.path.join('..','..','bulk-references/data')
     else:
         ref_dir = ref_dir
+    
+    refs = os.path.join(ref_dir,'results.json')
 
     for key in results.keys():
         key_split = re.split(r'--|_', key)
         ref_key = key_split[0] + '--' + key_split[1] + '_' + 'reference-bulk_' + key_split[2] + '--' + key_split[-2] + '--' + key_split[-1]
         
-        refs = os.path.join(ref_dir,'results.json')
-
-        if os.path.exists(refs) and ref_results[ref_key]['results']['convergence'] == False:
+        if os.path.exists(refs) and refs[ref_key]['results']['convergence'] == False:
             pass
         elif not os.path.exists(refs):
             pass
@@ -2278,13 +2278,13 @@ def get_results_with_slabs(data_dir,
             pass
         
         else:
-            ref_results = read_json(os.path.join(ref_dir,'results.json'))
+            # ref_results = read_json(os.path.join(ref_dir,'results.json'))
             structure = Structure.from_dict(results[key]['structure'])
 
             lattice, species, coords = structure.lattice, structure.species, structure.frac_coords
             
             # Data we get from the reference relaxed bulk result dictionary:
-            oriented_unit_cell = Structure.from_dict(ref_results[ref_key]['structure'])
+            oriented_unit_cell = Structure.from_dict(refs[ref_key]['structure'])
 
             # Data we get from slab_metadata.json
             miller_index = tuple(slab_metadata[key_split[0]][key_split[1]][key_split[2]][int(key_split[-3])]['slab']['miller_index'])
