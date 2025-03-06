@@ -2270,9 +2270,10 @@ def get_results_with_slabs(data_dir,
         key_split = re.split(r'--|_', key)
         ref_key = key_split[0] + '--' + key_split[1] + '_' + 'reference-bulk_' + key_split[2] + '--' + key_split[-2] + '--' + key_split[-1]
         
-        if ref_results[ref_key]['results']['convergence'] == False:
+        if os.path.exists(ref_dir) and ref_results[ref_key]['results']['convergence'] == False:
             pass
-                
+        elif not os.path.exists(ref_dir):
+            pass
         elif results[key]['results']['convergence'] == False:
             pass
         
