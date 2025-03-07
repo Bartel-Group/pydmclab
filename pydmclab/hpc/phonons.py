@@ -681,7 +681,7 @@ class QHA(object):
         comp = st.structure.composition
         ct = CompTools(comp)
         reduced_comp_and_factor = Composition(
-                formula
+                comp
                 ).get_reduced_composition_and_factor()
         formula_units = reduced_comp_and_factor[1]
         return formula_units
