@@ -2270,12 +2270,12 @@ def get_results_with_slabs(data_dir,
         
         refs = os.path.join(ref_dir,'results.json')
 
-        if os.path.exists(refs) and read_json(refs)[ref_key]['results']['convergence'] == False:
-            pass
+        if os.path.exists(refs) and not read_json(refs)[ref_key]['results']['convergence']:
+            continue
         elif not os.path.exists(refs):
-            pass
+            continue
         elif results[key]['results']['convergence'] == False:
-            pass
+            continue
         
         else:
             ref_results = read_json(os.path.join(ref_dir,'results.json'))
@@ -2311,8 +2311,8 @@ def get_results_with_slabs(data_dir,
 def get_adsorbed_slabs(adsorbate_type,
                        data_dir, 
                        slab_dir = None,
-                       selective_dynamics: bool = True,
-                       height: float = 0.9,
+                       selective_dynamics = True,
+                       height = 0.9,
                        super_cell = None,
                        ):
     
