@@ -2340,14 +2340,14 @@ def get_adsorbed_slabs(adsorbate_type,
         if isinstance(adsorbate_type,str):
             slab_results[key]['adsorbed_slabs'][adsorbate_type] = {}
             for i in range(len(ads_sites)):
-                adsorbate = Molecule(adsorbate_type,[[0,0,0]])
+                adsorbate = Molecule([adsorbate_type],[[0,0,0]])
                 adsorbed_slab = ads.add_adsorbate(adsorbate,ads_sites[i],super_cell)
 
                 slab_results[key]['adsorbed_slabs'][adsorbate_type][str(i)] = adsorbed_slab.as_dict()
         
         elif isinstance(adsorbate_type,(list,np.ndarray)):
             for k in range(len(adsorbate_type)):
-                adsorbate = Molecule(adsorbate_type[k],[[0,0,0]])
+                adsorbate = Molecule([adsorbate_type[k]],[[0,0,0]])
 
                 slab_results[key]['adsorbed_slabs'][adsorbate_type[k]] = {}
 

@@ -40,7 +40,7 @@ print(ads_sites['all'])
 # Adding adsorbate
 site = ads_sites["all"][0]
 
-adsorbate = Molecule("O", [[0, 0, 0]])
+adsorbate = Molecule(['O','H','N'], [[0, 0, 0],[0,0,0],[0,0,0]])
 
 # Add the adsorbate to the slab at the chosen site
 adsorbed_structure = asf_ru_001_slab.add_adsorbate(adsorbate, site,repeat = [2,2,1])
