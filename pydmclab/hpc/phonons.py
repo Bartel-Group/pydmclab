@@ -905,13 +905,13 @@ class QHA(object):
         plt.plot(Ts, Gs, label=mpid) 
 
         # Add title and axis labels
-        plt.title("Temperature vs Gibbs Free Energy at Different Volumes", fontsize=14)
+        # plt.title("Temperature vs Gibbs Free Energy at Different Volumes", fontsize=14)
         plt.xlabel("Temperature (K)", fontsize=12)
         plt.ylabel("Gibbs Free Energy (eV/f.u.)" if self.formula_units else "Gibbs Free Energy (eV/cell)", fontsize=12)
 
         # Add legend and grid
-        plt.legend(title="Volumes", loc="best", fontsize=10)
-        plt.grid(True)
+        # plt.legend(title="Volumes", loc="best", fontsize=10)
+        # plt.grid(True)
 
         # Display the plot
         plt.show()
@@ -969,9 +969,9 @@ class QHA(object):
         plt.plot(equil_vols, equil_F_values, color='red', marker='x', label="Equilibrium Volume")
 
         # Add legend for first and last temperature
-        plt.text(484, -123.5, f"T = {temperatures[1::skip][0]} K", fontsize=14,
+        plt.text(484, -30.8, f"T = {temperatures[1::skip][0]} K", fontsize=14,
                  color='black', ha='center', va='center')
-        plt.text(448, -151, f"T = {temperatures[1::skip][-1]} K", fontsize=14,
+        plt.text(448, -37.8, f"T = {temperatures[1::skip][-1]} K", fontsize=14,
                  color='black', ha='center', va='center')
 
         plt.xlabel("Volume ($\mathrm{Å}^3$)", fontsize=18)
