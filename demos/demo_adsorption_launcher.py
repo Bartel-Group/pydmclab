@@ -116,7 +116,7 @@ SUB_CONFIGS = get_sub_configs(
 SLURM_CONFIGS = get_slurm_configs(
     total_nodes=1,
     cores_per_node=32,
-    walltime_in_hours=95,
+    walltime_in_hours=48,
     mem_per_core="all",
     partition="agsmall,msismall,msidmc",
     error_file="log.e",
@@ -132,7 +132,7 @@ SLURM_CONFIGS = get_slurm_configs(
 #
 #  kpoint grid is based on previous calculations and is not necessarily the best choice
 #  consider additional convergence testing if you are unsure of what is best for your system
-INCAR_MODS = {"all-all": {"NELM": 60}}
+INCAR_MODS = {"all-all": {"NELM": 60, "IDIPOL":3}}
 KPOINTS_MODS = {"all-all": {"grid": [5, 5, 1]}}
 POTCAR_MODS = None
 
@@ -198,11 +198,7 @@ ADSORBATE_TYPE = 'O'
 def main():
     # make a submission script so you can execute launcher.py on the cluster
     remake_sub_for_launcher = False
-
-    # remake strucs? print strucs summary?
-    remake_strucs = False
-    print_strucs_check = True
-
+    
     # remake slabs? print slabs summary?
     remake_slabs = False
     print_slabs_check = True
@@ -238,17 +234,18 @@ def main():
         or remake_sub_for_launcher
     ):
         make_sub_for_launcher()
-
-    # generate slabs from your ground state structure and get reference bulks
+    
     slabs = get_adsorbed_slabs(
         adsorbate_type = ADSORBATE_TYPE,
-        data_dir = DATA_DIR,
+        data_dir = DATA_DIR, 
         slab_dir = None,
         selective_dynamics = True,
         height = 0.9,
-        super_cell = [2,2,1]
-    )
-    
+        super_cell = [2,2,1],
+        savename = 'ads_slabs.json',
+        remake = remake_slabs
+        )
+
     if print_slabs_check:
         check_slabs(slabs)
 
@@ -321,7 +318,12 @@ def main():
         results=results, gs=gs, data_dir=DATA_DIR, remake=remake_thermo_results
     )
 
-    slab_result = get_results_with_slabs(data_dir = DATA_DIR)
+    slab_result = get_results_with_slabs(
+        data_dir = DATA_DIR, 
+        remake = False, 
+        ref_dir = None,
+        savename = 'results_with_slabs.json'
+    )
     
     if print_thermo_results_check:
         check_thermo_results(thermo)

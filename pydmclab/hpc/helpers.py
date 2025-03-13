@@ -2314,8 +2314,14 @@ def get_adsorbed_slabs(adsorbate_type,
                        selective_dynamics = True,
                        height = 0.9,
                        super_cell = None,
+                       savename = 'ads_slabs.json',
+                       remake = False
                        ):
     
+    fjson = os.path.join(data_dir,savename)
+    if os.path.exists(fjson) and not remake:
+        return read_json(fjson)
+
     if slab_dir == None:
         slab_dir = os.path.join('..','..','slabs','data')
 
@@ -2369,7 +2375,8 @@ def get_adsorbed_slabs(adsorbate_type,
                 new_key = strucID + '_' + millerID + '_' + sizeID + '_' + vacuumID + '_' + termID + '_' + adsorbID + '_' + indexID
                 ads_slabs[chemID][new_key] = slab_results[key]['adsorbed_slabs'][molecule][index]
     
-    return write_json(ads_slabs,os.path.join(data_dir,'ads_slabs.json'))
+    write_json(ads_slabs,fjson)
+    return read_json(fjson)
 
 def get_lowest_energy_slabs(data_dir,
                             chgnet_json = 'relax_results.json',
