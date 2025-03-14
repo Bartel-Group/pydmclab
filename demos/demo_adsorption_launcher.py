@@ -30,8 +30,6 @@ from pydmclab.utils.handy import read_json, write_json
 # import any custom functions that might be needed for this workflow below
 #  (ie non-default helpers)
 from pydmclab.hpc.helpers import (
-    get_strucs_from_cifs,
-    get_slabs,
     check_slabs,
     set_magmoms_from_template,
 )
@@ -101,7 +99,7 @@ SUB_CONFIGS = get_sub_configs(
     static_addons={},
     prioritize_relaxes=True,
     start_with_loose=False,
-    custom_calc_list=None,
+    custom_calc_list=['static'],
     restart_these_calcs=None,
     submit_calculations_in_parallel=False,
     machine="msi",
@@ -198,7 +196,7 @@ ADSORBATE_TYPE = 'O'
 def main():
     # make a submission script so you can execute launcher.py on the cluster
     remake_sub_for_launcher = False
-    
+
     # remake slabs? print slabs summary?
     remake_slabs = False
     print_slabs_check = True
