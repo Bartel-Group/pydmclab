@@ -4,7 +4,6 @@ from shutil import copyfile
 from pydmclab.data.configs import load_base_configs
 
 from pydmclab.hpc.helpers import (
-    check_strucs,
     check_magmoms,
     get_launch_dirs,
     check_launch_dirs,
