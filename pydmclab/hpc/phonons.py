@@ -871,13 +871,13 @@ class QHA(object):
             plt.plot(Ts, Fs, label=f"{float(vol):.2f}")  # Format volume label to 2 decimals
 
         # Add title and axis labels
-        plt.title("Temperature vs Helmholtz Free Energy at Different Volumes", fontsize=14)
-        plt.xlabel("Temperature (K)", fontsize=12)
-        plt.ylabel("Helmholtz Free Energy (eV/f.u.)" if self.formula_units else "Helmholtz Free Energy (eV/cell)", fontsize=12)
+        # plt.title("Temperature vs Helmholtz Free Energy at Different Volumes", fontsize=14)
+        plt.xlabel("Temperature (K)")
+        plt.ylabel("Helmholtz Free Energy (eV/f.u.)" if self.formula_units else "Helmholtz Free Energy (eV/cell)")
 
         # Add legend and grid
         plt.legend(title="Volumes", loc="best", fontsize=10)
-        plt.grid(True)
+
 
         # Display the plot
         plt.show()
@@ -906,8 +906,8 @@ class QHA(object):
 
         # Add title and axis labels
         # plt.title("Temperature vs Gibbs Free Energy at Different Volumes", fontsize=14)
-        plt.xlabel("Temperature (K)", fontsize=12)
-        plt.ylabel("Gibbs Free Energy (eV/f.u.)" if self.formula_units else "Gibbs Free Energy (eV/cell)", fontsize=12)
+        plt.xlabel("Temperature (K)")
+        plt.ylabel("Gibbs Free Energy (eV/f.u.)" if self.formula_units else "Gibbs Free Energy (eV/cell)")
 
         # Add legend and grid
         # plt.legend(title="Volumes", loc="best", fontsize=10)
