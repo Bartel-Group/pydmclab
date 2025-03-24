@@ -112,6 +112,16 @@ class Passer(object):
                     return curr_xc_calc.replace(curr_calc, "preggastatic")
             prev_xc_calc = curr_xc_calc.replace(curr_calc, "relax")
             return prev_xc_calc
+        
+        if curr_calc == "static_dipole":
+            # static energy dipole corrected calcs inherit from static
+            prev_xc_calc = curr_xc_calc.replace(curr_calc, "static")
+            return prev_xc_calc
+
+        if curr_calc == "static_ldipole":
+            # static forces dipole corrected calcs inherit from static_dipole
+            prev_xc_calc = curr_xc_calc.replace(curr_calc, "static_dipole")
+            return prev_xc_calc
 
         if "defect_neutral" in curr_calc:
             if curr_xc in ["gga", "ggau"]:
@@ -154,8 +164,8 @@ class Passer(object):
 
         if curr_calc in ["parchg"]:
             # for parchg, inherit from lobster
-            return curr_xc_calc.replace(curr_calc, "lobster")
-
+            return curr_xc_calc.replace(curr_calc, "lobster")  
+        
         # everything else inherits from static
         return curr_xc_calc.replace(curr_calc, "static")
 
@@ -712,6 +722,14 @@ class Passer(object):
         """
         return Poscar.from_file(os.path.join(self.calc_dir, "POSCAR"))
 
+    @property
+    def get_center_of_charge_density(self) -> np.ndarray:
+        """
+        Returns:
+            the center of charge density of the current calculation
+        """
+        return AnalyzeVASP(self.calc_dir).center_of_charge_density
+
     def update_incar(
         self,
         wavecar_out: str | None,
@@ -738,6 +756,10 @@ class Passer(object):
 
         curr_calc = self.curr_calc
         curr_xc_calc = self.xc_calc
+
+        if curr_calc in ['static_ldipole']:
+            incar_adjustments['DIPOL'] = self.get_center_of_charge_density
+
         if curr_calc in ["lobster"]:
             incar_adjustments["ISMEAR"] = -5
 

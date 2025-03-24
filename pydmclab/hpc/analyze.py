@@ -5,7 +5,7 @@ import json
 import glob
 
 
-from pymatgen.io.vasp.outputs import Vasprun, Outcar, Eigenval, Oszicar
+from pymatgen.io.vasp.outputs import Vasprun, Outcar, Eigenval, Oszicar, Chgcar
 from pymatgen.core.structure import Structure
 from pymatgen.io.vasp.inputs import Kpoints, Incar
 from pymatgen.io.lobster.outputs import Doscar, Cohpcar, Charge, MadelungEnergies
@@ -1258,6 +1258,45 @@ class AnalyzeVASP(object):
     #     )
     #     slab_dict = slab.as_dict()
     #     return slab_dict
+    @property
+    def center_of_charge_density(self):
+        """
+        Returns:
+            center of charge density (list of floats) or None using the CHGCAR file
+        """
+
+        fchg = os.path.join(self.calc_dir, "CHGCAR")
+        if not os.path.exists(fchg):
+            return None
+        chgcar = Chgcar.from_file(fchg)
+        charge_density = chgcar.data['total']
+        
+        lattice = chgcar.structure.lattice.matrix
+
+        grid_shape = np.array(charge_density.shape)
+
+        grid_indices = np.indices(grid_shape).reshape(3, -1).T 
+        # Normalize indices to fractional coordinates (0 to 1)
+        frac_coords = grid_indices / (grid_shape - 1)
+
+        # Convert fractional coordinates to Cartesian coordinates
+        cart_coords = frac_coords @ lattice
+
+        # Flatten the charge density array so it matches the list of coordinates
+        density_flat = charge_density.flatten()
+
+        # Compute the total charge (should be the integral over the density)
+        total_charge = np.sum(density_flat)
+
+        # Compute the center of charge as the weighted average of the coordinates
+        center_of_charge = np.sum(cart_coords * density_flat[:, None], axis=0) / total_charge
+
+        return center_of_charge
+
+
+
+
+
 
     def summary(
         self,

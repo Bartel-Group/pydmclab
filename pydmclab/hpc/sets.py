@@ -235,6 +235,14 @@ class GetSet(object):
             new_settings["LWAVE"] = True
             new_settings["ISMEAR"] = -5
 
+        # for energy dipole correction
+        if calc == 'static_dipole':
+            new_settings['IDIPOL'] = 3
+        
+        # for force dipole correction 
+        if calc == 'static_ldipole':
+            new_settings['LDIPOL'] = True
+            
         # for computing polarization --> set explicit requirements
         # Note: VASP will only compute the macroscopic polarization if the system is insulating
         # grep "dipole moment" in your OUTCAR to see if it was computed
