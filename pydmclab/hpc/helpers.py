@@ -2437,7 +2437,7 @@ def get_adsorption_energy_results(data_dir,
 
     if not ads:
         try:
-            ads = read_json(os.path.join(data_dir,'ads_slabs.json'))
+            ads = read_json(os.path.join(data_dir,'results.json'))
         except:
             ads = None
     
