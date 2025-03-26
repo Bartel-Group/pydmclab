@@ -238,10 +238,14 @@ class GetSet(object):
         # for energy dipole correction
         if calc == 'static_dipole':
             new_settings['IDIPOL'] = 3
+            new_settings['NSW'] = 0
+            new_settings['IBRION'] = -1
         
         # for force dipole correction 
         if calc == 'static_ldipole':
             new_settings['LDIPOL'] = True
+            new_settings['NSW'] = 0
+            new_settings['IBRION'] = -1
             
         # for computing polarization --> set explicit requirements
         # Note: VASP will only compute the macroscopic polarization if the system is insulating
