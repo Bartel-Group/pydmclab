@@ -247,8 +247,8 @@ def main():
         remake = remake_slabs
         )
 
-    if print_slabs_check:
-        check_slabs(slabs)
+    # if print_slabs_check:
+    #     check_slabs(slabs)
 
     # If your template ground state structure is magnetic, magmoms should be set via `override_mag`
     if GEN_MAGMOMS:
