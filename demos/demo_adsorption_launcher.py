@@ -22,6 +22,7 @@ from pydmclab.hpc.helpers import (
     make_sub_for_launcher,
     get_results_with_slabs,
     get_adsorbed_slabs,
+    get_adsorption_energy_results
 )
 
 from pydmclab.utils.handy import read_json, write_json
@@ -129,7 +130,7 @@ SLURM_CONFIGS = get_slurm_configs(
 #
 #  kpoint grid is based on previous calculations and is not necessarily the best choice
 #  consider additional convergence testing if you are unsure of what is best for your system
-INCAR_MODS = {"all-all": {"NELM": 60, "IDIPOL":3}}
+INCAR_MODS = {"all-all": {"NELM": 60}}
 KPOINTS_MODS = {"all-all": {"grid": [5, 5, 1]}}
 POTCAR_MODS = None
 
@@ -223,6 +224,9 @@ def main():
     # remake thermo results? print thermo summary?
     remake_thermo_results = True
     print_thermo_results_check = True
+
+    # remake results with adsorption energies
+    remake_ads_res = True
 
     # remake submission script for launcher?
     # make one if it doesn't exist
@@ -320,6 +324,13 @@ def main():
         remake = False, 
         ref_dir = None,
         savename = 'results_with_slabs.json'
+    )
+
+    ads_res = get_adsorption_energy_results(
+        data_dir = DATA_DIR,
+        slab_dir = None,
+        remake = remake_ads_res,
+        savename = 'results.json'
     )
     
     if print_thermo_results_check:

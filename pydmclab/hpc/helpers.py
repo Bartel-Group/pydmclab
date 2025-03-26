@@ -2378,45 +2378,102 @@ def get_adsorbed_slabs(adsorbate_type,
     write_json(ads_slabs,fjson)
     return read_json(fjson)
 
-def get_lowest_energy_slabs(data_dir,
-                            chgnet_json = 'relax_results.json',
-                            ads_slabs = 'ads_slabs.json',
-                            savename = 'ads_slabs_DFT.json',
-                            remake = True,
-                            threshold_percentage = 0.01
-                            ):
+# def get_lowest_energy_slabs(data_dir,
+#                             chgnet_json = 'relax_results.json',
+#                             ads_slabs = 'ads_slabs.json',
+#                             savename = 'ads_slabs_DFT.json',
+#                             remake = True,
+#                             threshold_percentage = 0.01
+#                             ):
+    
+#     fjson = os.path.join(data_dir,savename)
+#     if os.path.exists(fjson) and not remake:
+#         return read_json(fjson)
+    
+#     unrelaxed_ads_slabs = read_json(os.path.join(data_dir,ads_slabs))
+#     cmpd = list(unrelaxed_ads_slabs.keys())[0]
+#     chgnet_results = read_json(os.path.join(data_dir,chgnet_json))
+#     chgnet_relax_dict = chgnet_results['relax_results'][cmpd]
+#     list_of_all_slabs = []
+#     chgnet_energies = []
+
+#     for key in chgnet_relax_dict.keys():
+#         list_of_all_slabs.append(key)
+#         E = chgnet_relax_dict[key]['final_energy']
+#         chgnet_energies.append(E)
+
+#     minimum_energy = np.min(chgnet_energies)
+#     DFT_threshold = (1-threshold_percentage/100)*minimum_energy
+    
+#     slabs_to_drop = []
+
+#     for i in range(len(chgnet_energies)):
+#         if chgnet_energies[i] > DFT_threshold:
+#             slabs_to_drop.append(list_of_all_slabs[i])
+    
+#     for slab_id in slabs_to_drop:
+#         if slab_id in unrelaxed_ads_slabs[cmpd]:
+#             del unrelaxed_ads_slabs[cmpd][slab_id]
+    
+#     write_json(unrelaxed_ads_slabs,fjson)
+
+#     return read_json(fjson)
+
+def get_adsorption_energy_results(data_dir,
+                          slab_dir = None,
+                          remake = False,
+                          ads = None,
+                          savename = 'results.json'
+                          ):
     
     fjson = os.path.join(data_dir,savename)
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
     
-    unrelaxed_ads_slabs = read_json(os.path.join(data_dir,ads_slabs))
-    cmpd = list(unrelaxed_ads_slabs.keys())[0]
-    chgnet_results = read_json(os.path.join(data_dir,chgnet_json))
-    chgnet_relax_dict = chgnet_results['relax_results'][cmpd]
-    list_of_all_slabs = []
-    chgnet_energies = []
+    if not slab_dir:
+        slab_dir = os.path.join('..','..','slabs','data')
 
-    for key in chgnet_relax_dict.keys():
-        list_of_all_slabs.append(key)
-        E = chgnet_relax_dict[key]['final_energy']
-        chgnet_energies.append(E)
+    slab_result = read_json(os.path.join(slab_dir,'results.json'))
 
-    minimum_energy = np.min(chgnet_energies)
-    DFT_threshold = (1-threshold_percentage/100)*minimum_energy
+    if not ads:
+        try:
+            ads = read_json(os.path.join(data_dir,'ads_slabs.json'))
+        except:
+            ads = None
     
-    slabs_to_drop = []
+    cp = ChemPots()
+    cp_dict = cp.chempots
 
-    for i in range(len(chgnet_energies)):
-        if chgnet_energies[i] > DFT_threshold:
-            slabs_to_drop.append(list_of_all_slabs[i])
-    
-    for slab_id in slabs_to_drop:
-        if slab_id in unrelaxed_ads_slabs[cmpd]:
-            del unrelaxed_ads_slabs[cmpd][slab_id]
-    
-    write_json(unrelaxed_ads_slabs,fjson)
+    for key in ads.keys():
+        
+        if ads:
+            ads_results = ads[key]['results']
+        else:
+            continue
 
+        if not ads_results['convergence']:
+            continue
+        
+        else:
+            key_split = re.split('--', key)
+            chemID, ads_slabID, magmom, calc_type = key_split[0], key_split[1], key_split[2], key_split[3]
+            ads_slabID_split = re.split('_',ads_slabID)
+            strucID,miller,slab_size,vacuum,term,adsorbate = ads_slabID_split[0],ads_slabID_split[1],ads_slabID_split[2],ads_slabID_split[3],ads_slabID_split[4],ads_slabID_split[5]
+            
+            equivalent_slab_ID = strucID + '_' + miller + '_' + slab_size + '_' + vacuum + '_' + term
+
+            slab_result_key = chemID + '--' + equivalent_slab_ID + '--' + magmom + '--' + calc_type
+
+            E_slab_ads = ads_results['E_per_at']
+            E_slab = slab_result[slab_result_key]['results']['E_per_at']
+
+            E_adsorbate = cp_dict[adsorbate]
+
+            E_ads = E_slab_ads - (E_slab + E_adsorbate)
+
+            ads_results['Adsorption_E_per_at'] = E_ads
+    
+    write_json(ads,fjson)
     return read_json(fjson)
 
 def main():
