@@ -968,11 +968,11 @@ class QHA(object):
         # Now plot the equilibrium volumes and Gibbs free energies at each temperature
         plt.plot(equil_vols, equil_F_values, color='red', marker='x', label="Equilibrium Volume")
 
-        # Add legend for first and last temperature
-        plt.text(484, -30.8, f"T = {temperatures[1::skip][0]} K", fontsize=14,
-                 color='black', ha='center', va='center')
-        plt.text(448, -37.8, f"T = {temperatures[1::skip][-1]} K", fontsize=14,
-                 color='black', ha='center', va='center')
+        # # Add legend for first and last temperature
+        # plt.text(484, -30.8, f"T = {temperatures[1::skip][0]} K", fontsize=14,
+        #          color='black', ha='center', va='center')
+        # plt.text(448, -37.8, f"T = {temperatures[1::skip][-1]} K", fontsize=14,
+        #          color='black', ha='center', va='center')
 
         plt.xlabel("Volume ($\mathrm{Å}^3$)", fontsize=18)
         plt.ylabel("F (eV/f.u.)", fontsize=18)
