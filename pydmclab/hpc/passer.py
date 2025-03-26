@@ -757,7 +757,15 @@ class Passer(object):
         curr_calc = self.curr_calc
         curr_xc_calc = self.xc_calc
 
-        if curr_calc in ['static_ldipole']:
+        # Handle dipole correction settings
+        if curr_calc == 'static_dipole':
+            # For energy-only dipole correction
+            incar_adjustments['IDIPOL'] = 3  
+            incar_adjustments['LDIPOL'] = False
+        elif curr_calc == 'static_ldipole':
+            # For forces and energy dipole correction
+            incar_adjustments['IDIPOL'] = 3  
+            incar_adjustments['LDIPOL'] = True
             incar_adjustments['DIPOL'] = self.get_center_of_charge_density
 
         if curr_calc in ["lobster"]:
