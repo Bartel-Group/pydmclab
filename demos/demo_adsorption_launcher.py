@@ -20,7 +20,6 @@ from pydmclab.hpc.helpers import (
     get_vasp_configs,
     get_analysis_configs,
     make_sub_for_launcher,
-    get_results_with_slabs,
     get_adsorbed_slabs,
     get_adsorption_energy_results
 )
