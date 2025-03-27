@@ -566,8 +566,9 @@ class Gibbs():
         return {"data": Gs, "fitted_F_values": fitted_F_values, "volumes_for_fitting": smooth_volumes}
     
 class QHA(object):
-    def __init__(self, results: dict, eos: str = "vinet"):
+    def __init__(self, results: dict, temperatures = np.linspace(0, 2000, 201), eos: str = "vinet"):
         self.results = results
+        self.temperatures = temperatures
         self.eos = eos
         self._parsed_results = None  # Cache for parsed results
 
@@ -660,14 +661,13 @@ class QHA(object):
         }
         return volumes
     
-    @property
-    def temperatures(self):
-        """
-        Returns:
-            list: A list of temperatures (K) from the thermal properties data
-        """
-        temperatures = np.linspace(0, 2000, 201)
-        return temperatures
+    # @property
+    # def temperatures(self):
+    #     """
+    #     Returns:
+    #         list: A list of temperatures (K) from the thermal properties data
+    #     """
+    #     return self.temperatures
     
     def formula_units(self, formula, mpid):
         """
@@ -824,25 +824,44 @@ class QHA(object):
             return read_json(fjson)
         return qha_dict
 
-    def plot_phonon_dos(self, formula, mpid, volume, remove_imaginary=False):
+    def plot_phonon_dos(self, formula, mpid, volume=None, remove_imaginary=False):
         """
         Plot phonon density of states for a specific volume.
         Args:
             formula (str): Chemical formula of the material.
             mpid (str): Materials Project ID.
-            volume (float): Volume of the structure.
+            volume (float): Volume of the structure. If none, will plot phonon dos for all the volumes.
             remove_imaginary (bool): Whether to remove imaginary frequencies. Default is False.
         """
-        phonon_dos = self.phonon_dos(remove_imaginary=remove_imaginary)[(formula, mpid)][str(volume)]
+        phonon_dos_dict = self.phonon_dos(remove_imaginary=remove_imaginary)[(formula, mpid)]
+        
+        if not volume:
+            plt.figure(figsize=(10, 6))
+            for volume in phonon_dos_dict:
+                phonon_dos = phonon_dos_dict[str(volume)]
 
-        frequency_points = np.array([d['E'] for d in phonon_dos['dos']])
-        total_dos = np.array([d['dos'] for d in phonon_dos['dos']])
+                frequency_points = np.array([d['E'] for d in phonon_dos['dos']])
+                total_dos = np.array([d['dos'] for d in phonon_dos['dos']])
+                label = f"{mpid} - {float(volume):.2f} A^3"
+                plt.plot(frequency_points, total_dos, label=label)
 
-        plt.figure(figsize=(10, 6))
-        plt.plot(frequency_points, total_dos, label=f"{mpid} - {volume:.2f} A^3")
+            plt.title(f"Phonon Density of States for {mpid}", fontsize=14)
+            plt.legend(title="Volumes", loc="best", fontsize=10)
+
+        else:
+            phonon_dos = phonon_dos_dict[str(volume)]
+
+            frequency_points = np.array([d['E'] for d in phonon_dos['dos']])
+            total_dos = np.array([d['dos'] for d in phonon_dos['dos']])
+
+            plt.figure(figsize=(10, 6))
+            plt.plot(frequency_points, total_dos, label=f"{mpid} - {volume:.2f} A^3")
+            plt.title(f"Phonon Density of States for {mpid} - {volume:.2f} A^3", fontsize=14)
+            
         plt.xlabel("Energy (eV)", fontsize=12)
         plt.ylabel("Phonon DOS (1/eV)", fontsize=12)
-        plt.title(f"Phonon Density of States for {mpid} - {volume:.2f} A^3", fontsize=14)
+
+    
    
     def plot_helmholtz_free_energy(self, formula, mpid, temp_cutoff=None):
         """
