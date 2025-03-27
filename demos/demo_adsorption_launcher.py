@@ -306,7 +306,7 @@ def main():
     # get smaller dataset just for your calculated ground-state entries at each composition
     gs = get_gs(
         results=results,
-        calc_types_to_search=("static",),
+        calc_types_to_search=("static_ldipole",),
         data_dir=DATA_DIR,
         remake=remake_gs,
     )
