@@ -334,7 +334,8 @@ class VASPSetUp(object):
             "elf_kpar": ["ELF: KPAR>1 not implemented"],
             "elf_ncl": ["WARNING: ELF not implemented for non collinear case"],
             "rhosyg": ["RHOSYG internal error"],
-            "posmap": ["POSMAP internal error: symmetry equivalent atom not found"],
+            "posmap": ["POSMAP internal error: symmetry equivalent atom not found",
+                       "internal error in subroutine POSMAP"],
             "point_group": ["Error: point group operation missing"],
             "ibzkpt": ["internal error in subroutine IBZKPT"],
             "bad_sym": [

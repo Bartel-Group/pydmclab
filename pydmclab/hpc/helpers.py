@@ -126,7 +126,7 @@ def get_slurm_configs(
     cores_per_node=8,
     walltime_in_hours=95,
     mem_per_core="all",
-    partition="agsmall,msismall,msidmc",
+    partition="msismall,msidmc",
     error_file="log.e",
     output_file="log.o",
     account="cbartel",
@@ -186,9 +186,9 @@ def get_slurm_configs(
             mem_per_cpu = partitions[partition]["mem_per_core"]
             if isinstance(mem_per_cpu, str):
                 if "GB" in mem_per_cpu:
-                    mem_per_cpu = int(mem_per_cpu.replace("GB", "")) * 1000
-        elif partition == "agsmall,msidmc":
-            mem_per_cpu = 4000
+                    mem_per_cpu = float(mem_per_cpu.replace("GB", "")) * 1000
+        elif "msismall" in partition and "msidmc" in partition:
+            mem_per_cpu = 3900
         else:
             mem_per_cpu = 1900
     else:

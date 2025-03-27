@@ -374,14 +374,11 @@ class Passer(object):
             return [line.strip() for line in f]
 
     @property
-    def copy_wavecar(self) -> str | None:
+    def avoid_wavecar_passing(self) -> bool:
         """
-        Copies WAVECAR from parent to child
-
+        Returns:
+            True for errors that prevent copying of wavecar from parent to child
         """
-
-        if self.is_curr_calc_being_restarted:
-            return None
 
         errors_to_avoid_wavecar_passing = [
             "grad_not_orth",
@@ -392,9 +389,24 @@ class Passer(object):
         ]
 
         errors_in_curr_calc = self.errors_encountered_in_curr_calc
+
         if errors_in_curr_calc and set(errors_to_avoid_wavecar_passing).intersection(
             set(errors_in_curr_calc)
         ):
+            return True
+
+        return False
+
+    @property
+    def copy_wavecar(self) -> str | None:
+        """
+        Copies WAVECAR from parent to child
+        """
+
+        if self.is_curr_calc_being_restarted:
+            return None
+
+        if self.avoid_wavecar_passing:  # not sure if this is needed here
             return None
 
         prev_wavecar = os.path.join(self.prev_calc_dir, "WAVECAR")
@@ -403,6 +415,29 @@ class Passer(object):
         if os.path.exists(prev_wavecar):
             copyfile(prev_wavecar, curr_wavecar)
             return "copied wavecar"
+
+        return None
+
+    @property
+    def copy_chgcar(self) -> str | None:
+        """
+        If error prevents copying of WAVECAR, instead copies CHGCAR from parent to child
+        """
+
+        curr_wavecar = os.path.join(self.calc_dir, "WAVECAR")
+
+        if os.path.exists(curr_wavecar):
+            return None
+
+        if self.avoid_wavecar_passing:
+
+            prev_chgcar = os.path.join(self.prev_calc_dir, "CHGCAR")
+            curr_chgcar = os.path.join(self.calc_dir, "CHGCAR")
+
+            if os.path.exists(prev_chgcar):
+                copyfile(prev_chgcar, curr_chgcar)
+                return "copied chgcar"
+
         return None
 
     @property
@@ -717,6 +752,7 @@ class Passer(object):
         wavecar_out: str | None,
         prelobster_out: str | None,
         parchg_out: str | None,
+        chgcar_out: str | None,
     ) -> str:
         """
         Returns: Nothing
@@ -763,7 +799,7 @@ class Passer(object):
             incar_adjustments["ISMEAR"] = -5
             incar_adjustments["LWAVE"] = False
 
-        if parchg_out:
+        if parchg_out or chgcar_out:
             incar_adjustments["ICHARG"] = 1
 
         # make sure we don't override user-defined INCAR modifications
@@ -839,11 +875,13 @@ class Passer(object):
         prelobster_out = self.setup_prelobster
         parchg_out = self.setup_parchg
         wavecar_out = self.copy_wavecar
+        chgcar_out = self.copy_chgcar
         lobster_kpts_out = self.pass_kpoints_for_lobster
         incar_out = self.update_incar(
             wavecar_out=wavecar_out,
             prelobster_out=prelobster_out,
             parchg_out=parchg_out,
+            chgcar_out=chgcar_out,
         )
 
         return "completed pass"

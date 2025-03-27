@@ -614,7 +614,7 @@ class SiteTools(object):
         ions = []
         for entry in species:
             el = entry["element"]
-            if "oxidation_state" in entry:
+            if "oxidation_state" in entry and entry["oxidation_state"] is not None:
                 ox = float(entry["oxidation_state"])
             else:
                 ox = None
