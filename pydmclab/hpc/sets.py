@@ -238,7 +238,7 @@ class GetSet(object):
         # for energy dipole correction
         if calc == 'static_dipole':
             new_settings['IDIPOL'] = 3 
-            new_settings['LDIPOL'] = False  
+            # new_settings['LDIPOL'] = False  
             new_settings['NSW'] = 0
             new_settings['IBRION'] = -1
             new_settings['LCHARG'] = True

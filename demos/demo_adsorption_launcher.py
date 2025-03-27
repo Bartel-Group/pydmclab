@@ -155,7 +155,7 @@ VASP_CONFIGS = get_vasp_configs(
 #  see pydmclab.hpc.analyze.AnalyzeVASP
 #  see pydmclab.hpc.analyze.AnalyzeBatch
 ANALYSIS_CONFIGS = get_analysis_configs(
-    only_calc="static",
+    only_calc="static_ldipole",
     only_xc=None,
     analyze_structure=True,
     analyze_trajectory=False,
@@ -317,13 +317,6 @@ def main():
     # get thermo results for all entries (smaller than results, bigger than gs)
     thermo = get_thermo_results(
         results=results, gs=gs, data_dir=DATA_DIR, remake=remake_thermo_results
-    )
-
-    slab_result = get_results_with_slabs(
-        data_dir = DATA_DIR, 
-        remake = False, 
-        ref_dir = None,
-        savename = 'results_with_slabs.json'
     )
 
     ads_res = get_adsorption_energy_results(

@@ -728,7 +728,7 @@ class Passer(object):
         Returns:
             the center of charge density of the current calculation
         """
-        return AnalyzeVASP(self.calc_dir).center_of_charge_density
+        return AnalyzeVASP(self.prev_calc_dir).center_of_charge_density
 
     def update_incar(
         self,
@@ -761,10 +761,9 @@ class Passer(object):
         if curr_calc == 'static_dipole':
             # For energy-only dipole correction
             incar_adjustments['IDIPOL'] = 3  
-            incar_adjustments['LDIPOL'] = False
+            # incar_adjustments['LDIPOL'] = False
         elif curr_calc == 'static_ldipole':
             # For forces and energy dipole correction
-            incar_adjustments['IDIPOL'] = 3  
             incar_adjustments['LDIPOL'] = True
             incar_adjustments['DIPOL'] = self.get_center_of_charge_density
 
