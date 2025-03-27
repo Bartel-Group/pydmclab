@@ -250,7 +250,6 @@ class GetSet(object):
 
         # for force dipole correction 
         if calc == 'static_ldipole':
-            new_settings['IDIPOL'] = 3
             new_settings['LDIPOL'] = True
             new_settings['NSW'] = 0
             new_settings['IBRION'] = -1
