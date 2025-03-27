@@ -1443,6 +1443,11 @@ def get_thermo_results(
             calc: {xc: {formula: {} for formula in gs[calc][xc]} for xc in gs[calc]}
             for calc in gs
         }
+    elif "static_ldipole" in gs:
+        thermo_results = {
+            calc: {xc: {formula: {} for formula in gs[calc][xc]} for xc in gs[calc]}
+            for calc in gs
+        }
     elif "static" in gs:
         thermo_results = {xc: {formula: {} for formula in gs[xc]} for xc in gs}
     else:
@@ -2315,6 +2320,7 @@ def get_adsorbed_slabs(adsorbate_type,
                        slab_dir = None,
                        selective_dynamics = True,
                        height = 0.9,
+
                        super_cell = None,
                        savename = 'ads_slabs.json',
                        remake = False
@@ -2334,7 +2340,6 @@ def get_adsorbed_slabs(adsorbate_type,
     
     key_splitting = re.split(r'--|_', list(slab_results.keys())[0])
     chemID = key_splitting[0]
-
     for key in slab_results.keys():
         slab_dict = slab_results[key]['slab']
         slab = Slab.from_dict(slab_dict)
@@ -2363,9 +2368,12 @@ def get_adsorbed_slabs(adsorbate_type,
                     adsorbed_slab = ads.add_adsorbate(adsorbate,ads_sites[j],super_cell)
 
                     slab_results[key]['adsorbed_slabs'][adsorbate_type[k]][str(j)] = adsorbed_slab.as_dict()
+                    ads_formula = adsorbed_slab.formula
+
     
     ads_slabs = {}
-    ads_slabs[chemID] = {}
+    ads_formula = slab_results[key]['results']['formula']
+    ads_slabs[ads_formula] = {}
 
     for key in slab_results.keys():
         key_split = re.split(r'--|_', key)
