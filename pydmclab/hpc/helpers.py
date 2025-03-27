@@ -2397,8 +2397,7 @@ def get_adsorbed_slabs(adsorbate_type,
 
     
     ads_slabs = {}
-    ads_formula = slab_results[key]['results']['formula']
-    ads_slabs[ads_formula] = {}
+    ads_slabs[chemID] = {}
 
     for key in slab_results.keys():
         key_split = re.split(r'--|_', key)
