@@ -1508,6 +1508,8 @@ def get_thermo_results(
 
         if "lobster" in thermo_results:
             thermo_results[calc][xc][formula][ID] = tmp_thermo
+        elif "static_ldipole" in thermo_results:
+            thermo_results[calc][xc][formula][ID] = tmp_thermo
         else:
             thermo_results[xc][formula][ID] = tmp_thermo
 
