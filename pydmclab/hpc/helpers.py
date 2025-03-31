@@ -1,6 +1,7 @@
 import multiprocessing as multip
 import os
 import warnings
+import subprocess
 
 from pydmclab.hpc.launch import LaunchTools
 from pydmclab.hpc.submit import SubmitTools
@@ -1963,6 +1964,48 @@ def crawl_and_purge(
     if safety == "on":
         print(
             "You had the safety on\n If it were off, you would have purged %i files, freeing up %.2f GB of memory"
+            % (len(purged_files), mem_created / 1e9)
+        )
+
+
+def purge_bad_vasp_o_files(head_dir, safety="on", verbose=False):
+    """
+    Args:
+        head_dir (str)
+            directory to start crawling beneath
+        safety (str)
+            'on' or 'off' to turn on/off safety
+                - if safety is on, won't actually delete files
+    """
+    purged_files = []
+    mem_created = 0
+    for subdir, dirs, files in os.walk(head_dir):
+        if "vasp.o" in files:
+            path_to_f = os.path.join(subdir, "vasp.o")
+
+            tail = subprocess.run(
+                ["tail", "-n", "10", path_to_f],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+
+            if "BAD TERMINATION" in tail.stdout:
+                if verbose:
+                    print("\nBad termination found at %s" % path_to_f)
+                mem_created += os.stat(path_to_f).st_size
+                purged_files.append(path_to_f)
+                if safety == "off":
+                    os.remove(path_to_f)
+
+    if safety == "off":
+        print(
+            "\nYou purged %i files, freeing up %.2f GB of memory"
+            % (len(purged_files), mem_created / 1e9)
+        )
+    if safety == "on":
+        print(
+            "\nYou had the safety on\n If it were off, you would have purged %i files, freeing up %.2f GB of memory"
             % (len(purged_files), mem_created / 1e9)
         )
 
