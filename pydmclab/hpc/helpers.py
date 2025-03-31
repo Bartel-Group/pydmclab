@@ -1981,6 +1981,7 @@ def purge_bad_vasp_o_files(head_dir, safety="on", verbose=False):
     mem_created = 0
     for subdir, dirs, files in os.walk(head_dir):
         if "vasp.o" in files:
+            print("Found vasp.o")
             path_to_f = os.path.join(subdir, "vasp.o")
 
             tail = subprocess.run(
@@ -1990,7 +1991,7 @@ def purge_bad_vasp_o_files(head_dir, safety="on", verbose=False):
                 check=True,
             )
 
-            if "Bad Terminaiton" in tail.stdout:
+            if "BAD TERMINATION" in tail.stdout:
                 if verbose:
                     print("Bad termination found at %s" % path_to_f)
                 mem_created += os.stat(path_to_f).st_size
