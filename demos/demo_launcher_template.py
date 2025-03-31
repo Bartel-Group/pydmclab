@@ -24,6 +24,7 @@ from pydmclab.hpc.helpers import (
     get_vasp_configs,
     get_analysis_configs,
     make_sub_for_launcher,
+    purge_bad_vasp_o_files,
 )
 
 from pydmclab.utils.handy import read_json, write_json
@@ -35,11 +36,21 @@ from pydmclab.core.comp import CompTools
 from pydmclab.core.struc import StrucTools
 from pydmclab.hpc.analyze import AnalyzeVASP
 
+# set up some paths that will point to where your data/calculations will live
+#  these are just defaults, you can change the `_DIR` variables to point to wherever you want
+#
+# The home directory path is used to point to your local copy of the pydmclab repo
+#   pydmclab is assumed to be in /users/{number}/{username}/bin/pydmclab
+#   and $HOME points to /users/{number}/{username}
+HOME_PATH = os.environ["HOME"]
+_, _, _, USER_NAME = HOME_PATH.split("/")
+SCRATCH_PATH = os.path.join(os.environ["SCRATCH_GLOBAL"], USER_NAME)
+
 # where is this file
 SCRIPTS_DIR = os.getcwd()
 
-# where are my calculations going to live (maybe on scratch)
-CALCS_DIR = SCRIPTS_DIR.replace("scripts", "calcs")
+# where are my calculations going to live (defaults to scratch)
+CALCS_DIR = SCRIPTS_DIR.replace("scripts", "calcs").replace(HOME_PATH, SCRATCH_PATH)
 
 # where is my data going to live
 DATA_DIR = SCRIPTS_DIR.replace("scripts", "data")
@@ -48,12 +59,6 @@ DATA_DIR = SCRIPTS_DIR.replace("scripts", "data")
 for d in [CALCS_DIR, DATA_DIR]:
     if not os.path.exists(d):
         os.makedirs(d)
-
-# set your home directory path -- this will just be used to point to your local copies of the pydmclab repo
-#   assumed to be in /users/{number}/{username}/bin/pydmclab
-#   $HOME points to /users/{number}/{username}
-HOME_PATH = os.environ["HOME"]
-
 
 # copy our passer.py file to your scripts_dir
 #  if you want to use a custom passer, just set CUSTOM_PASSER = True and put your passer.py in the scripts dir
@@ -122,7 +127,7 @@ SLURM_CONFIGS = get_slurm_configs(
     cores_per_node=8,
     walltime_in_hours=95,
     mem_per_core="all",
-    partition="agsmall,msismall,msidmc",
+    partition="msismall,msidmc",
     error_file="log.e",
     output_file="log.o",
     account="cbartel",
@@ -180,7 +185,12 @@ CONFIGS.update(ANALYSIS_CONFIGS)
 CONFIGS = write_json(CONFIGS, os.path.join(SCRIPTS_DIR, "configs.json"))
 
 # whether or not you want to generate MAGMOMs (only if you're running AFM)
-GEN_MAGMOMS = True if LAUNCH_CONFIGS["n_afm_configs"] else False
+# if the template structure is magnetic, `override_mag` should be set
+GEN_MAGMOMS = (
+    True
+    if (LAUNCH_CONFIGS["n_afm_configs"] or LAUNCH_CONFIGS["override_mag"])
+    else False
+)
 
 # NOTE: the default is to use the imported functions from pydmclab.hpc.helpers
 # You will often want to write your own "get_query", "get_strucs", "get_modified_results" functions instead
@@ -221,6 +231,10 @@ def main():
     # remake launch directories? print launch_dirs summary?
     remake_launch_dirs = False
     print_launch_dirs_check = True
+
+    # turn purge safety on or off? print file locations?
+    purge_safety = "on"
+    purge_verbose = True
 
     # remake submission scripts? ready to launch them?
     remake_subs = True
@@ -308,6 +322,11 @@ def main():
     )
     if print_launch_dirs_check:
         check_launch_dirs(launch_dirs)
+
+    # purge any bad vasp.o files so they get resubmitted in the next step
+    purge_bad_vasp_o_files(
+        head_dir=CALCS_DIR, purge_safety=purge_safety, verbose=purge_verbose
+    )
 
     # write/update submission scripts in each launch directory
     #  submit them if you're ready
