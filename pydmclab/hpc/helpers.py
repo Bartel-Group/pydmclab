@@ -1992,7 +1992,7 @@ def purge_bad_vasp_o_files(head_dir, safety="on", verbose=False):
 
             if "BAD TERMINATION" in tail.stdout:
                 if verbose:
-                    print("Bad termination found at %s" % path_to_f)
+                    print("\nBad termination found at %s" % path_to_f)
                 mem_created += os.stat(path_to_f).st_size
                 purged_files.append(path_to_f)
                 if safety == "off":
@@ -2000,12 +2000,12 @@ def purge_bad_vasp_o_files(head_dir, safety="on", verbose=False):
 
     if safety == "off":
         print(
-            "You purged %i files, freeing up %.2f GB of memory"
+            "\nYou purged %i files, freeing up %.2f GB of memory"
             % (len(purged_files), mem_created / 1e9)
         )
     if safety == "on":
         print(
-            "You had the safety on\n If it were off, you would have purged %i files, freeing up %.2f GB of memory"
+            "\nYou had the safety on\n If it were off, you would have purged %i files, freeing up %.2f GB of memory"
             % (len(purged_files), mem_created / 1e9)
         )
 
