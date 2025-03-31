@@ -325,7 +325,7 @@ def main():
 
     # purge any bad vasp.o files so they get resubmitted in the next step
     purge_bad_vasp_o_files(
-        head_dir=CALCS_DIR, purge_safety=purge_safety, verbose=purge_verbose
+        head_dir=CALCS_DIR, safety=purge_safety, verbose=purge_verbose
     )
 
     # write/update submission scripts in each launch directory
