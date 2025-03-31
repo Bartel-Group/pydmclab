@@ -21,6 +21,7 @@ from pydmclab.hpc.helpers import (
     get_vasp_configs,
     get_analysis_configs,
     make_sub_for_launcher,
+    purge_bad_vasp_o_files,
 )
 
 from pydmclab.utils.handy import read_json, write_json
@@ -111,7 +112,7 @@ SLURM_CONFIGS = get_slurm_configs(
     cores_per_node=32,
     walltime_in_hours=95,
     mem_per_core="all",
-    partition="agsmall,msismall,msidmc",
+    partition="msismall,msidmc",
     error_file="log.e",
     output_file="log.o",
     account="cbartel",
@@ -271,7 +272,7 @@ def main():
 
     # purge any bad vasp.o files so they get resubmitted in the next step
     purge_bad_vasp_o_files(
-        head_dir=CALCS_DIR, purge_safety=purge_safety, verbose=purge_verbose
+        head_dir=CALCS_DIR, safety=purge_safety, verbose=purge_verbose
     )
 
     # write/update submission scripts in each launch directory
