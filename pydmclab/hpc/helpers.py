@@ -1,6 +1,7 @@
 import multiprocessing as multip
 import os
 import warnings
+import subprocess
 
 from pydmclab.hpc.launch import LaunchTools
 from pydmclab.hpc.submit import SubmitTools
@@ -126,7 +127,7 @@ def get_slurm_configs(
     cores_per_node=8,
     walltime_in_hours=95,
     mem_per_core="all",
-    partition="agsmall,msismall,msidmc",
+    partition="msismall,msidmc",
     error_file="log.e",
     output_file="log.o",
     account="cbartel",
@@ -186,9 +187,9 @@ def get_slurm_configs(
             mem_per_cpu = partitions[partition]["mem_per_core"]
             if isinstance(mem_per_cpu, str):
                 if "GB" in mem_per_cpu:
-                    mem_per_cpu = int(mem_per_cpu.replace("GB", "")) * 1000
-        elif partition == "agsmall,msidmc":
-            mem_per_cpu = 4000
+                    mem_per_cpu = float(mem_per_cpu.replace("GB", "")) * 1000
+        elif "msismall" in partition and "msidmc" in partition:
+            mem_per_cpu = 3900
         else:
             mem_per_cpu = 1900
     else:
@@ -1953,6 +1954,48 @@ def crawl_and_purge(
                     purged_files.append(path_to_f)
                     if safety == "off":
                         os.remove(path_to_f)
+    if safety == "off":
+        print(
+            "You purged %i files, freeing up %.2f GB of memory"
+            % (len(purged_files), mem_created / 1e9)
+        )
+    if safety == "on":
+        print(
+            "You had the safety on\n If it were off, you would have purged %i files, freeing up %.2f GB of memory"
+            % (len(purged_files), mem_created / 1e9)
+        )
+
+
+def purge_bad_vasp_o_files(head_dir, safety="on", verbose=False):
+    """
+    Args:
+        head_dir (str)
+            directory to start crawling beneath
+        safety (str)
+            'on' or 'off' to turn on/off safety
+                - if safety is on, won't actually delete files
+    """
+    purged_files = []
+    mem_created = 0
+    for subdir, dirs, files in os.walk(head_dir):
+        if "vasp.o" in files:
+            path_to_f = os.path.join(subdir, "vasp.o")
+
+            tail = subprocess.run(
+                ["tail", "-n", "10", path_to_f],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+
+            if "Bad Terminaiton" in tail.stdout:
+                if verbose:
+                    print("Bad termination found at %s" % path_to_f)
+                mem_created += os.stat(path_to_f).st_size
+                purged_files.append(path_to_f)
+                if safety == "off":
+                    os.remove(path_to_f)
+
     if safety == "off":
         print(
             "You purged %i files, freeing up %.2f GB of memory"
