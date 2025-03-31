@@ -21,7 +21,8 @@ from pydmclab.hpc.helpers import (
     get_analysis_configs,
     make_sub_for_launcher,
     get_adsorbed_slabs,
-    get_adsorption_energy_results
+    get_adsorption_energy_results,
+    purge_bad_vasp_o_files
 )
 
 from pydmclab.utils.handy import read_json, write_json
@@ -208,6 +209,10 @@ def main():
     remake_launch_dirs = False
     print_launch_dirs_check = True
 
+    # turn purge safety on or off? print file locations?
+    purge_safety = "on"
+    purge_verbose = True
+
     # remake submission scripts? ready to launch them?
     remake_subs = True
     ready_to_launch = True
@@ -279,6 +284,11 @@ def main():
     )
     if print_launch_dirs_check:
         check_launch_dirs(launch_dirs)
+
+        # purge any bad vasp.o files so they get resubmitted in the next step
+    purge_bad_vasp_o_files(
+        head_dir=CALCS_DIR, safety=purge_safety, verbose=purge_verbose
+    )
 
     # write/update submission scripts in each launch directory
     #  submit them if you're ready
