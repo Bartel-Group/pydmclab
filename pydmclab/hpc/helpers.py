@@ -1979,7 +1979,6 @@ def purge_bad_vasp_o_files(head_dir, safety="on", verbose=False):
     mem_created = 0
     for subdir, dirs, files in os.walk(head_dir):
         if "vasp.o" in files:
-            print("Found vasp.o")
             path_to_f = os.path.join(subdir, "vasp.o")
 
             tail = subprocess.run(
