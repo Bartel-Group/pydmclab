@@ -29,7 +29,7 @@ COLORS = get_colors(palette="tab10")
 class AnalyzePhonons(object):
     def __init__(self, calc_dir: str, 
                  supercell_matrix: list = None, 
-                 mesh: int|list|float=100):
+                 mesh: int|list|float=[30, 30, 30]):
         """
         Class to analyze phonon data from a VASP calculation using Phonopy, Can return force constants, dynamical matrix, mesh data, thermal properties, band structure, and total density of states.
         Args:
