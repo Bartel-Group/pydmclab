@@ -11,6 +11,7 @@ from pymatgen.io.vasp.inputs import Kpoints, Incar
 from pymatgen.io.lobster.outputs import Doscar, Cohpcar, Charge, MadelungEnergies
 from pymatgen.core.surface import Slab
 from pymatgen.io.vasp.outputs import Vasprun
+from pymatgen.io.vasp.inputs import Poscar
 
 from pydmclab.core.struc import StrucTools, SiteTools
 from pydmclab.core.comp import CompTools
@@ -51,11 +52,20 @@ class VASPOutputs(object):
         fposcar = os.path.join(self.calc_dir, "POSCAR")
         if not os.path.exists(fposcar):
             return None
-
         try:
-            return Structure.from_file(os.path.join(self.calc_dir, "POSCAR"))
+            poscar_obj = Poscar.from_file(fposcar)
+            structure = poscar_obj.structure
+
+            if poscar_obj.selective_dynamics:
+                selective_dynamics = [tuple(sd) for sd in poscar_obj.selective_dynamics]
+                structure.add_site_property("selective_dynamics", selective_dynamics)
+            return structure
         except:
             return None
+        # try:
+        #     return Structure.from_file(os.path.join(self.calc_dir, "POSCAR"))
+        # except:
+        #     return None
 
     @property
     def incar(self):
@@ -139,7 +149,13 @@ class VASPOutputs(object):
         if not os.path.exists(fcontcar):
             return None
         try:
-            return Structure.from_file(os.path.join(self.calc_dir, "CONTCAR"))
+            poscar_obj = Poscar.from_file(fcontcar)
+            structure = poscar_obj.structure
+
+            if poscar_obj.selective_dynamics:
+                selective_dynamics = [tuple(sd) for sd in poscar_obj.selective_dynamics]
+                structure.add_site_property("selective_dynamics", selective_dynamics)
+            return structure
         except:
             return None
 

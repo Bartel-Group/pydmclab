@@ -2240,14 +2240,23 @@ def get_slabs(
 def check_slabs(slabs: dict[str, dict[str, dict]]):
     for cmpd in slabs.keys():
         for slab_id in slabs[cmpd].keys():
-            struc_id, miller_str, s, v, termination_idx,adsorbate,adsorption_site = slab_id.split("_")
-            print(f"\nFormula: {cmpd}")
-            print(f"\tMiller index: {miller_str}")
-            print(
-                f"\tSlab size: {s.replace('s', '')}, Vacuum size: {v.replace('v', '')}"
-            )
-            print(f"\nAdsorbate: {adsorbate}")
-            print(f"\tStructure formula: {StrucTools(slabs[cmpd][slab_id]).formula}")
+            try:
+                struc_id, miller_str, s, v, termination_idx,adsorbate,adsorption_site = slab_id.split("_")
+                print(f"\nFormula: {cmpd}")
+                print(f"\tMiller index: {miller_str}")
+                print(
+                    f"\tSlab size: {s.replace('s', '')}, Vacuum size: {v.replace('v', '')}"
+                )
+                print(f"\nAdsorbate: {adsorbate}")
+                print(f"\tStructure formula: {StrucTools(slabs[cmpd][slab_id]).formula}")
+            except:
+                struc_id, miller_str, s, v, termination_idx = slab_id.split("_")
+                print(f"\nFormula: {cmpd}")
+                print(f"\tMiller index: {miller_str}")
+                print(
+                    f"\tSlab size: {s.replace('s', '')}, Vacuum size: {v.replace('v', '')}"
+                )
+                print(f"\tStructure formula: {StrucTools(slabs[cmpd][slab_id]).formula}")
 
 def set_magmoms_from_template(
     strucs: dict[str, dict[str, dict]],
