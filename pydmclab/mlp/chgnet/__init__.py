@@ -51,8 +51,8 @@ def clean_md_log_and_traj_files(logfile: str, trajfile: str) -> None:
                     logf.write(line)
 
     if atoms_to_remove:
-        traj = ase.io.Trajectory(trajfile, "r")
-        all_atoms = list(traj)
+        with ase.io.Trajectory(trajfile, "r") as traj:
+            all_atoms = list(traj)
         cleaned_atoms = [
             atoms for i, atoms in enumerate(all_atoms) if i not in atoms_to_remove
         ]

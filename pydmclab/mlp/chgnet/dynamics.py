@@ -517,8 +517,8 @@ class CHGNetMD:
         """Continue an MD simulation from a trajectory file."""
         if not os.path.exists(trajfile):
             raise FileNotFoundError(f"{trajfile} not found")
-        traj = Trajectory(trajfile)
-        starting_structure = traj[-1]
+        with Trajectory(trajfile, "r") as traj:
+            starting_structure = traj[-1]
         return cls(
             structure=starting_structure,
             model=model,
@@ -638,8 +638,8 @@ class AnalyzeMD:
         if self._full_summary is not None:
             return [d["structure"] for d in self._full_summary]
 
-        traj = Trajectory(self.trajfile)
-        return [AseAtomsAdaptor.get_structure(atoms).as_dict() for atoms in traj]
+        with Trajectory(self.trajfile, "r") as traj:
+            return [AseAtomsAdaptor.get_structure(atoms).as_dict() for atoms in traj]
 
     @property
     def full_summary(self) -> list[dict]:
