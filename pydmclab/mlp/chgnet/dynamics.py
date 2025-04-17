@@ -664,6 +664,20 @@ class AnalyzeMD:
 
         return log_summary
 
+    @property
+    def get_E_T_t_data(self) -> tuple[list[float], list[float], list[float]]:
+        """
+        Returns:
+            tuple[list[float], list[float], list[float]]: The time, potential energy, and temperature data.
+        """
+        data = self.log_summary
+
+        times = [d["t"] for d in data]
+        temps = [d["T"] for d in data]
+        Epots = [d["Epot"] for d in data]
+
+        return times, Epots, temps
+
     def plot_E_T_t(
         self,
         T_setpoint: float | None = None,
