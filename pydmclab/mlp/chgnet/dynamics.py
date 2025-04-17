@@ -26,6 +26,7 @@ from ase.io import write
 
 from pymatgen.core.structure import Structure
 from pymatgen.io.ase import AseAtomsAdaptor
+from pymatgen.analysis.diffusion.aimd.pathway import ProbabilityDensityAnalysis
 
 from torch import Tensor
 
@@ -941,3 +942,56 @@ class AnalyzeMD:
             for struc in self.traj_summary
         ]
         write(savename, ase_atoms)
+
+    def make_probability_density_analysis_chgcar(
+        self,
+        species: str | tuple[str],
+        ref_idx: int = 0,
+        interval: float = 0.5,
+        savename: str = "chgnet_md_pda.vasp",
+        remake: bool = False,
+    ) -> None:
+        """
+        sends probability density to chgcar format for visualization (e.g., in VESTA)
+
+        Args:
+            species (str | tuple[str]): The species to analyze.
+            ref_idx (int): The index of the reference structure to use (most likely 0 or -1).
+            interval (float): Interval between nearest grid points (Å).
+            savename (str): The file path to save the chgcar file.
+            remake (bool): Whether to remake the chgcar file.
+        """
+        if os.path.exists(savename) and not remake:
+            print(f"{savename} already exists. Skipping.")
+            return
+
+        # load in trajectories as list of Structure.as_dict()
+        trajs = self.traj_summary
+
+        # check ref_idx is within bounds
+        if not (-len(trajs) <= ref_idx < len(trajs)):
+            raise IndexError(
+                f"ref_idx {ref_idx} is out of bounds for number of trajectories ({len(trajs)})"
+            )
+
+        # grab structure to serve as reference
+        ini_struc = StrucTools(trajs[ref_idx]).structure
+
+        # make array of fractional coordinates
+        num_timesteps = len(trajs)
+        num_ions = len(trajs[0]["sites"])
+        traj_array = np.zeros((num_timesteps, num_ions, 3))
+        for i, traj in enumerate(trajs):
+            for j in range(num_ions):
+                traj_array[i, j] = traj["sites"][j]["abc"]
+
+        # initialize pda
+        pda = ProbabilityDensityAnalysis(
+            structure=ini_struc,
+            trajectories=traj_array,
+            interval=interval,
+            species=species,
+        )
+
+        # make chgcar for pda visualization
+        pda.to_chgcar(filename=savename)
