@@ -147,7 +147,7 @@ def convert_numpy_to_native(obj):
         return float(obj)
     elif isinstance(obj, np.integer):
         return int(obj)
-    elif isinstance(obj, np.bool):
+    elif isinstance(obj, np.bool_):
         return bool(obj)
     elif isinstance(obj, np.ndarray):
         return obj.tolist()
