@@ -29,6 +29,7 @@ from pymatgen.io.ase import AseAtomsAdaptor
 from torch import Tensor
 
 import matplotlib.pyplot as plt
+from pydmclab.plotting.xrd import PlotXRD
 from pydmclab.plotting.utils import set_rc_params, get_colors
 from pydmclab.mlp.chgnet import clean_md_log_and_traj_files
 
@@ -841,3 +842,82 @@ class AnalyzeMD:
 
         if return_fig:
             return fig, ax
+
+    def get_xrd_data(
+        self,
+        time_range: tuple[float, float] | float | None = None,
+        data_density: float = 0.2,
+    ) -> tuple[Structure]:
+        """
+
+        Args:
+            time_range (tuple[float, float] | float | None): The time range to examine the XRD evolution.
+                - If None, the entire simulation is used.
+                - If float, the percentage of the simulation to use (starting from the end); i.e. 0.1 is the last 10% of the simulation.
+                - If tuple, the start and end times of the simulation to use.
+            data_density (float): The percentage of data points to generate the XRD pattern for and include in the movie.
+
+        Returns:
+            tuple[Structure]: The structures to use for the XRD analysis
+        """
+        data = self.full_summary
+
+        if time_range is None:
+            strucs = [d["structure"] for d in data]
+        elif isinstance(time_range, float):
+            if time_range < 0 or time_range > 1:
+                raise ValueError(
+                    "if setting time_range as a float, it is a percentage, so it should be between 0 and 1"
+                )
+            strucs = [d["structure"] for d in data[-int(time_range * len(data)) :]]
+        elif isinstance(time_range, tuple):
+            if time_range[0] < data[0]["t"] or time_range[1] > data[-1]["t"]:
+                raise ValueError("time_range is outside the simulation time range")
+            strucs = [
+                d["structure"] for d in data if time_range[0] <= d["t"] <= time_range[1]
+            ]
+        else:
+            raise ValueError("time_range should be None, float, or tuple[float, float]")
+
+        reduced_strucs = tuple(strucs[:: int(1 / data_density)])
+
+        return reduced_strucs
+
+    def xrd_movie(
+        self,
+        time_range: tuple[float, float] | float | None = None,
+        data_density: float = 0.2,
+        reference_pattern: int | tuple[np.ndarray, np.ndarray] | None = 0,
+        broadened: bool = True,
+        savename: str = "md_xrd_evolution.mp4",
+    ) -> None:
+        """
+        makes a movie of the XRD evolution
+
+        note: this method requires 'ffmpeg' to be installed on your system
+
+        Args:
+            time_range (tuple[float, float] | float | None): The time range to examine the XRD evolution.
+                - If None, the entire simulation is used.
+                - If float, the percentage of the simulation to use (starting from the end); i.e. 0.1 is the last 10% of the simulation.
+                - If tuple, the start and end times of the simulation to use.
+            data_density (float): The percentage of data points to generate the XRD pattern for and include in the movie.
+            reference_pattern (int | tuple[np.ndarray, np.ndarray] | None): The reference XRD pattern to include in the movie.
+                - If int, the indice of xrd pattern to use (most likely 0 or -1).
+                - If tuple, input should be tuple of (2-theta, intensity) to use as the reference pattern.
+                - If None, no reference pattern is included.
+            broadened (bool): Whether to include broadening in the XRD pattern.
+            savename (str): The filename to save the movie.
+        """
+        reduced_strucs = self.get_xrd_data(
+            time_range=time_range, data_density=data_density
+        )
+
+        plotXRD = PlotXRD(xrd_data=reduced_strucs)
+
+        plotXRD.animated_plot(
+            savename=savename,
+            time_interval=100,
+            reference_pattern=reference_pattern,
+            broadened=broadened,
+        )
