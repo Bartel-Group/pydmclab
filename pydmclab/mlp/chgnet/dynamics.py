@@ -34,7 +34,7 @@ import matplotlib.pyplot as plt
 from pydmclab.core.struc import StrucTools
 from pydmclab.plotting.xrd import PlotXRD
 from pydmclab.plotting.utils import set_rc_params, get_colors
-from pydmclab.mlp.chgnet import clean_md_log_and_traj_files
+from pydmclab.mlp.utils import clean_md_log_and_traj_files
 
 from pydmclab.utils.handy import convert_numpy_to_native
 
