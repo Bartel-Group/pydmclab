@@ -22,6 +22,7 @@ from ase.filters import Filter
 from ase.calculators.calculator import Calculator, all_changes, all_properties
 from ase.io.trajectory import Trajectory
 from ase.io.jsonio import encode, decode
+from ase.io import write
 
 from pymatgen.core.structure import Structure
 from pymatgen.io.ase import AseAtomsAdaptor
@@ -29,6 +30,7 @@ from pymatgen.io.ase import AseAtomsAdaptor
 from torch import Tensor
 
 import matplotlib.pyplot as plt
+from pydmclab.core.struc import StrucTools
 from pydmclab.plotting.xrd import PlotXRD
 from pydmclab.plotting.utils import set_rc_params, get_colors
 from pydmclab.mlp.chgnet import clean_md_log_and_traj_files
@@ -921,3 +923,21 @@ class AnalyzeMD:
             reference_pattern=reference_pattern,
             broadened=broadened,
         )
+
+    def write_pdb(self, savename: str = "chgnet_md.pdb", remake: bool = False) -> None:
+        """
+        writes the trajectory to a pdb file
+
+        Args:
+            savename (str): The file path to save the pdb file.
+            remake (bool): Whether to remake the pdb file.
+        """
+        if os.path.exists(savename) and not remake:
+            print(f"{savename} already exists. Skipping.")
+            return
+
+        ase_atoms = [
+            AseAtomsAdaptor.get_atoms(StrucTools(struc).structure)
+            for struc in self.traj_summary
+        ]
+        write(savename, ase_atoms)
