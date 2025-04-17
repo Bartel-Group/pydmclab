@@ -29,7 +29,7 @@ from pymatgen.io.ase import AseAtomsAdaptor
 from torch import Tensor
 
 import matplotlib.pyplot as plt
-from pydmclab.plotting.utils import set_rc_params
+from pydmclab.plotting.utils import set_rc_params, get_colors
 from pydmclab.mlp.chgnet import clean_md_log_and_traj_files
 
 from pydmclab.utils.handy import convert_numpy_to_native
@@ -660,26 +660,184 @@ class AnalyzeMD:
 
         return log_summary
 
-    @property
-    def plot_E_T_t(self):
+    def plot_E_T_t(
+        self,
+        T_setpoint: float | None = None,
+        xlim: tuple[float, float] | None = None,
+        ylim_T: tuple[float, float] | None = None,
+        savename: str | None = None,
+        show: bool = False,
+        return_fig: bool = False,
+    ) -> tuple[plt.Figure, tuple[plt.Axes, plt.Axes]] | None:
         """
+        plots E vs t and T vs t
+
+        Args:
+            T_setpoint (float | None): The temperature setpoint to include in the plot.
+            xlim (tuple[float, float] | None): The x-axis limits of the subplots.
+            ylim_T (tuple[float, float] | None): The y-axis limits of the temperature subplot.
+            save_name (str): The file path to save the plot.
+            show (bool): Whether to show the plot.
+            return_fig (bool): Whether to return the figure and axes objects.
+
         Returns:
-            plots E vs t and T vs t
+            if return_fig is True, returns the figure and axes objects
+        """
+        times, Epots, temps = self.get_E_T_t_data
+
+        colors = get_colors("tab10")
+
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 6), sharex=True)
+        ax1.plot(times, Epots, label="E", color=colors["blue"])
+        ax1.set_ylabel("E (eV)")
+        ax2.plot(times, temps, label="T", color=colors["orange"])
+        ax2.set_ylabel("T (K)")
+        ax2.set_xlabel("time (ps)")
+
+        if T_setpoint is not None:
+            ax2.axhline(y=T_setpoint, color=colors["red"], linestyle="--", linewidth=2)
+
+        if xlim is not None:
+            ax1.set_xlim(xlim)
+            ax2.set_xlim(xlim)
+
+        if ylim_T is not None:
+            ax2.set_ylim(ylim_T)
+
+        fig.tight_layout()
+
+        if savename is not None:
+            fig.savefig(savename)
+
+        if show:
+            fig.show()
+
+        if return_fig:
+            return fig, (ax1, ax2)
+
+    def get_T_distribution_data(
+        self,
+        time_range: tuple[float, float] | None = None,
+        remove_outliers: float | None = None,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """
+        gets data for plotting the temperature distribution
+
+        Args:
+            time_range (tuple[float, float] | float | None): The time range to plot the temperature distribution.
+                - If None, the entire simulation is used.
+                - If float, the percentage of the simulation to use (starting from the end); i.e. 0.1 is the last 10% of the simulation.
+                - If tuple, the start and end times of the simulation to use.
+            remove_outliers (float | None): Don't plot data points with z-scores greater than this value. Does not affect mean and std calculations.
+
+        Returns:
+            tuple[np.ndarray, np.ndarray]: The full temperature data and the inlier temperature data (remaining temperatures after removing outliers).
         """
         data = self.log_summary
 
-        times = [d["t"] for d in data]
-        temps = [d["T"] for d in data]
-        Epots = [d["Epot"] for d in data]
+        if time_range is None:
+            temps = np.array([d["T"] for d in data])
+        elif isinstance(time_range, float):
+            if time_range < 0 or time_range > 1:
+                raise ValueError(
+                    "if setting time_range as a float, it is a percentage, so it should be between 0 and 1"
+                )
+            temps = np.array([d["T"] for d in data[-int(time_range * len(data)) :]])
+        elif isinstance(time_range, tuple):
+            if time_range[0] < data[0]["t"] or time_range[1] > data[-1]["t"]:
+                raise ValueError("time_range is outside the simulation time range")
+            temps = np.array(
+                [d["T"] for d in data if time_range[0] <= d["t"] <= time_range[1]]
+            )
+        else:
+            raise ValueError("time_range should be None, float, or tuple[float, float]")
 
-        fig = plt.figure()
-        ax1 = plt.subplot(211)
-        ax1 = plt.plot(times, Epots, label="E")
-        ax1 = plt.ylabel("E (eV)")
-        ax1 = plt.gca().xaxis.set_ticklabels([])
-        # ax1 = plt.legend()
-        ax2 = plt.subplot(212)
-        ax2 = plt.plot(times, temps, label="T", color="orange")
-        ax2 = plt.ylabel("T (K)")
-        ax2 = plt.xlabel("time (ps)")
-        # ax2 = plt.legend()
+        if remove_outliers is not None:
+            z_scores = (temps - np.mean(temps)) / np.std(temps)
+            inlier_temps = temps[np.abs(z_scores) <= remove_outliers]
+        else:
+            inlier_temps = temps
+
+        return temps, inlier_temps
+
+    def plot_T_distribution(
+        self,
+        time_range: tuple[float, float] | float | None = None,
+        num_bins: int = 50,
+        density: bool = True,
+        remove_outliers: float | None = None,
+        include_mean: bool = False,
+        T_setpoint: float | None = None,
+        savename: str | None = None,
+        show: bool = False,
+        return_fig: bool = False,
+    ) -> tuple[plt.Figure, plt.Axes] | None:
+        """
+        plots the temperature distribution
+
+        Args:
+            time_range (tuple[float, float] | float | None): The time range to plot the temperature distribution.
+                - If None, the entire simulation is used.
+                - If float, the percentage of the simulation to use (starting from the end); i.e. 0.1 is the last 10% of the simulation.
+                - If tuple, the start and end times of the simulation to use.
+            num_bins (int): The number of bins for the histogram.
+            density (bool): If True, plot the density instead of the frequency.
+            remove_outliers (float | None): Don't plot data points with z-scores greater than this value. Does not affect mean and std calculations.
+            include_mean (bool): Whether to include the mean temperature in the plot.
+            T_setpoint (float | None): The temperature setpoint to include in the plot.
+            savename (str): The file path to save the plot.
+            show (bool): Whether to show the plot.
+            return_fig (bool): Whether to return the figure and axes objects.
+
+        Returns:
+            If return_fig is True, returns the figure and axes objects.
+        """
+        temps, inlier_temps = self.get_T_distribution_data(
+            time_range=time_range, remove_outliers=remove_outliers
+        )
+
+        colors = get_colors("tab10")
+
+        fig, ax = plt.subplots(1, 1, figsize=(8, 6))
+        ax.hist(inlier_temps, bins=num_bins, density=density, color=colors["orange"])
+        ax.set_xlabel("T (K)")
+        ax.set_ylabel("Density" if density else "Frequency")
+
+        mean_plotting_temp = np.mean(temps)
+        max_deviation = np.max(np.abs(temps - mean_plotting_temp))
+        ax.set_xlim(
+            np.floor((mean_plotting_temp - max_deviation) / 100) * 100,
+            np.ceil((mean_plotting_temp + max_deviation) / 100) * 100,
+        )
+
+        if include_mean:
+            ax.axvline(
+                np.mean(temps),
+                color=colors["blue"],
+                linestyle="--",
+                linewidth=2,
+                label="mean",
+            )
+
+        if T_setpoint is not None:
+            ax.axvline(
+                T_setpoint,
+                color=colors["red"],
+                linestyle="--",
+                linewidth=2,
+                label="setpoint",
+            )
+
+        if include_mean or T_setpoint is not None:
+            ax.legend(loc="upper right")
+
+        fig.tight_layout()
+
+        if savename is not None:
+            fig.savefig(savename)
+
+        if show:
+            fig.show()
+
+        if return_fig:
+            return fig, ax
