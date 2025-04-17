@@ -401,6 +401,7 @@ class CHGNetMD:
         ensemble: str = "nvt",
         thermostat: str = "Berendsen_inhomogeneous",
         timestep: float = 2.0,
+        taut: float | None = None,
         use_device: Devices | None = None,
         check_cuda_mem: bool = False,
         stress_weight: float | None = 1 / 160.21766208,
@@ -421,6 +422,7 @@ class CHGNetMD:
             ensemble (str): The ensemble to use for the simulation.
             thermostat (str): The thermostat to use for the simulation.
             timestep (float): The timestep for the simulation.
+            tau_t (float | None): The time constant for the thermostat.
             use_device (Devices | None): The device to run the simulation on.
             check_cuda_mem (bool): Whether to check the available CUDA memory.
             stress_weight (float | None): The weight of the stress in the loss function.
@@ -475,6 +477,7 @@ class CHGNetMD:
             temperature=temperature,
             thermostat=thermostat,
             timestep=timestep,
+            taut=taut,
             pressure=pressure,
             use_device=use_device,
             on_isolated_atoms=on_isolated_atoms,
@@ -495,6 +498,7 @@ class CHGNetMD:
         ensemble: str = "nvt",
         thermostat: str = "Berendsen_inhomogeneous",
         timestep: float = 2.0,
+        taut: float | None = None,
         use_device: Devices | None = None,
         check_cuda_mem: bool = False,
         stress_weight: float | None = 1 / 160.21766208,
@@ -519,6 +523,7 @@ class CHGNetMD:
             ensemble=ensemble,
             thermostat=thermostat,
             timestep=timestep,
+            taut=taut,
             use_device=use_device,
             check_cuda_mem=check_cuda_mem,
             stress_weight=stress_weight,
@@ -536,6 +541,8 @@ class CHGNetMD:
             steps (int): The number of steps to run the simulation.
 
         """
+        if steps < 1:
+            raise ValueError("number of steps should be greater than 0")
         self.md.run(steps=steps)
 
 
