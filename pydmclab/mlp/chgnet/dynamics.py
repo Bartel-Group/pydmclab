@@ -30,6 +30,7 @@ from torch import Tensor
 
 import matplotlib.pyplot as plt
 from pydmclab.plotting.utils import set_rc_params
+from pydmclab.mlp.chgnet import clean_md_log_and_traj_files
 
 from pydmclab.utils.handy import convert_numpy_to_native
 
@@ -547,14 +548,40 @@ class CHGNetMD:
 
 
 class AnalyzeMD:
-    def __init__(self, logfile: str = "md.log", trajfile: str = "md.traj"):
+    def __init__(
+        self,
+        logfile: str = "md.log",
+        trajfile: str = "md.traj",
+        clean_files: bool = True,
+        full_summary: list[dict] | None = None,
+    ) -> None:
         """
         Args:
             logfile (str): The filename for the log file.
-            trajfile (str): The filename for the trajectory
+            trajfile (str): The filename for the trajectory.
+            clean_files (bool): Whether to clean the log and trajectory files.
+            full_summary (list[dict] | None): Optionally, a pre-generated summary containing both log and traj info.
         """
-        self.logfile = logfile
-        self.trajfile = trajfile
+
+        required_keys = {"t", "T", "Etot", "Epot", "Ekin", "run", "structure"}
+
+        if full_summary is not None:
+            for i, entry in enumerate(full_summary):
+                if not isinstance(entry, dict):
+                    raise ValueError(f"Entry {i} in full_summary is not a dictionary.")
+                missing_keys = required_keys - entry.keys()
+                if missing_keys:
+                    raise ValueError(
+                        f"Entry {i} in full_summary is missing keys: {missing_keys}"
+                    )
+            self._full_summary = full_summary
+        else:
+            if clean_files:
+                clean_md_log_and_traj_files(logfile, trajfile)
+
+            self.logfile = logfile
+            self.trajfile = trajfile
+            self._full_summary = None
 
     @property
     def log_summary(self) -> list[dict]:
@@ -562,11 +589,17 @@ class AnalyzeMD:
         Returns:
             list[dict]: A summary of the log file.
         """
+        if self._full_summary is not None:
+            return [
+                {k: v for k, v in d.items() if k != "structure"}
+                for d in self._full_summary
+            ]
+
         data = []
-        with open(self.logfile, "r") as logf:
-            run_count = 0
-            t_adj = 0.0
-            change_time_adjust = False
+        run_count = 0
+        t_adj = 0.0
+        change_time_adjust = False
+        with open(self.logfile, "r", encoding="utf-8") as logf:
             for line in logf:
                 line = line[:-1]
                 if "Time" in line:
@@ -577,7 +610,6 @@ class AnalyzeMD:
                 if change_time_adjust:
                     t_adj = data[-1]["t"]
                     change_time_adjust = False
-                    continue
                 t, Etot, Epot, Ekin, T = line.split()
                 data.append(
                     {
@@ -599,17 +631,11 @@ class AnalyzeMD:
                 each item of the list is a Structure.as_dict()
                 corresponds with the log_summary dict
         """
-        with Trajectory(self.trajfile) as traj:
-            traj_as_struc = [
-                AseAtomsAdaptor.get_structure(atoms).as_dict() for atoms in traj
-            ]
-        summary = self.log_summary
-        prev_run = summary[0]["run"]
-        for i, data in enumerate(summary):
-            if data["run"] != prev_run:
-                del traj_as_struc[i]
-            prev_run = data["run"]
-        return traj_as_struc
+        if self._full_summary is not None:
+            return [d["structure"] for d in self._full_summary]
+
+        traj = Trajectory(self.trajfile)
+        return [AseAtomsAdaptor.get_structure(atoms).as_dict() for atoms in traj]
 
     @property
     def full_summary(self) -> list[dict]:
@@ -618,8 +644,16 @@ class AnalyzeMD:
             list[dict]: A summary of the log and trajectory files.
                 each item of the list is a dict with the log_summary and corresponding structure at that time step
         """
+        if self._full_summary is not None:
+            return self._full_summary
+
         log_summary = self.log_summary
         traj_summary = self.traj_summary
+
+        if len(log_summary) != len(traj_summary):
+            raise Warning(
+                "log and trajectory files have different lengths, data may be mismatched"
+            )
 
         for i, structure in enumerate(traj_summary):
             log_summary[i]["structure"] = structure
