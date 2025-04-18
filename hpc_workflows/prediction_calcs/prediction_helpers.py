@@ -637,9 +637,9 @@ def collect_results(
 
     print("\nCollecting results")
 
-    results = {"prediction_results": {}, "prediction_configs": {}}
+    results = {"prediction_results": {}, "architecture_configs": {}}
 
-    results["prediction_configs"] = architecture_configs["prediction_configs"]
+    results["architecture_configs"] = architecture_configs
 
     # collect results from each batch
     for batch_id in batching:
@@ -670,11 +670,11 @@ def collect_results(
 def check_collected_results(results: dict, batching: dict) -> None:
     """
     Args:
-        results (dict): dict of predictionation results and configs
+        results (dict): dict of prediction results and configs
         batching (dict): {"batch_id": {"launch_dir": str}}
 
     Returns:
-        None, prints how many batches have been fully predictioned
+        None, prints how many batches have been fully predicted
     """
 
     results_possible = len(batching)
