@@ -23,7 +23,7 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-mlp = ["chgnet"]
+mlp = ["chgnet", "mace-torch"]
 defects = ["doped"]
 phonons = ["phonopy"]
 

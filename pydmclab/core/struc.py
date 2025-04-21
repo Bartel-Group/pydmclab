@@ -18,6 +18,7 @@ from pymatgen.transformations.standard_transformations import (
 from pymatgen.analysis import structure_matcher
 from pymatgen.analysis.structure_matcher import StructureMatcher
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
+from pymatgen.analysis.diffraction.xrd import XRDCalculator
 
 from pydmclab.core import struc as pydmc_struc
 from pydmclab.core.comp import CompTools
@@ -435,6 +436,49 @@ class StrucTools(object):
         structure.scale_lattice(new_vol)
 
         return structure
+
+    def get_xrd_pattern(
+        self,
+        wavelength: str | float = "CuKa",
+        symprec: float = 0,
+        debye_waller_factors: dict | None = None,
+        scaled: bool = True,
+        two_theta_range: Tuple[float, float] | None = (0, 90),
+    ) -> dict[str, list]:
+        """
+        Args:
+            wavelength: wavelength of X-ray radiation
+                (see pymatgen.analysis.diffraction.xrd.XRDCalculator for str options)
+            symprec: symmetry precision for structure refinement (no refinement if 0)
+            debye_waller_factors: {element symbol: float} for specifying Debye-Waller factors
+            scaled: whether to scale the intensities to a max of 100 (True) or use absolute values (False)
+            two_theta_range: range of two-theta values to calculate
+
+        Returns:
+            dict of XRD pattern
+                {'two_thetas' : numpy array of two-theta values in degrees (numpy.float64),
+                 'intensities' : numpy array of intensities (numpy.float64),
+                 'hkl_and_multiplicity' : list of {'hkl': miller indices, 'multiplicity': multiplicity},
+                 'd_spacing' : list of d-spacings (numpy.float64)}
+        """
+        # setup the calculator
+        xrd_calculator = XRDCalculator(
+            wavelength=wavelength,
+            symprec=symprec,
+            debye_waller_factors=debye_waller_factors,
+        )
+        # find the pattern
+        xrd_pattern_of_struc = xrd_calculator.get_pattern(
+            self.structure, scaled=scaled, two_theta_range=two_theta_range
+        )
+        # process the data
+        xrd_hkls = [hkl[0] for hkl in xrd_pattern_of_struc.hkls]
+        return {
+            "two_thetas": xrd_pattern_of_struc.x,
+            "intensities": xrd_pattern_of_struc.y,
+            "hkl_and_multiplicity": xrd_hkls,
+            "d_spacing": xrd_pattern_of_struc.d_hkls,
+        }
 
     def get_slabs(
         self,

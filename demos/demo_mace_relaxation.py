@@ -1,6 +1,6 @@
 import os
 from pydmclab.core.struc import StrucTools
-from pydmclab.mlp.chgnet.dynamics import CHGNetRelaxer
+from pydmclab.mlp.mace.dynamics import MACERelaxer, MACELoader
 
 
 DATA_DIR = os.path.join("output", "mlp-relaxation")
@@ -8,7 +8,7 @@ if not os.path.exists(DATA_DIR):
     os.makedirs(DATA_DIR)
 
 TEST_STRUC = os.path.join("cifs", "mp-18767-LiMnO2.cif")
-SAVE_TRAJ = os.path.join("output", "mlp-relaxation", "chgnet_relaxation.traj")
+SAVE_TRAJ = os.path.join("output", "mlp-relaxation", "mace_relaxation.traj")
 
 
 def main():
@@ -18,8 +18,15 @@ def main():
     # Perturb structure
     perturbed_structure = initial_structure.perturb(0.3)
 
+    # View the available MACE pretrained models
+    loader = MACELoader()
+    print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+    print("Available MACE pretrained models:")
+    print(loader.pretrained_models)
+    print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+
     # Initialize relaxer
-    relaxer = CHGNetRelaxer(model="0.3.0", use_device="mps")
+    relaxer = MACERelaxer(models="medium", device="cpu")
 
     # Relax structure
     results = relaxer.relax(
@@ -33,7 +40,7 @@ def main():
     # Get results from the observer
     observer = results["trajectory"]
     final_energy = results["final_energy"]
-    print("CHGNet took {} steps to converge.".format(len(observer)))
+    print("MACE took {} steps to converge.".format(len(observer)))
 
     # Get initial and final energies
     print("Initial energy: {:.3f} eV".format(observer.energies[0]))
