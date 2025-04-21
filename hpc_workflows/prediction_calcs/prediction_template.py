@@ -2,7 +2,7 @@ import os
 import torch
 from pydmclab.core.struc import StrucTools
 from pydmclab.mlp import "placeholder"
-from pydmclab.utils.handy import read_json, write_json
+from pydmclab.utils.handy import read_json, write_json, convert_numpy_to_native
 
 
 def main():
@@ -64,7 +64,9 @@ def main():
         struc_results = "placeholder"
 
         struc_results["structure"] = ini_dict
+        struc_results = convert_numpy_to_native(struc_results)
         current_prediction_results.update({name: struc_results})
+
 
         # save results on the given save interval
         if len(current_prediction_results) == save_interval:

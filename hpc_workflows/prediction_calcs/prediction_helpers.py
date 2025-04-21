@@ -25,7 +25,6 @@ def get_chgnet_configs(
     return_atom_feas: bool = False,
     return_crystal_feas: bool = False,
     batch_size: int = 16,
-    verbose: bool = False,
 ):
     """
     Note: this assumes cpu only use on MSI
@@ -66,8 +65,7 @@ def get_chgnet_configs(
         "return_crystal_feas"
     ] = return_crystal_feas
     architecture_configs["predict_structure_configs"]["batch_size"] = batch_size
-    architecture_configs["predict_structure_configs"]["verbose"] = verbose
-
+    
     return architecture_configs
 
 
@@ -94,7 +92,6 @@ def get_mace_configs(
     dispersion_xc: str = "pbe",
     dispersion_cutoff: float = 40.0 * units.Bohr,
     remake_cache: bool = False,
-    verbose: bool = False,
 ):
     """
     Note: this assumes cpu only use on MSI
@@ -134,7 +131,6 @@ def get_mace_configs(
     architecture_configs["relaxer_configs"]["dispersion_xc"] = dispersion_xc
     architecture_configs["relaxer_configs"]["dispersion_cutoff"] = dispersion_cutoff
     architecture_configs["relaxer_configs"]["remake_cache"] = remake_cache
-    architecture_configs["relaxer_configs"]["verbose"] = verbose
 
     return architecture_configs
 
@@ -394,14 +390,14 @@ def make_prediction_scripts(
 
             elif 'relaxer_configs = "placeholder"' in line:
                 config_lines = [
-                    f"{indent}{key} = {value}\n"
+                    f"{indent}{key} = {repr(value)}\n"
                     for key, value in architecture_configs["relaxer_configs"].items()
                 ]
                 prediction_script_lines[i : i + 1] = config_lines
 
             elif 'predict_structure_configs = "placeholder"' in line:
                 config_lines = [
-                    f"{indent}{key} = {value}\n"
+                    f"{indent}{key} = {repr(value)}\n"
                     for key, value in architecture_configs[
                         "predict_structure_configs"
                     ].items()
@@ -419,27 +415,26 @@ def make_prediction_scripts(
                 )
 
             elif 'relaxer = "placeholder"' in line:
+
+                class_call_line = [f"{indent}relaxer = {architecture}Relaxer(\n"]
                 relaxer_config_lines = [
-                    f"{indent}    {key} = {key},"
+                    f"{indent}    {key} = {key},\n"
                     for key in architecture_configs["relaxer_configs"].keys()
                 ]
-                prediction_script_lines[i] = (
-                    f"{indent}relaxer = {architecture}Relaxer(\n"
-                )
-                prediction_script_lines[i + 1 : i + 1] = relaxer_config_lines
-                prediction_script_lines[i + 2 : i + 2] = f"{indent})\n"
-
+                end_call_line = [f"{indent})\n"]
+                
+                prediction_script_lines[i : i + 1] = class_call_line + relaxer_config_lines + end_call_line
+                
             elif 'struc_results = "placeholder"' in line:
+                class_call_line = [f"{indent}struc_results = relaxer.predict_structure(ini_struc, \n"]
                 predict_structure_config_lines = [
-                    f"{indent}    {key} = {key},"
+                    f"{indent}    {key} = {key},\n"
                     for key in architecture_configs["predict_structure_configs"].keys()
                 ]
-                prediction_script_lines[i] = (
-                    f"{indent}struc_results = relaxer.predict_structure(ini_struc, \n"
-                )
-                prediction_script_lines[i + 1 : i + 1] = predict_structure_config_lines
-                prediction_script_lines[i + 2 : i + 2] = f"{indent})\n"
-
+                end_call_line = [f"{indent})\n"]
+                
+                prediction_script_lines[i : i + 1] = class_call_line + predict_structure_config_lines + end_call_line
+                
         with open(prediction_script, "w", encoding="utf-8") as script_file:
             script_file.writelines(prediction_script_lines)
 
@@ -462,6 +457,10 @@ def make_submission_scripts(
     """
 
     architecture = user_configs["architecture"]
+    if architecture.lower() == "chgnet":
+        model = user_configs["relaxer_configs"]["model"].replace(".", "")
+    elif architecture.lower() == "mace":
+        model = user_configs["relaxer_configs"]["models"]
 
     for batch_id in batching:
 
@@ -471,8 +470,9 @@ def make_submission_scripts(
 
         if os.path.exists(prediction_launcher) and not remake:
             continue
+        
 
-        job_name = f"{architecture.lower()}_prediction_{batch_id}"
+        job_name = f"{architecture.lower()}_{model}_prediction_{batch_id}"
 
         with open(prediction_launcher, "w", encoding="utf-8") as f:
             f.write("#!/bin/bash -l\n")
