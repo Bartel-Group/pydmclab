@@ -795,15 +795,15 @@ class AnalyzeVASP(object):
             tmp_cohp = np.zeros(len(out["E"]))
             tmp_icohp = np.zeros(len(out["E"]))
             for site_tag in pcohp[el_tag]:
-                for spin in pcohp[el_tag][site_tag]["cohp"]:
-                    cohp_to_add = np.array(pcohp[el_tag][site_tag]["cohp"][spin])
-                    #                    print(cohp_to_add)
-                    if len(cohp_to_add) == len(tmp_cohp):
-                        tmp_cohp = np.add(cohp_to_add, tmp_cohp)
+                #for spin in pcohp[el_tag][site_tag]["cohp"]:
+                cohp_to_add = np.array(pcohp[el_tag][site_tag]["cohp"]["total"])
+                #                    print(cohp_to_add)
+                if len(cohp_to_add) == len(tmp_cohp):
+                    tmp_cohp = np.add(cohp_to_add, tmp_cohp)
 
-                    icohp_to_add = np.array(pcohp[el_tag][site_tag]["icohp"][spin])
-                    if len(icohp_to_add) == len(tmp_icohp):
-                        tmp_icohp = np.add(icohp_to_add, tmp_icohp)
+                icohp_to_add = np.array(pcohp[el_tag][site_tag]["icohp"]["total"])
+                if len(icohp_to_add) == len(tmp_icohp):
+                    tmp_icohp = np.add(icohp_to_add, tmp_icohp)
 
             out[el_tag]["cohp"] = tmp_cohp
             out[el_tag]["icohp"] = tmp_icohp
