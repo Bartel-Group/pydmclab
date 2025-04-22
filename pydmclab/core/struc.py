@@ -1271,8 +1271,6 @@ class SlabTools(object):
             elif isinstance(ref_potentials, ChemPots):
                 ref_potentials = ref_potentials.chempots
 
-            print(ref_potentials["O"])
-
             missing_refs = set(excess_or_deficient_amts) - set(ref_potentials)
             if missing_refs:
                 raise ValueError(
