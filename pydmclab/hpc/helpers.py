@@ -2424,47 +2424,6 @@ def get_adsorbed_slabs(adsorbate_type,
     write_json(ads_slabs,fjson)
     return read_json(fjson)
 
-# def get_lowest_energy_slabs(data_dir,
-#                             chgnet_json = 'relax_results.json',
-#                             ads_slabs = 'ads_slabs.json',
-#                             savename = 'ads_slabs_DFT.json',
-#                             remake = True,
-#                             threshold_percentage = 0.01
-#                             ):
-    
-#     fjson = os.path.join(data_dir,savename)
-#     if os.path.exists(fjson) and not remake:
-#         return read_json(fjson)
-    
-#     unrelaxed_ads_slabs = read_json(os.path.join(data_dir,ads_slabs))
-#     cmpd = list(unrelaxed_ads_slabs.keys())[0]
-#     chgnet_results = read_json(os.path.join(data_dir,chgnet_json))
-#     chgnet_relax_dict = chgnet_results['relax_results'][cmpd]
-#     list_of_all_slabs = []
-#     chgnet_energies = []
-
-#     for key in chgnet_relax_dict.keys():
-#         list_of_all_slabs.append(key)
-#         E = chgnet_relax_dict[key]['final_energy']
-#         chgnet_energies.append(E)
-
-#     minimum_energy = np.min(chgnet_energies)
-#     DFT_threshold = (1-threshold_percentage/100)*minimum_energy
-    
-#     slabs_to_drop = []
-
-#     for i in range(len(chgnet_energies)):
-#         if chgnet_energies[i] > DFT_threshold:
-#             slabs_to_drop.append(list_of_all_slabs[i])
-    
-#     for slab_id in slabs_to_drop:
-#         if slab_id in unrelaxed_ads_slabs[cmpd]:
-#             del unrelaxed_ads_slabs[cmpd][slab_id]
-    
-#     write_json(unrelaxed_ads_slabs,fjson)
-
-#     return read_json(fjson)
-
 def purge_bad_vasp_o_files(head_dir, safety="on", verbose=False):
     """
     Args:
@@ -2562,6 +2521,8 @@ def get_adsorption_energy_results(data_dir,
     
     write_json(ads,fjson)
     return read_json(fjson)
+
+
 
 def main():
     return
