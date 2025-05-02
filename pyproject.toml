@@ -23,7 +23,7 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-mlp = ["chgnet", "mace-torch"]
+mlp = ["chgnet", "mace-torch", "pymatgen-analysis-diffusion"]
 defects = ["doped"]
 phonons = ["phonopy"]
 
