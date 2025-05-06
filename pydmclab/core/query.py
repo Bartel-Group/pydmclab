@@ -80,6 +80,9 @@ class MPQuery(object):
         include_sub_phase_diagrams=False,
         include_structure=True,
         properties=None,
+        include_computed_structure_entry=False,
+        compatible_only=True,
+        additional_criteria=None,
     ):
         """
         Args:
@@ -199,7 +202,7 @@ class MPQuery(object):
 
             search_for = chemsyses
             docs = mpr.summary.search(
-            chemsys=search_for, energy_above_hull=(0, max_Ehull)
+                chemsys=search_for, energy_above_hull=(0, max_Ehull)
             )
 
         # query MP based on a search for compounds containing at least these elements
@@ -296,6 +299,20 @@ class MPQuery(object):
                     for mpid in d
                     if np.round(d[mpid]["dE_gs"], 5) <= max_polymorph_energy
                 }
+
+        if include_computed_structure_entry:
+            final_mpids = d.keys()
+            entries = mpr.get_entries(
+                final_mpids,
+                compatible_only=compatible_only,
+                additional_criteria=additional_criteria,
+            )
+
+            for entry in entries:
+                id = entry.data["material_id"]
+                if id in final_mpids:
+                    d[id]["computed_structure_entry"] = entry.as_dict()
+
         return d
 
     def get_structures_by_material_id(self, material_ids):
