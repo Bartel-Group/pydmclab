@@ -540,9 +540,9 @@ class StrucTools(object):
         return None
 
 class InterfaceTools(object):
-
     """
-    Class that takes two bulk structures as arguments, generates a slab for each and then creates an interface between them using the CoherentInterfaceBuilder class from pymatgen.`
+    Summary:
+        A class for manipulating interfaces and computing their properties.
     """
 
     def __init__(self, 
@@ -559,6 +559,24 @@ class InterfaceTools(object):
                  max_length_tol = 0.03,
                  max_angle_tol = 0.01,
                  bidirectional = False,) -> None:
+
+        """
+        Args:
+            slab_film (Slab): Slab object for the film
+            slab_substrate (Slab): Slab object for the substrate
+            slab_film_e_per_atom (float): Energy per atom of the film slab
+            slab_substrate_e_per_atom (float): Energy per atom of the substrate slab
+            Note: The following arguments are only used to build Coherent Interfaces which is only used for MCIA calculations not for DFT calcs
+                film (Structure | str | dict | None): Structure object or path to file for the bulk film
+                substrate (Structure | str | dict | None): Structure object or path to file for the bulk substrate
+                film_miller (tuple[int, int, int] | None): Miller index to cut the film out of the bulk
+                substrate_miller (tuple[int, int, int] | None): Miller index to cut the substrate out of the bulkt
+                max_area_ratio_tol (float): Maximum area ratio tolerance
+                max_area (float): Maximum area
+                max_length_tol (float): Maximum length tolerance
+                max_angle_tol (float): Maximum angle tolerance
+                bidirectional (bool): Whether to use bidirectional termination
+        """
 
         if film is not None:
             if isinstance(film, dict):
