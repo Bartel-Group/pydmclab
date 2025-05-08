@@ -80,7 +80,7 @@ class MPQuery(object):
         include_sub_phase_diagrams=False,
         include_structure=True,
         properties=None,
-        include_computed_structure_entry=False,
+        include_computed_structure_entries=False,
         compatible_only=True,
         additional_criteria=None,
     ):
@@ -300,18 +300,23 @@ class MPQuery(object):
                     if np.round(d[mpid]["dE_gs"], 5) <= max_polymorph_energy
                 }
 
-        if include_computed_structure_entry:
+        if include_computed_structure_entries:
             final_mpids = d.keys()
             entries = mpr.get_entries(
                 final_mpids,
                 compatible_only=compatible_only,
+                inc_structure=include_structure,
                 additional_criteria=additional_criteria,
             )
 
             for entry in entries:
                 id = entry.data["material_id"]
+                xc = entry.data["run_type"]
                 if id in final_mpids:
-                    d[id]["computed_structure_entry"] = entry.as_dict()
+                    if d[id].get("computed_structure_entries") is None:
+                        d[id]["computed_structure_entries"] = {}
+                    if d[id]["computed_structure_entries"].get(xc) is None:
+                        d[id]["computed_structure_entries"][xc] = entry.as_dict()
 
         return d
 

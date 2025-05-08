@@ -431,7 +431,7 @@ def get_query(
     include_sub_phase_diagrams=False,
     include_structure=True,
     properties=None,
-    include_computed_structure_entry=False,
+    include_computed_structure_entries=False,
     compatible_only=True,
     additional_criteria=None,
     data_dir=os.getcwd().replace("scripts", "data"),
@@ -520,7 +520,7 @@ def get_query(
         include_structure=include_structure,
         max_strucs_per_cmpd=max_strucs_per_cmpd,
         include_sub_phase_diagrams=include_sub_phase_diagrams,
-        include_computed_structure_entry=include_computed_structure_entry,
+        include_computed_structure_entries=include_computed_structure_entries,
         compatible_only=compatible_only,
         additional_criteria=additional_criteria,
     )
