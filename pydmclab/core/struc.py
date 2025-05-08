@@ -559,30 +559,6 @@ class InterfaceTools(object):
                  max_length_tol = 0.03,
                  max_angle_tol = 0.01,
                  bidirectional = False,) -> None:
-        """
-        Args:
-            film (Structure): pymatgen Structure object for the film
-            substrate (Structure): pymatgen Structure object for the substrate
-        """
-        # if isinstance(film, dict):
-        #     film = Structure.from_dict(film)
-        # if isinstance(substrate, dict):
-        #     substrate = Structure.from_dict(substrate)
-        
-        # if isinstance(film, str):
-        #     if os.path.exists(film):
-        #         film = Structure.from_file(film)
-        #     else:
-        #         raise ValueError(
-        #             "you passed a string to InterfaceTools > this means a path to a structure > but the path is empty ..."
-        #         )
-        # if isinstance(substrate, str):
-        #     if os.path.exists(substrate):
-        #         substrate = Structure.from_file(substrate)
-        #     else:
-        #         raise ValueError(
-        #             "you passed a string to InterfaceTools > this means a path to a structure > but the path is empty ..."
-        #         )
 
         if film is not None:
             if isinstance(film, dict):
