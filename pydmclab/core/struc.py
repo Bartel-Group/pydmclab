@@ -2,14 +2,15 @@ import os
 import subprocess
 import yaml
 import random
+import warnings
 from collections import Counter, defaultdict
 from shutil import copyfile, rmtree
 from typing import List, Tuple, Dict, Literal
-
+from collections.abc import Iterator
 import numpy as np
 
-from pymatgen.core import Structure, PeriodicSite
-from pymatgen.core.surface import SlabGenerator
+from pymatgen.core import Structure, PeriodicSite, Composition
+from pymatgen.core.surface import SlabGenerator, Slab
 from pymatgen.transformations.standard_transformations import (
     OrderDisorderedStructureTransformation,
     AutoOxiStateDecorationTransformation,
@@ -19,8 +20,13 @@ from pymatgen.analysis import structure_matcher
 from pymatgen.analysis.structure_matcher import StructureMatcher
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
+from pymatgen.analysis.interfaces.zsl import ZSLGenerator, fast_norm
+from pymatgen.analysis.interfaces.coherent_interfaces import CoherentInterfaceBuilder
+from pymatgen.core.interface import Interface, label_termination
+
 from pydmclab.core import struc as pydmc_struc
 from pydmclab.core.comp import CompTools
+from pydmclab.core.energies import ChemPots
 
 
 class StrucTools(object):
@@ -533,6 +539,378 @@ class StrucTools(object):
 
         return None
 
+class InterfaceTools(object):
+
+    """
+    Class that takes two bulk structures as arguments, generates a slab for each and then creates an interface between them using the CoherentInterfaceBuilder class from pymatgen.`
+    """
+
+    def __init__(self, 
+                 slab_film: Slab,                                           # Slab
+                 slab_substrate: Slab,                                      # Slab
+                 slab_film_e_per_atom: float,
+                 slab_substrate_e_per_atom: float,
+                 film: Structure | str | dict | None = None,                # Bulk (only change this if you want to calculate MCIA)
+                 substrate: Structure | str | dict | None = None,           # Bulk (only change this if you want to calculate MCIA)
+                 film_miller: tuple[int, int, int] | None = None,
+                 substrate_miller: tuple[int, int, int] | None = None,
+                 max_area_ratio_tol = 0.09,
+                 max_area = 400,
+                 max_length_tol = 0.03,
+                 max_angle_tol = 0.01,
+                 bidirectional = False,) -> None:
+        """
+        Args:
+            film (Structure): pymatgen Structure object for the film
+            substrate (Structure): pymatgen Structure object for the substrate
+        """
+        # if isinstance(film, dict):
+        #     film = Structure.from_dict(film)
+        # if isinstance(substrate, dict):
+        #     substrate = Structure.from_dict(substrate)
+        
+        # if isinstance(film, str):
+        #     if os.path.exists(film):
+        #         film = Structure.from_file(film)
+        #     else:
+        #         raise ValueError(
+        #             "you passed a string to InterfaceTools > this means a path to a structure > but the path is empty ..."
+        #         )
+        # if isinstance(substrate, str):
+        #     if os.path.exists(substrate):
+        #         substrate = Structure.from_file(substrate)
+        #     else:
+        #         raise ValueError(
+        #             "you passed a string to InterfaceTools > this means a path to a structure > but the path is empty ..."
+        #         )
+
+        if film is not None:
+            if isinstance(film, dict):
+                film = Structure.from_dict(film)
+            elif isinstance(film, str):
+                if os.path.exists(film):
+                    film = Structure.from_file(film)
+                else:
+                    raise ValueError("Invalid film path")
+            self.film = film
+        else:
+            self.film = None
+
+        if substrate is not None:
+            if isinstance(substrate, dict):
+                substrate = Structure.from_dict(substrate)
+            elif isinstance(substrate, str):
+                if os.path.exists(substrate):
+                    substrate = Structure.from_file(substrate)
+                else:
+                    raise ValueError("Invalid substrate path")
+            self.substrate = substrate
+        else:
+            self.substrate = None
+
+        self.max_area_ratio_tol = max_area_ratio_tol
+        self.max_area = max_area
+        self.max_length_tol = max_length_tol
+        self.max_angle_tol = max_angle_tol
+        self.bidirectional = bidirectional
+        self.film_miller = film_miller
+        self.substrate_miller = substrate_miller
+        self.substrate_slab = slab_substrate
+        self.film_slab = slab_film
+        self.film_slab_e_per_atom = slab_film_e_per_atom
+        self.substrate_slab_e_per_atom = slab_substrate_e_per_atom
+
+        return None
+
+    @property
+    def zsl_generator(self) -> ZSLGenerator:
+        """
+        Generate a ZSLGenerator object for the interface between the film and substrate.
+
+        Returns:
+            ZSLGenerator: ZSLGenerator object for the interface
+        """
+        zsl_gen = ZSLGenerator(
+            max_area_ratio_tol=self.max_area_ratio_tol,
+            max_area=self.max_area,
+            max_length_tol=self.max_length_tol,
+            max_angle_tol=self.max_angle_tol,
+            bidirectional=self.bidirectional,
+        )
+        return zsl_gen
+    
+    def get_coherent_interface_generator(self,
+                      terminations: tuple[str, str],
+                      gap: float = 2.0,
+                      vacuum_over_film: float = 5.0,
+                      film_thickness : float = 6.0,
+                      substrate_thickness: float = 6.0,
+    ) -> Iterator[Interface]:
+        """
+        Generate a coherent interface between the film and substrate. 
+
+        Note: Do not use this function if you are wanting to run interface DFT calculations. 
+              The interfaces it generates are prohibitively large. Use the get_interfaces method instead.
+              This method's main function is to generate small interfaces (1 layer thick for each slab) to calculate minimal coincident interface area (MCIA)
+        Args:
+            termination (tuple): tuple of two strings representing the terminations of the film and substrate
+            gap (float): distance between the film and substrate in Layers units
+            vacuum_over_film (float): distance between the film and vacuum in Layers units
+            film_thickness (float): thickness of the film in Layers units
+            substrate_thickness (float): thickness of the substrate in Layers units
+
+        Returns:
+            Interator: iterator of Interface objects
+        """
+        zsl = self.zsl_generator
+        cib = CoherentInterfaceBuilder(
+            substrate_structure=self.substrate,
+            film_structure=self.film,
+            film_miller=self.film_miller,
+            substrate_miller=self.substrate_miller,
+            zslgen=zsl,
+        )
+
+        generator = cib.get_interfaces(
+            termination = terminations,
+            gap = gap,
+            vacuum_over_film = vacuum_over_film,
+            film_thickness = film_thickness,
+            substrate_thickness = substrate_thickness,
+        )
+
+        return generator
+    
+    def get_interface_from_slabs(
+            self,
+            in_plane_offset: tuple[float, float] = (0, 0),
+            gap: float = 1.6,
+            vacuum_over_film: float = 0,
+            interface_properties: dict | None = None,
+            center_slab: bool = True,
+    )-> Interface:
+        
+        interface = Interface.from_slabs(
+            substrate_slab = self.substrate_slab,
+            film_slab = self.film_slab,
+            in_plane_offset = in_plane_offset,
+            gap = gap,
+            vacuum_over_film = vacuum_over_film,
+            interface_properties = interface_properties,
+            center_slab = center_slab,
+        )
+        
+        self.interface = interface
+        
+        return interface
+    
+    def interface_surface_area(self,
+                     relaxed_interface: Interface,
+                    #  interface_e_per_atom: float,
+                     )-> float:
+
+        st = SlabTools(
+            slab_structure=relaxed_interface,
+            slab_e_per_at=None,
+        )
+
+        area = st.surface_area()
+        self.area = area
+        
+        return area
+
+        
+    def interfacial_energy(self,relaxed_interface: Interface, interface_e_per_at:float):
+        
+        # Calling the interface_surface_area method to get the area
+        self.interface_surface_area(relaxed_interface)
+
+        energy = 1/(2*self.area) * (
+            interface_e_per_at
+            - (self.film_slab_e_per_atom + self.substrate_slab_e_per_atom)
+        )
+
+        return energy
+
+    @property
+    def to_cif(self):
+        if not hasattr(self, 'interface'):
+            raise AttributeError("You must call get_interface_from_slabs() before using the to_cif property.")
+        
+        self.interface.to(filename="/Users/christopherakiki/Desktop/interface.cif")
+        return None 
+
+class SlabTools(object):
+    """
+    A class for manipulating slabs and computing their properties.
+    """
+
+    def __init__(
+        self,
+        slab_structure: Structure | dict | str,
+        slab_e_per_at: float,
+        *,
+        unreduced_bulk_composition: Composition | dict | str = None,
+        bulk_e_per_at: float = None,
+    ) -> None:
+        """
+        Initialize the SlabTools object.
+
+        Args:
+            slab_structure (Structure | dict | str): pymatgen Structure object, Structure.as_dict(), or path to structure file.
+            slab_e_per_at (float): Energy per atom of the slab.
+            unreduced_bulk_composition (Composition | dict | str, optional): Unreduced bulk composition. This is the full composition of the bulk from which the slab was cleaved.
+                (e.g., if the slab was cleaved from SrTiO3 and is 10 layers thick, the unreduced bulk composition would be Sr10Ti10O30).
+            bulk_e_per_at (float, optional): Energy per atom of the bulk. Defaults to None.
+        """
+
+        slab_structure = StrucTools(slab_structure).structure
+
+        self.slab_structure = slab_structure
+        self.slab_e_per_at = slab_e_per_at
+
+        if isinstance(unreduced_bulk_composition, (dict, str)):
+            unreduced_bulk_composition = Composition(unreduced_bulk_composition)
+
+        self.unreduced_bulk_composition = unreduced_bulk_composition
+        self.bulk_e_per_at = bulk_e_per_at
+
+    @property
+    def is_stoich(self) -> bool:
+        """
+        Check if the slab is stoichiometric with respect to the bulk composition.
+        """
+        if not self.unreduced_bulk_composition:
+            raise ValueError(
+                "Unreduced bulk composition must be provided to check stoichiometry."
+            )
+
+        return self.slab_structure.composition == self.unreduced_bulk_composition
+
+    @property
+    def off_stoichiometry(self) -> dict[str, float]:
+        """
+        Calculate the off-stoichiometry of the slab with respect to the bulk composition.
+        """
+        if not self.unreduced_bulk_composition:
+            raise ValueError(
+                "Unreduced bulk composition must be provided to calculate off-stoichiometry."
+            )
+
+        unreduced_slab_composition = self.slab_structure.composition
+        unreduced_slab_composition.allow_negative = True
+
+        return (unreduced_slab_composition - self.unreduced_bulk_composition).as_dict()
+
+    def surface_area(
+        self, vacuum_axis: Literal["a", "b", "c", "auto"] = "auto", verbose: bool = True
+    ) -> float:
+        """
+        Returns the surface area of the slab.
+        """
+        lattice_mattrix = self.slab_structure.lattice.matrix
+
+        if not isinstance(vacuum_axis, str) or vacuum_axis not in [
+            "a",
+            "b",
+            "c",
+            "auto",
+        ]:
+            raise ValueError("vacuum_axis must be one of 'a', 'b', 'c', or 'auto'.")
+
+        axis_lengths = {
+            "a": np.linalg.norm(lattice_mattrix[0]),
+            "b": np.linalg.norm(lattice_mattrix[1]),
+            "c": np.linalg.norm(lattice_mattrix[2]),
+        }
+
+        if vacuum_axis != "auto" and axis_lengths[vacuum_axis] != max(
+            axis_lengths.values()
+        ):
+            warnings.warn(
+                f"The specified vacuum axis '{vacuum_axis}' is not the longest axis in the lattice.",
+                category=UserWarning,
+            )
+
+        if vacuum_axis == "a":
+            lattice_mattrix = np.delete(lattice_mattrix, 0, axis=0)
+        elif vacuum_axis == "b":
+            lattice_mattrix = np.delete(lattice_mattrix, 1, axis=0)
+        elif vacuum_axis == "c":
+            lattice_mattrix = np.delete(lattice_mattrix, 2, axis=0)
+        elif vacuum_axis == "auto":
+            if verbose:
+                print("Auto selected - Vacuum axis will be set to the largest axis.")
+            index_of_largest_axis = np.argmax(
+                [np.linalg.norm(axis) for axis in lattice_mattrix]
+            )
+            lattice_mattrix = np.delete(lattice_mattrix, index_of_largest_axis, axis=0)
+
+        surface_area = np.linalg.norm(np.cross(lattice_mattrix[0], lattice_mattrix[1]))
+
+        return surface_area
+
+    def surface_energy(
+        self,
+        *,
+        vacuum_axis: Literal["a", "b", "c", "auto"] = "auto",
+        ref_potentials: ChemPots | dict = None,
+        verbose: bool = True,
+        **kwargs,
+    ) -> float:
+
+        if not (self.unreduced_bulk_composition and self.bulk_e_per_at):
+            raise ValueError(
+                "Unreduced bulk composition and bulk energy per atom must be provided to calculate surface energy."
+            )
+
+        slab_e_tot = self.slab_e_per_at * len(self.slab_structure)
+        bulk_e_tot = self.bulk_e_per_at * self.unreduced_bulk_composition.num_atoms
+
+        surface_area = self.surface_area(vacuum_axis=vacuum_axis, verbose=verbose)
+
+        if not self.is_stoich:
+            from pydmclab.core.energies import ChemPots
+
+            excess_or_deficient_amts = self.off_stoichiometry
+
+            if not ref_potentials:
+                temperature = kwargs.pop("temperature", None)
+                if not temperature:
+                    mus = ChemPots(**kwargs)
+                    ref_potentials = mus.chempots
+                    ref_potentials = {
+                        k: v
+                        for k, v in ref_potentials.items()
+                        if k in excess_or_deficient_amts
+                    }
+                else:
+                    mus_at_0K = ChemPots(temperature=0, **kwargs)
+                    ref_pots_at_0K = mus_at_0K.chempots
+                    mus_at_temp = ChemPots(temperature=temperature, **kwargs)
+                    ref_pots_at_temp = mus_at_temp.chempots
+                    ref_potentials = {
+                        el: ref_pots_at_0K[el] + ref_pots_at_temp[el]
+                        for el in excess_or_deficient_amts
+                    }
+
+            elif isinstance(ref_potentials, ChemPots):
+                ref_potentials = ref_potentials.chempots
+
+            missing_refs = set(excess_or_deficient_amts) - set(ref_potentials)
+            if missing_refs:
+                raise ValueError(
+                    f"Reference potentials are missing for the following elements: {missing_refs}."
+                )
+
+            delta_mu_sum = sum(
+                excess_or_deficient_amts[el] * ref_potentials[el]
+                for el in excess_or_deficient_amts
+            )
+
+            return (slab_e_tot - bulk_e_tot - delta_mu_sum) / (2 * surface_area)
+
+        return (slab_e_tot - bulk_e_tot) / (2 * surface_area)
 
 class SiteTools(object):
     """
