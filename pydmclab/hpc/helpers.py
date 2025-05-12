@@ -11,7 +11,7 @@ from pydmclab.hpc.submit import SubmitTools
 from pydmclab.hpc.analyze import AnalyzeVASP, AnalyzeBatch
 from pydmclab.core.comp import CompTools
 from pydmclab.core.query import MPQuery, MPLegacyQuery
-from pydmclab.core.struc import StrucTools
+from pydmclab.core.struc import StrucTools, InterfaceTools
 from pydmclab.core.mag import MagTools
 from pydmclab.core.energies import ChemPots, FormationEnthalpy, MPFormationEnergy
 from pydmclab.utils.handy import read_json, write_json
@@ -2522,6 +2522,69 @@ def get_adsorption_energy_results(data_dir,
             ads_results['Adsorption_E_per_at'] = E_ads
     
     write_json(ads,fjson)
+    return read_json(fjson)
+
+
+def get_interfaces(data_dir,
+                   film_slab_dir,
+                   substrate_slab_dir,
+                   remake = False,
+                   savename = 'interfaces.json',):
+    
+    fjson = os.path.join(data_dir,savename)
+    if os.path.exists(fjson) and not remake:
+        return read_json(fjson)
+    
+    film_slabs = read_json(os.path.join(film_slab_dir,'results_with_slabs.json'))
+    substrate_slabs = read_json(os.path.join(substrate_slab_dir,'results_with_slabs.json'))
+    
+    films = {}
+    substrates = {}
+
+    for entry in film_slabs:
+        if 'slab' in film_slabs[entry]:
+            slab_dict = film_slabs[entry]['slab']
+            slab = Slab.from_dict(slab_dict)
+            films[entry] = slab
+            entry_split = re.split('--', entry)
+            film_chemID = entry_split[0]
+    for entry in substrate_slabs:
+        if 'slab' in substrate_slabs[entry]:
+            slab_dict = substrate_slabs[entry]['slab']
+            slab = Slab.from_dict(slab_dict)
+            substrates[entry] = slab
+            entry_split = re.split('--', entry)
+            substrate_chemID = entry_split[0]
+
+    interfaces = {}
+    comp_ID = substrate_chemID + '_' + film_chemID
+    interfaces[comp_ID] = {}
+
+    for film_key in films.keys():
+        film_key_split = re.split('--|_', film_key)
+        film_chemID, film_miller, film_size, film_termination = film_key_split[0], film_key_split[2], film_key_split[3], film_key_split[5]
+
+        film_slab = films[film_key]
+        film_e_per_atom = film_slabs[film_key]['results']['E_per_at']
+
+        for substrate_key in substrates.keys():
+            substrate_key_split = re.split('--|_', substrate_key)
+            substrate_chemID, substrate_miller, substrate_size, substrate_termination = substrate_key_split[0], substrate_key_split[2], substrate_key_split[3], substrate_key_split[5]
+
+            substrate_slab = substrates[substrate_key]
+            substrate_e_per_atom = substrate_slabs[substrate_key]['results']['E_per_at']
+
+            unique_ID = substrate_chemID + '--' + substrate_miller + '_' + substrate_size + '_' + substrate_termination + '-' + film_chemID +'--' + film_miller + '_' + film_size + '_' + film_termination
+
+            interfaces[comp_ID][unique_ID] = {}
+
+            IF = InterfaceTools(slab_film=film_slab, slab_substrate=substrate_slab, slab_film_e_per_atom=film_e_per_atom, slab_substrate_e_per_atom=substrate_e_per_atom)
+
+            interface = IF.get_interface_from_slabs()
+
+            interfaces[comp_ID][unique_ID] = interface.as_dict()
+    
+    write_json(interfaces,fjson)
     return read_json(fjson)
 
 

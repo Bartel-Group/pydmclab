@@ -684,7 +684,7 @@ class InterfaceTools(object):
     def get_interface_from_slabs(
             self,
             in_plane_offset: tuple[float, float] = (0, 0),
-            gap: float = 1.6,
+            gap: float = 0,
             vacuum_over_film: float = 0,
             interface_properties: dict | None = None,
             center_slab: bool = True,
