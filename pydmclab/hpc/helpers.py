@@ -448,6 +448,7 @@ def get_query(
     data_dir=os.getcwd().replace("scripts", "data"),
     savename="query.json",
     remake=False,
+    conventional=True,
 ):
     """
     Use this to retrieve data + structures from the Materials Project (next-gen)
@@ -531,6 +532,7 @@ def get_query(
         include_structure=include_structure,
         max_strucs_per_cmpd=max_strucs_per_cmpd,
         include_sub_phase_diagrams=include_sub_phase_diagrams,
+        conventional=conventional,
     )
 
     write_json(data, fjson)
@@ -2521,7 +2523,6 @@ def get_adsorption_energy_results(data_dir,
     
     write_json(ads,fjson)
     return read_json(fjson)
-
 
 
 def main():
