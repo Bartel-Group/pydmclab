@@ -1,3 +1,5 @@
+from __future__ import annotations 
+
 import os
 import subprocess
 import yaml
@@ -26,7 +28,11 @@ from pymatgen.core.interface import Interface, label_termination
 
 from pydmclab.core import struc as pydmc_struc
 from pydmclab.core.comp import CompTools
-from pydmclab.core.energies import ChemPots
+
+from typing import TYPE_CHECKING 
+
+if TYPE_CHECKING:
+    from pydmclab.core.energies import ChemPots
 
 
 class StrucTools(object):
