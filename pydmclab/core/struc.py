@@ -10,6 +10,7 @@ from shutil import copyfile, rmtree
 from typing import List, Tuple, Dict, Literal
 from collections.abc import Iterator
 import numpy as np
+from typing import Union
 
 from pymatgen.core import Structure, PeriodicSite, Composition
 from pymatgen.core.surface import SlabGenerator, Slab
@@ -705,7 +706,7 @@ class InterfaceTools(object):
         return interface
     
     def interface_surface_area(self,
-                     relaxed_interface: Interface,
+                     relaxed_interface: Union[Interface, Structure],
                     #  interface_e_per_atom: float,
                      )-> float:
 
@@ -720,7 +721,7 @@ class InterfaceTools(object):
         return area
 
         
-    def interfacial_energy(self,relaxed_interface: Interface, interface_e_per_at:float):
+    def interfacial_energy(self,relaxed_interface: Union[Interface, Structure], interface_e_per_at:float):
         
         # Calling the interface_surface_area method to get the area
         self.interface_surface_area(relaxed_interface)

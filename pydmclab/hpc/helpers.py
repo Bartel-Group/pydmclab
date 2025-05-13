@@ -2548,6 +2548,8 @@ def get_interfaces(data_dir,
             films[entry] = slab
             entry_split = re.split('--', entry)
             film_chemID = entry_split[0]
+        else:
+            continue
     for entry in substrate_slabs:
         if 'slab' in substrate_slabs[entry]:
             slab_dict = substrate_slabs[entry]['slab']
@@ -2555,6 +2557,8 @@ def get_interfaces(data_dir,
             substrates[entry] = slab
             entry_split = re.split('--', entry)
             substrate_chemID = entry_split[0]
+        else:
+            continue
 
     interfaces = {}
     comp_ID = substrate_chemID + '_' + film_chemID
@@ -2562,19 +2566,19 @@ def get_interfaces(data_dir,
 
     for film_key in films.keys():
         film_key_split = re.split('--|_', film_key)
-        film_chemID, film_miller, film_size, film_termination = film_key_split[0], film_key_split[2], film_key_split[3], film_key_split[5]
+        film_slabID, film_miller, film_size, film_termination = film_key_split[1], film_key_split[2], film_key_split[3], film_key_split[5]
 
         film_slab = films[film_key]
         film_e_per_atom = film_slabs[film_key]['results']['E_per_at']
 
         for substrate_key in substrates.keys():
             substrate_key_split = re.split('--|_', substrate_key)
-            substrate_chemID, substrate_miller, substrate_size, substrate_termination = substrate_key_split[0], substrate_key_split[2], substrate_key_split[3], substrate_key_split[5]
+            substrate_slabID, substrate_miller, substrate_size, substrate_termination = substrate_key_split[1], substrate_key_split[2], substrate_key_split[3], substrate_key_split[5]
 
             substrate_slab = substrates[substrate_key]
             substrate_e_per_atom = substrate_slabs[substrate_key]['results']['E_per_at']
 
-            unique_ID = substrate_chemID + '--' + substrate_miller + '_' + substrate_size + '_' + substrate_termination + '-' + film_chemID +'--' + film_miller + '_' + film_size + '_' + film_termination
+            unique_ID = substrate_slabID + '_' + substrate_miller + '_' + substrate_size + '_' + substrate_termination + '--' + film_slabID + '_' + film_miller + '_' + film_size + '_' + film_termination
 
             interfaces[comp_ID][unique_ID] = {}
 
@@ -2586,6 +2590,105 @@ def get_interfaces(data_dir,
     
     write_json(interfaces,fjson)
     return read_json(fjson)
+
+def get_interfacial_energy(data_dir,
+                           film_slab_dir,
+                           substrate_slab_dir,):
+
+    film_slabs = read_json(os.path.join(film_slab_dir,'results_with_slabs.json'))
+    substrate_slabs = read_json(os.path.join(substrate_slab_dir,'results_with_slabs.json'))
+    interfaces = read_json(os.path.join(data_dir,'results.json'))
+
+    films_energy = {}
+    substrates_energy = {}
+    interfaces_energy = {}
+
+    for entry in film_slabs:
+        if film_slabs[entry]['results']['convergence']:
+            energy = film_slabs[entry]['results']['E_per_at']
+            films_energy[entry] = energy
+            split = re.split('--|_',entry)
+            film_vacuum = split[4]
+        else:
+            continue
+    
+    for entry in substrate_slabs:
+        if substrate_slabs[entry]['results']['convergence']:
+            energy = substrate_slabs[entry]['results']['E_per_at']
+            substrates_energy[entry] = energy
+            split = re.split('--|_',entry)
+            sub_vacuum = split[4]
+        else:
+            continue
+
+    for entry in interfaces:
+        if interfaces[entry]['results']['convergence']:
+            energy = interfaces[entry]['results']['E_per_at']
+            interfaces_energy[entry] = energy
+            entry_split = re.split('--', entry)
+            interface_chemID = entry_split[0]
+        else:
+            continue
+    
+    film_slabs_strucs = {}
+    substrate_slabs_strucs = {}
+    interfaces_strucs = {}
+
+    for entry in film_slabs:
+        if 'slab' in film_slabs[entry] and film_slabs[entry]['results']['convergence']:
+            slab_dict = film_slabs[entry]['slab']
+            slab = Slab.from_dict(slab_dict)
+            film_slabs_strucs[entry] = slab
+        else:
+            continue
+    for entry in substrate_slabs:
+        if 'slab' in substrate_slabs[entry] and substrate_slabs[entry]['results']['convergence']:
+            slab_dict = substrate_slabs[entry]['slab']
+            slab = Slab.from_dict(slab_dict)
+            substrate_slabs_strucs[entry] = slab
+        else:
+            continue
+    for entry in interfaces:
+        if 'structure' in interfaces[entry] and interfaces[entry]['results']['convergence']:
+            struc_dict = interfaces[entry]['structure']
+            struc = Structure.from_dict(struc_dict)
+            interfaces_strucs[entry] = struc
+        else:
+            continue
+
+    for key in interfaces.keys():
+        if interfaces[key]['results']['convergence']:
+            key_split = re.split('--|_', key)
+
+            sub_chemID, film_chemID = key_split[0], key_split[1]
+            
+            sub_mpID, sub_miller, sub_size, sub_term = key_split[2], key_split[3], key_split[4], key_split[5]
+            film_mpID, film_miller, film_size, film_term = key_split[6], key_split[7], key_split[8], key_split[9]
+
+            mag, functional = key_split[10], key_split[11]
+
+            films_key = film_chemID + '--' + film_mpID + '_' + film_miller + '_' + film_size + '_' + film_vacuum + '_' + film_term + '--' + mag + '--' + functional
+            substrates_key = sub_chemID + '--' + sub_mpID + '_' + sub_miller + '_' + sub_size + '_' + sub_vacuum + '_' + sub_term + '--' + mag + '--' + functional
+
+            interfaces_key = sub_chemID + '_' + film_chemID + '--' + film_mpID + '_' + film_miller + '_' + film_size + '_' + film_vacuum + '_' + film_term + '--' + sub_mpID + '_' + sub_miller + '_' + sub_size + '_' + sub_vacuum + '_' + sub_term
+
+            IF  = InterfaceTools(slab_film=film_slabs_strucs[films_key], 
+                                slab_substrate=substrate_slabs_strucs[substrates_key], 
+                                slab_film_e_per_atom=films_energy[films_key], 
+                                slab_substrate_e_per_atom=substrates_energy[substrates_key])
+
+            interfaces[key]['results']['E_interfacial_per_at'] = {}
+
+            inter_e = IF.interfacial_energy(relaxed_interface = interfaces_strucs[interfaces_key],
+                                            interface_e_per_at= interfaces_energy[interfaces_key])
+            
+            interfaces[key]['results']['E_interfacial_per_at'] = inter_e
+
+        else:
+            continue
+    
+    write_json(interfaces,os.path.join(data_dir,'results.json'))
+    return read_json(os.path.join(data_dir,'results.json'))
 
 
 def main():
