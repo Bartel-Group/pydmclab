@@ -2357,9 +2357,9 @@ def get_results_with_slabs(data_dir,
 def get_adsorbed_slabs(adsorbate_type,
                        data_dir, 
                        slab_dir = None,
+                       ref_bulk_dir = None,
                        selective_dynamics = True,
-                       height = 0.9,
-
+                       height = None,
                        super_cell = None,
                        savename = 'ads_slabs.json',
                        remake = False
@@ -2369,20 +2369,36 @@ def get_adsorbed_slabs(adsorbate_type,
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
 
-    if slab_dir == None:
+    if not slab_dir:
         slab_dir = os.path.join('..','..','slabs','data')
-
     else:
         slab_dir = slab_dir
 
+    if not ref_bulk_dir:
+        ref_bulk_dir = os.path.join('..','..','bulk-references/data')
+    else:
+        ref_bulk_dir = ref_bulk_dir
+
     slab_results = read_json(os.path.join(slab_dir,'results_with_slabs.json'))
-    
+    ref_bulk_results = read_json(os.path.join(ref_bulk_dir,'results.json'))
+
     key_splitting = re.split(r'--|_', list(slab_results.keys())[0])
     chemID = key_splitting[0]
     for key in slab_results.keys():
         slab_dict = slab_results[key]['slab']
         slab = Slab.from_dict(slab_dict)
-
+        
+        key_split = re.split(r'--|_', key)
+        formula, mpID, miller, size, vac, term, mag, theory = key_split[0], key_split[1], key_split[2], key_split[3], key_split[4], key_split[5], key_split[6], key_split[7]
+        ref_bulk_results_key = formula + '--' + mpID + '_' + 'reference-bulk_' + miller + '--' + mag + '--' + theory
+        
+        ref_struc = Structure.from_dict(ref_bulk_results[ref_bulk_results_key]['structure'])
+        
+        if not height:
+            height = ref_struc.lattice.c
+        else:
+            height = height
+        
         ads = AdsorbateSiteFinder(slab, selective_dynamics, height)
         ads_sites_dict = ads.find_adsorption_sites()
         ads_sites = ads_sites_dict['all']
