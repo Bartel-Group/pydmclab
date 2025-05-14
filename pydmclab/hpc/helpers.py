@@ -4,6 +4,7 @@ import re
 import warnings
 import numpy as np 
 import subprocess
+from typing import Union
 
 
 from pydmclab.hpc.launch import LaunchTools
@@ -2353,13 +2354,49 @@ def get_results_with_slabs(data_dir,
     write_json(results,fjson)
     return read_json(fjson)
 
+def set_selective_dynamics_by_height(structure: Union[Structure, Slab], 
+                                     height: float) -> Structure:
+    """
+    Set selective dynamics flags in a pymatgen Structure based on a height threshold from the topmost atom.
+
+    Args:
+        structure (Structure): The input pymatgen Structure object.
+        height (float): The vertical (z-direction) distance from the highest atom to consider for relaxation.
+
+    Returns:
+        Structure: A new Structure object with selective dynamics flags set.
+    """
+    # Make a copy so original structure is not modified
+    struct = structure.copy()
+    
+    # Get all z-coordinates in Cartesian coordinates
+    z_coords = [site.coords[2] for site in struct.sites]
+    
+    # Find max z
+    max_z = max(z_coords)
+    
+    # Compute threshold z
+    z_threshold = max_z - height
+    
+    # Determine selective dynamics flags
+    selective_flags = []
+    for z in z_coords:
+        if z >= z_threshold:
+            selective_flags.append([True, True, True])  # Relax
+        else:
+            selective_flags.append([False, False, False])  # Fixed
+    
+    # Set the selective dynamics flags
+    struct.add_site_property("selective_dynamics", selective_flags)
+    
+    return struct
 
 def get_adsorbed_slabs(adsorbate_type,
                        data_dir, 
                        slab_dir = None,
                        ref_bulk_dir = None,
-                       selective_dynamics = True,
-                       height = None,
+                       selective_dynamics = False,
+                       height = 0.9,
                        super_cell = None,
                        savename = 'ads_slabs.json',
                        remake = False
@@ -2394,10 +2431,9 @@ def get_adsorbed_slabs(adsorbate_type,
         
         ref_struc = Structure.from_dict(ref_bulk_results[ref_bulk_results_key]['structure'])
         
-        if not height:
-            height = ref_struc.lattice.c
-        else:
-            height = height
+        bulk_unit_cell_height = ref_struc.lattice.c
+
+        set_selective_dynamics_by_height(slab, height = bulk_unit_cell_height)
         
         ads = AdsorbateSiteFinder(slab, selective_dynamics, height)
         ads_sites_dict = ads.find_adsorption_sites()
