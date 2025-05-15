@@ -191,10 +191,6 @@ GEN_MAGMOMS = (
     else False
 )
 
-# What kind of molecule do we want to adsorb?
-# Can either be a string or a list of strings
-# Example: 'O' or ['O','N','H']
-
 def main():
     # make a submission script so you can execute launcher.py on the cluster
     remake_sub_for_launcher = False

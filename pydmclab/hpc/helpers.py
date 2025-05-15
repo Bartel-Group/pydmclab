@@ -2581,6 +2581,7 @@ def get_interfaces(data_dir,
                    film_slab_dir,
                    substrate_slab_dir,
                    remake = False,
+                   gap = 2.0,
                    savename = 'interfaces.json',):
     
     fjson = os.path.join(data_dir,savename)
@@ -2636,7 +2637,7 @@ def get_interfaces(data_dir,
 
             IF = InterfaceTools(slab_film=film_slab, slab_substrate=substrate_slab, slab_film_e_per_atom=film_e_per_atom, slab_substrate_e_per_atom=substrate_e_per_atom)
 
-            interface = IF.get_interface_from_slabs()
+            interface = IF.get_interface_from_slabs(gap=gap)
 
             interfaces[comp_ID][unique_ID] = interface.as_dict()
     
