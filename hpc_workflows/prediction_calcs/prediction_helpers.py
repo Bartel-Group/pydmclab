@@ -5,6 +5,8 @@ import os
 import shutil
 import subprocess
 
+from tqdm import tqdm
+
 from ase import units
 
 from pydmclab.utils.handy import read_json, write_json
@@ -250,13 +252,17 @@ def batch_strucs(strucs: dict, batch_size: int) -> dict:
     batched_strucs = {}
     current_batch = {}
 
-    for formula in strucs:
-        for struc_id, struc in strucs[formula].items():
-            current_batch[f"{formula}_{struc_id}"] = struc
-            if len(current_batch) == batch_size:
-                batched_strucs[f"batch_{batch_id}"] = current_batch
-                batch_id += 1
-                current_batch = {}
+    total_strucs = sum(len(strucs[formula]) for formula in strucs)
+
+    with tqdm(total=total_strucs, desc="Batching structures") as pbar:
+        for formula in strucs:
+            for struc_id, struc in strucs[formula].items():
+                current_batch[f"{formula}_{struc_id}"] = struc
+                pbar.update(1)
+                if len(current_batch) == batch_size:
+                    batched_strucs[f"batch_{batch_id}"] = current_batch
+                    batch_id += 1
+                    current_batch = {}
 
     if current_batch:
         batched_strucs[f"batch_{batch_id}"] = current_batch
@@ -347,14 +353,18 @@ def make_prediction_scripts(
         None, writes predict script for each job (batch)
     """
 
-    architecture = architecture_configs["architecture"]
+    architecture = user_configs["architecture"]
+    if architecture.lower() == "chgnet":
+        model = user_configs["relaxer_configs"]["model"].replace(".", "")
+    elif architecture.lower() == "mace":
+        model = user_configs["relaxer_configs"]["models"]
 
     for batch_id in batching:
 
         launch_dir = batching[batch_id]["launch_dir"]
 
         prediction_script = os.path.join(
-            launch_dir, f"{architecture.lower()}-prediction.py"
+            launch_dir, f"{architecture.lower()}-{model}-prediction.py"
         )
 
         if os.path.exists(prediction_script) and not remake:
@@ -411,7 +421,7 @@ def make_prediction_scripts(
 
             elif 'results = os.path.join(curr_dir, "placeholder")' in line:
                 prediction_script_lines[i] = (
-                    f"{indent}results = os.path.join(curr_dir, '{architecture.lower()}_prediction_results.json')\n"
+                    f"{indent}results = os.path.join(curr_dir, '{architecture.lower()}_{model}_prediction_results.json')\n"
                 )
 
             elif 'relaxer = "placeholder"' in line:
@@ -486,7 +496,7 @@ def make_submission_scripts(
             f.write(f"#SBATCH --job-name={job_name}\n")
             f.write(f"#SBATCH --partition={user_configs['partition']}\n")
             f.write("\n")
-            f.write(f"python {architecture.lower()}-prediction.py\n")
+            f.write(f"python {architecture.lower()}-{model}-prediction.py\n")
 
         print(f"\nCreated new submission script for {launch_dir}")
 
@@ -556,9 +566,15 @@ def check_job_completion_status(launch_dir: str, user_configs: dict) -> bool:
     """
 
     architecture = user_configs["architecture"]
+    if architecture.lower() == "chgnet":
+        model = user_configs["relaxer_configs"]["model"].replace(".", "")
+    elif architecture.lower() == "mace":
+        model = user_configs["relaxer_configs"]["models"]
+
+
     num_ini_strucs = len(read_json(os.path.join(launch_dir, "ini_strucs.json")))
     batch_results = os.path.join(
-        launch_dir, f"{architecture.lower()}_prediction_results.json"
+        launch_dir, f"{architecture.lower()}_{model}_prediction_results.json"
     )
     if os.path.exists(batch_results):
         num_predictioned_strucs = len(read_json(batch_results))
@@ -580,7 +596,12 @@ def submit_jobs(batching: dict, user_configs: dict) -> None:
     Returns:
         None, submits jobs if not already in queue or finished
     """
+
     architecture = user_configs["architecture"]
+    if architecture.lower() == "chgnet":
+        model = user_configs["relaxer_configs"]["model"].replace(".", "")
+    elif architecture.lower() == "mace":
+        model = user_configs["relaxer_configs"]["models"]
 
     scripts_dir = os.getcwd()
 
@@ -588,7 +609,7 @@ def submit_jobs(batching: dict, user_configs: dict) -> None:
 
         launch_dir = batching[batch_id]["launch_dir"]
 
-        job_name = f"{architecture.lower()}_prediction_{batch_id}"
+        job_name = f"{architecture.lower()}_{model}_prediction_{batch_id}"
 
         # check if job is already in queue
         if check_job_submission_status(job_name):
@@ -630,8 +651,12 @@ def collect_results(
         results (dict): dict of predictionation results and configs
     """
     architecture = user_configs["architecture"]
+    if architecture.lower() == "chgnet":
+        model = user_configs["relaxer_configs"]["model"].replace(".", "")
+    elif architecture.lower() == "mace":
+        model = user_configs["relaxer_configs"]["models"]
 
-    fjson = os.path.join(data_dir, f"{architecture.lower()}_prediction_results.json")
+    fjson = os.path.join(data_dir, f"{architecture.lower()}_{model}_prediction_results.json")
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
 
@@ -653,7 +678,7 @@ def collect_results(
             continue
 
         batch_prediction_results = read_json(
-            os.path.join(launch_dir, f"{architecture.lower()}_prediction_results.json")
+            os.path.join(launch_dir, f"{architecture.lower()}_{model}_prediction_results.json")
         )
 
         for formula_struc_id, prediction_result in batch_prediction_results.items():
