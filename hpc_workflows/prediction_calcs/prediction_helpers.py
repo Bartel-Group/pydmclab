@@ -67,7 +67,7 @@ def get_chgnet_configs(
         "return_crystal_feas"
     ] = return_crystal_feas
     architecture_configs["predict_structure_configs"]["batch_size"] = batch_size
-    
+
     return architecture_configs
 
 
@@ -359,96 +359,111 @@ def make_prediction_scripts(
     elif architecture.lower() == "mace":
         model = user_configs["relaxer_configs"]["models"]
 
-    for batch_id in batching:
+    total_batches = len(batching)
 
-        launch_dir = batching[batch_id]["launch_dir"]
+    with tqdm(total=total_batches, desc="Making prediction scripts") as pbar:
 
-        prediction_script = os.path.join(
-            launch_dir, f"{architecture.lower()}-{model}-prediction.py"
-        )
+        for batch_id in batching:
 
-        if os.path.exists(prediction_script) and not remake:
-            continue
+            launch_dir = batching[batch_id]["launch_dir"]
 
-        with open(prediction_template, "r", encoding="utf-8") as template_file:
-            template_lines = template_file.readlines()
+            prediction_script = os.path.join(
+                launch_dir, f"{architecture.lower()}-{model}-prediction.py"
+            )
 
-        prediction_script_lines = template_lines.copy()
+            if os.path.exists(prediction_script) and not remake:
+                continue
 
-        for i, line in enumerate(prediction_script_lines):
+            with open(prediction_template, "r", encoding="utf-8") as template_file:
+                template_lines = template_file.readlines()
 
-            indent = detect_indent(line)
+            prediction_script_lines = template_lines.copy()
 
-            if 'from pydmclab.mlp import "placeholder"' in line:
-                prediction_script_lines[i] = (
-                    f"{indent}from pydmclab.mlp.{architecture.lower()}.dynamics import {architecture}Relaxer\n"
-                )
+            for i, line in enumerate(prediction_script_lines):
 
-            elif 'intra_op_threads = "placeholder"' in line:
-                prediction_script_lines[i] = (
-                    f'{indent}intra_op_threads = {user_configs["num_intraop_threads"]}\n'
-                )
-            elif 'inter_op_threads = "placeholder"' in line:
-                prediction_script_lines[i] = (
-                    f'{indent}inter_op_threads = {user_configs["num_interop_threads"]}\n'
-                )
+                indent = detect_indent(line)
 
-            elif 'architecture = "placeholder"' in line:
-                prediction_script_lines[i] = (
-                    f"{indent}architecture = '{architecture}'\n"
-                )
+                if 'from pydmclab.mlp import "placeholder"' in line:
+                    prediction_script_lines[i] = (
+                        f"{indent}from pydmclab.mlp.{architecture.lower()}.dynamics import {architecture}Relaxer\n"
+                    )
 
-            elif 'relaxer_configs = "placeholder"' in line:
-                config_lines = [
-                    f"{indent}{key} = {repr(value)}\n"
-                    for key, value in architecture_configs["relaxer_configs"].items()
-                ]
-                prediction_script_lines[i : i + 1] = config_lines
+                elif 'intra_op_threads = "placeholder"' in line:
+                    prediction_script_lines[i] = (
+                        f'{indent}intra_op_threads = {user_configs["num_intraop_threads"]}\n'
+                    )
+                elif 'inter_op_threads = "placeholder"' in line:
+                    prediction_script_lines[i] = (
+                        f'{indent}inter_op_threads = {user_configs["num_interop_threads"]}\n'
+                    )
 
-            elif 'predict_structure_configs = "placeholder"' in line:
-                config_lines = [
-                    f"{indent}{key} = {repr(value)}\n"
-                    for key, value in architecture_configs[
-                        "predict_structure_configs"
-                    ].items()
-                ]
-                prediction_script_lines[i : i + 1] = config_lines
+                elif 'architecture = "placeholder"' in line:
+                    prediction_script_lines[i] = (
+                        f"{indent}architecture = '{architecture}'\n"
+                    )
 
-            elif 'save_interval = "placeholder"' in line:
-                prediction_script_lines[i] = (
-                    f"{indent}save_interval = {user_configs['save_interval']}\n"
-                )
+                elif 'relaxer_configs = "placeholder"' in line:
+                    config_lines = [
+                        f"{indent}{key} = {repr(value)}\n"
+                        for key, value in architecture_configs[
+                            "relaxer_configs"
+                        ].items()
+                    ]
+                    prediction_script_lines[i : i + 1] = config_lines
 
-            elif 'results = os.path.join(curr_dir, "placeholder")' in line:
-                prediction_script_lines[i] = (
-                    f"{indent}results = os.path.join(curr_dir, '{architecture.lower()}_{model}_prediction_results.json')\n"
-                )
+                elif 'predict_structure_configs = "placeholder"' in line:
+                    config_lines = [
+                        f"{indent}{key} = {repr(value)}\n"
+                        for key, value in architecture_configs[
+                            "predict_structure_configs"
+                        ].items()
+                    ]
+                    prediction_script_lines[i : i + 1] = config_lines
 
-            elif 'relaxer = "placeholder"' in line:
+                elif 'save_interval = "placeholder"' in line:
+                    prediction_script_lines[i] = (
+                        f"{indent}save_interval = {user_configs['save_interval']}\n"
+                    )
 
-                class_call_line = [f"{indent}relaxer = {architecture}Relaxer(\n"]
-                relaxer_config_lines = [
-                    f"{indent}    {key} = {key},\n"
-                    for key in architecture_configs["relaxer_configs"].keys()
-                ]
-                end_call_line = [f"{indent})\n"]
-                
-                prediction_script_lines[i : i + 1] = class_call_line + relaxer_config_lines + end_call_line
-                
-            elif 'struc_results = "placeholder"' in line:
-                class_call_line = [f"{indent}struc_results = relaxer.predict_structure(ini_struc, \n"]
-                predict_structure_config_lines = [
-                    f"{indent}    {key} = {key},\n"
-                    for key in architecture_configs["predict_structure_configs"].keys()
-                ]
-                end_call_line = [f"{indent})\n"]
-                
-                prediction_script_lines[i : i + 1] = class_call_line + predict_structure_config_lines + end_call_line
-                
-        with open(prediction_script, "w", encoding="utf-8") as script_file:
-            script_file.writelines(prediction_script_lines)
+                elif 'results = os.path.join(curr_dir, "placeholder")' in line:
+                    prediction_script_lines[i] = (
+                        f"{indent}results = os.path.join(curr_dir, '{architecture.lower()}_{model}_prediction_results.json')\n"
+                    )
 
-        print(f"\nCreated new prediction script for {launch_dir}")
+                elif 'relaxer = "placeholder"' in line:
+
+                    class_call_line = [f"{indent}relaxer = {architecture}Relaxer(\n"]
+                    relaxer_config_lines = [
+                        f"{indent}    {key} = {key},\n"
+                        for key in architecture_configs["relaxer_configs"].keys()
+                    ]
+                    end_call_line = [f"{indent})\n"]
+
+                    prediction_script_lines[i : i + 1] = (
+                        class_call_line + relaxer_config_lines + end_call_line
+                    )
+
+                elif 'struc_results = "placeholder"' in line:
+                    class_call_line = [
+                        f"{indent}struc_results = relaxer.predict_structure(ini_struc, \n"
+                    ]
+                    predict_structure_config_lines = [
+                        f"{indent}    {key} = {key},\n"
+                        for key in architecture_configs[
+                            "predict_structure_configs"
+                        ].keys()
+                    ]
+                    end_call_line = [f"{indent})\n"]
+
+                    prediction_script_lines[i : i + 1] = (
+                        class_call_line + predict_structure_config_lines + end_call_line
+                    )
+
+            with open(prediction_script, "w", encoding="utf-8") as script_file:
+                script_file.writelines(prediction_script_lines)
+
+            print(f"\nCreated new prediction script for {launch_dir}")
+            pbar.update(1)
 
     return
 
@@ -480,7 +495,6 @@ def make_submission_scripts(
 
         if os.path.exists(prediction_launcher) and not remake:
             continue
-        
 
         job_name = f"{architecture.lower()}_{model}_prediction_{batch_id}"
 
@@ -571,7 +585,6 @@ def check_job_completion_status(launch_dir: str, user_configs: dict) -> bool:
     elif architecture.lower() == "mace":
         model = user_configs["relaxer_configs"]["models"]
 
-
     num_ini_strucs = len(read_json(os.path.join(launch_dir, "ini_strucs.json")))
     batch_results = os.path.join(
         launch_dir, f"{architecture.lower()}_{model}_prediction_results.json"
@@ -656,7 +669,9 @@ def collect_results(
     elif architecture.lower() == "mace":
         model = user_configs["relaxer_configs"]["models"]
 
-    fjson = os.path.join(data_dir, f"{architecture.lower()}_{model}_prediction_results.json")
+    fjson = os.path.join(
+        data_dir, f"{architecture.lower()}_{model}_prediction_results.json"
+    )
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
 
@@ -667,26 +682,34 @@ def collect_results(
     results["architecture_configs"] = architecture_configs
 
     # collect results from each batch
-    for batch_id in batching:
 
-        launch_dir = batching[batch_id]["launch_dir"]
+    total_batches = len(batching)
 
-        # check if job is finished
-        if not check_job_completion_status(
-            launch_dir=launch_dir, user_configs=user_configs
-        ):
-            continue
+    with tqdm(total=total_batches, desc="Collecting results") as pbar:
+        for batch_id in batching:
 
-        batch_prediction_results = read_json(
-            os.path.join(launch_dir, f"{architecture.lower()}_{model}_prediction_results.json")
-        )
+            launch_dir = batching[batch_id]["launch_dir"]
 
-        for formula_struc_id, prediction_result in batch_prediction_results.items():
-            formula, struc_id = formula_struc_id.split("_", 1)
-            if formula not in results["prediction_results"]:
-                results["prediction_results"][formula] = {}
-            prediction_result["batch_id"] = batch_id
-            results["prediction_results"][formula][struc_id] = prediction_result
+            # check if job is finished
+            if not check_job_completion_status(
+                launch_dir=launch_dir, user_configs=user_configs
+            ):
+                continue
+
+            batch_prediction_results = read_json(
+                os.path.join(
+                    launch_dir,
+                    f"{architecture.lower()}_{model}_prediction_results.json",
+                )
+            )
+
+            for formula_struc_id, prediction_result in batch_prediction_results.items():
+                formula, struc_id = formula_struc_id.split("_", 1)
+                if formula not in results["prediction_results"]:
+                    results["prediction_results"][formula] = {}
+                prediction_result["batch_id"] = batch_id
+                results["prediction_results"][formula][struc_id] = prediction_result
+            pbar.update(1)
 
     write_json(results, fjson)
     return read_json(fjson)
