@@ -621,6 +621,9 @@ class InterfaceTools(object):
         self.film_slab_e_per_atom = slab_film_e_per_atom
         self.substrate_slab_e_per_atom = slab_substrate_e_per_atom
 
+        self.film_n_atoms = slab_film.num_sites
+        self.substrate_n_atoms = slab_substrate.num_sites
+
         return None
 
     @property
@@ -726,9 +729,11 @@ class InterfaceTools(object):
         # Calling the interface_surface_area method to get the area
         self.interface_surface_area(relaxed_interface)
 
+        interface_n_atoms = relaxed_interface.num_sites
+
         energy = 1/(2*self.area) * (
-            interface_e_per_at
-            - (self.film_slab_e_per_atom + self.substrate_slab_e_per_atom)
+            interface_e_per_at*interface_n_atoms
+            - (self.film_slab_e_per_atom * self.film_n_atoms + self.substrate_slab_e_per_atom * self.substrate_n_atoms)
         )
 
         return energy
