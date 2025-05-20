@@ -2723,7 +2723,7 @@ def get_interfacial_energy(data_dir,
             films_key = film_chemID + '--' + film_mpID + '_' + film_miller + '_' + film_size + '_' + film_vacuum + '_' + film_term + '--' + mag + '--' + functional
             substrates_key = sub_chemID + '--' + sub_mpID + '_' + sub_miller + '_' + sub_size + '_' + sub_vacuum + '_' + sub_term + '--' + mag + '--' + functional
 
-            interfaces_key = sub_chemID + '_' + film_chemID + '--' + film_mpID + '_' + film_miller + '_' + film_size + '_' + film_vacuum + '_' + film_term + '--' + sub_mpID + '_' + sub_miller + '_' + sub_size + '_' + sub_vacuum + '_' + sub_term
+            # interfaces_key = sub_chemID + '_' + film_chemID + '--' + film_mpID + '_' + film_miller + '_' + film_size + '_' + film_vacuum + '_' + film_term + '--' + sub_mpID + '_' + sub_miller + '_' + sub_size + '_' + sub_vacuum + '_' + sub_term
 
             IF  = InterfaceTools(slab_film=film_slabs_strucs[films_key], 
                                 slab_substrate=substrate_slabs_strucs[substrates_key], 
@@ -2732,8 +2732,8 @@ def get_interfacial_energy(data_dir,
 
             interfaces[key]['results']['E_interfacial_per_at'] = {}
 
-            inter_e = IF.interfacial_energy(relaxed_interface = interfaces_strucs[interfaces_key],
-                                            interface_e_per_at= interfaces_energy[interfaces_key])
+            inter_e = IF.interfacial_energy(relaxed_interface = interfaces_strucs[key],
+                                            interface_e_per_at= interfaces_energy[key])
             
             interfaces[key]['results']['E_interfacial_per_at'] = inter_e
 
