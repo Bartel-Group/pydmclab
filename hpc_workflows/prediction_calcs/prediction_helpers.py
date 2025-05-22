@@ -563,10 +563,8 @@ def check_job_submission_status(job_name: str) -> bool:
 
     # if this job is in the queue, return True
     if len(names_in_q) > 0:
-        # print("  %s already in queue, not messing with it\n" % job_name)
         return True
 
-    # print("  %s not in queue, onward\n" % job_name)
     return False
 
 
