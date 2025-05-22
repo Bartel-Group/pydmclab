@@ -1469,7 +1469,7 @@ class SolidSolutionGenerator:
             rmtree(dir_name)
 
     def run(
-        self, sqsgen_path: str = "path/to/sqsgen", cleanup: bool = True
+        self, sqsgen_path: str = "path/to/sqsgen", cleanup: bool = False
     ) -> Tuple[List[Structure], List[Structure], List[Structure]]:
         """
         Run the entire solid solution generation process.
