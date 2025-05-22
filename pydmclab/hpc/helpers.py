@@ -2391,11 +2391,9 @@ def set_selective_dynamics_by_height(structure: Union[Structure, Slab],
     
     return struct
 
-def get_adsorbed_slabs(adsorbate_type,
-                       data_dir,
-                       multi_atom = False,
-                       molecule_comp = None,
-                       coordinates = None,
+def get_adsorbed_slabs(data_dir,
+                       adsorbate_type=None,
+                       molecule_object = None,
                        slab_dir = None,
                        ref_bulk_dir = None,
                        selective_dynamics = False,
@@ -2444,20 +2442,15 @@ def get_adsorbed_slabs(adsorbate_type,
 
         slab_results[key]['adsorbed_slabs'] = {}
 
-        if isinstance(adsorbate_type,str):
+        if isinstance(adsorbate_type,str) and adsorbate_type:
             slab_results[key]['adsorbed_slabs'][adsorbate_type] = {}
             for i in range(len(ads_sites)):
-                if not multi_atom and not coordinates and not molecule_comp:
-                    adsorbate = Molecule([adsorbate_type],[[0,0,0]])
-                elif multi_atom and coordinates and molecule_comp:
-                    adsorbate = Molecule(molecule_comp,coordinates)
-                else:
-                    raise ValueError('You must either provide a list of coordinates and a list of composition for multi-atom adsorbates or set multi_atom to False and provide string or list of strings of single adsorbate types')
+                adsorbate = Molecule([adsorbate_type],[[0,0,0]])
                 adsorbed_slab = ads.add_adsorbate(adsorbate,ads_sites[i],super_cell)
 
                 slab_results[key]['adsorbed_slabs'][adsorbate_type][str(i)] = adsorbed_slab.as_dict()
         
-        elif isinstance(adsorbate_type,(list,np.ndarray)):
+        elif isinstance(adsorbate_type,(list,np.ndarray)) and adsorbate_type:
             for k in range(len(adsorbate_type)):
                 adsorbate = Molecule([adsorbate_type[k]],[[0,0,0]])
 
@@ -2468,8 +2461,13 @@ def get_adsorbed_slabs(adsorbate_type,
 
                     slab_results[key]['adsorbed_slabs'][adsorbate_type[k]][str(j)] = adsorbed_slab.as_dict()
                     ads_formula = adsorbed_slab.formula
+        elif not adsorbate_type and molecule_object:
+            slab_results[key]['adsorbed_slabs'][molecule_object.reduced_formula] = {}
+            for i in range(len(ads_sites)):
+                adsorbed_slab = ads.add_adsorbate(molecule_object,ads_sites[i],super_cell)
 
-    
+                slab_results[key]['adsorbed_slabs'][molecule_object.reduced_formula][str(i)] = adsorbed_slab.as_dict()
+
     ads_slabs = {}
     ads_slabs[chemID] = {}
 
