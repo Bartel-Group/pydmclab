@@ -2392,7 +2392,9 @@ def set_selective_dynamics_by_height(structure: Union[Structure, Slab],
     return struct
 
 def get_adsorbed_slabs(adsorbate_type,
-                       data_dir, 
+                       data_dir,
+                       multi_atom = False,
+                       molecule_comp = None,
                        coordinates = None,
                        slab_dir = None,
                        ref_bulk_dir = None,
@@ -2445,10 +2447,12 @@ def get_adsorbed_slabs(adsorbate_type,
         if isinstance(adsorbate_type,str):
             slab_results[key]['adsorbed_slabs'][adsorbate_type] = {}
             for i in range(len(ads_sites)):
-                if not coordinates:
+                if not multi_atom and not coordinates and not molecule_comp:
                     adsorbate = Molecule([adsorbate_type],[[0,0,0]])
+                elif multi_atom and coordinates and molecule_comp:
+                    adsorbate = Molecule(molecule_comp,coordinates)
                 else:
-                    adsorbate = Molecule([adsorbate_type],coordinates)
+                    raise ValueError('You must either provide a list of coordinates and a list of composition for multi-atom adsorbates or set multi_atom to False and provide string or list of strings of single adsorbate types')
                 adsorbed_slab = ads.add_adsorbate(adsorbate,ads_sites[i],super_cell)
 
                 slab_results[key]['adsorbed_slabs'][adsorbate_type][str(i)] = adsorbed_slab.as_dict()
