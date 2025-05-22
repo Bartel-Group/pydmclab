@@ -1,5 +1,8 @@
 import os
 import torch
+
+from tqdm import tqdm
+
 from pydmclab.core.struc import StrucTools
 from pydmclab.mlp import "placeholder"
 from pydmclab.utils.handy import read_json, write_json, convert_numpy_to_native
@@ -54,30 +57,33 @@ def main():
     relaxer = "placeholder"
 
     # predict structures
+    total_strucs = len(ini_strucs)
     current_prediction_results = {}
-    for name, ini_struc in ini_strucs.items():
+    
+    with tqdm(total=total_strucs, desc="Predicting Structures") as pbar:
+        for name, ini_struc in ini_strucs.items():
 
-        st = StrucTools(ini_struc)
-        ini_struc = st.structure
-        ini_dict = st.structure_as_dict
+            st = StrucTools(ini_struc)
+            ini_struc = st.structure
+            ini_dict = st.structure_as_dict
 
-        struc_results = "placeholder"
+            struc_results = "placeholder"
 
-        struc_results["structure"] = ini_dict
-        struc_results = convert_numpy_to_native(struc_results)
-        current_prediction_results.update({name: struc_results})
+            struc_results["structure"] = ini_dict
+            struc_results = convert_numpy_to_native(struc_results)
+            current_prediction_results.update({name: struc_results})
+            pbar.update(1)
 
+            # save results on the given save interval
+            if len(current_prediction_results) == save_interval:
+                prediction_results.update(current_prediction_results)
+                write_json(prediction_results, results)
+                current_prediction_results = {}
 
-        # save results on the given save interval
-        if len(current_prediction_results) == save_interval:
+        # save the last set of results
+        if current_prediction_results:
             prediction_results.update(current_prediction_results)
             write_json(prediction_results, results)
-            current_prediction_results = {}
-
-    # save the last set of results
-    if current_prediction_results:
-        prediction_results.update(current_prediction_results)
-        write_json(prediction_results, results)
 
     return
 

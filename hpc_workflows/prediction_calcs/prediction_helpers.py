@@ -462,7 +462,6 @@ def make_prediction_scripts(
             with open(prediction_script, "w", encoding="utf-8") as script_file:
                 script_file.writelines(prediction_script_lines)
 
-            print(f"\nCreated new prediction script for {launch_dir}")
             pbar.update(1)
 
     return
@@ -511,8 +510,6 @@ def make_submission_scripts(
             f.write(f"#SBATCH --partition={user_configs['partition']}\n")
             f.write("\n")
             f.write(f"python {architecture.lower()}-{model}-prediction.py\n")
-
-        print(f"\nCreated new submission script for {launch_dir}")
 
     return
 
@@ -673,8 +670,6 @@ def collect_results(
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
 
-    print("\nCollecting results")
-
     results = {"prediction_results": {}, "architecture_configs": {}}
 
     results["architecture_configs"] = architecture_configs
@@ -692,6 +687,7 @@ def collect_results(
             if not check_job_completion_status(
                 launch_dir=launch_dir, user_configs=user_configs
             ):
+                pbar.update(1)
                 continue
 
             batch_prediction_results = read_json(
@@ -734,8 +730,6 @@ def check_collected_results(results: dict, batching: dict) -> None:
 
     results_collected = len(unique_batch_ids)
 
-    print(
-        f"\nCollected results for {results_collected} / {results_possible} prediction batches"
-    )
+    print(f"\nCompleted {results_collected} / {results_possible} prediction batches")
 
     return
