@@ -2393,6 +2393,7 @@ def set_selective_dynamics_by_height(structure: Union[Structure, Slab],
 
 def get_adsorbed_slabs(adsorbate_type,
                        data_dir, 
+                       coordinates = None,
                        slab_dir = None,
                        ref_bulk_dir = None,
                        selective_dynamics = False,
@@ -2444,7 +2445,10 @@ def get_adsorbed_slabs(adsorbate_type,
         if isinstance(adsorbate_type,str):
             slab_results[key]['adsorbed_slabs'][adsorbate_type] = {}
             for i in range(len(ads_sites)):
-                adsorbate = Molecule([adsorbate_type],[[0,0,0]])
+                if not coordinates:
+                    adsorbate = Molecule([adsorbate_type],[[0,0,0]])
+                else:
+                    adsorbate = Molecule([adsorbate_type],coordinates)
                 adsorbed_slab = ads.add_adsorbate(adsorbate,ads_sites[i],super_cell)
 
                 slab_results[key]['adsorbed_slabs'][adsorbate_type][str(i)] = adsorbed_slab.as_dict()
