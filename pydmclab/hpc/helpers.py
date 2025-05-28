@@ -431,6 +431,9 @@ def get_query(
     include_sub_phase_diagrams=False,
     include_structure=True,
     properties=None,
+    include_computed_structure_entries=False,
+    compatible_only=True,
+    additional_criteria=None,
     data_dir=os.getcwd().replace("scripts", "data"),
     savename="query.json",
     remake=False,
@@ -478,6 +481,13 @@ def get_query(
                 if 'all', then use all properties
                 if a string, then add that property to typical_properties
                 if a list, then add those properties to typical_properties
+        include_computed_structure_entries (bool)
+            if True, include computed structure entries in the query
+                these are entries that are computed by MP for specific functionals and specify applied corrections
+        compatible_only (bool)
+            if True, only retrieve entries that are compatible with the Materials Project database (i.e. having corrected energies)
+        additional_criteria (dict or None)
+            dictionary of additional criteria to query (e.g., {"thermo_types": ["GGA_GGA+U", "R2SCAN"]})
         data_dir (str)
             directory to save fjson
         savename (str)
@@ -517,6 +527,9 @@ def get_query(
         include_structure=include_structure,
         max_strucs_per_cmpd=max_strucs_per_cmpd,
         include_sub_phase_diagrams=include_sub_phase_diagrams,
+        include_computed_structure_entries=include_computed_structure_entries,
+        compatible_only=compatible_only,
+        additional_criteria=additional_criteria,
     )
 
     write_json(data, fjson)
