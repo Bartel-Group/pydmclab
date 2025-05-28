@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
 
 def get_chgnet_configs(
-    model: CHGNet | CHGNetCalculator | Versions | None = None,
+    model: Versions | None = None,
     stress_weight: float | None = 1 / 160.21766208,
     on_isolated_atoms: Literal["ignore", "warn", "error"] = "warn",
     task: PredTask = "efsm",
@@ -29,7 +29,7 @@ def get_chgnet_configs(
     batch_size: int = 16,
 ):
     """
-    Note: this assumes cpu only use on MSI
+    Note: this assumes cpu only use on MSI and only supports pretrained models
 
     Args:
         model: if None, uses model "0.3.0"
@@ -40,7 +40,6 @@ def get_chgnet_configs(
         return_atom_feas: if True, returns atom features
         return_crystal_feas: if True, returns crystal features
         batch_size: the number of structures to predict per pass to the model
-        verbose: if True, prints prediction information
 
     Returns:
         prediction_configs (dict): dict of model/prediction configurations
@@ -72,7 +71,7 @@ def get_chgnet_configs(
 
 
 def get_mace_configs(
-    models: MACECalculator | list[nn.Module] | nn.Module | list[str] | str,
+    models: str,
     default_dtype: Literal["float32", "float64", "auto"] = "auto",
     model_type: Literal["MACE", "DipoleMACE", "EnergyDipoleMace"] = "MACE",
     energy_units_to_eV: float = 1.0,
@@ -96,18 +95,23 @@ def get_mace_configs(
     remake_cache: bool = False,
 ):
     """
-    Note: this assumes cpu only use on MSI
+    Note: this assumes cpu only use on MSI and only supports pretrained models
 
     Args:
-        model: if None, uses model "0.3.0"
-        stress_weight: the conversion factor to convert GPa to eV/A^3
-        on_isolated_atoms: what to do if isolated atoms are found
-        task: what to predict with the model
-        return_site_energies: if True, returns site energies
-        return_atom_feas: if True, returns atom features
-        return_crystal_feas: if True, returns crystal features
-        batch_size: the number of structures to predict per pass to the model
-        verbose: if True, prints prediction information
+        model: must be a string of the model name, e.g. "macemediummpa
+        default_dtype: the default dtype to use for the model
+        model_type: the type of MACE model to use
+        energy_units_to_eV: the conversion factor to convert energy units to eV
+        length_units_to_A: the conversion factor to convert length units to Angstroms
+        charges_key: the key to use for the charges in the input structure
+        compile_mode: the mode to use for compiling the model
+        fullgraph: if True, uses the full graph for the model
+        enable_cueq: if True, enables the CUEQ module
+        include_dispersion: if True, includes dispersion in the model
+        damping_function: the damping function to use for dispersion
+        dispersion_xc: the exchange-correlation functional to use for dispersion
+        dispersion_cutoff: the cutoff for dispersion in Angstroms
+        remake_cache: if True, will remake the cache for the model
 
     Returns:
         architecture_configs (dict): dict of prediction configurations

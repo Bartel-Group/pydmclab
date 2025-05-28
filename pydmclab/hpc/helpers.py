@@ -481,6 +481,13 @@ def get_query(
                 if 'all', then use all properties
                 if a string, then add that property to typical_properties
                 if a list, then add those properties to typical_properties
+        include_computed_structure_entries (bool)
+            if True, include computed structure entries in the query
+                these are entries that are computed by MP for specific functionals and specify applied corrections
+        compatible_only (bool)
+            if True, only retrieve entries that are compatible with the Materials Project database (i.e. having corrected energies)
+        additional_criteria (dict or None)
+            dictionary of additional criteria to query (e.g., {"thermo_types": ["GGA_GGA+U", "R2SCAN"]})
         data_dir (str)
             directory to save fjson
         savename (str)

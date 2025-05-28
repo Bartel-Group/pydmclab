@@ -130,6 +130,21 @@ class MPQuery(object):
                 if a string, then add that property to typical_properties
                 if a list, then add those properties to typical_properties
 
+        include_computed_structure_entries (bool)
+            if True, include computed structure entries for each MP ID
+                these are the entries that have been computed by Materials Project
+                and specify the run type (e.g., GGA_GGA+U, R2SCAN, etc.) as well as
+                and corrections applied to the structure
+
+        compatible_only (bool)
+            if True, only include entries that are compatible with the Materials Project
+                formation energy criteria (e.g., have corrected energies)
+
+        additional_criteria (dict or None)
+            additional criteria to filter the entries by
+                e.g., {"thermo_types": ["GGA_GGA+U", "R2SCAN"]} to only include entries
+                that have been computed with these methods
+
         Returns:
             {mpid : {property (str) : value (mixed type)}}
 
