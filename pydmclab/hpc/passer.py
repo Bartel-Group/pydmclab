@@ -765,7 +765,7 @@ class Passer(object):
         elif curr_calc == 'static_ldipole':
             # For forces and energy dipole correction
             incar_adjustments['LDIPOL'] = True
-            incar_adjustments['DIPOL'] = self.get_center_of_charge_density
+            incar_adjustments['DIPOL'] = " ".join([str(x) for x in self.get_center_of_charge_density])
 
         if curr_calc in ["lobster"]:
             incar_adjustments["ISMEAR"] = -5
