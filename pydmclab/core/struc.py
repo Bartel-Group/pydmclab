@@ -1,14 +1,21 @@
+from __future__ import annotations
+
 import os
 import subprocess
 import yaml
 import random
+import warnings
+
+from typing import TYPE_CHECKING
 from collections import Counter, defaultdict
 from shutil import copyfile, rmtree
 from typing import List, Tuple, Dict, Literal
 
 import numpy as np
 
-from pymatgen.core import Structure, PeriodicSite
+from math import lcm
+
+from pymatgen.core import Structure, PeriodicSite, Composition
 from pymatgen.core.surface import SlabGenerator
 from pymatgen.transformations.standard_transformations import (
     OrderDisorderedStructureTransformation,
@@ -22,6 +29,9 @@ from pymatgen.analysis.diffraction.xrd import XRDCalculator
 
 from pydmclab.core import struc as pydmc_struc
 from pydmclab.core.comp import CompTools
+
+if TYPE_CHECKING:
+    from pydmclab.core.energies import ChemPots
 
 
 class StrucTools(object):
@@ -1146,3 +1156,176 @@ class SolidSolutionGenerator:
             self.cleanup()
 
         return self.disordered_solns, self.ordered_solns, self.sqs_solns
+
+
+class SlabTools(object):
+    """
+    A class for manipulating slabs and computing their properties.
+    """
+
+    def __init__(
+        self,
+        slab_structure: Structure | dict | str,
+        slab_e_per_at: float,
+        *,
+        unreduced_bulk_composition: Composition | dict | str = None,
+        bulk_e_per_at: float = None,
+    ) -> None:
+        """
+        Initialize the SlabTools object.
+
+        Args:
+            slab_structure (Structure | dict | str): pymatgen Structure object, Structure.as_dict(), or path to structure file.
+            slab_e_per_at (float): Energy per atom of the slab.
+            unreduced_bulk_composition (Composition | dict | str, optional): Unreduced bulk composition. This is the full composition of the bulk from which the slab was cleaved.
+                (e.g., if the slab was cleaved from SrTiO3 and is 10 layers thick, the unreduced bulk composition would be Sr10Ti10O30).
+            bulk_e_per_at (float, optional): Energy per atom of the bulk. Defaults to None.
+        """
+
+        slab_structure = StrucTools(slab_structure).structure
+
+        self.slab_structure = slab_structure
+        self.slab_e_per_at = slab_e_per_at
+
+        if isinstance(unreduced_bulk_composition, (dict, str)):
+            unreduced_bulk_composition = Composition(unreduced_bulk_composition)
+
+        self.unreduced_bulk_composition = unreduced_bulk_composition
+        self.bulk_e_per_at = bulk_e_per_at
+
+    @property
+    def is_stoich(self) -> bool:
+        """
+        Check if the slab is stoichiometric with respect to the bulk composition.
+        """
+        if not self.unreduced_bulk_composition:
+            raise ValueError(
+                "Unreduced bulk composition must be provided to check stoichiometry."
+            )
+
+        return self.slab_structure.composition == self.unreduced_bulk_composition
+
+    @property
+    def off_stoichiometry(self) -> dict[str, float]:
+        """
+        Calculate the off-stoichiometry of the slab with respect to the bulk composition.
+        """
+        if not self.unreduced_bulk_composition:
+            raise ValueError(
+                "Unreduced bulk composition must be provided to calculate off-stoichiometry."
+            )
+
+        unreduced_slab_composition = self.slab_structure.composition
+        unreduced_slab_composition.allow_negative = True
+
+        return (unreduced_slab_composition - self.unreduced_bulk_composition).as_dict()
+
+    def surface_area(
+        self, vacuum_axis: Literal["a", "b", "c", "auto"] = "auto", verbose: bool = True
+    ) -> float:
+        """
+        Returns the surface area of the slab.
+        """
+        lattice_mattrix = self.slab_structure.lattice.matrix
+
+        if not isinstance(vacuum_axis, str) or vacuum_axis not in [
+            "a",
+            "b",
+            "c",
+            "auto",
+        ]:
+            raise ValueError("vacuum_axis must be one of 'a', 'b', 'c', or 'auto'.")
+
+        axis_lengths = {
+            "a": np.linalg.norm(lattice_mattrix[0]),
+            "b": np.linalg.norm(lattice_mattrix[1]),
+            "c": np.linalg.norm(lattice_mattrix[2]),
+        }
+
+        if vacuum_axis != "auto" and axis_lengths[vacuum_axis] != max(
+            axis_lengths.values()
+        ):
+            warnings.warn(
+                f"The specified vacuum axis '{vacuum_axis}' is not the longest axis in the lattice.",
+                category=UserWarning,
+            )
+
+        if vacuum_axis == "a":
+            lattice_mattrix = np.delete(lattice_mattrix, 0, axis=0)
+        elif vacuum_axis == "b":
+            lattice_mattrix = np.delete(lattice_mattrix, 1, axis=0)
+        elif vacuum_axis == "c":
+            lattice_mattrix = np.delete(lattice_mattrix, 2, axis=0)
+        elif vacuum_axis == "auto":
+            if verbose:
+                print("Auto selected - Vacuum axis will be set to the largest axis.")
+            index_of_largest_axis = np.argmax(
+                [np.linalg.norm(axis) for axis in lattice_mattrix]
+            )
+            lattice_mattrix = np.delete(lattice_mattrix, index_of_largest_axis, axis=0)
+
+        surface_area = np.linalg.norm(np.cross(lattice_mattrix[0], lattice_mattrix[1]))
+
+        return surface_area
+
+    def surface_energy(
+        self,
+        *,
+        vacuum_axis: Literal["a", "b", "c", "auto"] = "auto",
+        ref_potentials: ChemPots | dict = None,
+        verbose: bool = True,
+        **kwargs,
+    ) -> float:
+
+        if not (self.unreduced_bulk_composition and self.bulk_e_per_at):
+            raise ValueError(
+                "Unreduced bulk composition and bulk energy per atom must be provided to calculate surface energy."
+            )
+
+        slab_e_tot = self.slab_e_per_at * len(self.slab_structure)
+        bulk_e_tot = self.bulk_e_per_at * self.unreduced_bulk_composition.num_atoms
+
+        surface_area = self.surface_area(vacuum_axis=vacuum_axis, verbose=verbose)
+
+        if not self.is_stoich:
+            from pydmclab.core.energies import ChemPots
+
+            excess_or_deficient_amts = self.off_stoichiometry
+
+            if not ref_potentials:
+                temperature = kwargs.pop("temperature", None)
+                if not temperature:
+                    mus = ChemPots(**kwargs)
+                    ref_potentials = mus.chempots
+                    ref_potentials = {
+                        k: v
+                        for k, v in ref_potentials.items()
+                        if k in excess_or_deficient_amts
+                    }
+                else:
+                    mus_at_0K = ChemPots(temperature=0, **kwargs)
+                    ref_pots_at_0K = mus_at_0K.chempots
+                    mus_at_temp = ChemPots(temperature=temperature, **kwargs)
+                    ref_pots_at_temp = mus_at_temp.chempots
+                    ref_potentials = {
+                        el: ref_pots_at_0K[el] + ref_pots_at_temp[el]
+                        for el in excess_or_deficient_amts
+                    }
+
+            elif isinstance(ref_potentials, ChemPots):
+                ref_potentials = ref_potentials.chempots
+
+            missing_refs = set(excess_or_deficient_amts) - set(ref_potentials)
+            if missing_refs:
+                raise ValueError(
+                    f"Reference potentials are missing for the following elements: {missing_refs}."
+                )
+
+            delta_mu_sum = sum(
+                excess_or_deficient_amts[el] * ref_potentials[el]
+                for el in excess_or_deficient_amts
+            )
+
+            return (slab_e_tot - bulk_e_tot - delta_mu_sum) / (2 * surface_area)
+
+        return (slab_e_tot - bulk_e_tot) / (2 * surface_area)
