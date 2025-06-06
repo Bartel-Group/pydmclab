@@ -433,6 +433,7 @@ def get_query(
     include_sub_phase_diagrams=False,
     include_structure=True,
     properties=None,
+    conventional=True,
     include_computed_structure_entries=False,
     compatible_only=True,
     additional_criteria=None,
@@ -529,6 +530,7 @@ def get_query(
         include_structure=include_structure,
         max_strucs_per_cmpd=max_strucs_per_cmpd,
         include_sub_phase_diagrams=include_sub_phase_diagrams,
+        conventional=conventional,
         include_computed_structure_entries=include_computed_structure_entries,
         compatible_only=compatible_only,
         additional_criteria=additional_criteria,
@@ -2106,8 +2108,9 @@ def get_slabs(
     strucs: dict[str, dict[str, dict]],
     miller_indices: list[list[int] | int] | list[list[int]] | list[int] | int,
     *,
-    min_slab_sizes: list[int] | int = 10,
+    min_slab_sizes: list[int] | int = 6,
     vacuum_sizes: list[int] | int = 3,
+    force_orthogonal_c: bool = True,
     data_dir: str | os.PathLike = os.getcwd().replace("scripts", "data"),
     savename: str = "slabs.json",
     metadata_savename: str = "slabs_metadata.json",
@@ -2219,6 +2222,11 @@ def get_slabs(
                             slab_id = (
                                 f"{struc_id}_{miller_str}_s{s}_v{v}_{termination_idx}"
                             )
+
+                            if force_orthogonal_c:
+                                generated_slab = Slab.from_dict(slab["slab"])
+                                orthogonal_slab = generated_slab.get_orthogonal_c_slab()
+                                slab["slab"] = orthogonal_slab.as_dict()
 
                             if sort_slab_strucs:
                                 unsorted_slab = Slab.from_dict(slab["slab"])

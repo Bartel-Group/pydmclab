@@ -4,6 +4,8 @@ import numpy as np
 from pymatgen.ext.matproj import MPRester as old_MPRester
 from mp_api.client import MPRester
 
+from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
+
 from pydmclab.core.comp import CompTools
 from pydmclab.core.struc import StrucTools
 
@@ -80,6 +82,7 @@ class MPQuery(object):
         include_sub_phase_diagrams=False,
         include_structure=True,
         properties=None,
+        conventional=False,
         include_computed_structure_entries=False,
         compatible_only=True,
         additional_criteria=None,
@@ -256,6 +259,20 @@ class MPQuery(object):
                 # map notable keys to shorter names
                 if k in long_to_short_keys:
                     tmp[long_to_short_keys[k]] = v
+                elif k == "structure":
+                    if conventional:
+                        # Convert structure dict to Structure object
+                        structure = StrucTools(v).structure
+                        # Get conventional structure
+                        spg = SpacegroupAnalyzer(structure)
+                        conventional_structure = (
+                            spg.get_conventional_standard_structure()
+                        )
+                        # Store the conventional structure as a dict
+                        tmp[k] = conventional_structure.as_dict()
+                    else:
+                        # just store the structure as a dict
+                        tmp[k] = v
                 elif k in properties:
                     tmp[k] = v
             # include a clean formula
