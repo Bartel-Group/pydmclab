@@ -2621,8 +2621,6 @@ def get_interfaces(data_dir,
         else:
             continue
     
-
-
     interfaces = {}
     comp_ID = substrate_chemID + '_' + film_chemID
     interfaces[comp_ID] = {}
@@ -2669,9 +2667,9 @@ def get_interfaces(data_dir,
                 substrate_e_per_atom = substrate_slabs[substrate_key]['results']['E_per_at']
 
                 unique_ID = substrate_slabID + '_' + substrate_miller + '_' + substrate_size + '_' + substrate_termination + '--' + film_slabID + '_' + film_miller + '_' + film_size + '_' + film_termination
-
-                interfaces[comp_ID][unique_ID] = {}
+                
                 if substrate_miller == film_miller:
+                    interfaces[comp_ID][unique_ID] = {}
                     IF = InterfaceTools(slab_film=film_slab, slab_substrate=substrate_slab, slab_film_e_per_atom=film_e_per_atom, slab_substrate_e_per_atom=substrate_e_per_atom)
 
                     interface = IF.get_interface_from_slabs(gap=gap, vacuum_over_film=vacuum_over_film)
@@ -2679,6 +2677,7 @@ def get_interfaces(data_dir,
                     interfaces[comp_ID][unique_ID] = interface.as_dict()
                 else:
                     continue
+
     
     write_json(interfaces,fjson)
     return read_json(fjson)
