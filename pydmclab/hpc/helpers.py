@@ -2627,7 +2627,7 @@ def get_interfaces(data_dir,
     comp_ID = substrate_chemID + '_' + film_chemID
     interfaces[comp_ID] = {}
 
-    if only_matching_millers:
+    if not only_matching_millers:
 
         for film_key in films.keys():
             film_key_split = re.split('--|_', film_key)
