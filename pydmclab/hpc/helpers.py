@@ -2588,6 +2588,8 @@ def get_interfaces(data_dir,
                    substrate_slab_dir,
                    remake = False,
                    gap = 2.0,
+                   vacuum_over_film = 2.0,
+                   only_matching_millers = True,
                    savename = 'interfaces.json',):
     
     fjson = os.path.join(data_dir,savename)
@@ -2618,34 +2620,65 @@ def get_interfaces(data_dir,
             substrate_chemID = entry_split[0]
         else:
             continue
+    
+
 
     interfaces = {}
     comp_ID = substrate_chemID + '_' + film_chemID
     interfaces[comp_ID] = {}
 
-    for film_key in films.keys():
-        film_key_split = re.split('--|_', film_key)
-        film_slabID, film_miller, film_size, film_termination = film_key_split[1], film_key_split[2], film_key_split[3], film_key_split[5]
+    if only_matching_millers:
 
-        film_slab = films[film_key]
-        film_e_per_atom = film_slabs[film_key]['results']['E_per_at']
+        for film_key in films.keys():
+            film_key_split = re.split('--|_', film_key)
+            film_slabID, film_miller, film_size, film_termination = film_key_split[1], film_key_split[2], film_key_split[3], film_key_split[5]
 
-        for substrate_key in substrates.keys():
-            substrate_key_split = re.split('--|_', substrate_key)
-            substrate_slabID, substrate_miller, substrate_size, substrate_termination = substrate_key_split[1], substrate_key_split[2], substrate_key_split[3], substrate_key_split[5]
+            film_slab = films[film_key]
+            film_e_per_atom = film_slabs[film_key]['results']['E_per_at']
 
-            substrate_slab = substrates[substrate_key]
-            substrate_e_per_atom = substrate_slabs[substrate_key]['results']['E_per_at']
+            for substrate_key in substrates.keys():
+                substrate_key_split = re.split('--|_', substrate_key)
+                substrate_slabID, substrate_miller, substrate_size, substrate_termination = substrate_key_split[1], substrate_key_split[2], substrate_key_split[3], substrate_key_split[5]
 
-            unique_ID = substrate_slabID + '_' + substrate_miller + '_' + substrate_size + '_' + substrate_termination + '--' + film_slabID + '_' + film_miller + '_' + film_size + '_' + film_termination
+                substrate_slab = substrates[substrate_key]
+                substrate_e_per_atom = substrate_slabs[substrate_key]['results']['E_per_at']
 
-            interfaces[comp_ID][unique_ID] = {}
+                unique_ID = substrate_slabID + '_' + substrate_miller + '_' + substrate_size + '_' + substrate_termination + '--' + film_slabID + '_' + film_miller + '_' + film_size + '_' + film_termination
 
-            IF = InterfaceTools(slab_film=film_slab, slab_substrate=substrate_slab, slab_film_e_per_atom=film_e_per_atom, slab_substrate_e_per_atom=substrate_e_per_atom)
+                interfaces[comp_ID][unique_ID] = {}
 
-            interface = IF.get_interface_from_slabs(gap=gap)
+                IF = InterfaceTools(slab_film=film_slab, slab_substrate=substrate_slab, slab_film_e_per_atom=film_e_per_atom, slab_substrate_e_per_atom=substrate_e_per_atom)
 
-            interfaces[comp_ID][unique_ID] = interface.as_dict()
+                interface = IF.get_interface_from_slabs(gap=gap, vacuum_over_film=vacuum_over_film)
+
+                interfaces[comp_ID][unique_ID] = interface.as_dict()
+    else:
+
+        for film_key in films.keys():
+            film_key_split = re.split('--|_', film_key)
+            film_slabID, film_miller, film_size, film_termination = film_key_split[1], film_key_split[2], film_key_split[3], film_key_split[5]
+
+            film_slab = films[film_key]
+            film_e_per_atom = film_slabs[film_key]['results']['E_per_at']
+
+            for substrate_key in substrates.keys():
+                substrate_key_split = re.split('--|_', substrate_key)
+                substrate_slabID, substrate_miller, substrate_size, substrate_termination = substrate_key_split[1], substrate_key_split[2], substrate_key_split[3], substrate_key_split[5]
+
+                substrate_slab = substrates[substrate_key]
+                substrate_e_per_atom = substrate_slabs[substrate_key]['results']['E_per_at']
+
+                unique_ID = substrate_slabID + '_' + substrate_miller + '_' + substrate_size + '_' + substrate_termination + '--' + film_slabID + '_' + film_miller + '_' + film_size + '_' + film_termination
+
+                interfaces[comp_ID][unique_ID] = {}
+                if substrate_miller == film_miller:
+                    IF = InterfaceTools(slab_film=film_slab, slab_substrate=substrate_slab, slab_film_e_per_atom=film_e_per_atom, slab_substrate_e_per_atom=substrate_e_per_atom)
+
+                    interface = IF.get_interface_from_slabs(gap=gap, vacuum_over_film=vacuum_over_film)
+
+                    interfaces[comp_ID][unique_ID] = interface.as_dict()
+                else:
+                    continue
     
     write_json(interfaces,fjson)
     return read_json(fjson)
