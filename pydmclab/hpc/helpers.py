@@ -2206,11 +2206,10 @@ def get_slabs(
                         # Create supercells for each slab if requested
                         if supercell_size > 1:
                             for miller_str in temp_slabs:
-                                if miller_str != "bulk_template":  # Skip the bulk template
-                                    for term_idx in temp_slabs[miller_str]:
-                                        slab = Slab.from_dict(temp_slabs[miller_str][term_idx]["slab"])
-                                        slab.make_supercell([supercell_size, supercell_size, 1])
-                                        temp_slabs[miller_str][term_idx]["slab"] = slab.as_dict()    
+                                for term_idx in temp_slabs[miller_str]:
+                                    slab = Slab.from_dict(temp_slabs[miller_str][term_idx]["slab"])
+                                    slab.make_supercell([supercell_size, supercell_size, 1])
+                                    temp_slabs[miller_str][term_idx]["slab"] = slab.as_dict()    
 
                         for termination_idx, slab in enumerate(
                             temp_slabs[miller_str].values()
