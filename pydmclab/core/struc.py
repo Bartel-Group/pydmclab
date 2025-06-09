@@ -462,6 +462,7 @@ class StrucTools(object):
         max_normal_search: int | None = None,
         tolerance: float = 0.1,
         ftolerance: float = 0.1,
+        supercell_size: int = 1,
     ) -> dict[str, dict]:
         """
         Args:
@@ -506,6 +507,9 @@ class StrucTools(object):
         )
 
         slabs = slabgen.get_slabs(symmetrize=symmetrize, tol=tolerance, ftol=ftolerance)
+        if supercell_size > 1:
+            for i in range(len(slabs)):
+                slabs[i].make_supercell([supercell_size, supercell_size, 1])
 
         miller_str = "".join([str(i) for i in miller])
 
