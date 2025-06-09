@@ -2100,7 +2100,6 @@ def get_slabs(
     *,
     min_slab_sizes: list[int] | int = 10,
     vacuum_sizes: list[int] | int = 3,
-    supercell_size: int = 2,
     data_dir: str | os.PathLike = os.getcwd().replace("scripts", "data"),
     savename: str = "slabs.json",
     metadata_savename: str = "slabs_metadata.json",
@@ -2202,15 +2201,6 @@ def get_slabs(
                             min_vacuum_size=v,
                             **kwargs,
                         )
-                        
-                        # Create supercells for each slab if requested
-                        if supercell_size > 1:
-                            for miller_str in temp_slabs:
-                                if miller_str != "bulk_template":  # Skip the bulk template
-                                    for term_idx in temp_slabs[miller_str]:
-                                        slab = Slab.from_dict(temp_slabs[miller_str][int(term_idx)]["slab"])
-                                        slab.make_supercell([supercell_size, supercell_size, 1])
-                                        temp_slabs[miller_str][int(term_idx)]["slab"] = slab.as_dict()
 
                         for termination_idx, slab in enumerate(
                             temp_slabs[miller_str].values()
