@@ -239,6 +239,7 @@ def main():
         make_sub_for_launcher()
     
     interfaces = get_interfaces(data_dir = DATA_DIR,
+                   substrate_millers = [[],[]],
                    film_slab_dir=None,
                    substrate_slab_dir=None,
                    from_bulk=True,

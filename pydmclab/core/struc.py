@@ -557,14 +557,14 @@ class InterfaceTools(object):
     """
 
     def __init__(self, 
+                 film_miller: tuple[int, int, int],
+                 substrate_miller: tuple[int, int, int],
                  slab_film: Slab = None,                                           # Slab
                  slab_substrate: Slab = None,                                      # Slab
                  slab_film_e_per_atom: float = None,
                  slab_substrate_e_per_atom: float = None,
                  film: Structure | str | dict | None = None,                # Bulk (only change this if you want to calculate MCIA)
                  substrate: Structure | str | dict | None = None,           # Bulk (only change this if you want to calculate MCIA)
-                 film_miller: tuple[int, int, int] | None = None,
-                 substrate_miller: tuple[int, int, int] | None = None,
                  max_area_ratio_tol = 0.09,
                  max_area = 400,
                  max_length_tol = 0.03,

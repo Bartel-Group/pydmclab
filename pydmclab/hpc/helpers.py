@@ -2586,6 +2586,7 @@ def get_adsorption_energy_results(data_dir,
 
 
 def get_interfaces(data_dir,
+                   substrate_millers: list[list[int]] | list[int],
                    film_slab_dir = None,
                    substrate_slab_dir = None,
                    from_bulk = True,
@@ -2636,16 +2637,6 @@ def get_interfaces(data_dir,
                     f"Relaxed bulk structure {entry} is not converged. Please make sure your bulk structure is fully converged."
                 )
 
-        it = InterfaceTools(substrate=bulk_substrate_struc,)
-
-        interfaces = it.get_interfaces_from_substrate_bulk(
-            substrate_cation=substrate_cation,
-            film_cation=film_cation,
-            z_cutoff=z_cutoff,
-            min_slab_size=min_slab_size,
-            min_vacuum_size=min_vacuum_size
-        )
-
         relaxed_bulk_film_results = read_json(os.path.join(bulk_film_dir,'results.json'))
         for entry in relaxed_bulk_film_results:
             entry_split = re.split('--', entry)
@@ -2656,12 +2647,23 @@ def get_interfaces(data_dir,
         interface_chemID = substrate_chemID + '_' + film_chemID
         interfaces_dict[interface_chemID] = {}
 
-        for i in range(len(interfaces[substrate_miller])):
-            substrate_thickness = int(min_slab_size*z_cutoff)
-            film_thickness = min_slab_size - substrate_thickness
-            interface_ID = 'dmc-' + str(substrate_mpid) + '_' + substrate_miller + '_s' + str(substrate_thickness) + '_' + str(i) + '--' +'dmc-' + str(film_mpid) + '_' + film_miller + '_s' + str(film_thickness) + '_' + str(i)
-            interfaces_dict[interface_chemID][interface_ID] = {}
-            interfaces_dict[interface_chemID][interface_ID] = interfaces[substrate_miller][i]
+        for entry in substrate_millers:
+            miller_index_string = str(entry[0]) + str(entry[1]) + str(entry[2])
+            it = InterfaceTools(substrate=bulk_substrate_struc, substrate_miller=entry, film_miller=entry)
+            
+            interfaces = it.get_interfaces_from_substrate_bulk(
+                substrate_cation=substrate_cation,
+                film_cation=film_cation,
+                z_cutoff=z_cutoff,
+                min_slab_size=min_slab_size,
+                min_vacuum_size=min_vacuum_size
+            )
+            for i in range(len(interfaces[miller_index_string])):
+                substrate_thickness = int(min_slab_size*z_cutoff)
+                film_thickness = min_slab_size - substrate_thickness
+                interface_ID = 'dmc-' + str(substrate_mpid) + '_' + miller_index_string + '_s' + str(substrate_thickness) + '_' + str(i) + '--' +'dmc-' + str(film_mpid) + '_' + miller_index_string + '_s' + str(film_thickness) + '_' + str(i)
+                interfaces_dict[interface_chemID][interface_ID] = {}
+                interfaces_dict[interface_chemID][interface_ID] = interfaces[substrate_miller][i]
         
         write_json(interfaces_dict,fjson)
         return read_json(fjson)
