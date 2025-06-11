@@ -57,6 +57,9 @@ FILM_SLAB_DIR = {{"SPECIFY"}}
 
 SUBSTRATE_SLAB_DIR = {{"SPECIFY"}}
 
+BULK_SUBSTRATE_DIR = {{"SPECIFY"}}
+BULK_FILM_DIR = {{"SPECIFY"}}
+
 # make our calcs dir and data dir
 for d in [CALCS_DIR, DATA_DIR]:
     if not os.path.exists(d):

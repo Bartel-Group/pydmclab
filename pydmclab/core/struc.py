@@ -565,7 +565,6 @@ class InterfaceTools(object):
                  substrate: Structure | str | dict | None = None,           # Bulk (only change this if you want to calculate MCIA)
                  film_miller: tuple[int, int, int] | None = None,
                  substrate_miller: tuple[int, int, int] | None = None,
-                 isostructural = True,
                  max_area_ratio_tol = 0.09,
                  max_area = 400,
                  max_length_tol = 0.03,
@@ -626,8 +625,9 @@ class InterfaceTools(object):
         self.film_slab_e_per_atom = slab_film_e_per_atom
         self.substrate_slab_e_per_atom = slab_substrate_e_per_atom
 
-        self.film_n_atoms = slab_film.num_sites
-        self.substrate_n_atoms = slab_substrate.num_sites
+        if slab_film and slab_substrate:
+            self.film_n_atoms = slab_film.num_sites
+            self.substrate_n_atoms = slab_substrate.num_sites
 
         return None
 
