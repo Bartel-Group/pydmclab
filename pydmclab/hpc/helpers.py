@@ -2658,7 +2658,6 @@ def get_interfaces(data_dir,
                 min_slab_size=min_slab_size,
                 min_vacuum_size=min_vacuum_size
             )
-            write_json(interfaces,os.path.join(data_dir,'slab_Generator.json'))
             for i in range(len(interfaces[miller_index_string])):
                 substrate_thickness = int(min_slab_size*z_cutoff)
                 film_thickness = min_slab_size - substrate_thickness

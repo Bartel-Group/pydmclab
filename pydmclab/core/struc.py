@@ -729,16 +729,18 @@ class InterfaceTools(object):
             min_slab_size=min_slab_size,
             min_vacuum_size=min_vacuum_size,)
         
-        for entry in slabs:
+        slabs_copy = slabs.copy()
+        for entry in slabs_copy:
             if entry == str(self.substrate_miller[0]) + str(self.substrate_miller[1]) + str(self.substrate_miller[2]):
-                for i in range(len(slabs[entry])):
-                    ortho_slab = Slab.from_dict(slabs[entry][i]['slab']).get_orthogonal_c_slab()
+                for i in range(len(slabs_copy[entry])):
+                    ortho_slab = Slab.from_dict(slabs_copy[entry][i]['slab']).get_orthogonal_c_slab()
                     for j, site in enumerate(ortho_slab):
                         if site.specie.symbol == substrate_cation:
                             frac_coords = ortho_slab.lattice.get_fractional_coords(site.coords)
                             if frac_coords[2] > z_cutoff:
                                 ortho_slab[j] = film_cation
-                    slabs[entry][i]['slab'] = ortho_slab
+                    slabs_copy[entry][i]['slab'] = {}
+                    slabs_copy[entry][i]['slab'] = ortho_slab.as_dict()
             else:
                 continue
 
