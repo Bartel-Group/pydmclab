@@ -557,14 +557,15 @@ class InterfaceTools(object):
     """
 
     def __init__(self, 
-                 slab_film: Slab,                                           # Slab
-                 slab_substrate: Slab,                                      # Slab
-                 slab_film_e_per_atom: float,
-                 slab_substrate_e_per_atom: float,
+                 slab_film: Slab = None,                                           # Slab
+                 slab_substrate: Slab = None,                                      # Slab
+                 slab_film_e_per_atom: float = None,
+                 slab_substrate_e_per_atom: float = None,
                  film: Structure | str | dict | None = None,                # Bulk (only change this if you want to calculate MCIA)
                  substrate: Structure | str | dict | None = None,           # Bulk (only change this if you want to calculate MCIA)
                  film_miller: tuple[int, int, int] | None = None,
                  substrate_miller: tuple[int, int, int] | None = None,
+                 isostructural = True,
                  max_area_ratio_tol = 0.09,
                  max_area = 400,
                  max_length_tol = 0.03,
@@ -712,6 +713,37 @@ class InterfaceTools(object):
         
         return interface
     
+    def get_interfaces_from_substrate_bulk(
+            self,
+            film_cation: str,
+            substrate_cation: str,
+            z_cutoff: float = 0.5,
+            min_slab_size: float = 12,
+            min_vacuum_size: float = 10
+    ):
+        
+        st = StrucTools(self.substrate)
+
+        slabs = st.get_slabs(
+            miller=self.substrate_miller,
+            min_slab_size=min_slab_size,
+            min_vacuum_size=min_vacuum_size,)
+        
+        for entry in slabs:
+            if entry == str(self.substrate_miller[0]) + str(self.substrate_miller[1]) + str(self.substrate_miller[2]):
+                for i in range(len(slabs[entry])):
+                    ortho_slab = Slab.from_dict(slabs[entry][i]['slab']).get_orthogonal_c_slab()
+                    for j, site in enumerate(ortho_slab):
+                        if site.specie.symbol == substrate_cation:
+                            frac_coords = ortho_slab.lattice.get_fractional_coords(site.coords)
+                            if frac_coords[2] > z_cutoff:
+                                ortho_slab[j] = film_cation
+                    slabs[entry][i]['slab'] = ortho_slab
+            else:
+                continue
+
+        return slabs
+
     def interface_surface_area(self,
                      relaxed_interface: Union[Interface, Structure],
                     #  interface_e_per_atom: float,
@@ -747,7 +779,7 @@ class InterfaceTools(object):
         if not hasattr(self, 'interface'):
             raise AttributeError("You must call get_interface_from_slabs() before using the to_cif property.")
         
-        self.interface.to(filename="/Users/christopherakiki/Desktop/interface.cif")
+        self.interface.to_file(filename="/Users/christopherakiki/Desktop/interface.cif")
         return None 
 
 class SlabTools(object):

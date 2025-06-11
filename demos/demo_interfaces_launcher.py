@@ -234,16 +234,23 @@ def main():
         or remake_sub_for_launcher
     ):
         make_sub_for_launcher()
-
-    interfaces = get_interfaces(
-        data_dir = DATA_DIR,
-        film_slab_dir = FILM_SLAB_DIR,
-        substrate_slab_dir = SUBSTRATE_SLAB_DIR,
-        remake = remake_interfaces,
-        gap = 2.0,
-        vacuum_over_film = 2.0,
-        only_matching_millers = True,
-        savename = 'interfaces.json',)
+    
+    interfaces = get_interfaces(data_dir = DATA_DIR,
+                   film_slab_dir=None,
+                   substrate_slab_dir=None,
+                   from_bulk=True,
+                   bulk_substrate_dir=None,
+                   bulk_film_dir=None,
+                   film_cation=None,
+                   substrate_cation=None,
+                   z_cutoff=0.5,
+                   min_slab_size=12,
+                   min_vacuum_size=10,
+                   remake=remake_interfaces,
+                   gap=2.0,
+                   vacuum_over_film=2.0,
+                   only_matching_millers=True,
+                   savename='interfaces.json')
 
     # if print_slabs_check:
     #     check_slabs(interfaces)
