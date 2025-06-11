@@ -744,7 +744,7 @@ class InterfaceTools(object):
             else:
                 continue
 
-        return slabs
+        return slabs_copy
 
     def interface_surface_area(self,
                      relaxed_interface: Union[Interface, Structure],
