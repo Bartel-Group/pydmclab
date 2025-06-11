@@ -2663,7 +2663,7 @@ def get_interfaces(data_dir,
                 film_thickness = min_slab_size - substrate_thickness
                 interface_ID = 'dmc-' + str(substrate_mpid) + '_' + miller_index_string + '_s' + str(substrate_thickness) + '_' + str(i) + '--' +'dmc-' + str(film_mpid) + '_' + miller_index_string + '_s' + str(film_thickness) + '_' + str(i)
                 interfaces_dict[interface_chemID][interface_ID] = {}
-                interfaces_dict[interface_chemID][interface_ID] = Slab.as_dict(interfaces[miller_index_string][i])
+                interfaces_dict[interface_chemID][interface_ID] = Slab.as_dict(interfaces[miller_index_string][i]['slab'])
         
         write_json(interfaces_dict,fjson)
         return read_json(fjson)
