@@ -731,6 +731,7 @@ class InterfaceTools(object):
             min_vacuum_size=min_vacuum_size,)
         
         slabs_copy = slabs.copy()
+        list_of_sites_to_remove = []
         for entry in slabs_copy:
             if entry == str(self.substrate_miller[0]) + str(self.substrate_miller[1]) + str(self.substrate_miller[2]):
                 for i in range(len(slabs_copy[entry])):
@@ -743,7 +744,11 @@ class InterfaceTools(object):
                         if atoms_to_remove:
                             if site.specie.symbol in atoms_to_remove:
                                 if frac_coords[2] > z_cutoff:
-                                    ortho_slab.remove_sites([j])
+                                    # adding the sites to be removed to a list so I can remove them once I'm out of the loop
+                                    list_of_sites_to_remove.append(j)
+                    # removing the sites that are in the list
+                    ortho_slab.remove_sites(list_of_sites_to_remove)
+
                     slabs_copy[entry][i]['slab'] = {}
                     slabs_copy[entry][i]['slab'] = ortho_slab.as_dict()
             else:
