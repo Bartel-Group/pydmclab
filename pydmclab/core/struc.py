@@ -719,7 +719,8 @@ class InterfaceTools(object):
             substrate_cation: str,
             z_cutoff: float = 0.5,
             min_slab_size: float = 12,
-            min_vacuum_size: float = 10
+            min_vacuum_size: float = 10,
+            atoms_to_remove: list[str] = None,
     ):
         
         st = StrucTools(self.substrate)
@@ -739,6 +740,10 @@ class InterfaceTools(object):
                             frac_coords = ortho_slab.lattice.get_fractional_coords(site.coords)
                             if frac_coords[2] > z_cutoff:
                                 ortho_slab[j] = film_cation
+                        if atoms_to_remove:
+                            if site.specie.symbol in atoms_to_remove:
+                                if frac_coords[2] > z_cutoff:
+                                    ortho_slab.remove_sites([j])
                     slabs_copy[entry][i]['slab'] = {}
                     slabs_copy[entry][i]['slab'] = ortho_slab.as_dict()
             else:

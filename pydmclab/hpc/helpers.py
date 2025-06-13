@@ -2593,6 +2593,7 @@ def get_interfaces(data_dir,
                    bulk_substrate_dir = None,
                    bulk_film_dir = None,
                    film_cation: str = None,
+                   atoms_to_remove: list[str] = None,
                    substrate_cation: str = None,
                    z_cutoff: float = 0.5,
                    min_slab_size: float = 12,
@@ -2656,7 +2657,8 @@ def get_interfaces(data_dir,
                 film_cation=film_cation,
                 z_cutoff=z_cutoff,
                 min_slab_size=min_slab_size,
-                min_vacuum_size=min_vacuum_size
+                min_vacuum_size=min_vacuum_size,
+                atoms_to_remove=atoms_to_remove
             )
             for i in range(len(interfaces[miller_index_string])):
                 substrate_thickness = int(min_slab_size*z_cutoff)
