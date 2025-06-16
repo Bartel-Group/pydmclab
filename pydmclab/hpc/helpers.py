@@ -2573,11 +2573,17 @@ def get_adsorption_energy_results(data_dir,
             slab_result_key = chemID + '--' + equivalent_slab_ID + '--' + magmom + '--' + calc_type
 
             E_slab_ads = ads_results['E_per_at']
+            slab_ads_struc = Structure.from_dict(ads[key]['structure'])
+            slab_ads_nsites = slab_ads_struc.num_sites
+
             E_slab = slab_result[slab_result_key]['results']['E_per_at']
+            slab_struc = Structure.from_dict(slab_result[slab_result_key]['structure'])
+            slab_nsites = slab_struc.num_sites
+
 
             E_adsorbate = cp_dict[adsorbate]
 
-            E_ads = E_slab_ads - (E_slab + E_adsorbate)
+            E_ads = slab_ads_nsites*E_slab_ads - (slab_nsites*E_slab + E_adsorbate)
 
             ads_results['Adsorption_E_per_at'] = E_ads
     
