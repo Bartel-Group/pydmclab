@@ -2575,11 +2575,13 @@ def get_adsorption_energy_results(data_dir,
             E_slab_ads = ads_results['E_per_at']
             slab_ads_struc = Structure.from_dict(ads[key]['structure'])
             slab_ads_nsites = slab_ads_struc.num_sites
-
-            E_slab = slab_result[slab_result_key]['results']['E_per_at']
-            slab_struc = Structure.from_dict(slab_result[slab_result_key]['structure'])
-            slab_nsites = slab_struc.num_sites
-
+            
+            if slab_result[slab_result_key]['results']['convergence']:
+                E_slab = slab_result[slab_result_key]['results']['E_per_at']
+                slab_struc = Structure.from_dict(slab_result[slab_result_key]['structure'])
+                slab_nsites = slab_struc.num_sites
+            else:
+                continue
 
             E_adsorbate = cp_dict[adsorbate]
 
