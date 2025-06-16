@@ -2585,7 +2585,7 @@ def get_adsorption_energy_results(data_dir,
 
             E_ads = slab_ads_nsites*E_slab_ads - (slab_nsites*E_slab + E_adsorbate)
 
-            ads_results['Adsorption_E_per_at'] = E_ads
+            ads_results['E_per_adsorbate'] = E_ads
     
     write_json(ads,fjson)
     return read_json(fjson)
