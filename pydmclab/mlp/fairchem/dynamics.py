@@ -6,6 +6,7 @@ import sys
 import io
 import contextlib
 import inspect
+import warnings
 import pickle as pkl
 from enum import Enum
 from functools import partial
@@ -13,11 +14,16 @@ from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 import ase.optimize as opt
-from ase import filters
+from ase import filters, units
 from ase.filters import Filter
 from ase.calculators.calculator import Calculator
 from ase.stress import full_3x3_to_voigt_6_stress
 from ase.io.jsonio import encode, decode
+from ase.md.velocitydistribution import MaxwellBoltzmannDistribution, Stationary
+from ase.md.verlet import VelocityVerlet
+from ase.md.npt import NPT
+from ase.md.nptberendsen import Inhomogeneous_NPTBerendsen, NPTBerendsen
+from ase.md.nvtberendsen import NVTBerendsen
 
 from fairchem.core.calculate import pretrained_mlip
 from fairchem.core.datasets import data_list_collater
@@ -34,6 +40,7 @@ from fairchem.core.units.mlip_unit.api.inference import (
 
 from pymatgen.core.structure import Structure
 from pymatgen.io.ase import AseAtomsAdaptor
+from pymatgen.analysis.eos import BirchMurnaghan
 
 from pydmclab.mlp.fairchem.utils import (
     MixedPBCError,
@@ -328,7 +335,8 @@ class FAIRChemCalculator(Calculator):
 
 
 class FAIRChemObserver:
-    """Trajectory observer is a hook in the relaxation process that saves the
+    """
+    Trajectory observer is a hook in the relaxation process that saves the
     intermediate structures.
     """
 
@@ -397,7 +405,7 @@ class FAIRChemObserver:
 
 
 class FAIRChemRelaxer:
-    """Wrapper class for structural relaxation."""
+    """Structure relaxation class"""
 
     def __init__(
         self,
@@ -511,3 +519,412 @@ class FAIRChemRelaxer:
             "final_energy": obs.energies[-1],
             "trajectory": obs,
         }
+
+
+class FAIRChemMolecularDynamics:
+    """Molecular dynamics class"""
+
+    def __init__(
+        self,
+        atoms: Atoms | Structure,
+        *,
+        name_or_path: str,
+        task_name: UMATask | str | None = "omat",
+        ensemble: str = "nvt",
+        thermostat: str = "Berendsen_inhomogeneous",
+        starting_temperature: int | None = None,
+        temperature: int = 300,
+        pressure: float = 1.01325e-4,
+        timestep: float = 2.0,
+        taut: float | None = None,
+        taup: float | None = None,
+        bulk_modulus: float | None = None,
+        loginterval: int = 10,
+        logfile: str = "md.log",
+        trajfile: str = "md.traj",
+        append_trajectory: bool = False,
+        inference_settings: InferenceSettings | str = "default",
+        overrides: dict | None = None,
+        device: Literal["cuda", "cpu"] | None = None,
+        seed: int = 42,
+    ) -> None:
+
+        self.ensemble = ensemble
+        self.thermostat = thermostat
+
+        if isinstance(atoms, Structure):
+            atoms = AseAtomsAdaptor(atoms).get_atoms(atoms)
+
+        if starting_temperature is not None:
+            MaxwellBoltzmannDistribution(
+                atoms, temperature_K=starting_temperature, force_temp=True
+            )
+            Stationary(atoms)
+
+        self.atoms = atoms
+        self.atoms.calc = FAIRChemCalculator(
+            name_or_path=name_or_path,
+            task_name=task_name,
+            inference_settings=inference_settings,
+            overrides=overrides,
+            device=device,
+            seed=seed,
+        )
+
+        if taut is None:
+            taut = 100 * timestep
+        if taup is None:
+            taup = 1000 * timestep
+
+        if ensemble.lower() == "nve":
+
+            self.dyn = VelocityVerlet(
+                atoms=self.atoms,
+                timestep=timestep * units.fs,
+                trajectory=trajfile,
+                logfile=logfile,
+                loginterval=loginterval,
+                append_trajectory=append_trajectory,
+            )
+            print("NVE-MD created")
+
+        elif ensemble.lower() == "nvt":
+
+            if thermostat.lower() == "nose-hoover":
+
+                self.upper_triangular_cell()
+                self.dyn = NPT(
+                    atoms=self.atoms,
+                    timestep=timestep * units.fs,
+                    temperature_K=temperature,
+                    externalstress=pressure * units.GPa,
+                    ttime=taut * units.fs,
+                    pfactor=None,
+                    trajectory=trajfile,
+                    logfile=logfile,
+                    loginterval=loginterval,
+                    append_trajectory=append_trajectory,
+                )
+                print("NVT-Nose-Hoover MD created")
+
+            elif thermostat.lower().startswith("berendsen"):
+
+                self.dyn = NVTBerendsen(
+                    atoms=self.atoms,
+                    timestep=timestep * units.fs,
+                    temperature_K=temperature,
+                    taut=taut * units.fs,
+                    trajectory=trajfile,
+                    logfile=logfile,
+                    loginterval=loginterval,
+                    append_trajectory=append_trajectory,
+                )
+                print("NVT-Berendsen-MD created")
+
+            else:
+
+                raise ValueError(
+                    "Thermostat not supported, choose in 'Nose-Hoover', 'Berendsen', "
+                    "'Berendsen_inhomogeneous'"
+                )
+
+        elif ensemble.lower() == "npt":
+
+            if bulk_modulus is not None:
+                bulk_modulus_au = bulk_modulus / 160.2176  # GPa to eV/A^3
+                compressibility_au = 1 / bulk_modulus_au
+            else:
+                try:
+                    eos = EquationOfState(  # need to update the relaxer to be able to pass FAIRChemCalculator
+                        name_or_path=name_or_path,
+                        task_name=task_name,
+                        inference_settings=inference_settings,
+                        overrides=overrides,
+                        device=device,
+                        seed=seed,
+                    )
+                    eos.fit(atoms=atoms, steps=500, fmax=0.1, verbose=False)
+                    bulk_modulus = eos.get_bulk_modulus(unit="GPa")
+                    bulk_modulus_au = eos.get_bulk_modulus(unit="eV/A^3")
+                    compressibility_au = eos.get_compressibility(unit="A^3/eV")
+                    print(
+                        f"Completed bulk modulus calculation: "
+                        f"k = {bulk_modulus:.3}GPa, {bulk_modulus_au:.3}eV/A^3"
+                    )
+                except Exception:
+                    bulk_modulus_au = 2 / 160.2176
+                    compressibility_au = 1 / bulk_modulus_au
+                    warnings.warn(
+                        "Warning!!! Equation of State fitting failed, setting bulk "
+                        "modulus to 2 GPa. NPT simulation can proceed with incorrect "
+                        "pressure relaxation time."
+                        "User input for bulk modulus is recommended.",
+                        stacklevel=2,
+                    )
+            self.bulk_modulus = bulk_modulus
+
+            if thermostat.lower() == "nose-hoover":
+
+                self.upper_triangular_cell()
+                ptime = taup * units.fs
+                self.dyn = NPT(
+                    atoms=self.atoms,
+                    timestep=timestep * units.fs,
+                    temperature_K=temperature,
+                    externalstress=pressure * units.GPa,
+                    ttime=taut * units.fs,
+                    pfactor=bulk_modulus * units.GPa * ptime * ptime,
+                    trajectory=trajfile,
+                    logfile=logfile,
+                    loginterval=loginterval,
+                    append_trajectory=append_trajectory,
+                )
+                print("NPT-Nose-Hoover MD created")
+
+            elif thermostat.lower() == "berendsen_inhomogeneous":
+
+                # Inhomogeneous_NPTBerendsen thermo/barostat
+                # This is a more flexible scheme that fixes three angles of the unit
+                # cell but allows three lattice parameter to change independently.
+                # see: https://gitlab.com/ase/ase/-/blob/master/ase/md/nptberendsen.py
+
+                self.dyn = Inhomogeneous_NPTBerendsen(
+                    atoms=self.atoms,
+                    timestep=timestep * units.fs,
+                    temperature_K=temperature,
+                    pressure_au=pressure * units.GPa,
+                    taut=taut * units.fs,
+                    taup=taup * units.fs,
+                    compressibility_au=compressibility_au,
+                    trajectory=trajfile,
+                    logfile=logfile,
+                    loginterval=loginterval,
+                )
+                print("NPT-Berendsen-inhomogeneous-MD created")
+
+            elif thermostat.lower() == "npt_berendsen":
+
+                # This is a similar scheme to the Inhomogeneous_NPTBerendsen.
+                # This is a less flexible scheme that fixes the shape of the
+                # cell - three angles are fixed and the ratios between the three
+                # lattice constants.
+                # see: https://gitlab.com/ase/ase/-/blob/master/ase/md/nptberendsen.py
+
+                self.dyn = NPTBerendsen(
+                    atoms=self.atoms,
+                    timestep=timestep * units.fs,
+                    temperature_K=temperature,
+                    pressure_au=pressure * units.GPa,
+                    taut=taut * units.fs,
+                    taup=taup * units.fs,
+                    compressibility_au=compressibility_au,
+                    trajectory=trajfile,
+                    logfile=logfile,
+                    loginterval=loginterval,
+                    append_trajectory=append_trajectory,
+                )
+                print("NPT-Berendsen-MD created")
+
+            else:
+
+                raise ValueError(
+                    "Thermostat not supported, choose in 'Nose-Hoover', 'Berendsen', "
+                    "'Berendsen_inhomogeneous'"
+                )
+
+        self.trajectory = trajfile
+        self.logfile = logfile
+        self.loginterval = loginterval
+        self.timestep = timestep
+
+        return
+
+    def run(self, steps: int) -> None:
+        """
+        hin wrapper of ase MD run.
+
+        Args:
+            steps (int): number of MD steps
+        """
+
+        self.dyn.run(steps)
+
+    def set_atoms(self, atoms: Atoms) -> None:
+        """
+        Set new atoms to run MD.
+
+        Args:
+            atoms (Atoms): new atoms for running MD
+        """
+
+        calculator = self.atoms.calc
+        self.atoms = atoms
+        self.dyn.atoms = atoms
+        self.dyn.atoms.calc = calculator
+
+    def upper_triangular_cell(self, *, verbose: bool | None = False) -> None:
+        """Transform to upper-triangular cell.
+        ASE Nose-Hoover implementation only supports upper-triangular cell
+        while ASE's canonical description is lower-triangular cell.
+
+        Args:
+            verbose (bool): Whether to notify user about upper-triangular cell
+                transformation. Default = False
+        """
+        if not NPT._isuppertriangular(self.atoms.get_cell()):  # noqa: SLF001
+            a, b, c, alpha, beta, gamma = self.atoms.cell.cellpar()
+            angles = np.radians((alpha, beta, gamma))
+            sin_a, sin_b, _sin_g = np.sin(angles)
+            cos_a, cos_b, cos_g = np.cos(angles)
+            cos_p = (cos_g - cos_a * cos_b) / (sin_a * sin_b)
+            cos_p = np.clip(cos_p, -1, 1)
+            sin_p = (1 - cos_p**2) ** 0.5
+
+            new_basis = [
+                (a * sin_b * sin_p, a * sin_b * cos_p, a * cos_b),
+                (0, b * sin_a, b * cos_a),
+                (0, 0, c),
+            ]
+
+            self.atoms.set_cell(new_basis, scale_atoms=True)
+
+            if verbose:
+                print("Transformed to upper triangular unit cell.", flush=True)
+
+
+class EquationOfState:
+    """Class to calculate equation of state."""
+
+    def __init__(
+        self,
+        name_or_path: str = "uma-s-1",
+        task_name: UMATask | str | None = "omat",
+        inference_settings: InferenceSettings | str = "default",
+        overrides: dict | None = None,
+        device: Literal["cuda", "cpu"] | None = None,
+        seed: int = 42,
+        optimizer: ASEOptimizer | str = "FIRE",
+    ) -> None:
+        """Initialize a structure optimizer object for calculation of bulk modulus.
+
+        Args:
+            name_or_path (str): A model name from fairchem.core.pretrained.available_models or a path to a checkpoint file.
+            task_name (UMATask or str, optional): Name of the task to use if using a UMA checkpoint.
+                Determines default key names for energy, forces, and stress.
+                Can be one of 'omol', 'omat', 'oc20', 'odac', or 'omc'.
+            inference_settings (InferenceSettings | str): Settings for inference. Can be "default" (general purpose) or "turbo"
+                (optimized for speed but requires fixed atomic composition).
+            overrides (dict | None): Optional dictionary of settings to override default inference settings.
+            device (Literal["cuda", "cpu"] | None): Optional torch device to load the model onto. If None, uses the default device.
+            seed (int, optional): Random seed for reproducibility.
+            optimizer (ASEOptimizer | str): The ASE optimizer to use for relaxation.
+        """
+        self.relaxer = FAIRChemRelaxer(
+            name_or_path=name_or_path,
+            task_name=task_name,
+            inference_settings=inference_settings,
+            overrides=overrides,
+            device=device,
+            seed=seed,
+            optimizer=optimizer,
+        )
+        self.fitted = False
+
+    def fit(
+        self,
+        atoms: Structure | Atoms,
+        *,
+        n_points: int = 11,
+        fmax: float | None = 0.1,
+        steps: int | None = 500,
+        verbose: bool | None = False,
+        **kwargs,
+    ) -> None:
+        """Relax the Structure/Atoms and fit the Birch-Murnaghan equation of state.
+
+        Args:
+            atoms (Structure | Atoms): A Structure or Atoms object to relax.
+            n_points (int): Number of structures used in fitting the equation of states
+            fmax (float | None): The maximum force tolerance for relaxation.
+                Default = 0.1
+            steps (int | None): The maximum number of steps for relaxation.
+                Default = 500
+            verbose (bool): Whether to print the output of the ASE optimizer.
+                Default = False
+            **kwargs: Additional parameters for the optimizer.
+        """
+        if isinstance(atoms, Atoms):
+            atoms = AseAtomsAdaptor.get_structure(atoms)
+        primitive_cell = atoms.get_primitive_structure()
+        local_minima = self.relaxer.relax(
+            primitive_cell,
+            relax_cell=True,
+            fmax=fmax,
+            steps=steps,
+            verbose=verbose,
+            **kwargs,
+        )
+
+        volumes, energies = [], []
+        for idx in np.linspace(-0.1, 0.1, n_points):
+            structure_strained = local_minima["final_structure"].copy()
+            structure_strained.apply_strain([idx, idx, idx])
+            result = self.relaxer.relax(
+                structure_strained,
+                relax_cell=False,
+                fmax=fmax,
+                steps=steps,
+                verbose=verbose,
+                **kwargs,
+            )
+            volumes.append(result["final_structure"].volume)
+            energies.append(result["trajectory"].energies[-1])
+        self.bm = BirchMurnaghan(volumes=volumes, energies=energies)
+        self.bm.fit()
+        self.fitted = True
+
+    def get_bulk_modulus(self, unit: Literal["eV/A^3", "GPa"] = "eV/A^3") -> float:
+        """Get the bulk modulus of from the fitted Birch-Murnaghan equation of state.
+
+        Args:
+            unit (str): The unit of bulk modulus. Can be "eV/A^3" or "GPa"
+                Default = "eV/A^3"
+
+        Returns:
+            float: Bulk Modulus
+
+        Raises:
+            ValueError: If the equation of state is not fitted.
+        """
+        if self.fitted is False:
+            raise ValueError(
+                "Equation of state needs to be fitted first through self.fit()"
+            )
+        if unit == "eV/A^3":
+            return self.bm.b0
+        if unit == "GPa":
+            return self.bm.b0_GPa
+        raise ValueError("unit has to be eV/A^3 or GPa")
+
+    def get_compressibility(self, unit: str = "A^3/eV") -> float:
+        """Get the bulk modulus of from the fitted Birch-Murnaghan equation of state.
+
+        Args:
+            unit (str): The unit of bulk modulus. Can be "A^3/eV",
+            "GPa^-1" "Pa^-1" or "m^2/N"
+                Default = "A^3/eV"
+
+        Returns:
+            Bulk Modulus (float)
+        """
+        if self.fitted is False:
+            raise ValueError(
+                "Equation of state needs to be fitted first through self.fit()"
+            )
+        if unit == "A^3/eV":
+            return 1 / self.bm.b0
+        if unit == "GPa^-1":
+            return 1 / self.bm.b0_GPa
+        if unit in {"Pa^-1", "m^2/N"}:
+            return 1 / (self.bm.b0_GPa * 1e9)
+        raise NotImplementedError("unit has to be one of A^3/eV, GPa^-1 Pa^-1 or m^2/N")
