@@ -496,7 +496,7 @@ def make_submission_scripts(
             f.write(f"#SBATCH --job-name={job_name}\n")
             f.write(f"#SBATCH --partition={user_configs['partition']}\n")
             f.write("\n")
-            f.write("python chgnet_relax.py\n")
+            f.write(f"python {architecture.lower()}-{model}-prediction.py\n")
 
         print(f"\nCreated new submission script for {launch_dir}")
 
