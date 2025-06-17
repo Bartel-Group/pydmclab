@@ -2584,8 +2584,8 @@ def get_adsorption_energy_results(data_dir,
                 continue
 
             E_adsorbate = cp_dict[adsorbate]
-            E_ads = E_slab_ads - (E_slab + E_adsorbate)
-            # E_ads = slab_ads_nsites*E_slab_ads - (slab_nsites*E_slab + E_adsorbate)
+            # E_ads = E_slab_ads - (E_slab + E_adsorbate)
+            E_ads = slab_ads_nsites*E_slab_ads - (slab_nsites*E_slab + E_adsorbate)
 
             ads_results['E_per_adsorbate'] = E_ads
     
