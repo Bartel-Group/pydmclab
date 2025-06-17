@@ -438,6 +438,9 @@ class FAIRChemRelaxer:
         )
         if isinstance(calculator, FAIRChemCalculator):
             self.calculator = calculator
+            raise UserWarning(
+                "Using provided Calculator instead of generating new one."
+            )
         else:
             self.calculator = FAIRChemCalculator(
                 name_or_path=name_or_path,
@@ -729,6 +732,9 @@ class FAIRChemMD:
         self.atoms = atoms
         if isinstance(calculator, FAIRChemCalculator):
             self.atoms.calc = calculator
+            raise UserWarning(
+                "Using provided Calculator instead of generating new one."
+            )
         else:
             self.atoms.calc = FAIRChemCalculator(
                 name_or_path=name_or_path,
