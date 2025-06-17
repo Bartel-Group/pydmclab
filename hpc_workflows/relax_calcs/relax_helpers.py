@@ -359,7 +359,9 @@ def make_relax_scripts(
 
             launch_dir = batching[batch_id]["launch_dir"]
 
-            relax_script = os.path.join(launch_dir, "chgnet_relax.py")
+            relax_script = os.path.join(
+                launch_dir, f"{architecture.lower()}-{model}-relax.py"
+            )
 
             if os.path.exists(relax_script) and not remake:
                 continue
