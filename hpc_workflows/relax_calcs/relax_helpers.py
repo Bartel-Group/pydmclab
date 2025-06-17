@@ -61,7 +61,7 @@ def get_chgnet_configs(
 
     architecture_configs["relax_configs"]["fmax"] = fmax
     architecture_configs["relax_configs"]["steps"] = steps
-    architecture_configs["relax_configs"]["relax"] = relax_cell
+    architecture_configs["relax_configs"]["relax_cell"] = relax_cell
     architecture_configs["relax_configs"]["ase_filter"] = ase_filter
     architecture_configs["relax_configs"]["params_asefilter"] = params_asefilter
     architecture_configs["relax_configs"]["interval"] = interval
@@ -119,7 +119,7 @@ def get_fairchem_configs(
 
     architecture_configs["relax_configs"]["fmax"] = fmax
     architecture_configs["relax_configs"]["steps"] = steps
-    architecture_configs["relax_configs"]["relax"] = relax_cell
+    architecture_configs["relax_configs"]["relax_cell"] = relax_cell
     architecture_configs["relax_configs"]["ase_filter"] = ase_filter
     architecture_configs["relax_configs"]["params_asefilter"] = params_asefilter
     architecture_configs["relax_configs"]["interval"] = interval
