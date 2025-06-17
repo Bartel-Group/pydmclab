@@ -346,6 +346,10 @@ def make_relax_scripts(
     architecture = user_configs["architecture"]
     if architecture.lower() == "chgnet":
         model = user_configs["relaxer_configs"]["model"].replace(".", "")
+    elif architecture.lower() == "fairchem":
+        model_name = user_configs["relaxer_configs"]["name_or_path"]
+        model_task = user_configs["relaxer_configs"]["task_name"]
+        model = f"{model_name}-{model_task}"
 
     total_batches = len(batching)
 
@@ -383,6 +387,9 @@ def make_relax_scripts(
                     relax_script_lines[i] = (
                         f'{indent}inter_op_threads = {user_configs["num_interop_threads"]}\n'
                     )
+
+                elif 'architecture = "placeholder"' in line:
+                    relax_script_lines[i] = f"{indent}architecture = '{architecture}'\n"
 
                 elif 'relaxer_configs = "placeholder"' in line:
                     config_lines = [

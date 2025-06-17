@@ -36,7 +36,7 @@ def main():
     curr_dir = os.getcwd()
 
     # check what structures have been relaxed
-    results = os.path.join(curr_dir, "chgnet_relax_results.json")
+    results = os.path.join(curr_dir, "placeholder")
     if os.path.exists(results):
         relax_results = read_json(results)
     else:
