@@ -1,8 +1,11 @@
 import os
 import torch
+
+from tqdm import tqdm
+
 from pydmclab.core.struc import StrucTools
-from pydmclab.mlp.chgnet.dynamics import CHGNetRelaxer
-from pydmclab.utils.handy import read_json, write_json
+from pydmclab.mlp import "placeholder"
+from pydmclab.utils.handy import read_json, write_json, convert_numpy_to_native
 
 
 def main():
@@ -15,18 +18,16 @@ def main():
     torch.set_num_threads(intra_op_threads)
     torch.set_num_interop_threads(inter_op_threads)
 
-    # relax settings
-    model = "placeholder"
-    optimizer = "placeholder"
-    stress_weight = "placeholder"
-    on_isolated_atoms = "placeholder"
-    fmax = "placeholder"
-    steps = "placeholder"
-    relax_cell = "placeholder"
-    ase_filter = "placeholder"
-    params_asefilter = "placeholder"
-    relax_interval = "placeholder"
-    verbose = "placeholder"
+    # architecture type
+    architecture = "placeholder"
+
+    # model settings (these are model specific and can vary widely)
+    #   see the associated model relaxer class for args
+    relaxer_configs = "placeholder"
+
+    # prediction settings
+    #  see the associated relax method for your chosen model
+    relax_configs = "placeholder"
 
     # save settings
     save_interval = "placeholder"
@@ -50,47 +51,36 @@ def main():
     }
 
     # initialize the relaxer
-    relaxer = CHGNetRelaxer(
-        model=model,
-        optimizer=optimizer,
-        stress_weight=stress_weight,
-        on_isolated_atoms=on_isolated_atoms,
-    )
+    relaxer = "placeholder"
 
     # relax structures
+    total_strucs = len(ini_strucs)
     current_relax_results = {}
-    for name, ini_struc in ini_strucs.items():
+    
+    with tqdm(total=total_strucs, desc="Relaxing Structures") as pbar:
+        for name, ini_struc in ini_strucs.items():
 
-        ini_struc = StrucTools(ini_struc).structure
+            ini_struc = StrucTools(ini_struc).structure
 
-        struc_results = relaxer.relax(
-            atoms=ini_struc,
-            fmax=fmax,
-            steps=steps,
-            relax_cell=relax_cell,
-            ase_filter=ase_filter,
-            params_asefilter=params_asefilter,
-            interval=relax_interval,
-            verbose=verbose,
-        )
+            struc_results = "placeholder"
 
-        struc_results["final_structure"] = StrucTools(
-            struc_results["final_structure"]
-        ).structure_as_dict
-        struc_results["trajectory"] = struc_results["trajectory"].as_dict()
+            struc_results["final_structure"] = struc_results["final_structure"].as_dict()
+            struc_results["trajectory"] = struc_results["trajectory"].as_dict()
+            struc_results = convert_numpy_to_native(struc_results)
+            current_relax_results.update({name: struc_results})
+            
+            pbar.update(1)
 
-        current_relax_results.update({name: struc_results})
+            # save results on the given save interval
+            if len(current_relax_results) == save_interval:
+                relax_results.update(current_relax_results)
+                write_json(relax_results, results)
+                current_relax_results = {}
 
-        # save results on the given save interval
-        if len(current_relax_results) == save_interval:
+        # save the last set of results
+        if current_relax_results:
             relax_results.update(current_relax_results)
             write_json(relax_results, results)
-            current_relax_results = {}
-
-    # save the last set of results
-    if current_relax_results:
-        relax_results.update(current_relax_results)
-        write_json(relax_results, results)
 
     return
 

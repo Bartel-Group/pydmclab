@@ -1,18 +1,22 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Literal
+
 import os
 import shutil
 import subprocess
+
+from tqdm import tqdm
+
 from pydmclab.utils.handy import read_json, write_json
 
 if TYPE_CHECKING:
     from pydmclab.mlp import Versions
-    from pydmclab.mlp.chgnet.dynamics import CHGNet, CHGNetCalculator
     from ase.optimize.optimize import Optimizer as ASEOptimizer
+    from fairchem.core.units.mlip_unit.api.inference import InferenceSettings
 
 
-def get_relax_configs(
-    model: CHGNet | CHGNetCalculator | Versions | None = None,
+def get_chgnet_configs(
+    model: Versions | None = None,
     optimizer: ASEOptimizer | str = "FIRE",
     stress_weight: float | None = 1 / 160.21766208,
     on_isolated_atoms: Literal["ignore", "warn", "error"] = "warn",
@@ -21,11 +25,11 @@ def get_relax_configs(
     relax_cell: bool | None = True,
     ase_filter: str | None = "FrechetCellFilter",
     params_asefilter: dict | None = None,
-    interval: int | None = 1,
-    verbose: bool = False,
+    relax_interval: int | None = 1,
+    verbose: bool = True,
 ):
     """
-    Note: this assumes cpu only use on MSI
+    Note: this assumes cpu only use on MSI and only supports pretrained models
 
     Args:
         model: if None, uses model "0.3.0"
@@ -37,28 +41,91 @@ def get_relax_configs(
         relax_cell: whether to relax the cell (False is equivalent to ISIF = 2)
         ase_filter: the ASE filter to use
         params_asefilter: the parameters for the ASE filter
-        interval: logging interval
+        relax_interval: logging interval
         verbose: if True, prints relaxation information
 
     Returns:
-        relax_configs (dict): dict of relaxation configurations
+        relax_configs (dict): dict of architecture/ relaxer/ relax configurations
     """
 
-    relax_configs = {}
+    architecture_configs = {
+        "architecture": "CHGNet",
+        "relaxer_configs": {},
+        "relax_configs": {},
+    }
 
-    relax_configs["model"] = model
-    relax_configs["optimizer"] = optimizer
-    relax_configs["stress_weight"] = stress_weight
-    relax_configs["on_isolated_atoms"] = on_isolated_atoms
-    relax_configs["fmax"] = fmax
-    relax_configs["steps"] = steps
-    relax_configs["relax_cell"] = relax_cell
-    relax_configs["ase_filter"] = ase_filter
-    relax_configs["params_asefilter"] = params_asefilter
-    relax_configs["relax_interval"] = interval
-    relax_configs["verbose"] = verbose
+    architecture_configs["relaxer_configs"]["model"] = model
+    architecture_configs["relaxer_configs"]["optimizer"] = optimizer
+    architecture_configs["relaxer_configs"]["stress_weight"] = stress_weight
+    architecture_configs["relaxer_configs"]["on_isolated_atoms"] = on_isolated_atoms
 
-    return relax_configs
+    architecture_configs["relax_configs"]["fmax"] = fmax
+    architecture_configs["relax_configs"]["steps"] = steps
+    architecture_configs["relax_configs"]["relax"] = relax_cell
+    architecture_configs["relax_configs"]["ase_filter"] = ase_filter
+    architecture_configs["relax_configs"]["params_asefilter"] = params_asefilter
+    architecture_configs["relax_configs"]["relax_interval"] = relax_interval
+    architecture_configs["relax_configs"]["verbose"] = verbose
+
+    return architecture_configs
+
+
+def get_fairchem_configs(
+    name_or_path: str,
+    task_name: str,
+    inference_settings: InferenceSettings | str = "default",
+    overrides: dict | None = None,
+    optimizer: ASEOptimizer | str = "FIRE",
+    fmax: float | None = 0.1,
+    steps: int | None = 500,
+    relax_cell: bool | None = True,
+    ase_filter: str | None = "FrechetCellFilter",
+    params_asefilter: dict | None = None,
+    relax_interval: int | None = 1,
+    verbose: bool = True,
+):
+    """
+    Note: this assumes cpu only use on MSI and only supports pretrained models
+
+    Args:
+        name_or_path: the model name or a path to a checkpoint
+        task_name: class of materials you are relaxing (e.g., "omat" for inorganic crystals)
+        inference_settings: the inference settings to use ("default" is general purpose)
+        overrides: overrides for the inference settings
+        optimizer: default is "FIRE", see pydmclab.mlp.dynamics for more options
+        fmax: the force convergence criterion
+        steps: the maximum number of steps to try during relaxation
+        relax_cell: whether to relax the cell (False is equivalent to ISIF = 2)
+        ase_filter: the ASE filter to use
+        params_asefilter: the parameters for the ASE filter
+        relax_interval: logging interval
+        verbose: if True, prints relaxation information
+
+    Returns:
+        relax_configs (dict): dict of architecture/ relaxer/ relax configurations
+    """
+
+    architecture_configs = {
+        "architecture": "FAIRChem",
+        "relaxer_configs": {},
+        "relax_configs": {},
+    }
+
+    architecture_configs["relaxer_configs"]["name_or_path"] = name_or_path
+    architecture_configs["relaxer_configs"]["task_name"] = task_name
+    architecture_configs["relaxer_configs"]["inference_settings"] = inference_settings
+    architecture_configs["relaxer_configs"]["overrides"] = overrides
+    architecture_configs["relaxer_configs"]["optimizer"] = optimizer
+
+    architecture_configs["relax_configs"]["fmax"] = fmax
+    architecture_configs["relax_configs"]["steps"] = steps
+    architecture_configs["relax_configs"]["relax"] = relax_cell
+    architecture_configs["relax_configs"]["ase_filter"] = ase_filter
+    architecture_configs["relax_configs"]["params_asefilter"] = params_asefilter
+    architecture_configs["relax_configs"]["relax_interval"] = relax_interval
+    architecture_configs["relax_configs"]["verbose"] = verbose
+
+    return architecture_configs
 
 
 def get_launch_configs(batch_size: int = 100, save_interval: int = 5):
@@ -94,7 +161,7 @@ def get_slurm_configs(
     cores_per_node: int = 8,
     walltime_in_hours: int = 12,
     mem_per_core_in_MB: int = 1900,
-    partition: str = "agsmall, msismall, msidmc",
+    partition: str = "msismall, msidmc",
     error_file: str = "log.e",
     output_file: str = "log.o",
     account: str = "cbartel",
@@ -144,9 +211,15 @@ def get_torch_configs(
         torch_configs (dict): dict of torch configurations
     """
 
-    if num_intraop_threads > slurm_configs["ntasks"]:
+    if (
+        isinstance(num_intraop_threads, int)
+        and num_intraop_threads > slurm_configs["ntasks"]
+    ):
         raise ValueError("num_intraop_threads must be less than or equal to ntasks")
-    if num_interop_threads > slurm_configs["ntasks"]:
+    if (
+        isinstance(num_interop_threads, int)
+        and num_interop_threads > slurm_configs["ntasks"]
+    ):
         raise ValueError("num_interop_threads must be less than or equal to ntasks")
 
     torch_configs = {}
@@ -170,13 +243,17 @@ def batch_strucs(strucs: dict, batch_size: int) -> dict:
     batched_strucs = {}
     current_batch = {}
 
-    for formula in strucs:
-        for struc_id, struc in strucs[formula].items():
-            current_batch[f"{formula}_{struc_id}"] = struc
-            if len(current_batch) == batch_size:
-                batched_strucs[f"batch_{batch_id}"] = current_batch
-                batch_id += 1
-                current_batch = {}
+    total_strucs = sum(len(strucs[formula]) for formula in strucs)
+
+    with tqdm(total=total_strucs, desc="Batching structures") as pbar:
+        for formula in strucs:
+            for struc_id, struc in strucs[formula].items():
+                current_batch[f"{formula}_{struc_id}"] = struc
+                pbar.update(1)
+                if len(current_batch) == batch_size:
+                    batched_strucs[f"batch_{batch_id}"] = current_batch
+                    batch_id += 1
+                    current_batch = {}
 
     if current_batch:
         batched_strucs[f"batch_{batch_id}"] = current_batch
@@ -244,6 +321,14 @@ def setup_job(
     return read_json(fjson)
 
 
+def detect_indent(line: str) -> str:
+    """
+    Detect leading indentation (spaces or tabs) from a line.
+    Need to indent lines within main() and other functions while writing to the script.
+    """
+    return line[: len(line) - len(line.lstrip())]
+
+
 def make_relax_scripts(
     batching: dict, user_configs: dict, relax_template: str, remake: bool = False
 ) -> None:
@@ -258,74 +343,102 @@ def make_relax_scripts(
         None, writes chgnet relax script for each job (batch)
     """
 
-    for batch_id in batching:
+    architecture = user_configs["architecture"]
+    if architecture.lower() == "chgnet":
+        model = user_configs["relaxer_configs"]["model"].replace(".", "")
 
-        launch_dir = batching[batch_id]["launch_dir"]
+    total_batches = len(batching)
 
-        relax_script = os.path.join(launch_dir, "chgnet_relax.py")
+    with tqdm(total=total_batches, desc="Making relaxation scripts") as pbar:
 
-        if os.path.exists(relax_script) and not remake:
-            continue
+        for batch_id in batching:
 
-        with open(relax_template, "r", encoding="utf-8") as template_file:
-            template_lines = template_file.readlines()
+            launch_dir = batching[batch_id]["launch_dir"]
 
-        relax_script_lines = template_lines.copy()
+            relax_script = os.path.join(launch_dir, "chgnet_relax.py")
 
-        for i, line in enumerate(relax_script_lines):
-            if 'intra_op_threads = "placeholder"' in line:
-                relax_script_lines[i] = (
-                    f'    intra_op_threads = {user_configs["num_intraop_threads"]}\n'
-                )
-            elif 'inter_op_threads = "placeholder"' in line:
-                relax_script_lines[i] = (
-                    f'    inter_op_threads = {user_configs["num_interop_threads"]}\n'
-                )
-            elif 'model = "placeholder"' in line:
-                relax_script_lines[i] = f'    model = "{user_configs["model"]}"\n'
-            elif 'optimizer = "placeholder"' in line:
-                relax_script_lines[i] = (
-                    f'    optimizer = "{user_configs["optimizer"]}"\n'
-                )
-            elif 'stress_weight = "placeholder"' in line:
-                relax_script_lines[i] = (
-                    f'    stress_weight = {user_configs["stress_weight"]}\n'
-                )
-            elif 'on_isolated_atoms = "placeholder"' in line:
-                relax_script_lines[i] = (
-                    f'    on_isolated_atoms = "{user_configs["on_isolated_atoms"]}"\n'
-                )
-            elif 'fmax = "placeholder"' in line:
-                relax_script_lines[i] = f'    fmax = {user_configs["fmax"]}\n'
-            elif 'steps = "placeholder"' in line:
-                relax_script_lines[i] = f'    steps = {user_configs["steps"]}\n'
-            elif 'relax_cell = "placeholder"' in line:
-                relax_script_lines[i] = (
-                    f'    relax_cell = {user_configs["relax_cell"]}\n'
-                )
-            elif 'ase_filter = "placeholder"' in line:
-                relax_script_lines[i] = (
-                    f'    ase_filter = "{user_configs["ase_filter"]}"\n'
-                )
-            elif 'params_asefilter = "placeholder"' in line:
-                relax_script_lines[i] = (
-                    f'    params_asefilter = {user_configs["params_asefilter"]}\n'
-                )
-            elif 'relax_interval = "placeholder"' in line:
-                relax_script_lines[i] = (
-                    f'    relax_interval = {user_configs["relax_interval"]}\n'
-                )
-            elif 'verbose = "placeholder"' in line:
-                relax_script_lines[i] = f'    verbose = {user_configs["verbose"]}\n'
-            elif 'save_interval = "placeholder"' in line:
-                relax_script_lines[i] = (
-                    f'    save_interval = {user_configs["save_interval"]}\n'
-                )
+            if os.path.exists(relax_script) and not remake:
+                continue
 
-        with open(relax_script, "w", encoding="utf-8") as script_file:
-            script_file.writelines(relax_script_lines)
+            with open(relax_template, "r", encoding="utf-8") as template_file:
+                template_lines = template_file.readlines()
 
-        print(f"\nCreated new relax script for {launch_dir}")
+            relax_script_lines = template_lines.copy()
+
+            for i, line in enumerate(relax_script_lines):
+
+                indent = detect_indent(line)
+
+                if 'from pydmclab.mlp import "placeholder"' in line:
+                    relax_script_lines[i] = (
+                        f"{indent}from pydmclab.mlp.{architecture.lower()}.dynamics import {architecture}Relaxer\n"
+                    )
+
+                elif 'intra_op_threads = "placeholder"' in line:
+                    relax_script_lines[i] = (
+                        f'{indent}intra_op_threads = {user_configs["num_intraop_threads"]}\n'
+                    )
+
+                elif 'inter_op_threads = "placeholder"' in line:
+                    relax_script_lines[i] = (
+                        f'{indent}inter_op_threads = {user_configs["num_interop_threads"]}\n'
+                    )
+
+                elif 'relaxer_configs = "placeholder"' in line:
+                    config_lines = [
+                        f"{indent}{key} = {repr(value)}\n"
+                        for key, value in user_configs["relaxer_configs"].items()
+                    ]
+                    relax_script_lines[i : i + 1] = config_lines
+
+                elif 'relax_configs = "placeholder"' in line:
+                    config_lines = [
+                        f"{indent}{key} = {repr(value)}\n"
+                        for key, value in user_configs["relax_configs"].items()
+                    ]
+                    relax_script_lines[i : i + 1] = config_lines
+
+                elif 'save_interval = "placeholder"' in line:
+                    relax_script_lines[i] = (
+                        f"{indent}save_interval = {user_configs['save_interval']}\n"
+                    )
+
+                elif 'results = os.path.join(curr_dir, "placeholder")' in line:
+                    relax_script_lines[i] = (
+                        f"{indent}results = os.path.join(curr_dir, '{architecture.lower()}_{model}_prediction_results.json')\n"
+                    )
+
+                elif 'relaxer = "placeholder"' in line:
+
+                    class_call_line = [f"{indent}relaxer = {architecture}Relaxer(\n"]
+                    relaxer_config_lines = [
+                        f"{indent}    {key} = {key},\n"
+                        for key in user_configs["relaxer_configs"].keys()
+                    ]
+                    end_call_line = [f"{indent})\n"]
+                    relax_script_lines[i : i + 1] = (
+                        class_call_line + relaxer_config_lines + end_call_line
+                    )
+
+                elif 'struc_results = "placeholder"' in line:
+                    class_call_line = [
+                        f"{indent}struc_results = relaxer.relax(ini_struc, \n"
+                    ]
+                    predict_structure_config_lines = [
+                        f"{indent}    {key} = {key},\n"
+                        for key in user_configs["relax_configs"].keys()
+                    ]
+                    end_call_line = [f"{indent})\n"]
+                    relax_script_lines[i : i + 1] = (
+                        class_call_line + predict_structure_config_lines + end_call_line
+                    )
+
+            with open(relax_script, "w", encoding="utf-8") as script_file:
+                script_file.writelines(relax_script_lines)
+
+            pbar.update(1)
+
+            # print(f"\nCreated new relax script for {launch_dir}")
 
     return
 
@@ -343,6 +456,14 @@ def make_submission_scripts(
         job_names_by_dir (dict): dict of job names by launch directory
     """
 
+    architecture = user_configs["architecture"]
+    if architecture.lower() == "chgnet":
+        model = user_configs["relaxer_configs"]["model"].replace(".", "")
+    elif architecture.lower() == "fairchem":
+        model_name = user_configs["relaxer_configs"]["name_or_path"]
+        model_task = user_configs["relaxer_configs"]["task_name"]
+        model = f"{model_name}-{model_task}"
+
     for batch_id in batching:
 
         launch_dir = batching[batch_id]["launch_dir"]
@@ -352,7 +473,7 @@ def make_submission_scripts(
         if os.path.exists(relax_launcher) and not remake:
             continue
 
-        job_name = f"chgnet_relax_{batch_id}"
+        job_name = f"{architecture.lower()}_{model}_relax_{batch_id}"
 
         with open(relax_launcher, "w", encoding="utf-8") as f:
             f.write("#!/bin/bash -l\n")
@@ -426,7 +547,7 @@ def check_job_submission_status(job_name: str) -> bool:
     return False
 
 
-def check_job_completion_status(launch_dir: str) -> bool:
+def check_job_completion_status(launch_dir: str, user_configs: dict) -> bool:
     """
     Args:
         launch_dir (str): path to launch directory
@@ -435,8 +556,18 @@ def check_job_completion_status(launch_dir: str) -> bool:
         job_completed (bool): True if job has completed
     """
 
+    architecture = user_configs["architecture"]
+    if architecture.lower() == "chgnet":
+        model = user_configs["relaxer_configs"]["model"].replace(".", "")
+    elif architecture.lower() == "fairchem":
+        model_name = user_configs["relaxer_configs"]["name_or_path"]
+        model_task = user_configs["relaxer_configs"]["task_name"]
+        model = f"{model_name}-{model_task}"
+
     num_ini_strucs = len(read_json(os.path.join(launch_dir, "ini_strucs.json")))
-    batch_results = os.path.join(launch_dir, "chgnet_relax_results.json")
+    batch_results = os.path.join(
+        launch_dir, f"{architecture.lower()}_{model}_relax_results.json"
+    )
     if os.path.exists(batch_results):
         num_relaxed_strucs = len(read_json(batch_results))
     else:
@@ -448,7 +579,7 @@ def check_job_completion_status(launch_dir: str) -> bool:
         return False
 
 
-def submit_jobs(batching: dict) -> None:
+def submit_jobs(batching: dict, user_configs: dict) -> None:
     """
     Args:
         batching (dict): {"batch_id": {"launch_dir": str}}
@@ -458,13 +589,21 @@ def submit_jobs(batching: dict) -> None:
         None, submits jobs if not already in queue or finished
     """
 
+    architecture = user_configs["architecture"]
+    if architecture.lower() == "chgnet":
+        model = user_configs["relaxer_configs"]["model"].replace(".", "")
+    elif architecture.lower() == "fairchem":
+        model_name = user_configs["relaxer_configs"]["name_or_path"]
+        model_task = user_configs["relaxer_configs"]["task_name"]
+        model = f"{model_name}-{model_task}"
+
     scripts_dir = os.getcwd()
 
     for batch_id in batching:
 
         launch_dir = batching[batch_id]["launch_dir"]
 
-        job_name = f"chgnet_relax_{batch_id}"
+        job_name = f"{architecture.lower()}_{model}_relax_{batch_id}"
 
         # check if job is already in queue
         if check_job_submission_status(job_name):
@@ -472,7 +611,9 @@ def submit_jobs(batching: dict) -> None:
             continue
 
         # check if job has already finished
-        if check_job_completion_status(launch_dir=launch_dir):
+        if check_job_completion_status(
+            launch_dir=launch_dir, user_configs=user_configs
+        ):
             print(f"\n{job_name} is finished")
             continue
 
@@ -500,45 +641,53 @@ def collect_results(
         results (dict): dict of relaxation results and configs
     """
 
-    fjson = os.path.join(data_dir, "relax_results.json")
+    architecture = user_configs["architecture"]
+    if architecture.lower() == "chgnet":
+        model = user_configs["relaxer_configs"]["model"].replace(".", "")
+    elif architecture.lower() == "fairchem":
+        model_name = user_configs["relaxer_configs"]["name_or_path"]
+        model_task = user_configs["relaxer_configs"]["task_name"]
+        model = f"{model_name}-{model_task}"
+
+    fjson = os.path.join(data_dir, f"{architecture.lower()}_{model}_relax_results.json")
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
 
     print("\nCollecting results")
 
-    results = {"relax_results": {}, "relax_configs": {}}
+    results = {"relax_results": {}, "architecture_configs": {}}
 
-    # record relax job settings
-    results["relax_configs"]["model"] = user_configs["model"]
-    results["relax_configs"]["optimizer"] = user_configs["optimizer"]
-    results["relax_configs"]["stress_weight"] = user_configs["stress_weight"]
-    results["relax_configs"]["on_isolated_atoms"] = user_configs["on_isolated_atoms"]
-    results["relax_configs"]["fmax"] = user_configs["fmax"]
-    results["relax_configs"]["steps"] = user_configs["steps"]
-    results["relax_configs"]["relax_cell"] = user_configs["relax_cell"]
-    results["relax_configs"]["ase_filter"] = user_configs["ase_filter"]
-    results["relax_configs"]["params_asefilter"] = user_configs["params_asefilter"]
-    results["relax_configs"]["interval"] = user_configs["relax_interval"]
+    results["architecture_configs"]["architecture"] = user_configs["architecture"]
+    results["architecture_configs"]["relaxer_configs"] = user_configs["relaxer_configs"]
+    results["architecture_configs"]["rekax_configs"] = user_configs["relax_configs"]
 
     # collect results from each batch
-    for batch_id in batching:
 
-        launch_dir = batching[batch_id]["launch_dir"]
+    total_batches = len(batching)
 
-        # check if job is finished
-        if not check_job_completion_status(launch_dir=launch_dir):
-            continue
+    with tqdm(total=total_batches, desc="Collecting results") as pbar:
+        for batch_id in batching:
 
-        batch_relax_results = read_json(
-            os.path.join(launch_dir, "chgnet_relax_results.json")
-        )
+            launch_dir = batching[batch_id]["launch_dir"]
 
-        for formula_struc_id, relax_result in batch_relax_results.items():
-            formula, struc_id = formula_struc_id.split("_", 1)
-            if formula not in results["relax_results"]:
-                results["relax_results"][formula] = {}
-            relax_result["batch_id"] = batch_id
-            results["relax_results"][formula][struc_id] = relax_result
+            # check if job is finished
+            if not check_job_completion_status(
+                launch_dir=launch_dir, user_configs=user_configs
+            ):
+                pbar.update(1)
+                continue
+
+            batch_relax_results = read_json(
+                os.path.join(launch_dir, "chgnet_relax_results.json")
+            )
+
+            for formula_struc_id, relax_result in batch_relax_results.items():
+                formula, struc_id = formula_struc_id.split("_", 1)
+                if formula not in results["relax_results"]:
+                    results["relax_results"][formula] = {}
+                relax_result["batch_id"] = batch_id
+                results["relax_results"][formula][struc_id] = relax_result
+            pbar.update(1)
 
     write_json(results, fjson)
     return read_json(fjson)
@@ -565,8 +714,6 @@ def check_collected_results(results: dict, batching: dict) -> None:
 
     results_collected = len(unique_batch_ids)
 
-    print(
-        f"\nCollected results for {results_collected} / {results_possible} relax batches"
-    )
+    print(f"\nCompleted {results_collected} / {results_possible} relax batches")
 
     return
