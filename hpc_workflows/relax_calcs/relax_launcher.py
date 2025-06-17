@@ -154,7 +154,7 @@ def main():
 
     # submit jobs
     if ready_to_launch:
-        submit_jobs(batching=batching)
+        submit_jobs(batching=batching, user_configs=USER_CONFIGS)
 
     # collect results
     results = collect_results(
