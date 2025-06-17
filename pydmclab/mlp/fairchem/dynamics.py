@@ -423,6 +423,7 @@ class FAIRChemRelaxer:
         self,
         name_or_path: str = "uma-s-1",
         task_name: UMATask | str | None = "omat",
+        calculator: FAIRChemCalculator | None = None,
         inference_settings: InferenceSettings | str = "default",
         overrides: dict | None = None,
         device: Literal["cuda", "cpu"] | None = None,
@@ -435,14 +436,17 @@ class FAIRChemRelaxer:
             if isinstance(optimizer, str)
             else optimizer
         )
-        self.calculator = FAIRChemCalculator(
-            name_or_path=name_or_path,
-            task_name=task_name,
-            inference_settings=inference_settings,
-            overrides=overrides,
-            device=device,
-            seed=seed,
-        )
+        if isinstance(calculator, FAIRChemCalculator):
+            self.calculator = calculator
+        else:
+            self.calculator = FAIRChemCalculator(
+                name_or_path=name_or_path,
+                task_name=task_name,
+                inference_settings=inference_settings,
+                overrides=overrides,
+                device=device,
+                seed=seed,
+            )
 
     def predict_structure(
         self,
@@ -540,6 +544,7 @@ class EquationOfState:
         self,
         name_or_path: str = "uma-s-1",
         task_name: UMATask | str | None = "omat",
+        calculator: FAIRChemCalculator | None = None,
         inference_settings: InferenceSettings | str = "default",
         overrides: dict | None = None,
         device: Literal["cuda", "cpu"] | None = None,
@@ -553,6 +558,7 @@ class EquationOfState:
             task_name (UMATask or str, optional): Name of the task to use if using a UMA checkpoint.
                 Determines default key names for energy, forces, and stress.
                 Can be one of 'omol', 'omat', 'oc20', 'odac', or 'omc'.
+            calculator: if provided, use input FAIRChemCalculator
             inference_settings (InferenceSettings | str): Settings for inference. Can be "default" (general purpose) or "turbo"
                 (optimized for speed but requires fixed atomic composition).
             overrides (dict | None): Optional dictionary of settings to override default inference settings.
@@ -560,15 +566,23 @@ class EquationOfState:
             seed (int, optional): Random seed for reproducibility.
             optimizer (ASEOptimizer | str): The ASE optimizer to use for relaxation.
         """
-        self.relaxer = FAIRChemRelaxer(
-            name_or_path=name_or_path,
-            task_name=task_name,
-            inference_settings=inference_settings,
-            overrides=overrides,
-            device=device,
-            seed=seed,
-            optimizer=optimizer,
-        )
+
+        if isinstance(calculator, FAIRChemCalculator):
+            self.relaxer = FAIRChemRelaxer(
+                calculator=calculator,
+                optimizer=optimizer,
+            )
+        else:
+            self.relaxer = FAIRChemRelaxer(
+                name_or_path=name_or_path,
+                task_name=task_name,
+                inference_settings=inference_settings,
+                overrides=overrides,
+                device=device,
+                seed=seed,
+                optimizer=optimizer,
+            )
+
         self.fitted = False
 
     def fit(
@@ -680,6 +694,7 @@ class FAIRChemMD:
         *,
         name_or_path: str = "uma-s-1",
         task_name: UMATask | str | None = "omat",
+        calculator: FAIRChemCalculator | None = None,
         ensemble: str = "nvt",
         thermostat: str = "Berendsen_inhomogeneous",
         starting_temperature: int | None = None,
@@ -712,14 +727,17 @@ class FAIRChemMD:
             Stationary(atoms)
 
         self.atoms = atoms
-        self.atoms.calc = FAIRChemCalculator(
-            name_or_path=name_or_path,
-            task_name=task_name,
-            inference_settings=inference_settings,
-            overrides=overrides,
-            device=device,
-            seed=seed,
-        )
+        if isinstance(calculator, FAIRChemCalculator):
+            self.atoms.calc = calculator
+        else:
+            self.atoms.calc = FAIRChemCalculator(
+                name_or_path=name_or_path,
+                task_name=task_name,
+                inference_settings=inference_settings,
+                overrides=overrides,
+                device=device,
+                seed=seed,
+            )
 
         if taut is None:
             taut = 100 * timestep
@@ -785,14 +803,7 @@ class FAIRChemMD:
                 compressibility_au = 1 / bulk_modulus_au
             else:
                 try:
-                    eos = EquationOfState(  # need to update the relaxer to be able to pass FAIRChemCalculator
-                        name_or_path=name_or_path,
-                        task_name=task_name,
-                        inference_settings=inference_settings,
-                        overrides=overrides,
-                        device=device,
-                        seed=seed,
-                    )
+                    eos = EquationOfState(calculator=self.atoms.calc)
                     eos.fit(atoms=atoms, steps=500, fmax=0.1, verbose=False)
                     bulk_modulus = eos.get_bulk_modulus(unit="GPa")
                     bulk_modulus_au = eos.get_bulk_modulus(unit="eV/A^3")
