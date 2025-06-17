@@ -25,7 +25,7 @@ def get_chgnet_configs(
     relax_cell: bool | None = True,
     ase_filter: str | None = "FrechetCellFilter",
     params_asefilter: dict | None = None,
-    relax_interval: int | None = 1,
+    interval: int | None = 1,
     verbose: bool = True,
 ):
     """
@@ -41,7 +41,7 @@ def get_chgnet_configs(
         relax_cell: whether to relax the cell (False is equivalent to ISIF = 2)
         ase_filter: the ASE filter to use
         params_asefilter: the parameters for the ASE filter
-        relax_interval: logging interval
+        interval: logging interval for relax obs
         verbose: if True, prints relaxation information
 
     Returns:
@@ -64,7 +64,7 @@ def get_chgnet_configs(
     architecture_configs["relax_configs"]["relax"] = relax_cell
     architecture_configs["relax_configs"]["ase_filter"] = ase_filter
     architecture_configs["relax_configs"]["params_asefilter"] = params_asefilter
-    architecture_configs["relax_configs"]["relax_interval"] = relax_interval
+    architecture_configs["relax_configs"]["interval"] = interval
     architecture_configs["relax_configs"]["verbose"] = verbose
 
     return architecture_configs
@@ -81,7 +81,7 @@ def get_fairchem_configs(
     relax_cell: bool | None = True,
     ase_filter: str | None = "FrechetCellFilter",
     params_asefilter: dict | None = None,
-    relax_interval: int | None = 1,
+    interval: int | None = 1,
     verbose: bool = True,
 ):
     """
@@ -98,7 +98,7 @@ def get_fairchem_configs(
         relax_cell: whether to relax the cell (False is equivalent to ISIF = 2)
         ase_filter: the ASE filter to use
         params_asefilter: the parameters for the ASE filter
-        relax_interval: logging interval
+        interval: logging interval for relax obs
         verbose: if True, prints relaxation information
 
     Returns:
@@ -122,7 +122,7 @@ def get_fairchem_configs(
     architecture_configs["relax_configs"]["relax"] = relax_cell
     architecture_configs["relax_configs"]["ase_filter"] = ase_filter
     architecture_configs["relax_configs"]["params_asefilter"] = params_asefilter
-    architecture_configs["relax_configs"]["relax_interval"] = relax_interval
+    architecture_configs["relax_configs"]["interval"] = interval
     architecture_configs["relax_configs"]["verbose"] = verbose
 
     return architecture_configs

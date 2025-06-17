@@ -6,7 +6,7 @@ from pydmclab.hpc.helpers import check_strucs, check_launch_dirs
 
 
 HOME_PATH = os.environ["HOME"]
-RELAX_HELPERS_DIR = "%s/bin/pydmclab/hpc_workflows/chgnet_relax_calcs" % HOME_PATH
+RELAX_HELPERS_DIR = "%s/bin/pydmclab/hpc_workflows/relax_calcs" % HOME_PATH
 
 if RELAX_HELPERS_DIR not in sys.path:
     sys.path.append(RELAX_HELPERS_DIR)
@@ -91,7 +91,7 @@ USER_CONFIGS = {
 
 # location of relax_template.py
 RELAX_TEMPLATE = (
-    "%s/bin/pydmclab/hpc_workflows/chgnet_relax_calcs/relax_template.py" % HOME_PATH
+    "%s/bin/pydmclab/hpc_workflows/relax_calcs/relax_template.py" % HOME_PATH
 )
 
 
