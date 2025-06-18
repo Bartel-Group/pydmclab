@@ -668,7 +668,7 @@ def collect_results(
 
     results["architecture_configs"]["architecture"] = user_configs["architecture"]
     results["architecture_configs"]["relaxer_configs"] = user_configs["relaxer_configs"]
-    results["architecture_configs"]["rekax_configs"] = user_configs["relax_configs"]
+    results["architecture_configs"]["relax_configs"] = user_configs["relax_configs"]
 
     # collect results from each batch
 
