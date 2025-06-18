@@ -360,7 +360,7 @@ def make_relax_scripts(
             launch_dir = batching[batch_id]["launch_dir"]
 
             relax_script = os.path.join(
-                launch_dir, f"{architecture.lower()}-{model}-relax.py"
+                launch_dir, f"{architecture.lower()}_{model}_relax.py"
             )
 
             if os.path.exists(relax_script) and not remake:
@@ -496,7 +496,7 @@ def make_submission_scripts(
             f.write(f"#SBATCH --job-name={job_name}\n")
             f.write(f"#SBATCH --partition={user_configs['partition']}\n")
             f.write("\n")
-            f.write(f"python {architecture.lower()}-{model}-relax.py\n")
+            f.write(f"python {architecture.lower()}_{model}_relax.py\n")
 
         print(f"\nCreated new submission script for {launch_dir}")
 
