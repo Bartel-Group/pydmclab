@@ -2438,8 +2438,10 @@ def get_adsorbed_slabs(data_dir,
             bulk_unit_cell_height = ref_struc.lattice.c
 
             slab = set_selective_dynamics_by_height(slab, height = bulk_unit_cell_height)
+        else:
+            slab = slab
         
-        ads = AdsorbateSiteFinder(slab, height)
+        ads = AdsorbateSiteFinder(slab,height=height,selective_dynamics=False,)
         ads_sites_dict = ads.find_adsorption_sites()
         ads_sites = ads_sites_dict['all']
 
