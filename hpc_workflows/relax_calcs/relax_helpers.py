@@ -414,7 +414,7 @@ def make_relax_scripts(
 
                 elif 'results = os.path.join(curr_dir, "placeholder")' in line:
                     relax_script_lines[i] = (
-                        f"{indent}results = os.path.join(curr_dir, '{architecture.lower()}_{model}_prediction_results.json')\n"
+                        f"{indent}results = os.path.join(curr_dir, '{architecture.lower()}_{model}_relax_results.json')\n"
                     )
 
                 elif 'relaxer = "placeholder"' in line:
@@ -433,13 +433,13 @@ def make_relax_scripts(
                     class_call_line = [
                         f"{indent}struc_results = relaxer.relax(ini_struc, \n"
                     ]
-                    predict_structure_config_lines = [
+                    relax_structure_config_lines = [
                         f"{indent}    {key} = {key},\n"
                         for key in user_configs["relax_configs"].keys()
                     ]
                     end_call_line = [f"{indent})\n"]
                     relax_script_lines[i : i + 1] = (
-                        class_call_line + predict_structure_config_lines + end_call_line
+                        class_call_line + relax_structure_config_lines + end_call_line
                     )
 
             with open(relax_script, "w", encoding="utf-8") as script_file:
@@ -687,7 +687,10 @@ def collect_results(
                 continue
 
             batch_relax_results = read_json(
-                os.path.join(launch_dir, "chgnet_relax_results.json")
+                os.path.join(
+                    launch_dir,
+                    f"{architecture.lower()}_{model}_relax_results.json",
+                )
             )
 
             for formula_struc_id, relax_result in batch_relax_results.items():
