@@ -2432,13 +2432,14 @@ def get_adsorbed_slabs(data_dir,
         formula, mpID, miller, size, vac, term, mag, theory = key_split[0], key_split[1], key_split[2], key_split[3], key_split[4], key_split[5], key_split[6], key_split[7]
         ref_bulk_results_key = formula + '--' + mpID + '_' + 'reference-bulk_' + miller + '--' + mag + '--' + theory
         
-        ref_struc = Structure.from_dict(ref_bulk_results[ref_bulk_results_key]['structure'])
-        
-        bulk_unit_cell_height = ref_struc.lattice.c
+        if selective_dynamics:
+            ref_struc = Structure.from_dict(ref_bulk_results[ref_bulk_results_key]['structure'])
+            
+            bulk_unit_cell_height = ref_struc.lattice.c
 
-        slab = set_selective_dynamics_by_height(slab, height = bulk_unit_cell_height)
+            slab = set_selective_dynamics_by_height(slab, height = bulk_unit_cell_height)
         
-        ads = AdsorbateSiteFinder(slab, selective_dynamics, height)
+        ads = AdsorbateSiteFinder(slab, height)
         ads_sites_dict = ads.find_adsorption_sites()
         ads_sites = ads_sites_dict['all']
 
