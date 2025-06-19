@@ -24,7 +24,12 @@ def clean_md_log_and_traj_files(logfile: str, trajfile: str) -> None:
                 atoms_to_remove.append(i + 1)
             elif i + 1 < len(lines) and "Time" in line and "Time" in lines[i + 1]:
                 lines_to_remove.append(i)
-            elif i + 1 < len(lines) and "Time" in line and "0.0000" in lines[i + 1]:
+            elif (
+                i + 1 < len(lines)
+                and "Time" in line
+                and "0.0000" in lines[i + 1]
+                and i not in [0, 1]
+            ):
                 lines_to_remove.append(i + 1)
                 atoms_to_remove.append(i + 1)
 

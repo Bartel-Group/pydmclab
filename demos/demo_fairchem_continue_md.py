@@ -1,22 +1,22 @@
 import os
 import shutil
 from pydmclab.core.struc import StrucTools
-from pydmclab.mlp.chgnet.dynamics import CHGNetMD, AnalyzeMD
+from pydmclab.mlp.fairchem.dynamics import FAIRChemMD, AnalyzeMD
 
 DATA_DIR = os.path.join("output", "mlp-continue-md")
 if not os.path.exists(DATA_DIR):
     os.makedirs(DATA_DIR)
 
 # incomplete trajectory and log files
-INCOMPLETE_TRAJ = os.path.join(DATA_DIR, "incomplete_chgnet_md.traj")
-INCOMPLETE_LOG = os.path.join(DATA_DIR, "incomplete_chgnet_md.log")
+INCOMPLETE_TRAJ = os.path.join(DATA_DIR, "incomplete_fairchem_md.traj")
+INCOMPLETE_LOG = os.path.join(DATA_DIR, "incomplete_fairchem_md.log")
 
 INI_STRUC = os.path.join("cifs", "mp-505766-SrCoO3-supercell.cif")
 
 
 # this function is used to find the remaining steps (can change as needed)
-def find_remaining_steps(logfile, nsteps, timestep):
-    amd = AnalyzeMD(logfile=logfile)
+def find_remaining_steps(logfile, trajfile, nsteps, timestep):
+    amd = AnalyzeMD(logfile=logfile, trajfile=trajfile)
     summary = amd.log_summary
     last_time = summary[-1]["t"] * 1000  # in fs
     remaining_steps = round((nsteps * timestep - last_time) / timestep)
@@ -26,8 +26,8 @@ def find_remaining_steps(logfile, nsteps, timestep):
 def main():
 
     # name of trajectory and log files we will add to
-    save_traj = os.path.join(DATA_DIR, "chgnet_md.traj")
-    save_log = os.path.join(DATA_DIR, "chgnet_md.log")
+    save_traj = os.path.join(DATA_DIR, "fairchem_md.traj")
+    save_log = os.path.join(DATA_DIR, "fairchem_md.log")
 
     # remove these files if they exist for fresh demo
     if os.path.exists(save_traj):
@@ -50,11 +50,12 @@ def main():
     # determine if we are continuing from an existing trajectory
     if not os.path.exists(save_traj):
         # setup new MD simulation
-        md = CHGNetMD(
-            structure=perturbed_struc,
-            model="0.3.0",
-            use_device="cpu",
-            relax_first=True,
+        md = FAIRChemMD(
+            atoms=perturbed_struc,
+            name_or_path="uma-s-1",
+            task_name="omat",
+            ensemble="nvt",
+            thermostat="Berendsen_inhomogeneous",
             temperature=T,
             timestep=timestep,
             trajfile=save_traj,
@@ -65,9 +66,11 @@ def main():
         md.run(steps=nsteps)
     else:
         # continue from existing trajectory
-        md = CHGNetMD.continue_from_traj(
-            model="0.3.0",
-            use_device="cpu",
+        md = FAIRChemMD.continue_from_traj(
+            name_or_path="uma-s-1",
+            task_name="omat",
+            ensemble="nvt",
+            thermostat="Berendsen_inhomogeneous",
             temperature=T,
             timestep=timestep,
             trajfile=save_traj,
@@ -75,7 +78,7 @@ def main():
             loginterval=loginterval,
         )
         # find steps remaining
-        remaining_steps = find_remaining_steps(save_log, nsteps, timestep)
+        remaining_steps = find_remaining_steps(save_log, save_traj, nsteps, timestep)
         # continue MD simulation
         md.run(steps=remaining_steps)
 

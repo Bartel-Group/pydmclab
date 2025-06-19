@@ -4,14 +4,16 @@ import os
 from pydmclab.utils.handy import read_json
 from pydmclab.hpc.helpers import check_strucs, check_launch_dirs
 
+
 HOME_PATH = os.environ["HOME"]
-RELAX_HELPERS_DIR = "%s/bin/pydmclab/hpc_workflows/chgnet_relax_calcs" % HOME_PATH
+RELAX_HELPERS_DIR = "%s/bin/pydmclab/hpc_workflows/relax_calcs" % HOME_PATH
 
 if RELAX_HELPERS_DIR not in sys.path:
     sys.path.append(RELAX_HELPERS_DIR)
 
 from relax_helpers import (
-    get_relax_configs,
+    # get_chgnet_configs,
+    get_fairchem_configs,
     get_launch_configs,
     get_slurm_configs,
     get_torch_configs,
@@ -26,8 +28,13 @@ from relax_helpers import (
 # where is this file
 SCRIPTS_DIR = os.getcwd()
 
-# where are my calculations going to live (maybe on scratch)
+# where are my calculations going to live (same as scripts)
 CALCS_DIR = SCRIPTS_DIR.replace("scripts", "calcs")
+
+# alternatively can have calculations live on scratch
+# _, _, _, USER_NAME = HOME_PATH.split("/")
+# SCRATCH_PATH = os.path.join(os.environ["SCRATCH_GLOBAL"], USER_NAME)
+# CALCS_DIR = SCRIPTS_DIR.replace("scripts", "calcs").replace(HOME_PATH, SCRATCH_PATH)
 
 # where is my data going to live
 DATA_DIR = SCRIPTS_DIR.replace("scripts", "data")
@@ -37,12 +44,14 @@ for d in [CALCS_DIR, DATA_DIR]:
     if not os.path.exists(d):
         os.makedirs(d)
 
-# set chgnet relaxation configs
-RELAX_CONFIGS = get_relax_configs(
-    model="0.3.0",
+# set architecture configs using get_{architecture}_configs
+#   these are model specific and can vary widely
+ARCHITECTURE_CONFIGS = get_fairchem_configs(
+    name_or_path="uma-s-1",
+    task_name="omat",
+    inference_settings="default",
+    overrides=None,
     optimizer="FIRE",
-    stress_weight=1 / 160.21766208,
-    on_isolated_atoms="warn",
     fmax=0.1,
     steps=500,
     relax_cell=True,
@@ -61,7 +70,7 @@ SLURM_CONFIGS = get_slurm_configs(
     cores_per_node=16,
     walltime_in_hours=6,
     mem_per_core_in_MB=1900,
-    partition="agsmall,msismall,msidmc",
+    partition="msismall,msidmc",
     error_file="log.e",
     output_file="log.o",
     account="cbartel",
@@ -73,11 +82,16 @@ TORCH_CONFIGS = get_torch_configs(
 )
 
 # collect all user configs
-USER_CONFIGS = {**RELAX_CONFIGS, **LAUNCH_CONFIGS, **SLURM_CONFIGS, **TORCH_CONFIGS}
+USER_CONFIGS = {
+    **ARCHITECTURE_CONFIGS,
+    **LAUNCH_CONFIGS,
+    **SLURM_CONFIGS,
+    **TORCH_CONFIGS,
+}
 
 # location of relax_template.py
 RELAX_TEMPLATE = (
-    "%s/bin/pydmclab/hpc_workflows/chgnet_relax_calcs/relax_template.py" % HOME_PATH
+    "%s/bin/pydmclab/hpc_workflows/relax_calcs/relax_template.py" % HOME_PATH
 )
 
 
@@ -140,7 +154,7 @@ def main():
 
     # submit jobs
     if ready_to_launch:
-        submit_jobs(batching=batching)
+        submit_jobs(batching=batching, user_configs=USER_CONFIGS)
 
     # collect results
     results = collect_results(

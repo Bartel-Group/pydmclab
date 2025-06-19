@@ -1,6 +1,6 @@
 import os
 from pydmclab.core.struc import StrucTools
-from pydmclab.mlp.chgnet.dynamics import CHGNetMD, AnalyzeMD
+from pydmclab.mlp.fairchem.dynamics import FAIRChemMD, AnalyzeMD
 
 
 DATA_DIR = os.path.join("output", "mlp-md")
@@ -8,8 +8,8 @@ if not os.path.exists(DATA_DIR):
     os.makedirs(DATA_DIR)
 
 TEST_STRUC = os.path.join("cifs", "mp-18767-LiMnO2.cif")
-SAVE_TRAJ = os.path.join("output", "mlp-md", "chgnet_md.traj")
-SAVE_LOG = os.path.join("output", "mlp-md", "chgnet_md.log")
+SAVE_TRAJ = os.path.join("output", "mlp-md", "fairchem_md.traj")
+SAVE_LOG = os.path.join("output", "mlp-md", "fairchem_md.log")
 
 
 def main():
@@ -31,16 +31,16 @@ def main():
     T, nsteps, loginterval = 1800, 100, 10
 
     # Initialize MD object with the perturbed structure
-    md = CHGNetMD(
-        structure=perturbed_structure,
-        model="0.3.0",
+    md = FAIRChemMD(
+        atoms=perturbed_structure,
+        name_or_path="uma-s-1",
+        task_name="omat",
+        ensemble="nvt",
+        thermostat="Berendsen_inhomogeneous",
         temperature=T,
-        relax_first=True,
         trajfile=SAVE_TRAJ,
         logfile=SAVE_LOG,
         loginterval=loginterval,
-        # **kwargs can be used to pass additional arguments to the relaxer object
-        # see pydmclab.mlp.dynamics.CHGNetRelaxer for more details
     )
 
     # Set the number of steps for the MD simulation and run (takes a bit of time)
@@ -53,7 +53,7 @@ def main():
     # amd.log_summary
     # amd.traj_summary
     # amd.full_summary
-    # amd.plot_E_T_t
+    amd.plot_E_T_t()
 
     return amd
 
