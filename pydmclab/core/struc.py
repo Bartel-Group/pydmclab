@@ -747,6 +747,7 @@ class InterfaceTools(object):
                                     # adding the sites to be removed to a list so I can remove them once I'm out of the loop
                                     list_of_sites_to_remove.append(j)
                     # removing the sites that are in the list
+                    ortho_slab = ortho_slab.sort()
                     ortho_slab.remove_sites(list_of_sites_to_remove)
 
                     slabs_copy[entry][i]['slab'] = {}
