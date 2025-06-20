@@ -1121,7 +1121,8 @@ class AnalyzeMD:
             )
 
         for i, structure in enumerate(traj_summary):
-            log_summary[i]["structure"] = structure
+            log_summary[i]["structure"] = convert_numpy_to_native(structure)
+            
 
         return log_summary
 
