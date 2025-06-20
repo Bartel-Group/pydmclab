@@ -140,6 +140,55 @@ def get_mace_configs(
 
     return architecture_configs
 
+def get_fairchem_configs(
+    name_or_path: str,
+    task_name: str,
+    inference_settings: InferenceSettings | str = "default",
+    overrides: dict | None = None,
+    optimizer: ASEOptimizer | str = "FIRE",
+    fmax: float | None = 0.1,
+    steps: int | None = 500,
+    relax_cell: bool | None = True,
+    ase_filter: str | None = "FrechetCellFilter",
+    params_asefilter: dict | None = None,
+    interval: int | None = 1,
+    verbose: bool = True,
+):
+    """
+    Note: this assumes cpu only use on MSI and only supports pretrained models
+
+    Args:
+        name_or_path: the model name or a path to a checkpoint
+        task_name: class of materials you are relaxing (e.g., "omat" for inorganic crystals)
+        inference_settings: the inference settings to use ("default" is general purpose)
+        overrides: overrides for the inference settings
+        optimizer: default is "FIRE", see pydmclab.mlp.dynamics for more options
+        fmax: the force convergence criterion
+        steps: the maximum number of steps to try during relaxation
+        relax_cell: whether to relax the cell (False is equivalent to ISIF = 2)
+        ase_filter: the ASE filter to use
+        params_asefilter: the parameters for the ASE filter
+        interval: logging interval for relax obs
+        verbose: if True, prints relaxation information
+
+    Returns:
+        relax_configs (dict): dict of architecture/ relaxer/ relax configurations
+    """
+
+    architecture_configs = {
+        "architecture": "FAIRChem",
+        "relaxer_configs": {},
+        "predict_structure_configs": {},
+    }
+
+    architecture_configs["relaxer_configs"]["name_or_path"] = name_or_path
+    architecture_configs["relaxer_configs"]["task_name"] = task_name
+    architecture_configs["relaxer_configs"]["inference_settings"] = inference_settings
+    architecture_configs["relaxer_configs"]["overrides"] = overrides
+    architecture_configs["relaxer_configs"]["optimizer"] = optimizer
+
+
+    return architecture_configs
 
 def get_launch_configs(batch_size: int = 100, save_interval: int = 5):
     """
@@ -362,6 +411,10 @@ def make_prediction_scripts(
         model = user_configs["relaxer_configs"]["model"].replace(".", "")
     elif architecture.lower() == "mace":
         model = user_configs["relaxer_configs"]["models"]
+    elif architecture.lower() == "fairchem":
+        model_name = user_configs["relaxer_configs"]["name_or_path"]
+        model_task = user_configs["relaxer_configs"]["task_name"]
+        model = f"{model_name}-{model_task}"
 
     total_batches = len(batching)
 
@@ -489,6 +542,10 @@ def make_submission_scripts(
         model = user_configs["relaxer_configs"]["model"].replace(".", "")
     elif architecture.lower() == "mace":
         model = user_configs["relaxer_configs"]["models"]
+    elif architecture.lower() == "fairchem":
+        model_name = user_configs["relaxer_configs"]["name_or_path"]
+        model_task = user_configs["relaxer_configs"]["task_name"]
+        model = f"{model_name}-{model_task}"
 
     for batch_id in batching:
 
@@ -583,6 +640,10 @@ def check_job_completion_status(launch_dir: str, user_configs: dict) -> bool:
         model = user_configs["relaxer_configs"]["model"].replace(".", "")
     elif architecture.lower() == "mace":
         model = user_configs["relaxer_configs"]["models"]
+    elif architecture.lower() == "fairchem":
+        model_name = user_configs["relaxer_configs"]["name_or_path"]
+        model_task = user_configs["relaxer_configs"]["task_name"]
+        model = f"{model_name}-{model_task}"
 
     num_ini_strucs = len(read_json(os.path.join(launch_dir, "ini_strucs.json")))
     batch_results = os.path.join(
@@ -614,6 +675,10 @@ def submit_jobs(batching: dict, user_configs: dict) -> None:
         model = user_configs["relaxer_configs"]["model"].replace(".", "")
     elif architecture.lower() == "mace":
         model = user_configs["relaxer_configs"]["models"]
+    elif architecture.lower() == "fairchem":
+        model_name = user_configs["relaxer_configs"]["name_or_path"]
+        model_task = user_configs["relaxer_configs"]["task_name"]
+        model = f"{model_name}-{model_task}"
 
     scripts_dir = os.getcwd()
 
@@ -667,6 +732,10 @@ def collect_results(
         model = user_configs["relaxer_configs"]["model"].replace(".", "")
     elif architecture.lower() == "mace":
         model = user_configs["relaxer_configs"]["models"]
+    elif architecture.lower() == "fairchem":
+        model_name = user_configs["relaxer_configs"]["name_or_path"]
+        model_task = user_configs["relaxer_configs"]["task_name"]
+        model = f"{model_name}-{model_task}"
 
     fjson = os.path.join(
         data_dir, f"{architecture.lower()}_{model}_prediction_results.json"
