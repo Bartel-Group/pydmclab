@@ -707,8 +707,7 @@ def collect_results(
                     results["relax_results"][formula][struc_id] = relax_result
                 else:
                     results["relax_results"][formula][struc_id] = {
-                        "final_structure": relax_result["final_structure"],
-                        "final_energy": relax_result["final_energy"],
+                        k: v for k, v in relax_result.items() if k != "trajectory"
                     }
             pbar.update(1)
 
