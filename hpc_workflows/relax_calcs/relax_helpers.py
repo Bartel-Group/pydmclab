@@ -637,13 +637,18 @@ def submit_jobs(batching: dict, user_configs: dict) -> None:
 
 
 def collect_results(
-    batching: dict, user_configs: dict, data_dir: str, remake: bool = True
+    batching: dict,
+    user_configs: dict,
+    data_dir: str,
+    include_obs: bool = True,
+    remake: bool = True,
 ) -> dict:
     """
     Args:
         batching (dict): {"batch_id": {"launch_dir": str}}
         user_configs (dict): user configs
         data_dir (str): path to data directory
+        include_obs (bool): whether to include obs in collected resultsß
         remake (bool): if True, remake results
 
     Returns:
@@ -698,7 +703,13 @@ def collect_results(
                 if formula not in results["relax_results"]:
                     results["relax_results"][formula] = {}
                 relax_result["batch_id"] = batch_id
-                results["relax_results"][formula][struc_id] = relax_result
+                if include_obs:
+                    results["relax_results"][formula][struc_id] = relax_result
+                else:
+                    results["relax_results"][formula][struc_id] = {
+                        "final_structure": relax_result["final_structure"],
+                        "final_energy": relax_result["final_energy"],
+                    }
             pbar.update(1)
 
     write_json(results, fjson)
