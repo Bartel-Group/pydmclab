@@ -1172,7 +1172,8 @@ class SlabTools(object):
         slab_structure: Structure | dict | str,
         slab_e_per_at: float,
         *,
-        unreduced_bulk_composition: Composition | dict | str = None,
+        unreduced_bulk_composition: Composition | Structure | dict | str = None,
+        reduced_bulk_composition: Composition | Structure | dict | str = None,
         bulk_e_per_at: float = None,
     ) -> None:
         """
@@ -1186,43 +1187,113 @@ class SlabTools(object):
             bulk_e_per_at (float, optional): Energy per atom of the bulk. Defaults to None.
         """
 
-        slab_structure = StrucTools(slab_structure).structure
+        if not isinstance(slab_structure, Structure):
+            slab_structure = StrucTools(slab_structure).structure
 
         self.slab_structure = slab_structure
         self.slab_e_per_at = slab_e_per_at
 
+        if not (unreduced_bulk_composition or reduced_bulk_composition):
+            raise ValueError(
+                "Please provide an unreduced_bulk_composition or a reduced_bulk_composition. \n If you know the unreduced bulk composition, use that."
+            )
+
+        if unreduced_bulk_composition and reduced_bulk_composition:
+            raise ValueError(
+                "Please provide either an unreduced_bulk_composition or a reduced_bulk_composition, not both. \n The unreduced bulk composition is recommended."
+            )
+
         if isinstance(unreduced_bulk_composition, (dict, str)):
             unreduced_bulk_composition = Composition(unreduced_bulk_composition)
+        elif isinstance(unreduced_bulk_composition, Structure):
+            unreduced_bulk_composition = unreduced_bulk_composition.composition
+
+        if isinstance(reduced_bulk_composition, (dict, str)):
+            reduced_bulk_composition = Composition(reduced_bulk_composition)
+        elif isinstance(reduced_bulk_composition, Structure):
+            reduced_bulk_composition = reduced_bulk_composition.composition
+
+        if unreduced_bulk_composition and not reduced_bulk_composition:
+            reduced_bulk_composition = unreduced_bulk_composition.reduced_composition
 
         self.unreduced_bulk_composition = unreduced_bulk_composition
+        self.reduced_bulk_composition = reduced_bulk_composition
         self.bulk_e_per_at = bulk_e_per_at
 
     @property
     def is_stoich(self) -> bool:
         """
-        Check if the slab is stoichiometric with respect to the bulk composition.
+        Check if the slab is stoichiometric with respect to the reduced bulk composition.
         """
-        if not self.unreduced_bulk_composition:
-            raise ValueError(
-                "Unreduced bulk composition must be provided to check stoichiometry."
-            )
 
-        return self.slab_structure.composition == self.unreduced_bulk_composition
+        return (
+            self.slab_structure.composition.reduced_composition
+            == self.reduced_bulk_composition
+        ) or (
+            self.reduced_bulk_composition
+            == self.slab_structure.composition.reduced_composition
+        )
 
     @property
-    def off_stoichiometry(self) -> dict[str, float]:
+    def exact_off_stoichiometry(self) -> dict[str, float]:
         """
-        Calculate the off-stoichiometry of the slab with respect to the bulk composition.
+        Calculate the exact off-stoichiometry of the slab with respect to the unreduced bulk composition.
         """
         if not self.unreduced_bulk_composition:
             raise ValueError(
-                "Unreduced bulk composition must be provided to calculate off-stoichiometry."
+                "An unreduced bulk composition must be provided to calculate the exact off-stoichiometry. \n If you have a reduced bulk composition, use SlabTools.possible_off_stoichiometries."
             )
 
         unreduced_slab_composition = self.slab_structure.composition
         unreduced_slab_composition.allow_negative = True
 
         return (unreduced_slab_composition - self.unreduced_bulk_composition).as_dict()
+
+    @property
+    def possible_off_stoichiometries(self) -> dict[str, float]:
+        """
+        Calculate the possible off-stoichiometries of the slab with respect to the reduced bulk composition.
+        This is useful when the unreduced bulk composition is not known.
+        """
+
+        slab_amts = self.slab_structure.composition.get_el_amt_dict()
+        bulk_amts = self.reduced_bulk_composition.get_el_amt_dict()
+        overlapping_elements = set(slab_amts.keys()).intersection(set(bulk_amts.keys()))
+
+        bulk_reduced_total_atoms = sum(bulk_amts.values())
+
+        scale_estimates = []
+        for el in overlapping_elements:
+            scale_estimate = slab_amts[el] / bulk_amts[el]
+            scale_estimates.append(scale_estimate)
+
+        min_scale = max(1, int(np.floor(min(scale_estimates))))
+        max_scale = int(np.ceil(max(scale_estimates)))
+
+        scenarios = []
+
+        for scale in range(min_scale, max_scale + 1):
+            scaled_bulk_composition = {el: amt * scale for el, amt in bulk_amts.items()}
+            excess_or_deficient_amts = {
+                el: slab_amts[el] - scaled_bulk_composition.get(el, 0)
+                for el in slab_amts
+            }
+
+            total_deviation = sum(abs(v) for v in excess_or_deficient_amts.values())
+
+            if total_deviation <= bulk_reduced_total_atoms:
+                scenario_data = {
+                    "excess_or_deficient_amts": excess_or_deficient_amts,
+                    "bulk_scale_factor": scale,
+                    "scaled_bulk_composition": Composition(scaled_bulk_composition),
+                    "total_deviation": total_deviation,
+                }
+                scenarios.append(scenario_data)
+
+        # Sort by total deviation (prefer scenarios with smaller deviations)
+        scenarios.sort(key=lambda x: x["total_deviation"])
+
+        return scenarios
 
     def surface_area(
         self, vacuum_axis: Literal["a", "b", "c", "auto"] = "auto", verbose: bool = True
@@ -1281,20 +1352,40 @@ class SlabTools(object):
         **kwargs,
     ) -> float:
 
-        if not (self.unreduced_bulk_composition and self.bulk_e_per_at):
+        if not self.bulk_e_per_at:
             raise ValueError(
-                "Unreduced bulk composition and bulk energy per atom must be provided to calculate surface energy."
+                "Bulk energy per atom must be provided to calculate surface energy."
             )
-
-        slab_e_tot = self.slab_e_per_at * len(self.slab_structure)
-        bulk_e_tot = self.bulk_e_per_at * self.unreduced_bulk_composition.num_atoms
 
         surface_area = self.surface_area(vacuum_axis=vacuum_axis, verbose=verbose)
 
         if not self.is_stoich:
+
             from pydmclab.core.energies import ChemPots
 
-            excess_or_deficient_amts = self.off_stoichiometry
+            slab_e_tot = self.slab_e_per_at * len(self.slab_structure)
+
+            if self.unreduced_bulk_composition:
+                bulk_e_tot = (
+                    self.bulk_e_per_at * self.unreduced_bulk_composition.num_atoms
+                )
+                excess_or_deficient_amts = self.exact_off_stoichiometry
+            else:
+                possible_scenarios = self.possible_off_stoichiometries
+
+                if not possible_scenarios:
+                    raise ValueError(
+                        f"No possible off-stoichiometries found with deviation less than {sum(self.reduced_bulk_composition.get_el_amt_dict()).values()} total atoms."
+                    )
+
+                # Use the first scenario with the smallest total deviation
+                bulk_e_tot = (
+                    self.bulk_e_per_at
+                    * possible_scenarios[0]["scaled_bulk_composition"].num_atoms
+                )
+                excess_or_deficient_amts = possible_scenarios[0][
+                    "excess_or_deficient_amts"
+                ]
 
             if not ref_potentials:
                 temperature = kwargs.pop("temperature", None)
@@ -1331,5 +1422,11 @@ class SlabTools(object):
             )
 
             return (slab_e_tot - bulk_e_tot - delta_mu_sum) / (2 * surface_area)
+
+        slab_e_tot = (
+            self.slab_e_per_at
+            * self.slab_structure.composition.reduced_composition.num_atoms
+        )
+        bulk_e_tot = self.bulk_e_per_at * self.reduced_bulk_composition.num_atoms
 
         return (slab_e_tot - bulk_e_tot) / (2 * surface_area)
