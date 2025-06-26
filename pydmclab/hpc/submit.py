@@ -60,6 +60,10 @@ class SubmitTools(object):
             ID_specific_vasp_configs (dict)
                 any configs that pertain to a particular structure for a particular formula
                     usually passed here from your launch_dirs.json file (just like magmom)
+                Should be formatted as:
+                    {(kpoint, incar, potcar)_mods: {param: value}}
+                    xc-calc is assumed to be 'all-all' in every case and should not be specified (as it is now)
+                    e.g., {'incar_mods': {'ISMEAR': 0, 'SIGMA': 0.05}} or {'kpoints_mods': {'grid': [6, 6, 6]}}
 
             user_configs (dict)
                 any non-default parameters you want to pass
@@ -84,12 +88,21 @@ class SubmitTools(object):
 
         if ID_specific_vasp_configs:
             for input_file in ["incar", "kpoints", "potcar"]:
-                key = "%s_mods" % input_file
+                key = f"{input_file}_mods"
                 if key in ID_specific_vasp_configs:
-                    if "all-all" in configs[key]:
-                        configs[key]["all-all"].update(ID_specific_vasp_configs[key])
-                    else:
-                        configs[key].update({"all-all": ID_specific_vasp_configs[key]})
+
+                    if not isinstance(ID_specific_vasp_configs[key], dict):
+                        raise ValueError(
+                            f"{key} should be a dictionary of modifications, not {type(ID_specific_vasp_configs[key])}."
+                        )
+
+                    for sub_key, sub_value in ID_specific_vasp_configs[key].items():
+                        if isinstance(sub_value, dict):
+                            raise ValueError(
+                                f"{key} is more than 2 layers deep. Avoid specifying 'xc-calc' as 'all-all' is assumed."
+                            )
+
+                    configs[key].update({"all-all": ID_specific_vasp_configs[key]})
 
         # set mag based on launch_dir
         configs["mag"] = mag
@@ -379,8 +392,10 @@ class SubmitTools(object):
             else:
                 raise NotImplementedError("LOBSTER > 4 not on Bridges?")
         else:
-            raise NotImplementedError('dont have LOBSTER path for machine "%s"' % machine)
-    
+            raise NotImplementedError(
+                'dont have LOBSTER path for machine "%s"' % machine
+            )
+
     @property
     def lobster_command(self) -> str:
         """
@@ -422,19 +437,35 @@ class SubmitTools(object):
         job_name = self.job_name
 
         # create a temporary file w/ jobs in queue with my username and this job_name
+        # also double-checks if this job is in the msidmc partition
         scripts_dir = os.getcwd()
         fqueue = os.path.join(scripts_dir, "_".join(["q", job_name]) + ".o")
         with open(fqueue, "w", encoding="utf-8") as f:
             subprocess.call(
-                ["squeue", "-u", "%s" % os.getlogin(), "--name=%s" % job_name], stdout=f
+                [
+                    "squeue",
+                    f"--user={os.getlogin()}",
+                    "--noheader",
+                    f"--name={job_name}",
+                ],
+                stdout=f,
+            )
+            subprocess.call(
+                [
+                    "squeue",
+                    f"--user={os.getlogin()}",
+                    "--partition=msidmc",
+                    "--noheader",
+                    f"--name={job_name}",
+                ],
+                stdout=f,
             )
 
         # get the job names I have in the queue
         names_in_q = []
         with open(fqueue, "r", encoding="utf-8") as f:
             for line in f:
-                if "PARTITION" not in line:
-                    names_in_q.append([v for v in line.split(" ") if len(v) > 0][2])
+                names_in_q.append([v for v in line.split(" ") if len(v) > 0][2])
 
         # delete the file I wrote w/ the queue output
         os.remove(fqueue)
@@ -498,10 +529,10 @@ class SubmitTools(object):
             if not os.path.exists(calc_dir):
                 os.mkdir(calc_dir)
 
-            if restart_this_one:
-                # if restarting, status = new
-                statuses[xc_calc] = "new"
-                continue
+            # if restart_this_one:
+            #     # if restarting, status = new
+            #     statuses[xc_calc] = "new"
+            #     continue
 
             # (2) check convergence of current calc
             E_per_at = AnalyzeVASP(calc_dir).E_per_at
@@ -542,6 +573,10 @@ class SubmitTools(object):
                     statuses[xc_calc] = "new"
             if (calc_to_run == "prelobster") and os.path.exists(
                 os.path.join(calc_dir, "IBZKPT")
+            ):
+                statuses[xc_calc] = "done"
+            if (calc_to_run == "parchg") and os.path.exists(
+                os.path.join(calc_dir, "PARCHG")
             ):
                 statuses[xc_calc] = "done"
 
@@ -726,6 +761,7 @@ class SubmitTools(object):
 
             for xc_calc in calc_list:
                 status = statuses[xc_calc]
+                xc_to_run, calc_to_run = xc_calc.split("-")
 
                 # write status to status.o
                 f.write('\necho "%s is %s" >> %s\n' % (xc_calc, status, fstatus))
@@ -738,6 +774,10 @@ class SubmitTools(object):
                 calc_dir = os.path.join(launch_dir, xc_calc)
 
                 if status == "done":
+                    if calc_to_run in ["lobster", "bs"]:
+                        if not os.path.exists(os.path.join(calc_dir, "lobsterout")):
+                            f.write("\ncd %s\n" % calc_dir)
+                            f.write(self.lobster_command)
                     if not self.collection_status(xc_calc):
                         # execute the collector (writes)
                         f.write("\ncd %s\n" % self.scripts_dir)
@@ -748,7 +788,6 @@ class SubmitTools(object):
                     continue
 
                 # retrieve the incar_mods that pertain to this particular calculation
-                xc_to_run, calc_to_run = xc_calc.split("-")
                 configs["xc_to_run"] = xc_to_run
                 configs["calc_to_run"] = calc_to_run
                 vsu = VASPSetUp(calc_dir=calc_dir, user_configs=configs)

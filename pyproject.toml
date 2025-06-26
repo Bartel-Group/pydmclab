@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pydmclab"
-version = "1.3.0"
+version = "1.4.0"
 description = "A Python package to facilitate DFT calculations and analysis for the Design of Materials on Computers Group."
 authors = [{name = "Chris Bartel", email = "cbartel@umn.edu"}]
 requires-python = ">=3.10.0"
@@ -23,7 +23,8 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-mlp = ["chgnet"]
+mlp = ["chgnet", "mace-torch", "pymatgen-analysis-diffusion"]
+fairchem = ["fairchem-core"]
 defects = ["doped"]
 phonons = ["phonopy"]
 

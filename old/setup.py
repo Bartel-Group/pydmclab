@@ -12,7 +12,7 @@ URL = "https://github.umn.edu/bartel-group/pydmclab"
 EMAIL = "cbartel@umn.edu"
 AUTHOR = "Chris Bartel"
 REQUIRES_PYTHON = ">=3.10.0"
-VERSION = "1.3.0"
+VERSION = "1.3.1"
 
 REQUIRED = ["numpy>=1.25.0", "mp-api>=0.39", "pymatgen>=2023.0.0"]
 EXTRAS = {

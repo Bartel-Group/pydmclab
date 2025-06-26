@@ -10,7 +10,6 @@ from scipy.ndimage import gaussian_filter1d
 import random
 
 
-# Please note that this function only deals with the case of total spin
 def ax_tdos(
     tdos,
     population_sources="all",
@@ -34,6 +33,8 @@ def ax_tdos(
     show=True,
 ):
     """
+    NOTE: This function currently only deals with the case of total spin
+
     Args:
         tdos (dict)
             result of pydmclab.hpc.analyze.tdos()
@@ -46,7 +47,7 @@ def ax_tdos(
                         d['up']['total'] = 1d array of spin-up DOS for structure
                         d['down'][el] = 1d array of spin-down DOS for that element
                         etc
-                so if I wanted to plot the total DOS for my structure and separate spin up (+ DOS) and spin down (- DOS)
+                to plot the total DOS of a structure, separating spin up (+ DOS) and spin down (- DOS)
                     energies = d['E']
                     dos_up = d['up']['total']
                     dos_down = d['down']['total']
@@ -76,8 +77,7 @@ def ax_tdos(
 
         spins (str)
             'summed' : plot + and - DOS together as +
-            'separate' : plot + and - DOS separately as + and -
-                @TO-DO: implement separate spins
+            'separate' : plot + and - DOS separately as + and - (note: not yet implemented)
 
         normalization (float)
             divide DOS by this number
@@ -235,7 +235,6 @@ def ax_tdos(
     return ax
 
 
-
 def ax_tcohp(
     tcohp,
     colors,
@@ -244,22 +243,21 @@ def ax_tcohp(
     params={"line_alpha": 0.9, "fill_alpha": 0.3, "lw": 1},
     special_labels=None,
     normalization=None,
-    flip = True,
-    bond_type = "cohp",
+    flip=True,
+    bond_type="cohp",
     smearing=2.0,
     Efermi=0.0,
     xlim=(-6, 6),
     ylim=(-2, 2),
     xticks=(True, [-6, -4, -2, 0, 2, 4, 6]),
-    yticks=(True, [-2, -1, 0, 1, 2]),   
+    yticks=(True, [-2, -1, 0, 1, 2]),
     xlabel=r"$-COHP$",
     ylabel=r"$E-E_F\/(eV)$",
     legend=True,
     title=None,
     savename=False,
     show=True,
-    ):
-
+):
     """
     Args:
         tcohp (dict)
@@ -272,14 +270,14 @@ def ax_tcohp(
                     cohp --> absolute populations
                     icohp --> integrated populations
                     d[el1-el2]['cohp' or 'icohp'] will return a 1d array of populations summed over all interactions of el1-el2 in the structure, summed over all spins
-                so if I wanted to plot the total COHP for the interaction between Ru and O throughout the structure:
+                to plot the total COHP for the interaction between Ru and O throughout the structure:
                     energies = d['E']
                     cohp = d['O-Ru']['cohp']
                     plt.plot(cohp, energies)
-        
+
         colors (dict)
             {bond : color (str)}
-            
+
         population_sources (str or list)
             'all' : plot all bonds
             ['S-S'] : plots just the S-S bonds
@@ -304,13 +302,13 @@ def ax_tcohp(
                     1 : no normalization (same as None)
                     CompTools(formula).n_atoms (per formula unit)
                     results['meta']['all_input_parameters']['NELECT'] (per electron)
-        
+
         flip = (bool)
             flip the COHP value to -COHP
-        
+
         bond_type (str)
             "cohp" or "icohp"
-        
+
         smearing (float or False)
             std. dev. for Gaussian smearing of COHP or False for no smearing
 
@@ -385,14 +383,14 @@ def ax_tcohp(
             if bond in special_labels:
                 label = special_labels[bond]
 
-        energies = tcohp['E']
+        energies = tcohp["E"]
         populations = tcohp[bond]
-        
+
         occ_energies = []
         occ_populations = []
         unocc_energies = []
         unocc_populations = []
-        
+
         for idx, E in enumerate(energies):
             if E == occupied_up_to:
                 occ_energies.append(energies[idx])
@@ -405,7 +403,6 @@ def ax_tcohp(
             elif E > occupied_up_to:
                 unocc_energies.append(energies[idx])
                 unocc_populations.append(populations[idx])
-                
 
         # smearing with Gaussian filter
         if smearing:
@@ -431,21 +428,21 @@ def ax_tcohp(
         ax = plt.fill_betweenx(
             occ_energies, occ_populations, color=color, alpha=params["fill_alpha"], lw=0
         )
-        
-    ax = plt.axvline(x=0, color='black', linestyle='--')        
-    ax = plt.axhline(y=Efermi, color='black', linestyle='--')
+
+    ax = plt.axvline(x=0, color="black", linestyle="--")
+    ax = plt.axhline(y=Efermi, color="black", linestyle="--")
 
     ax = plt.xticks(xticks[1])
     ax = plt.yticks(yticks[1])
     if not xticks[0]:
-        ax = plt.gca().xaxis.set_ticklabels([])      
+        ax = plt.gca().xaxis.set_ticklabels([])
     if not yticks[0]:
         ax = plt.gca().yaxis.set_ticklabels([])
     ax = plt.xlabel(xlabel)
     ax = plt.ylabel(ylabel)
     ax = plt.title(title)
     ax = plt.xlim(xlim)
-    ax = plt.ylim(ylim)   
+    ax = plt.ylim(ylim)
 
     if legend:
         if isinstance(legend, str):
@@ -458,5 +455,5 @@ def ax_tcohp(
 
     if savename:
         plt.savefig(savename)
-        
+
     return ax

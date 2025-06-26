@@ -57,10 +57,10 @@ class Collector(object):
             configs["include_pcobi"] = False
             configs["include_tdos"] = False
             configs["include_pdos"] = False
-        if calc != "static":
-            configs["include_mag"] = False
-            configs["include_entry"] = False
-            configs["include_structure"] = False
+        # if calc != "static":
+        #     configs["include_mag"] = False
+        #     configs["include_entry"] = False
+        #     configs["include_structure"] = False
         if calc != "dfpt":
             configs["include_phonons"] = False
 

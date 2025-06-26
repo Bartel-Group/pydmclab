@@ -4,6 +4,8 @@ import numpy as np
 from pymatgen.ext.matproj import MPRester as old_MPRester
 from mp_api.client import MPRester
 
+from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
+
 from pydmclab.core.comp import CompTools
 from pydmclab.core.struc import StrucTools
 
@@ -80,6 +82,10 @@ class MPQuery(object):
         include_sub_phase_diagrams=False,
         include_structure=True,
         properties=None,
+        conventional=False,
+        include_computed_structure_entries=False,
+        compatible_only=True,
+        additional_criteria=None,
     ):
         """
         Args:
@@ -126,6 +132,21 @@ class MPQuery(object):
                 if 'all', then use all properties
                 if a string, then add that property to typical_properties
                 if a list, then add those properties to typical_properties
+
+        include_computed_structure_entries (bool)
+            if True, include computed structure entries for each MP ID
+                these are the entries that have been computed by Materials Project
+                and specify the run type (e.g., GGA_GGA+U, R2SCAN, etc.) as well as
+                and corrections applied to the structure
+
+        compatible_only (bool)
+            if True, only include entries that are compatible with the Materials Project
+                formation energy criteria (e.g., have corrected energies)
+
+        additional_criteria (dict or None)
+            additional criteria to filter the entries by
+                e.g., {"thermo_types": ["GGA_GGA+U", "R2SCAN"]} to only include entries
+                that have been computed with these methods
 
         Returns:
             {mpid : {property (str) : value (mixed type)}}
@@ -199,7 +220,7 @@ class MPQuery(object):
 
             search_for = chemsyses
             docs = mpr.summary.search(
-            chemsys=search_for, energy_above_hull=(0, max_Ehull)
+                chemsys=search_for, energy_above_hull=(0, max_Ehull)
             )
 
         # query MP based on a search for compounds containing at least these elements
@@ -238,6 +259,20 @@ class MPQuery(object):
                 # map notable keys to shorter names
                 if k in long_to_short_keys:
                     tmp[long_to_short_keys[k]] = v
+                elif k == "structure":
+                    if conventional:
+                        # Convert structure dict to Structure object
+                        structure = StrucTools(v).structure
+                        # Get conventional structure
+                        spg = SpacegroupAnalyzer(structure)
+                        conventional_structure = (
+                            spg.get_conventional_standard_structure()
+                        )
+                        # Store the conventional structure as a dict
+                        tmp[k] = conventional_structure.as_dict()
+                    else:
+                        # just store the structure as a dict
+                        tmp[k] = v
                 elif k in properties:
                     tmp[k] = v
             # include a clean formula
@@ -296,6 +331,25 @@ class MPQuery(object):
                     for mpid in d
                     if np.round(d[mpid]["dE_gs"], 5) <= max_polymorph_energy
                 }
+
+        if include_computed_structure_entries:
+            final_mpids = d.keys()
+            entries = mpr.get_entries(
+                final_mpids,
+                compatible_only=compatible_only,
+                inc_structure=include_structure,
+                additional_criteria=additional_criteria,
+            )
+
+            for entry in entries:
+                id = entry.data["material_id"]
+                xc = entry.data["run_type"]
+                if id in final_mpids:
+                    if d[id].get("computed_structure_entries") is None:
+                        d[id]["computed_structure_entries"] = {}
+                    if d[id]["computed_structure_entries"].get(xc) is None:
+                        d[id]["computed_structure_entries"][xc] = entry.as_dict()
+
         return d
 
     def get_structures_by_material_id(self, material_ids):

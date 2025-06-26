@@ -1,4 +1,5 @@
 import json, os, yaml, subprocess
+import numpy as np
 from pydmclab.core.mag import MagTools
 from pydmclab.core.comp import CompTools
 
@@ -35,7 +36,7 @@ def read_yaml(fyaml):
         fyaml (str) - file name of yaml to read
 
     Returns:
-        dictionary stored in fjson
+        dictionary stored in fyaml
     """
     with open(fyaml) as f:
         return yaml.safe_load(f)
@@ -63,7 +64,7 @@ class dotdict(dict):
     __delattr__ = dict.__delitem__
 
 
-def is_slurm_job_in_queue(job_name, user_name="cbartel", fqueue="q.o"):
+def is_slurm_job_in_queue(job_name, user_name, fqueue="q.o"):
     with open(fqueue, "w") as f:
         subprocess.call(["squeue", "-u", user_name, "--name=%s" % job_name], stdout=f)
     names_in_q = []
@@ -136,3 +137,25 @@ def eVat_to_kJmol(formula, eV_per_at):
 
 def kJmol_to_eVat(formula, kJ_per_mol):
     return kJ_per_mol / (96.485 * CompTools(formula).n_atoms)
+
+
+def convert_numpy_to_native(obj):
+    """
+    Convert numpy types to native (JSON serializable) types
+    """
+    if isinstance(obj, np.float32) or isinstance(obj, np.float64):
+        return float(obj)
+    elif isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.bool_):
+        return bool(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, dict):
+        return {k: convert_numpy_to_native(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_numpy_to_native(i) for i in obj]
+    elif isinstance(obj, tuple):
+        return tuple(convert_numpy_to_native(i) for i in obj)
+    else:
+        return obj

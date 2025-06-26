@@ -4,8 +4,8 @@ import numpy as np
 from chgnet.data.dataset import StructureData, get_train_val_test_loader
 
 from pydmclab.core.struc import StrucTools
-from pydmclab.mlp.dynamics import CHGNetRelaxer
-from pydmclab.mlp.trainer import CHGNetTrainer
+from pydmclab.mlp.chgnet.dynamics import CHGNetRelaxer
+from pydmclab.mlp.chgnet.trainer import CHGNetTrainer
 
 DATA_DIR = os.path.join("output", "mlp-finetuning")
 if not os.path.exists(DATA_DIR):

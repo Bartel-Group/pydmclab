@@ -1,13 +1,21 @@
+from __future__ import annotations
+
 import os
 import subprocess
 import yaml
-from collections import Counter
+import random
+import warnings
+
+from typing import TYPE_CHECKING
+from collections import Counter, defaultdict
 from shutil import copyfile, rmtree
-from typing import List, Tuple, Literal
+from typing import List, Tuple, Dict, Literal
 
 import numpy as np
 
-from pymatgen.core import Structure, PeriodicSite
+from math import lcm
+
+from pymatgen.core import Structure, PeriodicSite, Composition
 from pymatgen.core.surface import SlabGenerator
 from pymatgen.transformations.standard_transformations import (
     OrderDisorderedStructureTransformation,
@@ -17,9 +25,13 @@ from pymatgen.transformations.standard_transformations import (
 from pymatgen.analysis import structure_matcher
 from pymatgen.analysis.structure_matcher import StructureMatcher
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
+from pymatgen.analysis.diffraction.xrd import XRDCalculator
 
 from pydmclab.core import struc as pydmc_struc
 from pydmclab.core.comp import CompTools
+
+if TYPE_CHECKING:
+    from pydmclab.core.energies import ChemPots
 
 
 class StrucTools(object):
@@ -223,6 +235,7 @@ class StrucTools(object):
         algo: Literal[0, 1, 2] = 0,
         decorate: bool = True,
         n_strucs: int = 1,
+        scaling_factor: int = 1000,
         verbose: bool = True,
     ) -> dict[int, dict]:
         """
@@ -240,6 +253,10 @@ class StrucTools(object):
             n_strucs (int)
                 number of ordered structures to return
 
+            scaling_factor (int)
+                (n_strucs x scaling_factor) structures are initially generated
+                to ensure sufficient sampling of ordered strucs
+
         Returns:
             dict of ordered structures
             {index : structure (Structure.as_dict())}
@@ -256,7 +273,7 @@ class StrucTools(object):
             structure = self.structure
 
         # only return one structure if n_strucs = 1
-        return_ranked_list = n_strucs if n_strucs > 1 else False
+        return_ranked_list = n_strucs * scaling_factor if n_strucs > 1 else False
 
         # generate ordered structure
         if verbose:
@@ -274,7 +291,8 @@ class StrucTools(object):
             # find unique groups of structures
             groups = matcher.group_structures(out)
             out = [groups[i][0] for i in range(len(groups))]
-            return {i: out[i].as_dict() for i in range(len(out))}
+            strucs = {i: out[i].as_dict() for i in range(len(out))}
+            return {i: strucs[i] for i in range(n_strucs) if i in strucs}
         else:
             # if only one structure is made, return in same formation (dict)
             return {0: out.as_dict()}
@@ -434,6 +452,49 @@ class StrucTools(object):
 
         return structure
 
+    def get_xrd_pattern(
+        self,
+        wavelength: str | float = "CuKa",
+        symprec: float = 0,
+        debye_waller_factors: dict | None = None,
+        scaled: bool = True,
+        two_theta_range: Tuple[float, float] | None = (0, 90),
+    ) -> dict[str, list]:
+        """
+        Args:
+            wavelength: wavelength of X-ray radiation
+                (see pymatgen.analysis.diffraction.xrd.XRDCalculator for str options)
+            symprec: symmetry precision for structure refinement (no refinement if 0)
+            debye_waller_factors: {element symbol: float} for specifying Debye-Waller factors
+            scaled: whether to scale the intensities to a max of 100 (True) or use absolute values (False)
+            two_theta_range: range of two-theta values to calculate
+
+        Returns:
+            dict of XRD pattern
+                {'two_thetas' : numpy array of two-theta values in degrees (numpy.float64),
+                 'intensities' : numpy array of intensities (numpy.float64),
+                 'hkl_and_multiplicity' : list of {'hkl': miller indices, 'multiplicity': multiplicity},
+                 'd_spacing' : list of d-spacings (numpy.float64)}
+        """
+        # setup the calculator
+        xrd_calculator = XRDCalculator(
+            wavelength=wavelength,
+            symprec=symprec,
+            debye_waller_factors=debye_waller_factors,
+        )
+        # find the pattern
+        xrd_pattern_of_struc = xrd_calculator.get_pattern(
+            self.structure, scaled=scaled, two_theta_range=two_theta_range
+        )
+        # process the data
+        xrd_hkls = [hkl[0] for hkl in xrd_pattern_of_struc.hkls]
+        return {
+            "two_thetas": xrd_pattern_of_struc.x,
+            "intensities": xrd_pattern_of_struc.y,
+            "hkl_and_multiplicity": xrd_hkls,
+            "d_spacing": xrd_pattern_of_struc.d_hkls,
+        }
+
     def get_slabs(
         self,
         miller: tuple[int, int, int] = (1, 0, 0),
@@ -441,9 +502,10 @@ class StrucTools(object):
         min_slab_size: int = 10,
         min_vacuum_size: int = 10,
         center_slab: bool = True,
-        in_unit_planes: bool = False,
+        in_unit_planes: bool = True,
         reorient_lattice: bool = True,
         symmetrize: bool = True,
+        max_normal_search: int | None = None,
         tolerance: float = 0.1,
         ftolerance: float = 0.1,
     ) -> dict[str, dict]:
@@ -486,13 +548,14 @@ class StrucTools(object):
             center_slab=center_slab,
             in_unit_planes=in_unit_planes,
             reorient_lattice=reorient_lattice,
+            max_normal_search=max_normal_search,
         )
 
         slabs = slabgen.get_slabs(symmetrize=symmetrize, tol=tolerance, ftol=ftolerance)
 
         miller_str = "".join([str(i) for i in miller])
 
-        out = {miller_str: {}, "bulk_structure": bulk.as_dict()}
+        out = {miller_str: {}, "bulk_template": bulk.as_dict()}
         for i, slab in enumerate(slabs):
             out[miller_str][i] = {}
             out[miller_str][i]["slab"] = slab.as_dict()
@@ -501,6 +564,10 @@ class StrucTools(object):
             out[miller_str][i]["center_slab"] = center_slab
             out[miller_str][i]["in_unit_planes"] = in_unit_planes
             out[miller_str][i]["reorient_lattice"] = reorient_lattice
+            out[miller_str][i]["symmetrize"] = symmetrize
+            out[miller_str][i]["tolerance"] = tolerance
+            out[miller_str][i]["ftolerance"] = ftolerance
+            out[miller_str][i]["max_normal_search"] = max_normal_search
 
         return out
 
@@ -600,7 +667,7 @@ class SiteTools(object):
         ions = []
         for entry in species:
             el = entry["element"]
-            if "oxidation_state" in entry:
+            if "oxidation_state" in entry and entry["oxidation_state"] is not None:
                 ox = float(entry["oxidation_state"])
             else:
                 ox = None
@@ -669,12 +736,22 @@ class SiteTools(object):
                 ox += entry["oxidation_state"] * entry["occu"]
         return ox
 
+
 class SolidSolutionGenerator:
     """
-    Purpose:
-        Generate quasi-random solid solutions (SQS) between two crystal structures.
-        This is accomplished using the sqsgen package. Details can be found here:
-        https://sqsgenerator.readthedocs.io/en/latest/how_to.html
+    Generate quasi-random solid solutions (SQS) between two crystal structures.
+    This is accomplished using the sqsgenerator package.
+
+    Attributes:
+        endmembers (List[Structure]): List of two endmember structures.
+        num_solns (int): Number of solutions to generate.
+        supercell_dim (List[int]): Dimensions of the supercell.
+        element_A (str): Element that differs in the first endmember.
+        element_B (str): Element that differs in the second endmember.
+        disordered_solns (List[Structure]): List of disordered solid solution structures.
+        ordered_solns (List[Structure]): List of ordered solid solution structures.
+        sqs_solns (List[Structure]): List of special quasirandom structures (SQS).
+        dirs (Dict[str, str]): Dictionary of directory paths used in the process.
 
     Example usage:
         struc_A = Structure.from_file('Endmembers/SrRuO3.cif')
@@ -682,42 +759,73 @@ class SolidSolutionGenerator:
         generator = SolidSolutionGenerator(endmembers=[struc_A, struc_B], num_solns=15, supercell_dim=[2, 1, 2])
         disordered, ordered, sqs = generator.run(sqsgen_path='/path/to/sqsgen')
 
-        Where '/path/to/sqsgen' should be replaced with the location of your sqsgen installation.
+    Note:
+        '/path/to/sqsgen' should be replaced with the location of your sqsgen installation.
     """
-    def __init__(self, endmembers: List[Structure], num_solns: int = 15, supercell_dim: List[int] = [2, 2, 2]):
+
+    def __init__(
+        self,
+        endmembers: List[Structure],
+        num_solns: int = 15,
+        supercell_dim: List[int] = [2, 2, 2],
+    ):
+        """
+        Initialize the SolidSolutionGenerator.
+
+        Args:
+            endmembers (List[Structure]): List of two endmember structures.
+            num_solns (int, optional): Number of solutions to generate. Defaults to 15.
+            supercell_dim (List[int], optional): Dimensions of the supercell. Defaults to [2, 2, 2].
+        """
         self.endmembers = endmembers
         self.num_solns = num_solns
         self.supercell_dim = supercell_dim
-        self.element_A = None
-        self.element_B = None
-        self.disordered_solns = None
-        self.ordered_solns = None
-        self.sqs_solns = None
+        self.element_A: str = None
+        self.element_B: str = None
+        self.disordered_solns: List[Structure] = None
+        self.ordered_solns: List[Structure] = None
+        self.sqs_solns: List[Structure] = None
 
         # Create necessary directories
-        self.dirs = {
-            'output': 'Ordered_Solutions',
-            'yaml': 'yaml_files',
-            'sqs': 'SQS',
-            'temp': 'working_dir'
+        self.dirs: Dict[str, str] = {
+            "output": "Ordered_Solutions",
+            "yaml": "yaml_files",
+            "sqs": "SQS",
+            "temp": "working_dir",
         }
         for dir_name in self.dirs.values():
             os.makedirs(dir_name, exist_ok=True)
 
     def generate_solid_solutions(self) -> List[Structure]:
+        """
+        Generate disordered solid solutions between the two endmember structures.
+
+        Returns:
+            List[Structure]: List of disordered solid solution structures.
+
+        Raises:
+            ValueError: If the endmember structures are incompatible or if more than one element differs between them.
+        """
         struc_A, struc_B = self.endmembers
-        assert len(self.endmembers) == 2, f'There should be 2 endmembers, but you provided {len(self.endmembers)}.'
+        assert (
+            len(self.endmembers) == 2
+        ), f"There should be 2 endmembers, but you provided {len(self.endmembers)}."
 
         # Ensure the two endmember structures are compatible
         matcher = structure_matcher.StructureMatcher(
-            scale=True, attempt_supercell=True, primitive_cell=False,
-            comparator=structure_matcher.FrameworkComparator())
+            scale=True,
+            attempt_supercell=True,
+            primitive_cell=False,
+            comparator=structure_matcher.FrameworkComparator(),
+        )
         try:
             struc_B = matcher.get_s2_like_s1(struc_A, struc_B)
         except ValueError:
             struc_A = matcher.get_s2_like_s1(struc_B, struc_A)
 
-        assert struc_A is not None and struc_B is not None, 'The endmember structures you provided cannot be matched!'
+        assert (
+            struc_A is not None and struc_B is not None
+        ), "The endmember structures you provided cannot be matched!"
 
         struc_A.remove_oxidation_states()
         struc_B.remove_oxidation_states()
@@ -728,7 +836,9 @@ class SolidSolutionGenerator:
         differing_elements = elements_A.symmetric_difference(elements_B)
 
         if len(differing_elements) != 2:
-            raise ValueError('The code currently supports systems where only one element differs between the endmembers.')
+            raise ValueError(
+                "The code currently supports systems where only one element differs between the endmembers."
+            )
 
         # Map differing elements to variables
         self.element_A = differing_elements.intersection(elements_A).pop()
@@ -739,18 +849,24 @@ class SolidSolutionGenerator:
 
         for index, site in enumerate(struc_A):
             site_dict = site.as_dict()
-            A_species.append(site_dict['species'][0]['element'])
-            site_dict['species'] = [{'element': 'Li', 'oxidation_state': 0.0, 'occu': 1.0}]
+            A_species.append(site_dict["species"][0]["element"])
+            site_dict["species"] = [
+                {"element": "Li", "oxidation_state": 0.0, "occu": 1.0}
+            ]
             struc_A[index] = PeriodicSite.from_dict(site_dict)
 
         for index, site in enumerate(struc_B):
             site_dict = site.as_dict()
-            B_species.append(site_dict['species'][0]['element'])
-            site_dict['species'] = [{'element': 'Li', 'oxidation_state': 0.0, 'occu': 1.0}]
+            B_species.append(site_dict["species"][0]["element"])
+            site_dict["species"] = [
+                {"element": "Li", "oxidation_state": 0.0, "occu": 1.0}
+            ]
             struc_B[index] = PeriodicSite.from_dict(site_dict)
 
         # Interpolate the two structures and ignore the first entry (an end-member)
-        interp_structs = struc_A.interpolate(struc_B, nimages=self.num_solns, interpolate_lattices=True)[1:]
+        interp_structs = struc_A.interpolate(
+            struc_B, nimages=self.num_solns, interpolate_lattices=True
+        )[1:]
 
         # Compute fractional occupancies
         soln_interval = 1.0 / (self.num_solns + 1)
@@ -760,39 +876,142 @@ class SolidSolutionGenerator:
         for index, (A, B) in enumerate(zip(A_species, B_species)):
             for i in range(self.num_solns):
                 site_dict = interp_structs[i][index].as_dict()
-                site_dict['species'] = []
+                site_dict["species"] = []
 
                 if A == B:
-                    site_dict['species'].append({'element': A, 'oxidation_state': 0.0, 'occu': 1.0})
+                    site_dict["species"].append(
+                        {"element": A, "oxidation_state": 0.0, "occu": 1.0}
+                    )
                 else:
                     c1 = 1 - soln_fractions[i]
                     c2 = soln_fractions[i]
-                    site_dict['species'].append({'element': A, 'oxidation_state': 0.0, 'occu': c1})
-                    site_dict['species'].append({'element': B, 'oxidation_state': 0.0, 'occu': c2})
+                    site_dict["species"].append(
+                        {"element": A, "oxidation_state": 0.0, "occu": c1}
+                    )
+                    site_dict["species"].append(
+                        {"element": B, "oxidation_state": 0.0, "occu": c2}
+                    )
 
                 interp_structs[i][index] = PeriodicSite.from_dict(site_dict)
 
         self.disordered_solns = interp_structs
         return interp_structs
 
+    def order_disordered_structure(self, disordered_structure: Structure) -> Structure:
+        """
+        Convert a disordered pymatgen Structure object to an ordered one
+        by assigning species to sites according to their fractional occupancies.
+
+        For this class, the precise ordering does not matter. But the sqsgen
+        package requires the structure to be ordered. All that matters is the
+        relative number of each species on the sites to be disordered, which is
+        automatically determined by the fractional occupancies in disordered_structure.
+
+        Args:
+            disordered_structure (Structure): The input disordered structure.
+
+        Returns:
+            Structure: An ordered version of the input structure.
+        """
+        # Initialize an empty structure with the same lattice
+        ordered_structure: Structure = Structure(disordered_structure.lattice, [], [])
+
+        disordered_sites: List[PeriodicSite] = []
+        total_occupancy: Dict[str, float] = defaultdict(float)
+
+        # Separate ordered and disordered sites
+        for site in disordered_structure:
+            if site.is_ordered:
+                # Ordered site: add directly to the new structure
+                ordered_structure.append(site.species, site.frac_coords)
+            else:
+                # Disordered site: collect for processing
+                disordered_sites.append(site)
+                for specie, occupancy in site.species.items():
+                    total_occupancy[str(specie)] += occupancy
+
+        # Total number of disordered sites
+        num_disordered_sites: int = len(disordered_sites)
+
+        # Calculate the number of each species to assign
+        n_specie: Dict[str, int] = {}
+        fractional_part: Dict[str, float] = {}
+        for specie, total_occ in total_occupancy.items():
+            n_specie[specie] = int(total_occ)
+            fractional_part[specie] = total_occ - n_specie[specie]
+
+        total_assigned: int = sum(n_specie.values())
+        diff: int = num_disordered_sites - total_assigned
+
+        # Adjust the counts to match the total number of disordered sites
+        if diff > 0:
+            # Need to add species
+            for _ in range(diff):
+                # Find specie with the largest fractional part
+                specie: str = max(fractional_part, key=fractional_part.get)
+                n_specie[specie] += 1
+                fractional_part[specie] = 0  # Avoid selecting again
+        elif diff < 0:
+            # Need to remove species
+            for _ in range(-diff):
+                # Find specie with the smallest fractional part and positive count
+                specie_candidates: List[str] = [
+                    s for s in fractional_part if n_specie[s] > 0
+                ]
+                specie: str = min(specie_candidates, key=lambda s: fractional_part[s])
+                n_specie[specie] -= 1
+                fractional_part[specie] = 1  # Avoid selecting again
+
+        # Create a list of species according to the counts
+        species_list: List[str] = []
+        for specie, count in n_specie.items():
+            species_list.extend([specie] * count)
+
+        # Shuffle the list to distribute species randomly
+        random.shuffle(species_list)
+
+        # Assign species to the disordered sites
+        for site, specie in zip(disordered_sites, species_list):
+            ordered_structure.append({specie: 1.0}, site.frac_coords)
+
+        return ordered_structure
+
     def generate_ordered_solutions(self) -> List[Structure]:
+        """
+        Generate ordered solid solutions from the disordered solutions.
+
+        Returns:
+            List[Structure]: List of ordered solid solution structures.
+        """
         if self.disordered_solns is None:
             self.generate_solid_solutions()
 
         ordered_solns = []
         for i, interp_struc in enumerate(self.disordered_solns):
             interp_struc.make_supercell(self.supercell_dim)
-            interp_struc = interp_struc.add_oxidation_state_by_guess()
-            struc_tools = pydmc_struc.StrucTools(interp_struc)
-            ordered_struc = struc_tools.get_ordered_structures()[0]
-            ordered_struc = Structure.from_dict(ordered_struc)
+            inerp_struc = interp_struc.remove_oxidation_states()
+            ordered_struc = self.order_disordered_structure(interp_struc)
             ordered_solns.append(ordered_struc)
-            ordered_struc.to(filename=os.path.join(self.dirs['output'], f'{i}.vasp'), fmt='poscar')
+            ordered_struc.to(
+                filename=os.path.join(self.dirs["output"], f"{i}.vasp"), fmt="poscar"
+            )
 
         self.ordered_solns = ordered_solns
         return ordered_solns
 
-    def _parse_structure(self, file_path: str) -> Tuple[List[List[float]], List[List[float]], List[str], Structure]:
+    def _parse_structure(
+        self, file_path: str
+    ) -> Tuple[List[List[float]], List[List[float]], List[str], Structure]:
+        """
+        Parse a structure file and extract lattice, coordinates, species, and structure object.
+
+        Args:
+            file_path (str): Path to the structure file.
+
+        Returns:
+            Tuple[List[List[float]], List[List[float]], List[str], Structure]:
+                Lattice matrix, fractional coordinates, species list, and Structure object.
+        """
         structure = Structure.from_file(file_path)
         structure.remove_oxidation_states()
         lattice = structure.lattice.matrix.tolist()
@@ -800,11 +1019,30 @@ class SolidSolutionGenerator:
         coords = [site.frac_coords.tolist() for site in structure]
         return lattice, coords, species, structure
 
-    def _write_output_file(self, output_path: str, lattice: List[List[float]], coords: List[List[float]], species: List[str]):
+    def _write_output_file(
+        self,
+        output_path: str,
+        lattice: List[List[float]],
+        coords: List[List[float]],
+        species: List[str],
+    ) -> None:
+        """
+        Write the structure information to a YAML file for SQS generation.
+
+        Args:
+            output_path (str): Path to write the output YAML file.
+            lattice (List[List[float]]): Lattice matrix.
+            coords (List[List[float]]): Fractional coordinates of sites.
+            species (List[str]): List of species on each site.
+        """
         composition_dict = dict(Counter(species))
-        filtered_composition = {self.element_A: composition_dict.get(self.element_A, 0),
-                                self.element_B: composition_dict.get(self.element_B, 0)}
-        species = [self.element_A if specie == self.element_B else specie for specie in species]
+        filtered_composition = {
+            self.element_A: composition_dict.get(self.element_A, 0),
+            self.element_B: composition_dict.get(self.element_B, 0),
+        }
+        species = [
+            self.element_A if specie == self.element_B else specie for specie in species
+        ]
         data = {
             "structure": {
                 "supercell": [1, 1, 1],
@@ -815,57 +1053,110 @@ class SolidSolutionGenerator:
             "iterations": 1e6,
             "shell_weights": {1: 1.0},
             "which": self.element_A,
-            "composition": filtered_composition
+            "composition": filtered_composition,
         }
-        with open(output_path, 'w') as file:
+        with open(output_path, "w") as file:
             yaml.dump(data, file, default_flow_style=False)
 
-    def generate_sqs(self, sqsgen_path: str = 'path/to/sqsgen') -> List[Structure]:
+    def generate_sqs(self, sqsgen_path: str = "path/to/sqsgen") -> List[Structure]:
+        """
+        Generate special quasirandom structures (SQS) from the ordered solutions.
+
+        Args:
+            sqsgen_path (str, optional): Path to the sqsgen executable. Defaults to "path/to/sqsgen".
+
+        Returns:
+            List[Structure]: List of SQS structures.
+        """
         if self.ordered_solns is None:
             self.generate_ordered_solutions()
 
         # Convert ordered structures to YAML format
-        for i, fname in enumerate(os.listdir(self.dirs['output'])):
-            input_file = os.path.join(self.dirs['output'], fname)
-            output_file = os.path.join(self.dirs['yaml'], f'{os.path.splitext(fname)[0]}.yaml')
+        for i, fname in enumerate(os.listdir(self.dirs["output"])):
+            input_file = os.path.join(self.dirs["output"], fname)
+            output_file = os.path.join(
+                self.dirs["yaml"], f"{os.path.splitext(fname)[0]}.yaml"
+            )
             lattice, coords, species, structure = self._parse_structure(input_file)
             self._write_output_file(output_file, lattice, coords, species)
 
         # Generate an SQS from each YAML file
-        calc_sqs = [os.path.join(sqsgen_path, 'sqsgen'), "run", "iteration", "sqs_input.yaml"]
-        export_sqs = [os.path.join(sqsgen_path, 'sqsgen'), "export", "sqs_input.result.yaml"]
+        calc_sqs = [
+            os.path.join(sqsgen_path, "sqsgen"),
+            "run",
+            "iteration",
+            "sqs_input.yaml",
+        ]
+        export_sqs = [
+            os.path.join(sqsgen_path, "sqsgen"),
+            "export",
+            "sqs_input.result.yaml",
+        ]
         sqs_solns = []
 
-        for fname in os.listdir(self.dirs['yaml']):
+        for fname in os.listdir(self.dirs["yaml"]):
             # Copy YAML input to temp_dir
-            copyfile(os.path.join(self.dirs['yaml'], fname), os.path.join(self.dirs['temp'], 'sqs_input.yaml'))
-            os.chdir(self.dirs['temp'])
+            copyfile(
+                os.path.join(self.dirs["yaml"], fname),
+                os.path.join(self.dirs["temp"], "sqs_input.yaml"),
+            )
+            os.chdir(self.dirs["temp"])
 
             # Run sqsgen and export CIF(s)
-            subprocess.run(calc_sqs, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-            subprocess.run(export_sqs, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            subprocess.run(
+                calc_sqs,
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            subprocess.run(
+                export_sqs,
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
 
             # Copy one SQS to the sqs_dir
-            cif_filenames = [filename for filename in os.listdir('.') if filename.endswith('.cif')]
+            cif_filenames = [
+                filename for filename in os.listdir(".") if filename.endswith(".cif")
+            ]
             struc = Structure.from_file(cif_filenames[0])
-            num_struc = fname.split('.')[0]
-            struc.to(filename=f'../{self.dirs["sqs"]}/{num_struc}.vasp', fmt='poscar')
+            num_struc = fname.split(".")[0]
+            struc.to(filename=f'../{self.dirs["sqs"]}/{num_struc}.vasp', fmt="poscar")
             sqs_solns.append(struc)
 
             # Clean up by removing all files in temp_dir
-            for existing_fname in os.listdir('.'):
+            for existing_fname in os.listdir("."):
                 os.remove(existing_fname)
 
-            os.chdir('..')
+            os.chdir("..")
 
         self.sqs_solns = sqs_solns
         return sqs_solns
 
-    def cleanup(self):
+    def cleanup(self) -> None:
+        """
+        Remove all directories created during the process.
+        """
         for dir_name in self.dirs.values():
             rmtree(dir_name)
 
-    def run(self, sqsgen_path: str = 'path/to/sqsgen', cleanup: bool = True) -> Tuple[List[Structure], List[Structure], List[Structure]]:
+    def run(
+        self, sqsgen_path: str = "path/to/sqsgen", cleanup: bool = True
+    ) -> Tuple[List[Structure], List[Structure], List[Structure]]:
+        """
+        Run the entire solid solution generation process.
+
+        Args:
+            sqsgen_path (str, optional): Path to the sqsgen executable. Defaults to "path/to/sqsgen".
+            cleanup (bool, optional): Whether to remove temporary directories after completion. Defaults to True.
+
+        Returns:
+            Tuple[List[Structure], List[Structure], List[Structure]]:
+                Lists of disordered, ordered, and SQS structures.
+        """
         self.generate_solid_solutions()
         self.generate_ordered_solutions()
         self.generate_sqs(sqsgen_path)
@@ -874,3 +1165,176 @@ class SolidSolutionGenerator:
             self.cleanup()
 
         return self.disordered_solns, self.ordered_solns, self.sqs_solns
+
+
+class SlabTools(object):
+    """
+    A class for manipulating slabs and computing their properties.
+    """
+
+    def __init__(
+        self,
+        slab_structure: Structure | dict | str,
+        slab_e_per_at: float,
+        *,
+        unreduced_bulk_composition: Composition | dict | str = None,
+        bulk_e_per_at: float = None,
+    ) -> None:
+        """
+        Initialize the SlabTools object.
+
+        Args:
+            slab_structure (Structure | dict | str): pymatgen Structure object, Structure.as_dict(), or path to structure file.
+            slab_e_per_at (float): Energy per atom of the slab.
+            unreduced_bulk_composition (Composition | dict | str, optional): Unreduced bulk composition. This is the full composition of the bulk from which the slab was cleaved.
+                (e.g., if the slab was cleaved from SrTiO3 and is 10 layers thick, the unreduced bulk composition would be Sr10Ti10O30).
+            bulk_e_per_at (float, optional): Energy per atom of the bulk. Defaults to None.
+        """
+
+        slab_structure = StrucTools(slab_structure).structure
+
+        self.slab_structure = slab_structure
+        self.slab_e_per_at = slab_e_per_at
+
+        if isinstance(unreduced_bulk_composition, (dict, str)):
+            unreduced_bulk_composition = Composition(unreduced_bulk_composition)
+
+        self.unreduced_bulk_composition = unreduced_bulk_composition
+        self.bulk_e_per_at = bulk_e_per_at
+
+    @property
+    def is_stoich(self) -> bool:
+        """
+        Check if the slab is stoichiometric with respect to the bulk composition.
+        """
+        if not self.unreduced_bulk_composition:
+            raise ValueError(
+                "Unreduced bulk composition must be provided to check stoichiometry."
+            )
+
+        return self.slab_structure.composition == self.unreduced_bulk_composition
+
+    @property
+    def off_stoichiometry(self) -> dict[str, float]:
+        """
+        Calculate the off-stoichiometry of the slab with respect to the bulk composition.
+        """
+        if not self.unreduced_bulk_composition:
+            raise ValueError(
+                "Unreduced bulk composition must be provided to calculate off-stoichiometry."
+            )
+
+        unreduced_slab_composition = self.slab_structure.composition
+        unreduced_slab_composition.allow_negative = True
+
+        return (unreduced_slab_composition - self.unreduced_bulk_composition).as_dict()
+
+    def surface_area(
+        self, vacuum_axis: Literal["a", "b", "c", "auto"] = "auto", verbose: bool = True
+    ) -> float:
+        """
+        Returns the surface area of the slab.
+        """
+        lattice_mattrix = self.slab_structure.lattice.matrix
+
+        if not isinstance(vacuum_axis, str) or vacuum_axis not in [
+            "a",
+            "b",
+            "c",
+            "auto",
+        ]:
+            raise ValueError("vacuum_axis must be one of 'a', 'b', 'c', or 'auto'.")
+
+        axis_lengths = {
+            "a": np.linalg.norm(lattice_mattrix[0]),
+            "b": np.linalg.norm(lattice_mattrix[1]),
+            "c": np.linalg.norm(lattice_mattrix[2]),
+        }
+
+        if vacuum_axis != "auto" and axis_lengths[vacuum_axis] != max(
+            axis_lengths.values()
+        ):
+            warnings.warn(
+                f"The specified vacuum axis '{vacuum_axis}' is not the longest axis in the lattice.",
+                category=UserWarning,
+            )
+
+        if vacuum_axis == "a":
+            lattice_mattrix = np.delete(lattice_mattrix, 0, axis=0)
+        elif vacuum_axis == "b":
+            lattice_mattrix = np.delete(lattice_mattrix, 1, axis=0)
+        elif vacuum_axis == "c":
+            lattice_mattrix = np.delete(lattice_mattrix, 2, axis=0)
+        elif vacuum_axis == "auto":
+            if verbose:
+                print("Auto selected - Vacuum axis will be set to the largest axis.")
+            index_of_largest_axis = np.argmax(
+                [np.linalg.norm(axis) for axis in lattice_mattrix]
+            )
+            lattice_mattrix = np.delete(lattice_mattrix, index_of_largest_axis, axis=0)
+
+        surface_area = np.linalg.norm(np.cross(lattice_mattrix[0], lattice_mattrix[1]))
+
+        return surface_area
+
+    def surface_energy(
+        self,
+        *,
+        vacuum_axis: Literal["a", "b", "c", "auto"] = "auto",
+        ref_potentials: ChemPots | dict = None,
+        verbose: bool = True,
+        **kwargs,
+    ) -> float:
+
+        if not (self.unreduced_bulk_composition and self.bulk_e_per_at):
+            raise ValueError(
+                "Unreduced bulk composition and bulk energy per atom must be provided to calculate surface energy."
+            )
+
+        slab_e_tot = self.slab_e_per_at * len(self.slab_structure)
+        bulk_e_tot = self.bulk_e_per_at * self.unreduced_bulk_composition.num_atoms
+
+        surface_area = self.surface_area(vacuum_axis=vacuum_axis, verbose=verbose)
+
+        if not self.is_stoich:
+            from pydmclab.core.energies import ChemPots
+
+            excess_or_deficient_amts = self.off_stoichiometry
+
+            if not ref_potentials:
+                temperature = kwargs.pop("temperature", None)
+                if not temperature:
+                    mus = ChemPots(**kwargs)
+                    ref_potentials = mus.chempots
+                    ref_potentials = {
+                        k: v
+                        for k, v in ref_potentials.items()
+                        if k in excess_or_deficient_amts
+                    }
+                else:
+                    mus_at_0K = ChemPots(temperature=0, **kwargs)
+                    ref_pots_at_0K = mus_at_0K.chempots
+                    mus_at_temp = ChemPots(temperature=temperature, **kwargs)
+                    ref_pots_at_temp = mus_at_temp.chempots
+                    ref_potentials = {
+                        el: ref_pots_at_0K[el] + ref_pots_at_temp[el]
+                        for el in excess_or_deficient_amts
+                    }
+
+            elif isinstance(ref_potentials, ChemPots):
+                ref_potentials = ref_potentials.chempots
+
+            missing_refs = set(excess_or_deficient_amts) - set(ref_potentials)
+            if missing_refs:
+                raise ValueError(
+                    f"Reference potentials are missing for the following elements: {missing_refs}."
+                )
+
+            delta_mu_sum = sum(
+                excess_or_deficient_amts[el] * ref_potentials[el]
+                for el in excess_or_deficient_amts
+            )
+
+            return (slab_e_tot - bulk_e_tot - delta_mu_sum) / (2 * surface_area)
+
+        return (slab_e_tot - bulk_e_tot) / (2 * surface_area)
