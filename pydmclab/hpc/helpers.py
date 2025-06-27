@@ -1,11 +1,8 @@
 import multiprocessing as multip
 import os
 import warnings
-<<<<<<< HEAD
 import numpy as np
-=======
 import subprocess
->>>>>>> origin/main
 
 from pydmclab.hpc.launch import LaunchTools
 from pydmclab.hpc.submit import SubmitTools
