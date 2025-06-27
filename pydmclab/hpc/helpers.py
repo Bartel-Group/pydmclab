@@ -2191,14 +2191,21 @@ def get_slabs(
             st = StrucTools(strucs[cmpd][struc_id])
 
             evaluated_miller_indices = set()
-            for m in miller_indices:
-                if isinstance(m, int):
-                    distinct_miller_indices = get_symmetrically_distinct_miller_indices(
-                        st.structure, m
-                    )
-                    evaluated_miller_indices.update(distinct_miller_indices)
-                else:
-                    evaluated_miller_indices.add(tuple(m))
+
+            if isinstance(miller_indices, int):
+                distinct_miller_indices = get_symmetrically_distinct_miller_indices(
+                    st.structure, miller_indices
+                )
+                evaluated_miller_indices.update(distinct_miller_indices)
+            elif isinstance(miller_indices, list):
+                for m in miller_indices:
+                    if isinstance(m, int):
+                        distinct_miller_indices = (
+                            get_symmetrically_distinct_miller_indices(st.structure, m)
+                        )
+                        evaluated_miller_indices.update(distinct_miller_indices)
+                    else:
+                        evaluated_miller_indices.add(tuple(m))
             evaluated_miller_indices = sorted(list(evaluated_miller_indices))
 
             for em in evaluated_miller_indices:

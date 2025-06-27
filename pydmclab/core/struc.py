@@ -1195,7 +1195,7 @@ class SlabTools(object):
 
         if not (unreduced_bulk_composition or reduced_bulk_composition):
             raise ValueError(
-                "Please provide an unreduced_bulk_composition or a reduced_bulk_composition. \n If you know the unreduced bulk composition, use that."
+                "Please provide an unreduced_bulk_composition or a reduced_bulk_composition. \n It is recommended to use the unreduced bulk composition, if known."
             )
 
         if unreduced_bulk_composition and reduced_bulk_composition:
@@ -1250,7 +1250,7 @@ class SlabTools(object):
         return (unreduced_slab_composition - self.unreduced_bulk_composition).as_dict()
 
     @property
-    def possible_off_stoichiometries(self) -> dict[str, float]:
+    def possible_off_stoichiometries(self) -> list[dict[str, float]]:
         """
         Calculate the possible off-stoichiometries of the slab with respect to the reduced bulk composition.
         This is useful when the unreduced bulk composition is not known.
@@ -1260,8 +1260,6 @@ class SlabTools(object):
         bulk_amts = self.reduced_bulk_composition.get_el_amt_dict()
         overlapping_elements = set(slab_amts.keys()).intersection(set(bulk_amts.keys()))
 
-        bulk_reduced_total_atoms = sum(bulk_amts.values())
-
         scale_estimates = []
         for el in overlapping_elements:
             scale_estimate = slab_amts[el] / bulk_amts[el]
@@ -1270,27 +1268,40 @@ class SlabTools(object):
         min_scale = max(1, int(np.floor(min(scale_estimates))))
         max_scale = int(np.ceil(max(scale_estimates)))
 
+        scale_values = set(range(min_scale, max_scale + 1))
+        scale_values.update(scale_estimates)
+        scale_values = sorted(scale_values)
+
         scenarios = []
 
-        for scale in range(min_scale, max_scale + 1):
+        for scale in scale_values:
             scaled_bulk_composition = {el: amt * scale for el, amt in bulk_amts.items()}
             excess_or_deficient_amts = {
                 el: slab_amts[el] - scaled_bulk_composition.get(el, 0)
                 for el in slab_amts
             }
 
+            has_fractional_values = any(
+                not float(amt).is_integer() for amt in scaled_bulk_composition.values()
+            ) or any(
+                not float(amt).is_integer() for amt in excess_or_deficient_amts.values()
+            )
+
+            if has_fractional_values:
+                continue
+
             total_deviation = sum(abs(v) for v in excess_or_deficient_amts.values())
 
-            if total_deviation <= bulk_reduced_total_atoms:
-                scenario_data = {
-                    "excess_or_deficient_amts": excess_or_deficient_amts,
-                    "bulk_scale_factor": scale,
-                    "scaled_bulk_composition": Composition(scaled_bulk_composition),
-                    "total_deviation": total_deviation,
-                }
-                scenarios.append(scenario_data)
+            scenario_data = {
+                "excess_or_deficient_amts": excess_or_deficient_amts,
+                "bulk_scale_factor": scale,
+                "scaled_bulk_composition": Composition(
+                    scaled_bulk_composition
+                ).as_dict(),
+                "total_deviation": total_deviation,
+            }
+            scenarios.append(scenario_data)
 
-        # Sort by total deviation (prefer scenarios with smaller deviations)
         scenarios.sort(key=lambda x: x["total_deviation"])
 
         return scenarios
@@ -1348,6 +1359,7 @@ class SlabTools(object):
         *,
         vacuum_axis: Literal["a", "b", "c", "auto"] = "auto",
         ref_potentials: ChemPots | dict = None,
+        variable_element: str = None,
         verbose: bool = True,
         **kwargs,
     ) -> float:
@@ -1378,10 +1390,30 @@ class SlabTools(object):
                         f"No possible off-stoichiometries found with deviation less than {sum(self.reduced_bulk_composition.get_el_amt_dict()).values()} total atoms."
                     )
 
-                # Use the first scenario with the smallest total deviation
+                if variable_element:
+                    for scenario in possible_scenarios:
+                        excess_or_deficient_amts = scenario["excess_or_deficient_amts"]
+                        total_atoms = sum(
+                            abs(amt) for amt in excess_or_deficient_amts.values()
+                        )
+                        variable_element_count = abs(
+                            excess_or_deficient_amts.get(variable_element, 0)
+                        )
+                        scenario["variable_element_percentage"] = (
+                            (variable_element_count / total_atoms) * 100
+                            if total_atoms > 0
+                            else 0
+                        )
+
+                    possible_scenarios.sort(
+                        key=lambda x: x["variable_element_percentage"], reverse=True
+                    )
+
                 bulk_e_tot = (
                     self.bulk_e_per_at
-                    * possible_scenarios[0]["scaled_bulk_composition"].num_atoms
+                    * Composition.from_dict(
+                        possible_scenarios[0]["scaled_bulk_composition"]
+                    ).num_atoms
                 )
                 excess_or_deficient_amts = possible_scenarios[0][
                     "excess_or_deficient_amts"
@@ -1423,10 +1455,9 @@ class SlabTools(object):
 
             return (slab_e_tot - bulk_e_tot - delta_mu_sum) / (2 * surface_area)
 
-        slab_e_tot = (
-            self.slab_e_per_at
+        scale = (
+            self.slab_structure.composition.get_reduced_composition_and_factor()[1]
             * self.slab_structure.composition.reduced_composition.num_atoms
         )
-        bulk_e_tot = self.bulk_e_per_at * self.reduced_bulk_composition.num_atoms
 
-        return (slab_e_tot - bulk_e_tot) / (2 * surface_area)
+        return ((self.slab_e_per_at - self.bulk_e_per_at) * scale) / (2 * surface_area)
