@@ -124,7 +124,7 @@ SLURM_CONFIGS = get_slurm_configs(
 #  see pydmclab.hpc.vasp.VASPSetUp
 #  see pydmclab.hpc.sets.GetSet
 INCAR_MODS = {"all-all": {"NELM": 60}}
-KPOINT_MODS = {"all-all": {"grid": [5, 5, 5]}}
+KPOINT_MODS = {"all-all": {"grid": [6, 6, 6]}}
 POTCAR_MODS = None
 
 VASP_CONFIGS = get_vasp_configs(

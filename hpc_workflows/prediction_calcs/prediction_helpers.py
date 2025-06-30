@@ -226,6 +226,7 @@ def get_slurm_configs(
     partition: str = "msismall, msidmc",
     error_file: str = "log.e",
     output_file: str = "log.o",
+    job_name: str = None,
     account: str = "cbartel",
 ) -> dict:
     """
@@ -255,6 +256,7 @@ def get_slurm_configs(
     slurm_configs["partition"] = partition
     slurm_configs["error_file"] = error_file
     slurm_configs["output_file"] = output_file
+    slurm_configs["job_name"] = job_name
     slurm_configs["account"] = account
 
     return slurm_configs
@@ -307,6 +309,7 @@ def batch_strucs(strucs: dict, batch_size: int) -> dict:
 
     total_strucs = sum(len(strucs[formula]) for formula in strucs)
 
+    print("\n")
     with tqdm(total=total_strucs, desc="Batching structures") as pbar:
         for formula in strucs:
             for struc_id, struc in strucs[formula].items():
@@ -418,7 +421,8 @@ def make_prediction_scripts(
 
     total_batches = len(batching)
 
-    with tqdm(total=total_batches, desc="Making prediction scripts") as pbar:
+    print("\n")
+    with tqdm(total=total_batches, desc="(Re)making prediction scripts") as pbar:
 
         for batch_id in batching:
 
@@ -429,6 +433,8 @@ def make_prediction_scripts(
             )
 
             if os.path.exists(prediction_script) and not remake:
+                print(f"\n{prediction_script} already exists and remake is false, skipping")
+                pbar.update(1)
                 continue
 
             with open(prediction_template, "r", encoding="utf-8") as template_file:
@@ -556,7 +562,10 @@ def make_submission_scripts(
         if os.path.exists(prediction_launcher) and not remake:
             continue
 
-        job_name = f"{architecture.lower()}_{model}_prediction_{batch_id}"
+        if user_configs["job_name"] is not None:
+            job_name = f"{user_configs['job_name']}_{batch_id}"
+        else:
+            job_name = f"{architecture.lower()}_{model}_prediction_{batch_id}"
 
         with open(prediction_launcher, "w", encoding="utf-8") as f:
             f.write("#!/bin/bash -l\n")
@@ -686,7 +695,10 @@ def submit_jobs(batching: dict, user_configs: dict) -> None:
 
         launch_dir = batching[batch_id]["launch_dir"]
 
-        job_name = f"{architecture.lower()}_{model}_prediction_{batch_id}"
+        if user_configs["job_name"] is not None:
+            job_name = f"{user_configs['job_name']}_{batch_id}"
+        else:
+            job_name = f"{architecture.lower()}_{model}_prediction_{batch_id}"
 
         # check if job is already in queue
         if check_job_submission_status(job_name):
@@ -751,6 +763,7 @@ def collect_results(
 
     total_batches = len(batching)
 
+    print("\n")
     with tqdm(total=total_batches, desc="Collecting results") as pbar:
         for batch_id in batching:
 
@@ -771,11 +784,18 @@ def collect_results(
             )
 
             for formula_struc_id, prediction_result in batch_prediction_results.items():
-                formula, struc_id = formula_struc_id.split("_", 1)
+                formula, mpid, word_clean, facet_id, word_step, step_idx = formula_struc_id.split("_")
                 if formula not in results["prediction_results"]:
                     results["prediction_results"][formula] = {}
+                
+                if mpid not in results["prediction_results"][formula]:
+                    results["prediction_results"][formula][mpid] = {}
+                
+                if facet_id not in results["prediction_results"][formula][mpid]:
+                    results["prediction_results"][formula][mpid][facet_id] = {}
+                            
                 prediction_result["batch_id"] = batch_id
-                results["prediction_results"][formula][struc_id] = prediction_result
+                results["prediction_results"][formula][mpid][facet_id][step_idx] = prediction_result
             pbar.update(1)
 
     write_json(results, fjson)
@@ -796,10 +816,12 @@ def check_collected_results(results: dict, batching: dict) -> None:
 
     unique_batch_ids = set()
     for formula in results["prediction_results"]:
-        for struc_id in results["prediction_results"][formula]:
-            unique_batch_ids.add(
-                results["prediction_results"][formula][struc_id]["batch_id"]
-            )
+        for mpid in results["prediction_results"][formula]:
+            for facet_id in results["prediction_results"][formula][mpid]: 
+                for step_idx in results["prediction_results"][formula][mpid][facet_id]:
+                    unique_batch_ids.add(
+                        results["prediction_results"][formula][mpid][facet_id][step_idx]["batch_id"]
+                    )
 
     results_collected = len(unique_batch_ids)
 
