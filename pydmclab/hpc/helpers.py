@@ -2588,6 +2588,7 @@ def get_adsorption_energy_results(data_dir,
 
             E_adsorbate = cp_dict[adsorbate]
             # E_ads = E_slab_ads - (E_slab + E_adsorbate)
+
             E_ads = slab_ads_nsites*E_slab_ads - (slab_nsites*E_slab + E_adsorbate)
 
             ads_results['E_per_adsorbate'] = E_ads
@@ -2756,7 +2757,9 @@ def get_interfaces(data_dir,
                     
                     if substrate_miller == film_miller:
                         interfaces[comp_ID][unique_ID] = {}
-                        IF = InterfaceTools(slab_film=film_slab, slab_substrate=substrate_slab, slab_film_e_per_atom=film_e_per_atom, slab_substrate_e_per_atom=substrate_e_per_atom)
+                        sub_miller_list = [int(x) for x in substrate_miller]
+                        film_miller_list = [int(x) for x in film_miller]
+                        IF = InterfaceTools(substrate_miller=sub_miller_list, film_miller=film_miller_list, slab_film=film_slab, slab_substrate=substrate_slab, slab_film_e_per_atom=film_e_per_atom, slab_substrate_e_per_atom=substrate_e_per_atom)
 
                         interface = IF.get_interface_from_slabs(gap=gap, vacuum_over_film=vacuum_over_film)
 
