@@ -1211,7 +1211,9 @@ class SlabTools(object):
         if isinstance(reduced_bulk_composition, (dict, str)):
             reduced_bulk_composition = Composition(reduced_bulk_composition)
         elif isinstance(reduced_bulk_composition, Structure):
-            reduced_bulk_composition = reduced_bulk_composition.composition
+            reduced_bulk_composition = (
+                reduced_bulk_composition.composition.reduced_composition
+            )
 
         if unreduced_bulk_composition and not reduced_bulk_composition:
             reduced_bulk_composition = unreduced_bulk_composition.reduced_composition
