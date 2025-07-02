@@ -1,6 +1,22 @@
-# coding: utf-8
 # Copyright (c) MoGroup at UMD.
 # Distributed under the terms of the MIT License.
+
+# He, Xingfeng, Yizhou Zhu, Alexander Epstein, and Yifei Mo. "Statistical
+# variances of diffusional properties from ab initio molecular dynamics
+# simulations." npj Computational Materials 4, no. 1 (2018): 18.
+
+# He, Xingfeng, Yizhou Zhu, and Yifei Mo. "Origin of fast ion diffusion in
+# super-ionic conductors." Nature communications 8 (2017): 15893.
+
+# Mo, Yifei, Shyue Ping Ong, and Gerbrand Ceder. "First principles study of
+# the Li10GeP2S12 lithium super ionic conductor material." Chemistry of
+# Materials 24, no. 1 (2011): 15-17.
+
+# Ong, Shyue Ping, William Davidson Richards, Anubhav Jain, Geoffroy Hautier,
+# Michael Kocher, Shreyas Cholia, Dan Gunter, Vincent L. Chevrier,
+# Kristin A. Persson, and Gerbrand Ceder. "Python Materials Genomics (pymatgen):
+# A robust, open-source python library for materials analysis." Computational
+# Materials Science 68 (2013): 314-319.
 
 
 ##########################################################
