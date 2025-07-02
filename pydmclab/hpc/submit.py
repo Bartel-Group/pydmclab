@@ -826,7 +826,7 @@ class SubmitTools(object):
                     f.write(self.lobster_command)
 
                 # run bader for all static jobs
-                if calc_to_run in ["static", "lobster"] or "defect" in calc_to_run:
+                if calc_to_run in ["static", "lobster"]:
                     f.write(self.bader_command)
 
                 # execute the collector
