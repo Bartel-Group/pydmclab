@@ -11,7 +11,7 @@ def get_md_configs(
     timestep: float = 1.0,
     loginterval: int = 10,
     nsteps: int = 10000,
-    temperature: float = 300.0,
+    temperatures: float | tuple[float] = 300.0,
     pressure: float = 1.01325e-4,
     stress_weight: float | None = 1 / 160.21766208,
     addn_args: dict | None = None,
@@ -25,7 +25,7 @@ def get_md_configs(
         timestep (float): timestep in fs
         loginterval (int): interval for logging in steps
         nsteps (int): number of steps
-        temperature (float): temperature in K
+        temperatures (float | list[float]): temperature(s) in K
         pressure (float): pressure in GPa
         stress_weight (float | None): stress weight
         addn_args (dict): additional arguments (kwargs to pass to say the pre-relaxer)
@@ -38,6 +38,8 @@ def get_md_configs(
         ensembles = (ensembles,)
     if isinstance(thermostats, str):
         thermostats = (thermostats,)
+    if isinstance(temperatures, float):
+        temperatures = (temperatures,)
 
     valid_ensembles = ("nvt", "npt", "nve")
     if any(e not in valid_ensembles for e in ensembles):
@@ -72,7 +74,7 @@ def get_md_configs(
     md_configs["timestep"] = timestep
     md_configs["loginterval"] = loginterval
     md_configs["nsteps"] = nsteps
-    md_configs["temperature"] = temperature
+    md_configs["temperatures"] = temperatures
     md_configs["pressure"] = pressure
     md_configs["stress_weight"] = stress_weight
     md_configs["addn_args"] = addn_args
@@ -173,28 +175,36 @@ def make_launch_dirs(
 
     ensembles = user_configs["ensembles"]
     thermostats = user_configs["thermostats"]
+    temperatures = user_configs["temperatures"]
 
     launch_dirs = {}
     for formula in strucs:
         for struc_id in strucs[formula]:
             for ensemble in ensembles:
                 for thermostat in thermostats:
-                    launch_dir = os.path.join(
-                        calcs_dir, formula, struc_id, ensemble, thermostat
-                    )
-                    # make launch directory if it doesn't exist
-                    if not os.path.exists(launch_dir):
-                        os.makedirs(launch_dir)
-                    # save launch directory with its ensemble and thermostat easy to access
-                    launch_dirs[launch_dir] = {
-                        "formula": formula,
-                        "struc_id": struc_id,
-                        "ensemble": ensemble,
-                        "thermostat": thermostat,
-                    }
-                    # save initial structure as json in launch directory
-                    struc = strucs[formula][struc_id]
-                    write_json(struc, os.path.join(launch_dir, "ini_struc.json"))
+                    for temperature in temperatures:
+                        launch_dir = os.path.join(
+                            calcs_dir,
+                            formula,
+                            struc_id,
+                            ensemble,
+                            thermostat,
+                            temperature,
+                        )
+                        # make launch directory if it doesn't exist
+                        if not os.path.exists(launch_dir):
+                            os.makedirs(launch_dir)
+                        # save launch directory with its settings easy to access
+                        launch_dirs[launch_dir] = {
+                            "formula": formula,
+                            "struc_id": struc_id,
+                            "ensemble": ensemble,
+                            "thermostat": thermostat,
+                            "temperature": temperature,
+                        }
+                        # save initial structure as json in launch directory
+                        struc = strucs[formula][struc_id]
+                        write_json(struc, os.path.join(launch_dir, "ini_struc.json"))
 
     write_json(launch_dirs, fjson)
     return read_json(fjson)
@@ -216,7 +226,7 @@ def make_md_scripts(
 
     for launch_dir, settings in launch_dirs.items():
 
-        md_script = os.path.join(launch_dir, "chgnet_md.py")
+        md_script = os.path.join(launch_dir, "chgnet_md.py")  # generalize
 
         if os.path.exists(md_script) and not remake:
             continue
@@ -254,9 +264,7 @@ def make_md_scripts(
             elif 'nsteps = "placeholder"' in line:
                 md_script_lines[i] = f'    nsteps = {user_configs["nsteps"]}\n'
             elif 'temperature = "placeholder"' in line:
-                md_script_lines[i] = (
-                    f'    temperature = {user_configs["temperature"]}\n'
-                )
+                md_script_lines[i] = f'    temperature = {settings["temperature"]}\n'
             elif 'pressure = "placeholder"' in line:
                 md_script_lines[i] = f'    pressure = {user_configs["pressure"]}\n'
             elif 'addn_args = {"placeholder": "placeholder"}' in line:
@@ -292,8 +300,8 @@ def make_submission_scripts(
 
         formula = launch_dir.split("/")[-4]
         struc_id = launch_dir.split("/")[-3]
-        job_name = f'chgnet_md_{formula}_{struc_id}_{settings["ensemble"]}_{settings["thermostat"]}'
-
+        job_name = f'chgnet_md_{formula}_{struc_id}_{settings["ensemble"]}_{settings["thermostat"]}_{settings["temperature"]}'
+        # generalize
         with open(md_launcher, "w", encoding="utf-8") as f:
             f.write("#!/bin/bash -l\n")
             f.write(f"#SBATCH --nodes={user_configs['nodes']}\n")
@@ -306,7 +314,7 @@ def make_submission_scripts(
             f.write(f"#SBATCH --job-name={job_name}\n")
             f.write(f"#SBATCH --partition={user_configs['partition']}\n")
             f.write("\n")
-            f.write("python chgnet_md.py\n")
+            f.write("python chgnet_md.py\n")  # generalize?
 
         print(f"\nCreated new submission script for {launch_dir}")
 
@@ -379,15 +387,15 @@ def submit_jobs(launch_dirs: dict) -> None:
 
     for launch_dir, settings in launch_dirs.items():
 
-        job_name = f'chgnet_md_{settings["formula"]}_{settings["struc_id"]}_{settings["ensemble"]}_{settings["thermostat"]}'
-
+        job_name = f'chgnet_md_{settings["formula"]}_{settings["struc_id"]}_{settings["ensemble"]}_{settings["thermostat"]}_{settings["temperature"]}'
+        # generalize
         # check if job is already in queue
         if check_job_submission_status(job_name):
             print(f"\n{job_name} is already in queue")
             continue
 
         # check if job has already finished
-        results = os.path.join(launch_dir, "chgnet_md_results.json")
+        results = os.path.join(launch_dir, "chgnet_md_results.json")  # generalize
         if os.path.exists(results):
             print(f"\n{job_name} is finished")
             continue
@@ -435,7 +443,7 @@ def collect_results(
     results["md_configs"]["timestep"] = user_configs["timestep"]
     results["md_configs"]["loginterval"] = user_configs["loginterval"]
     results["md_configs"]["nsteps"] = user_configs["nsteps"]
-    results["md_configs"]["temperature"] = user_configs["temperature"]
+    results["md_configs"]["temperatures"] = user_configs["temperatures"]
     results["md_configs"]["pressure"] = user_configs["pressure"]
     results["md_configs"]["stress_weight"] = user_configs["stress_weight"]
     results["md_configs"]["addn_args"] = user_configs["addn_args"]
@@ -443,7 +451,7 @@ def collect_results(
     # collect results
     for launch_dir, settings in launch_dirs.items():
 
-        full_summary = os.path.join(launch_dir, "chgnet_md_results.json")
+        full_summary = os.path.join(launch_dir, "chgnet_md_results.json")  # generalize
 
         # check if job is finished
         if not os.path.exists(full_summary):
@@ -463,9 +471,14 @@ def collect_results(
         if ensemble not in results["md_results"][formula][struc_id]:
             results["md_results"][formula][struc_id][ensemble] = {}
         thermostat = settings["thermostat"]
+        if thermostat not in results["md_results"][formula][struc_id][ensemble]:
+            results["md_results"][formula][struc_id][ensemble][thermostat] = {}
+        temperature = settings["temperature"]
 
         # assign full summary to results dict
-        results["md_results"][formula][struc_id][ensemble][thermostat] = full_summary
+        results["md_results"][formula][struc_id][ensemble][thermostat][
+            temperature
+        ] = full_summary
 
     # save results
     write_json(results, fjson)
@@ -484,10 +497,11 @@ def check_collected_results(results: dict, launch_dirs: dict) -> None:
 
     results_possible = len(launch_dirs)
     results_collected = sum(
-        len(results["md_results"][formula][struc_id][ensemble])
+        len(results["md_results"][formula][struc_id][ensemble][thermostat])
         for formula in results["md_results"]
         for struc_id in results["md_results"][formula]
         for ensemble in results["md_results"][formula][struc_id]
+        for thermostat in results["md_results"][formula][struc_id][thermostat]
     )
     print(
         f"\nCollected results for {results_collected} / {results_possible} MD simulations"
@@ -540,43 +554,44 @@ def lowest_energy_struc_results(
         for struc_id in results["md_results"][formula]:
             for ensemble in results["md_results"][formula][struc_id]:
                 for thermostat in results["md_results"][formula][struc_id][ensemble]:
+                    for temperature in results["md_results"][formula][struc_id][
+                        ensemble
+                    ][thermostat]:
 
-                    # full summary of MD results
-                    full_summary = results["md_results"][formula][struc_id][ensemble][
-                        thermostat
-                    ]
+                        # full summary of MD results
+                        full_summary = results["md_results"][formula][struc_id][
+                            ensemble
+                        ][thermostat][temperature]
 
-                    # consider only the prescribed portion of the results
-                    cutoff_index = int(time_to_consider * len(full_summary))
-                    reduced_summary = full_summary[cutoff_index:]
+                        # consider only the prescribed portion of the results
+                        cutoff_index = int(time_to_consider * len(full_summary))
+                        reduced_summary = full_summary[cutoff_index:]
 
-                    # divide into num_strucs buckets
-                    # get the lowest energy structure from each bucket
-                    bucket_size = len(reduced_summary) // num_strucs
-                    lowest_energy_strucs = {}
-                    for i in range(num_strucs):
-                        bucket = reduced_summary[
-                            i * bucket_size : (i + 1) * bucket_size
-                        ]
-                        lowest_energy_struc = min(bucket, key=lambda x: x["Epot"])
-                        new_struc_id = (
-                            f"{struc_id}_{ensemble}_{thermostat}_md_struc_{i}"
-                        )
-                        if "structure" in lowest_energy_struc:
-                            lowest_energy_strucs[new_struc_id] = lowest_energy_struc[
-                                "structure"
+                        # divide into num_strucs buckets
+                        # get the lowest energy structure from each bucket
+                        bucket_size = len(reduced_summary) // num_strucs
+                        lowest_energy_strucs = {}
+                        for i in range(num_strucs):
+                            bucket = reduced_summary[
+                                i * bucket_size : (i + 1) * bucket_size
                             ]
-                        else:
-                            print(
-                                f"structure not found for {formula}_{struc_id}_{ensemble}_{thermostat}_bucket_{i}"
-                            )
+                            lowest_energy_struc = min(bucket, key=lambda x: x["Epot"])
+                            new_struc_id = f"{struc_id}_{ensemble}_{thermostat}_{temperature}_md_struc_{i}"
+                            if "structure" in lowest_energy_struc:
+                                lowest_energy_strucs[new_struc_id] = (
+                                    lowest_energy_struc["structure"]
+                                )
+                            else:
+                                print(
+                                    f"structure not found for {formula}_{struc_id}_{ensemble}_{thermostat}_bucket_{i}"
+                                )
 
-                    # setup strucs dict
-                    if formula not in strucs:
-                        strucs[formula] = {}
+                        # setup strucs dict
+                        if formula not in strucs:
+                            strucs[formula] = {}
 
-                    # assign lowest energy structures to strucs dict
-                    strucs[formula].update(lowest_energy_strucs)
+                        # assign lowest energy structures to strucs dict
+                        strucs[formula].update(lowest_energy_strucs)
 
     # save lowest energy structures
     write_json(strucs, fjson)

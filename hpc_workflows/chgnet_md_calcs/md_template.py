@@ -1,7 +1,8 @@
 import os
 import torch
 from pydmclab.core.struc import StrucTools
-from pydmclab.mlp.chgnet.dynamics import CHGNetMD, AnalyzeMD
+from pydmclab.mlp.analyze import AnalyzeMD
+from pydmclab.mlp.chgnet.dynamics import CHGNetMD
 from pydmclab.utils.handy import write_json
 
 
@@ -42,7 +43,7 @@ def main():
     ini_struc = StrucTools(os.path.join(curr_dir, "ini_struc.json")).structure
 
     # trajectory and log files
-    save_traj = os.path.join(curr_dir, "chgnet_md.traj")
+    save_traj = os.path.join(curr_dir, "chgnet_md.traj")  # need to generalize
     save_log = os.path.join(curr_dir, "chgnet_md.log")
 
     # running MD simulation
@@ -98,7 +99,9 @@ def main():
         os.remove(save_traj)
     else:
         full_summary = amd.full_summary
-        write_json(full_summary, os.path.join(curr_dir, "chgnet_md_results.json"))
+        write_json(
+            full_summary, os.path.join(curr_dir, "chgnet_md_results.json")
+        )  # generalize
 
     return
 

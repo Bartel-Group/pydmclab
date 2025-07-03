@@ -46,7 +46,7 @@ MD_CONFIGS = get_md_configs(
     timestep=1.0,
     loginterval=100,
     nsteps=10000,
-    temperature=1000.0,
+    temperatures=(1000.0,),
     pressure=1.01325e-4,
     addn_args={},
 )
