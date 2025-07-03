@@ -801,6 +801,7 @@ class SubmitTools(object):
                     "incar_mods": incar_mods,
                     "launch_dir": launch_dir,
                     "struc_src_for_hse": configs["struc_src_for_hse"],
+                    "xc_calc_src_for_lobster": configs["xc_calc_src_for_lobster"],
                 }
                 passer_dict_as_str = json.dumps(passer_dict)
 
