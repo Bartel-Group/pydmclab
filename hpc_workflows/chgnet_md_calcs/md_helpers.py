@@ -501,10 +501,11 @@ def make_md_scripts(
                 class_call_line = [
                     f"{indent}md = {architecture}MD.continue_from_traj(\n"
                 ]
-                calculator_config_lines = [
-                    f"{indent}    {key} = {key},\n"
-                    for key in user_configs["calculator_configs"].keys()
-                ]
+                # calculator_config_lines = [
+                #     f"{indent}    {key} = {key},\n"
+                #     for key in user_configs["calculator_configs"].keys()
+                #     if key in ("model", "name_or_path", "task_name")
+                # ]
                 md_config_lines = [
                     f"{indent}    {key} = {key},\n"
                     for key in user_configs["md_configs"].keys()
@@ -512,7 +513,7 @@ def make_md_scripts(
                 end_call_line = [f"{indent})\n"]
                 md_script_lines[i : i + 1] = (
                     class_call_line
-                    + calculator_config_lines
+                    # + calculator_config_lines
                     + md_config_lines
                     + end_call_line
                 )
