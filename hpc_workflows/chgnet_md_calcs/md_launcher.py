@@ -11,7 +11,8 @@ if MD_HELPERS_DIR not in sys.path:
     sys.path.append(MD_HELPERS_DIR)
 
 from md_helpers import (
-    get_md_configs,
+    get_chgnet_configs,
+    # get_fairchem_configs,
     get_slurm_configs,
     get_torch_configs,
     make_launch_dirs,
@@ -38,7 +39,7 @@ for d in [CALCS_DIR, DATA_DIR]:
         os.makedirs(d)
 
 # set chgnet molecular dynamics configs
-MD_CONFIGS = get_md_configs(
+ARCHITECTURE_CONFIGS = get_chgnet_configs(
     relax_first=True,
     ensembles=("nvt",),
     thermostats=("bi",),
@@ -69,7 +70,7 @@ TORCH_CONFIGS = get_torch_configs(
 )
 
 # collect all user configs
-USER_CONFIGS = {**MD_CONFIGS, **SLURM_CONFIGS, **TORCH_CONFIGS}
+USER_CONFIGS = {**ARCHITECTURE_CONFIGS, **SLURM_CONFIGS, **TORCH_CONFIGS}
 
 # location of md_template.py
 MD_TEMPLATE = "%s/bin/pydmclab/hpc_workflows/chgnet_md_calcs/md_template.py" % HOME_PATH

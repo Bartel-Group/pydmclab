@@ -1,9 +1,22 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING, Literal
+
 import os
 import subprocess
+
 from pydmclab.utils.handy import read_json, write_json
 
+if TYPE_CHECKING:
+    from pydmclab.mlp import Versions
+    from ase.optimize.optimize import Optimizer as ASEOptimizer
+    from fairchem.core.units.mlip_unit.api.inference import InferenceSettings
 
-def get_md_configs(
+
+def get_chgnet_configs(
+    model: Versions | None = None,
+    optimizer: ASEOptimizer | str = "FIRE",
+    stress_weight: float | None = 1 / 160.21766208,
+    on_isolated_atoms: Literal["ignore", "warn", "error"] = "warn",
     relax_first: bool = True,
     ensembles: str | tuple[str] = "nvt",
     thermostats: str | tuple[str] = "bi",
@@ -13,11 +26,16 @@ def get_md_configs(
     nsteps: int = 10000,
     temperatures: float | tuple[float] = 300.0,
     pressure: float = 1.01325e-4,
-    stress_weight: float | None = 1 / 160.21766208,
     addn_args: dict | None = None,
 ) -> dict:
     """
+    Note: this assumes cpu only use on MSI and only supports pretrained models
+
     Args:
+        model: if None, uses model "0.3.0"
+        optimizer: default is "FIRE", see pydmclab.mlp.dynamics for more options
+        stress_weight: the conversion factor to convert GPa to eV/A^3
+        on_isolated_atoms: what to do if isolated atoms are found
         relax_first (bool): if True, relax structures before MD
         ensembles (str | tuple): 'nvt', 'npt', or 'nve'
         thermostats (str | tuple): 'nh' for Nose-Hoover, 'b' for Berendsen, or 'bi' for Berendsen_inhomogeneous
@@ -27,11 +45,10 @@ def get_md_configs(
         nsteps (int): number of steps
         temperatures (float | list[float]): temperature(s) in K
         pressure (float): pressure in GPa
-        stress_weight (float | None): stress weight
         addn_args (dict): additional arguments (kwargs to pass to say the pre-relaxer)
 
     Returns:
-        md_configs (dict): dict of MD configurations
+        architecture_configs (dict): dict of architecture/ calculator/ md configurations
     """
 
     if isinstance(ensembles, str):
@@ -65,21 +82,130 @@ def get_md_configs(
     elif not isinstance(addn_args, dict):
         raise ValueError("addn_args must be a dictionary")
 
-    md_configs = {}
+    architecture_configs = {
+        "architecture": "CHGNet",
+        "calculator_configs": {},
+        "md_configs": {},
+    }
 
-    md_configs["relax_first"] = relax_first
-    md_configs["ensembles"] = ensembles
-    md_configs["thermostats"] = tuple(thermostat_full_names)
-    md_configs["taut"] = taut
-    md_configs["timestep"] = timestep
-    md_configs["loginterval"] = loginterval
-    md_configs["nsteps"] = nsteps
-    md_configs["temperatures"] = temperatures
-    md_configs["pressure"] = pressure
-    md_configs["stress_weight"] = stress_weight
-    md_configs["addn_args"] = addn_args
+    architecture_configs["calculator_configs"]["model"] = model
+    architecture_configs["calculator_configs"]["optimizer"] = optimizer
+    architecture_configs["calculator_configs"]["stress_weight"] = stress_weight
+    architecture_configs["calculator_configs"]["on_isolated_atoms"] = on_isolated_atoms
 
-    return md_configs
+    architecture_configs["md_configs"]["relax_first"] = relax_first
+    architecture_configs["md_configs"]["ensembles"] = ensembles
+    architecture_configs["md_configs"]["thermostats"] = tuple(thermostat_full_names)
+    architecture_configs["md_configs"]["taut"] = taut
+    architecture_configs["md_configs"]["timestep"] = timestep
+    architecture_configs["md_configs"]["loginterval"] = loginterval
+    architecture_configs["md_configs"]["nsteps"] = nsteps
+    architecture_configs["md_configs"]["temperatures"] = temperatures
+    architecture_configs["md_configs"]["pressure"] = pressure
+    architecture_configs["md_configs"]["stress_weight"] = stress_weight
+    architecture_configs["md_configs"]["addn_args"] = addn_args
+
+    return architecture_configs
+
+
+def get_fairchem_configs(
+    name_or_path: str,
+    task_name: str,
+    inference_settings: InferenceSettings | str = "default",
+    overrides: dict | None = None,
+    optimizer: ASEOptimizer | str = "FIRE",
+    ensembles: str | tuple[str] = "nvt",
+    thermostats: str | tuple[str] = "bi",
+    taut: float | None = None,
+    timestep: float = 1.0,
+    loginterval: int = 10,
+    nsteps: int = 10000,
+    temperatures: float | tuple[float] = 300.0,
+    pressure: float = 1.01325e-4,
+    stress_weight: float | None = 1 / 160.21766208,
+    addn_args: dict | None = None,
+) -> dict:
+    """
+    Note: this assumes cpu only use on MSI and only supports pretrained models
+
+    Args:
+        name_or_path: the model name or a path to a checkpoint
+        task_name: class of materials you are relaxing (e.g., "omat" for inorganic crystals)
+        inference_settings: the inference settings to use ("default" is general purpose)
+        overrides: overrides for the inference settings
+        optimizer: default is "FIRE", see pydmclab.mlp.dynamics for more options
+        ensembles (str | tuple): 'nvt', 'npt', or 'nve'
+        thermostats (str | tuple): 'nh' for Nose-Hoover, 'b' for Berendsen, or 'bi' for Berendsen_inhomogeneous
+        taut (float): time constant for temperature coupling in fs
+        timestep (float): timestep in fs
+        loginterval (int): interval for logging in steps
+        nsteps (int): number of steps
+        temperatures (float | list[float]): temperature(s) in K
+        pressure (float): pressure in GPa
+        stress_weight (float | None): stress weight
+        addn_args (dict): additional arguments (kwargs to pass to say the pre-relaxer)
+
+    Returns:
+        architecture_configs (dict): dict of architecture/ calculator/ md configurations
+    """
+
+    if isinstance(ensembles, str):
+        ensembles = (ensembles,)
+    if isinstance(thermostats, str):
+        thermostats = (thermostats,)
+    if isinstance(temperatures, float):
+        temperatures = (temperatures,)
+
+    valid_ensembles = ("nvt", "npt", "nve")
+    if any(e not in valid_ensembles for e in ensembles):
+        raise ValueError("valid ensembles are: 'nvt', 'npt', or 'nve'")
+
+    valid_thermostats = ("b", "bi", "nh")
+    if any(thermo not in valid_thermostats for thermo in thermostats):
+        raise ValueError("valid thermostats are: 'b', 'bi', or 'nh'")
+
+    thermostat_full_names = []
+    if "b" in thermostats:
+        thermostat_full_names.append("Berendsen")
+    if "bi" in thermostats:
+        thermostat_full_names.append("Berendsen_inhomogeneous")
+    if "nh" in thermostats:
+        thermostat_full_names.append("Nose-Hoover")
+
+    if taut is None:
+        taut = 100 * timestep
+
+    if addn_args is None:
+        addn_args = {}
+    elif not isinstance(addn_args, dict):
+        raise ValueError("addn_args must be a dictionary")
+
+    architecture_configs = {
+        "architecture": "FAIRChem",
+        "calculator_configs": {},
+        "md_configs": {},
+    }
+
+    architecture_configs["calculator_configs"]["name_or_path"] = name_or_path
+    architecture_configs["calculator_configs"]["task_name"] = task_name
+    architecture_configs["calculator_configs"][
+        "inference_settings"
+    ] = inference_settings
+    architecture_configs["calculator_configs"]["overrides"] = overrides
+    architecture_configs["calculator_configs"]["optimizer"] = optimizer
+
+    architecture_configs["md_configs"]["ensembles"] = ensembles
+    architecture_configs["md_configs"]["thermostats"] = tuple(thermostat_full_names)
+    architecture_configs["md_configs"]["taut"] = taut
+    architecture_configs["md_configs"]["timestep"] = timestep
+    architecture_configs["md_configs"]["loginterval"] = loginterval
+    architecture_configs["md_configs"]["nsteps"] = nsteps
+    architecture_configs["md_configs"]["temperatures"] = temperatures
+    architecture_configs["md_configs"]["pressure"] = pressure
+    architecture_configs["md_configs"]["stress_weight"] = stress_weight
+    architecture_configs["md_configs"]["addn_args"] = addn_args
+
+    return architecture_configs
 
 
 def get_slurm_configs(
@@ -210,6 +336,35 @@ def make_launch_dirs(
     return read_json(fjson)
 
 
+def detect_indent(line: str) -> str:
+    """
+    Detect leading indentation (spaces or tabs) from a line.
+    Need to indent lines within main() and other functions while writing to the script.
+    """
+    return line[: len(line) - len(line.lstrip())]
+
+
+def get_model(user_configs: dict) -> tuple[str, str]:
+    """
+    Args:
+        user_configs (dict): user configs
+
+    Returns:
+        A tuple containing the architecture and information about the model
+        based on the architecture
+    """
+    architecture = user_configs["architecture"]
+    if architecture.lower() == "chgnet":
+        return (
+            architecture,
+            user_configs["calculator_configs"]["model"].replace(".", ""),
+        )
+    elif architecture.lower() == "fairchem":
+        model_name = user_configs["calculator_configs"]["name_or_path"]
+        model_task = user_configs["calculator_configs"]["task_name"]
+        return (architecture, f"{model_name}-{model_task}")
+
+
 def make_md_scripts(
     launch_dirs: dict, user_configs: dict, md_template: str, remake: bool = False
 ) -> None:
@@ -224,9 +379,11 @@ def make_md_scripts(
         None, writes chgnet md script for each job
     """
 
+    architecture, model = get_model(user_configs)
+
     for launch_dir, settings in launch_dirs.items():
 
-        md_script = os.path.join(launch_dir, "chgnet_md.py")  # generalize
+        md_script = os.path.join(launch_dir, f"{architecture.lower()}_{model}_md.py")
 
         if os.path.exists(md_script) and not remake:
             continue
@@ -237,38 +394,133 @@ def make_md_scripts(
         md_script_lines = template_lines.copy()
 
         for i, line in enumerate(md_script_lines):
+
+            indent = detect_indent(line)
+
+            if 'from pydmclab.mlp import "placeholder"' in line:
+                md_script_lines[i] = (
+                    f"{indent}from pydmclab.mlp.{architecture.lower()}.dynamics import {architecture}MD\n"
+                )
+
             if 'intra_op_threads = "placeholder"' in line:
                 md_script_lines[i] = (
                     f'    intra_op_threads = {user_configs["num_intraop_threads"]}\n'
                 )
+
             elif 'inter_op_threads = "placeholder"' in line:
                 md_script_lines[i] = (
                     f'    inter_op_threads = {user_configs["num_interop_threads"]}\n'
                 )
+
+            elif 'architecture = "placeholder"' in line:
+                md_script_lines[i] = f"{indent}architecture = '{architecture}'\n"
+
+            elif 'calculator_configs = "placeholder"' in line:
+                config_lines = [
+                    f"{indent}{key} = {repr(value)}\n"
+                    for key, value in user_configs["calculator_configs"].items()
+                ]
+                md_script_lines[i : i + 1] = config_lines
+
+            elif 'md_configs = "placeholder"' in line:
+                config_lines = [
+                    f"{indent}{key} = {repr(value)}\n"
+                    for key, value in user_configs["md_configs"].items()
+                ]
+                md_script_lines[i : i + 1] = config_lines
+
+            elif 'save_log = os.path.join(curr_dir, "placeholder")' in line:
+                md_script_lines[i] = (
+                    f"{indent}save_log = os.path.join(curr_dir, '{architecture.lower()}_{model}_md.log')\n"
+                )
+
+            elif 'save_traj = os.path.join(curr_dir, "placeholder")' in line:
+                md_script_lines[i] = (
+                    f"{indent}save_traj = os.path.join(curr_dir, '{architecture.lower()}_{model}_md.traj')\n"
+                )
+
             elif 'relax_first = "placeholder"' in line:
                 md_script_lines[i] = (
-                    f'    relax_first = {user_configs["relax_first"]}\n'
+                    f'{indent}relax_first = {user_configs["relax_first"]}\n'
                 )
+
             elif 'ensemble = "placeholder"' in line:
-                md_script_lines[i] = f'    ensemble = "{settings["ensemble"]}"\n'
+                md_script_lines[i] = f'{indent}ensemble = "{settings["ensemble"]}"\n'
+
             elif 'thermostat = "placeholder"' in line:
-                md_script_lines[i] = f'    thermostat = "{settings["thermostat"]}"\n'
+                md_script_lines[i] = (
+                    f'{indent}thermostat = "{settings["thermostat"]}"\n'
+                )
+
             elif 'taut = "placeholder"' in line:
-                md_script_lines[i] = f'    taut = {user_configs["taut"]}\n'
+                md_script_lines[i] = f'{indent}taut = {user_configs["taut"]}\n'
+
             elif 'timestep = "placeholder"' in line:
-                md_script_lines[i] = f'    timestep = {user_configs["timestep"]}\n'
+                md_script_lines[i] = f'{indent}timestep = {user_configs["timestep"]}\n'
+
             elif 'loginterval = "placeholder"' in line:
                 md_script_lines[i] = (
-                    f'    loginterval = {user_configs["loginterval"]}\n'
+                    f'{indent}loginterval = {user_configs["loginterval"]}\n'
                 )
+
             elif 'nsteps = "placeholder"' in line:
-                md_script_lines[i] = f'    nsteps = {user_configs["nsteps"]}\n'
+                md_script_lines[i] = f'{indent}nsteps = {user_configs["nsteps"]}\n'
+
             elif 'temperature = "placeholder"' in line:
-                md_script_lines[i] = f'    temperature = {settings["temperature"]}\n'
+                md_script_lines[i] = (
+                    f'{indent}temperature = {settings["temperature"]}\n'
+                )
+
             elif 'pressure = "placeholder"' in line:
-                md_script_lines[i] = f'    pressure = {user_configs["pressure"]}\n'
+                md_script_lines[i] = f'{indent}pressure = {user_configs["pressure"]}\n'
+
             elif 'addn_args = {"placeholder": "placeholder"}' in line:
-                md_script_lines[i] = f'    addn_args = {user_configs["addn_args"]}\n'
+                md_script_lines[i] = (
+                    f'{indent}addn_args = {user_configs["addn_args"]}\n'
+                )
+
+            elif 'md = "placeholder"' in line:
+                class_call_line = [f"{indent}md = {architecture}MD(\n"]
+                # calculator_config_lines = [
+                #     f"{indent}    {key} = {key},\n"
+                #     for key in user_configs["calculator_configs"].keys()
+                # ]
+                md_config_lines = [
+                    f"{indent}    {key} = {key},\n"
+                    for key in user_configs["md_configs"].keys()
+                ]
+                end_call_line = [f"{indent})\n"]
+                md_script_lines[i : i + 1] = (
+                    class_call_line
+                    # + calculator_config_lines
+                    + md_config_lines
+                    + end_call_line
+                )
+
+            elif 'continue_md = "placeholder"' in line:
+                class_call_line = [
+                    f"{indent}md = {architecture}MD.continue_from_traj(\n"
+                ]
+                calculator_config_lines = [
+                    f"{indent}    {key} = {key},\n"
+                    for key in user_configs["calculator_configs"].keys()
+                ]
+                md_config_lines = [
+                    f"{indent}    {key} = {key},\n"
+                    for key in user_configs["md_configs"].keys()
+                ]
+                end_call_line = [f"{indent})\n"]
+                md_script_lines[i : i + 1] = (
+                    class_call_line
+                    + calculator_config_lines
+                    + md_config_lines
+                    + end_call_line
+                )
+
+            elif 'full_summary, os.path.join(curr_dir, "placeholder")' in line:
+                md_script_lines[i] = (
+                    f"{indent}full_summary, os.path.join(curr_dir, '{architecture.lower()}_{model}_md_results.json')\n"
+                )
 
         with open(md_script, "w", encoding="utf-8") as script_file:
             script_file.writelines(md_script_lines)
@@ -291,6 +543,8 @@ def make_submission_scripts(
         job_names_by_dir (dict): dict of job names by launch directory
     """
 
+    architecture, model = get_model(user_configs)
+
     for launch_dir, settings in launch_dirs.items():
 
         md_launcher = os.path.join(launch_dir, "sub.sh")
@@ -300,8 +554,8 @@ def make_submission_scripts(
 
         formula = launch_dir.split("/")[-4]
         struc_id = launch_dir.split("/")[-3]
-        job_name = f'chgnet_md_{formula}_{struc_id}_{settings["ensemble"]}_{settings["thermostat"]}_{settings["temperature"]}'
-        # generalize
+        job_name = f'{architecture.lower()}_{model}_md_{formula}_{struc_id}_{settings["ensemble"]}_{settings["thermostat"]}_{settings["temperature"]}'
+
         with open(md_launcher, "w", encoding="utf-8") as f:
             f.write("#!/bin/bash -l\n")
             f.write(f"#SBATCH --nodes={user_configs['nodes']}\n")
@@ -314,7 +568,7 @@ def make_submission_scripts(
             f.write(f"#SBATCH --job-name={job_name}\n")
             f.write(f"#SBATCH --partition={user_configs['partition']}\n")
             f.write("\n")
-            f.write("python chgnet_md.py\n")  # generalize?
+            f.write(f"python {architecture.lower()}_{model}_md.py\n")
 
         print(f"\nCreated new submission script for {launch_dir}")
 
@@ -374,28 +628,33 @@ def check_job_submission_status(job_name: str) -> bool:
     return False
 
 
-def submit_jobs(launch_dirs: dict) -> None:
+def submit_jobs(launch_dirs: dict, user_configs: dict) -> None:
     """
     Args:
         launch_dirs (dict): dict of launch directories and their settings
+        user_configs (dict): user configs
 
     Returns:
         None, submits jobs if not already in queue or finished
     """
 
+    architecture, model = get_model(user_configs)
+
     scripts_dir = os.getcwd()
 
     for launch_dir, settings in launch_dirs.items():
 
-        job_name = f'chgnet_md_{settings["formula"]}_{settings["struc_id"]}_{settings["ensemble"]}_{settings["thermostat"]}_{settings["temperature"]}'
-        # generalize
+        job_name = f'{architecture.lower()}_{model}_md_{settings["formula"]}_{settings["struc_id"]}_{settings["ensemble"]}_{settings["thermostat"]}_{settings["temperature"]}'
+
         # check if job is already in queue
         if check_job_submission_status(job_name):
             print(f"\n{job_name} is already in queue")
             continue
 
         # check if job has already finished
-        results = os.path.join(launch_dir, "chgnet_md_results.json")  # generalize
+        results = os.path.join(
+            launch_dir, f"{architecture.lower()}_{model}_md_results.json"
+        )
         if os.path.exists(results):
             print(f"\n{job_name} is finished")
             continue
@@ -427,31 +686,29 @@ def collect_results(
         results (dict): dict of MD results and configs
     """
 
-    fjson = os.path.join(data_dir, "md_results.json")
+    architecture, model = get_model(user_configs)
+
+    fjson = os.path.join(data_dir, f"{architecture.lower()}_{model}_md_results.json")
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
 
     print("\nCollecting results:")
 
-    results = {"md_results": {}, "md_configs": {}}
+    results = {"md_results": {}, "architecture_configs": {}}
 
-    # record MD job settings
-    results["md_configs"]["relax_first"] = user_configs["relax_first"]
-    results["md_configs"]["ensembles"] = user_configs["ensembles"]
-    results["md_configs"]["thermostats"] = user_configs["thermostats"]
-    results["md_configs"]["taut"] = user_configs["taut"]
-    results["md_configs"]["timestep"] = user_configs["timestep"]
-    results["md_configs"]["loginterval"] = user_configs["loginterval"]
-    results["md_configs"]["nsteps"] = user_configs["nsteps"]
-    results["md_configs"]["temperatures"] = user_configs["temperatures"]
-    results["md_configs"]["pressure"] = user_configs["pressure"]
-    results["md_configs"]["stress_weight"] = user_configs["stress_weight"]
-    results["md_configs"]["addn_args"] = user_configs["addn_args"]
+    # record architecture and MD job settings
+    results["architecture_configs"]["architecture"] = user_configs["architecture"]
+    results["architecture_configs"]["calculator_configs"] = user_configs[
+        "calculator_configs"
+    ]
+    results["architecture_configs"]["md_configs"] = user_configs["md_configs"]
 
     # collect results
     for launch_dir, settings in launch_dirs.items():
 
-        full_summary = os.path.join(launch_dir, "chgnet_md_results.json")  # generalize
+        full_summary = os.path.join(
+            launch_dir, f"{architecture.lower()}_{model}_md_results.json"
+        )
 
         # check if job is finished
         if not os.path.exists(full_summary):
@@ -519,7 +776,7 @@ def lowest_energy_struc_results(
 ) -> dict:
     """
     Args:
-        results (dict): dict of MD results and configs
+        results (dict): dict of MD results and architecture configs
         time_to_consider (float): percentage of results to consider for each MD simulation,
             e.g. 0.5 for the back half of the results
         num_strucs (int): number of lowest energy structures to collect for each MD simulation
@@ -532,8 +789,8 @@ def lowest_energy_struc_results(
 
     num_of_results_considered = int(
         time_to_consider
-        * results["md_configs"]["nsteps"]
-        // results["md_configs"]["loginterval"]
+        * results["architecture_configs"]["md_configs"]["nsteps"]
+        // results["architecture_configs"]["md_configs"]["loginterval"]
     )
     if num_of_results_considered < num_strucs:
         raise ValueError(
@@ -583,7 +840,7 @@ def lowest_energy_struc_results(
                                 )
                             else:
                                 print(
-                                    f"structure not found for {formula}_{struc_id}_{ensemble}_{thermostat}_bucket_{i}"
+                                    f"structure not found for {formula}_{struc_id}_{ensemble}_{thermostat}_{temperature}_bucket_{i}"
                                 )
 
                         # setup strucs dict

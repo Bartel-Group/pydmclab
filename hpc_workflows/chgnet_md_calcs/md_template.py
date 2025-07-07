@@ -4,6 +4,7 @@ from pydmclab.core.struc import StrucTools
 from pydmclab.mlp.analyze import AnalyzeMD
 from pydmclab.mlp.chgnet.dynamics import CHGNetMD
 from pydmclab.utils.handy import write_json
+from pydmclab.mlp import "placeholder"
 
 
 def find_remaining_steps(logfile, trajfile, nsteps, timestep):
@@ -24,6 +25,17 @@ def main():
     torch.set_num_threads(intra_op_threads)
     torch.set_num_interop_threads(inter_op_threads)
 
+    # architecture type
+    architecture = "placeholder"
+
+    # calculator settings (these are calculator specific and can vary widely)
+    #   see the associated calculator md class for args
+    calculator_configs = "placeholder"
+
+    # md settings
+    #  see the associated md method for your chosen model
+    md_configs = "placeholder"
+
     # MD simulation settings
     relax_first = "placeholder"
     ensemble = "placeholder"
@@ -43,27 +55,14 @@ def main():
     ini_struc = StrucTools(os.path.join(curr_dir, "ini_struc.json")).structure
 
     # trajectory and log files
-    save_traj = os.path.join(curr_dir, "chgnet_md.traj")  # need to generalize
-    save_log = os.path.join(curr_dir, "chgnet_md.log")
+    save_traj = os.path.join(curr_dir, "placeholder")
+    save_log = os.path.join(curr_dir, "placeholder")
 
     # running MD simulation
     if not os.path.exists(save_traj):
-        # setup MD with CHGNet
-        md = CHGNetMD(
-            structure=ini_struc,
-            model="0.3.0",
-            relax_first=relax_first,
-            temperature=temperature,
-            pressure=pressure,
-            ensemble=ensemble,
-            thermostat=thermostat,
-            timestep=timestep,
-            taut=taut,
-            trajfile=save_traj,
-            logfile=save_log,
-            loginterval=loginterval,
-            **addn_args,
-        )
+        # Initialize MD object
+        md = "placeholder"
+
         # run MD simulation
         md.run(steps=nsteps)
     else:
@@ -71,7 +70,7 @@ def main():
         remaining_steps = find_remaining_steps(save_log, save_traj, nsteps, timestep)
         if remaining_steps > 0:
             # continue from existing trajectory
-            md = CHGNetMD.continue_from_traj(
+            continue_md = CHGNetMD.continue_from_traj(
                 model="0.3.0",
                 temperature=temperature,
                 pressure=pressure,
@@ -85,7 +84,7 @@ def main():
                 **addn_args,
             )
             # continue MD simulation
-            md.run(steps=remaining_steps)
+            continue_md.run(steps=remaining_steps)
 
     # collect results locally
     amd = AnalyzeMD(logfile=save_log, trajfile=save_traj)
@@ -100,8 +99,8 @@ def main():
     else:
         full_summary = amd.full_summary
         write_json(
-            full_summary, os.path.join(curr_dir, "chgnet_md_results.json")
-        )  # generalize
+            full_summary, os.path.join(curr_dir, "placeholder")
+        )
 
     return
 
