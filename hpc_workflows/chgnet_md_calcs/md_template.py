@@ -2,7 +2,6 @@ import os
 import torch
 from pydmclab.core.struc import StrucTools
 from pydmclab.mlp.analyze import AnalyzeMD
-from pydmclab.mlp.chgnet.dynamics import CHGNetMD
 from pydmclab.utils.handy import write_json
 from pydmclab.mlp import "placeholder"
 

@@ -380,6 +380,10 @@ def make_md_scripts(
     """
 
     architecture, model = get_model(user_configs)
+    calculator_config_keys = {
+        "CHGNet": ["model"],
+        "FairChem": ["name_or_path", "task_name"],
+    }
 
     for launch_dir, settings in launch_dirs.items():
 
@@ -480,11 +484,16 @@ def make_md_scripts(
                 )
 
             elif 'md = "placeholder"' in line:
-                class_call_line = [f"{indent}md = {architecture}MD(\n"]
-                # calculator_config_lines = [
-                #     f"{indent}    {key} = {key},\n"
-                #     for key in user_configs["calculator_configs"].keys()
-                # ]
+                class_call_line = [
+                    f"{indent}md = {architecture}MD(ini_struc,\n"
+                ]  # ini_struc is the name of the variable containing the
+                # initial structure as defined in md_template.py
+                calculator_keys = calculator_config_keys.get(architecture, [])
+                calculator_config_lines = [
+                    f"{indent}    {key} = {key},\n"
+                    for key in calculator_keys
+                    if key in user_configs["calculator_configs"].keys()
+                ]
                 md_config_lines = [
                     f"{indent}    {key} = {key},\n"
                     for key in user_configs["md_configs"].keys()
@@ -492,7 +501,7 @@ def make_md_scripts(
                 end_call_line = [f"{indent})\n"]
                 md_script_lines[i : i + 1] = (
                     class_call_line
-                    # + calculator_config_lines
+                    + calculator_config_lines
                     + md_config_lines
                     + end_call_line
                 )
@@ -501,11 +510,12 @@ def make_md_scripts(
                 class_call_line = [
                     f"{indent}md = {architecture}MD.continue_from_traj(\n"
                 ]
-                # calculator_config_lines = [
-                #     f"{indent}    {key} = {key},\n"
-                #     for key in user_configs["calculator_configs"].keys()
-                #     if key in ("model", "name_or_path", "task_name")
-                # ]
+                calculator_keys = calculator_config_keys.get(architecture, [])
+                calculator_config_lines = [
+                    f"{indent}    {key} = {key},\n"
+                    for key in calculator_keys
+                    if key in user_configs["calculator_configs"].keys()
+                ]
                 md_config_lines = [
                     f"{indent}    {key} = {key},\n"
                     for key in user_configs["md_configs"].keys()
@@ -513,7 +523,7 @@ def make_md_scripts(
                 end_call_line = [f"{indent})\n"]
                 md_script_lines[i : i + 1] = (
                     class_call_line
-                    # + calculator_config_lines
+                    + calculator_config_lines
                     + md_config_lines
                     + end_call_line
                 )
