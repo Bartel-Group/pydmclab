@@ -775,7 +775,7 @@ def lowest_energy_struc_results(
 
     num_of_results_considered = int(
         time_to_consider
-        * results["architecture_configs"]["md_configs"]["nsteps"]
+        * results["architecture_configs"]["md_configs"]["steps"]
         // results["architecture_configs"]["md_configs"]["loginterval"]
     )
     if num_of_results_considered < num_strucs:
