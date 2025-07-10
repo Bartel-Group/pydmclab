@@ -99,7 +99,7 @@ def get_chgnet_configs(
     architecture_configs["md_configs"]["taut"] = taut
     architecture_configs["md_configs"]["timestep"] = timestep
     architecture_configs["md_configs"]["loginterval"] = loginterval
-    architecture_configs["md_configs"]["nsteps"] = nsteps
+    architecture_configs["md_configs"]["steps"] = nsteps
     architecture_configs["md_configs"]["temperatures"] = temperatures
     architecture_configs["md_configs"]["pressure"] = pressure
     architecture_configs["md_configs"]["stress_weight"] = stress_weight
@@ -199,7 +199,7 @@ def get_fairchem_configs(
     architecture_configs["md_configs"]["taut"] = taut
     architecture_configs["md_configs"]["timestep"] = timestep
     architecture_configs["md_configs"]["loginterval"] = loginterval
-    architecture_configs["md_configs"]["nsteps"] = nsteps
+    architecture_configs["md_configs"]["steps"] = nsteps
     architecture_configs["md_configs"]["temperatures"] = temperatures
     architecture_configs["md_configs"]["pressure"] = pressure
     architecture_configs["md_configs"]["stress_weight"] = stress_weight
