@@ -34,18 +34,9 @@ def main():
     # md settings
     #  see the associated md method for your chosen model
     md_configs = "placeholder"
-
-    # MD simulation settings
-    relax_first = "placeholder"
     ensemble = "placeholder"
     thermostat = "placeholder"
-    taut = "placeholder"
-    timestep = "placeholder"
-    loginterval = "placeholder"
-    nsteps = "placeholder"
     temperature = "placeholder"
-    pressure = "placeholder"
-    addn_args = {"placeholder": "placeholder"}
 
     # current directory
     curr_dir = os.getcwd()

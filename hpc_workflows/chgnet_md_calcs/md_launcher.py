@@ -11,8 +11,8 @@ if MD_HELPERS_DIR not in sys.path:
     sys.path.append(MD_HELPERS_DIR)
 
 from md_helpers import (
-    get_chgnet_configs,
-    # get_fairchem_configs,
+    # get_chgnet_configs,
+    get_fairchem_configs,
     get_slurm_configs,
     get_torch_configs,
     make_launch_dirs,
@@ -39,15 +39,17 @@ for d in [CALCS_DIR, DATA_DIR]:
         os.makedirs(d)
 
 # set chgnet molecular dynamics configs
-ARCHITECTURE_CONFIGS = get_chgnet_configs(
-    relax_first=True,
+ARCHITECTURE_CONFIGS = get_fairchem_configs(
+    name_or_path="uma-s-1",
+    task_name="omat",
     ensembles=("nvt",),
-    thermostats=("bi",),
-    taut=None,
-    timestep=1.0,
+    thermostats=("nh",),
+    starting_temperature=300,
+    taut=100,
+    timestep=2.0,
     loginterval=100,
-    nsteps=10000,
-    temperatures=(1000.0,),
+    nsteps=50000,
+    temperatures=(1200.0,),
     pressure=1.01325e-4,
     addn_args={},
 )
@@ -58,7 +60,7 @@ SLURM_CONFIGS = get_slurm_configs(
     cores_per_node=16,
     walltime_in_hours=24,
     mem_per_core_in_MB=1900,
-    partition="agsmall,msismall,msidmc",
+    partition="preempt,msismall,msidmc",
     error_file="log.e",
     output_file="log.o",
     account="cbartel",
@@ -138,6 +140,7 @@ def main():
     if ready_to_launch:
         submit_jobs(
             launch_dirs=launch_dirs,
+            user_configs=USER_CONFIGS,
         )
 
     # collect results

@@ -113,9 +113,9 @@ def get_fairchem_configs(
     task_name: str,
     inference_settings: InferenceSettings | str = "default",
     overrides: dict | None = None,
-    optimizer: ASEOptimizer | str = "FIRE",
     ensembles: str | tuple[str] = "nvt",
     thermostats: str | tuple[str] = "bi",
+    starting_temperature: int | None = None,
     taut: float | None = None,
     timestep: float = 1.0,
     loginterval: int = 10,
@@ -192,10 +192,10 @@ def get_fairchem_configs(
         "inference_settings"
     ] = inference_settings
     architecture_configs["calculator_configs"]["overrides"] = overrides
-    architecture_configs["calculator_configs"]["optimizer"] = optimizer
 
     architecture_configs["md_configs"]["ensembles"] = ensembles
     architecture_configs["md_configs"]["thermostats"] = tuple(thermostat_full_names)
+    architecture_configs["md_configs"]["starting_temperature"] = starting_temperature
     architecture_configs["md_configs"]["taut"] = taut
     architecture_configs["md_configs"]["timestep"] = timestep
     architecture_configs["md_configs"]["loginterval"] = loginterval
@@ -299,9 +299,9 @@ def make_launch_dirs(
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
 
-    ensembles = user_configs["ensembles"]
-    thermostats = user_configs["thermostats"]
-    temperatures = user_configs["temperatures"]
+    ensembles = user_configs["md_configs"]["ensembles"]
+    thermostats = user_configs["md_configs"]["thermostats"]
+    temperatures = user_configs["md_configs"]["temperatures"]
 
     launch_dirs = {}
     for formula in strucs:
@@ -380,10 +380,8 @@ def make_md_scripts(
     """
 
     architecture, model = get_model(user_configs)
-    calculator_config_keys = {
-        "CHGNet": ["model"],
-        "FairChem": ["name_or_path", "task_name"],
-    }
+    md_configs_plural = ["ensembles", "thermostats", "temperatures"]
+    md_configs_singular = ["ensemble", "thermostat", "temperature"]
 
     for launch_dir, settings in launch_dirs.items():
 
@@ -443,11 +441,6 @@ def make_md_scripts(
                     f"{indent}save_traj = os.path.join(curr_dir, '{architecture.lower()}_{model}_md.traj')\n"
                 )
 
-            elif 'relax_first = "placeholder"' in line:
-                md_script_lines[i] = (
-                    f'{indent}relax_first = {user_configs["relax_first"]}\n'
-                )
-
             elif 'ensemble = "placeholder"' in line:
                 md_script_lines[i] = f'{indent}ensemble = "{settings["ensemble"]}"\n'
 
@@ -456,47 +449,24 @@ def make_md_scripts(
                     f'{indent}thermostat = "{settings["thermostat"]}"\n'
                 )
 
-            elif 'taut = "placeholder"' in line:
-                md_script_lines[i] = f'{indent}taut = {user_configs["taut"]}\n'
-
-            elif 'timestep = "placeholder"' in line:
-                md_script_lines[i] = f'{indent}timestep = {user_configs["timestep"]}\n'
-
-            elif 'loginterval = "placeholder"' in line:
-                md_script_lines[i] = (
-                    f'{indent}loginterval = {user_configs["loginterval"]}\n'
-                )
-
-            elif 'nsteps = "placeholder"' in line:
-                md_script_lines[i] = f'{indent}nsteps = {user_configs["nsteps"]}\n'
-
             elif 'temperature = "placeholder"' in line:
                 md_script_lines[i] = (
                     f'{indent}temperature = {settings["temperature"]}\n'
                 )
 
-            elif 'pressure = "placeholder"' in line:
-                md_script_lines[i] = f'{indent}pressure = {user_configs["pressure"]}\n'
-
-            elif 'addn_args = {"placeholder": "placeholder"}' in line:
-                md_script_lines[i] = (
-                    f'{indent}addn_args = {user_configs["addn_args"]}\n'
-                )
-
             elif 'md = "placeholder"' in line:
-                class_call_line = [
-                    f"{indent}md = {architecture}MD(ini_struc,\n"
-                ]  # ini_struc is the name of the variable containing the
-                # initial structure as defined in md_template.py
-                calculator_keys = calculator_config_keys.get(architecture, [])
+                class_call_line = [f"{indent}md = {architecture}MD(ini_struc,\n"]
                 calculator_config_lines = [
                     f"{indent}    {key} = {key},\n"
-                    for key in calculator_keys
-                    if key in user_configs["calculator_configs"].keys()
+                    for key in user_configs["calculator_configs"].keys()
                 ]
-                md_config_lines = [
-                    f"{indent}    {key} = {key},\n"
+                md_configs_keys = [
+                    key
                     for key in user_configs["md_configs"].keys()
+                    if key not in md_configs_plural
+                ].extend(md_configs_singular)
+                md_config_lines = [
+                    f"{indent}    {key} = {key},\n" for key in md_configs_keys
                 ]
                 end_call_line = [f"{indent})\n"]
                 md_script_lines[i : i + 1] = (
@@ -510,15 +480,17 @@ def make_md_scripts(
                 class_call_line = [
                     f"{indent}md = {architecture}MD.continue_from_traj(\n"
                 ]
-                calculator_keys = calculator_config_keys.get(architecture, [])
                 calculator_config_lines = [
                     f"{indent}    {key} = {key},\n"
-                    for key in calculator_keys
-                    if key in user_configs["calculator_configs"].keys()
+                    for key in user_configs["calculator_configs"].keys()
                 ]
-                md_config_lines = [
-                    f"{indent}    {key} = {key},\n"
+                md_configs_keys = [
+                    key
                     for key in user_configs["md_configs"].keys()
+                    if key not in md_configs_plural
+                ].extend(md_configs_singular)
+                md_config_lines = [
+                    f"{indent}    {key} = {key},\n" for key in md_configs_keys
                 ]
                 end_call_line = [f"{indent})\n"]
                 md_script_lines[i : i + 1] = (
@@ -770,6 +742,9 @@ def check_collected_results(results: dict, launch_dirs: dict) -> None:
         for struc_id in results["md_results"][formula]
         for ensemble in results["md_results"][formula][struc_id]
         for thermostat in results["md_results"][formula][struc_id][thermostat]
+        for temperature in results["md_results"][formula][struc_id][thermostat][
+            temperature
+        ]
     )
     print(
         f"\nCollected results for {results_collected} / {results_possible} MD simulations"
