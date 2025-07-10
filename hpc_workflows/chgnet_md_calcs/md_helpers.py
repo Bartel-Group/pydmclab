@@ -382,7 +382,7 @@ def make_md_scripts(
         "thermostats",
         "temperatures",
         "steps",
-        "add_args",
+        "addn_args",
     ]
     md_configs_singular = ["ensemble", "thermostat", "temperature"]
 
