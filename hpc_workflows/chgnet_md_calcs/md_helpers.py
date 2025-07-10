@@ -122,7 +122,6 @@ def get_fairchem_configs(
     nsteps: int = 10000,
     temperatures: float | tuple[float] = 300.0,
     pressure: float = 1.01325e-4,
-    stress_weight: float | None = 1 / 160.21766208,
     addn_args: dict | None = None,
 ) -> dict:
     """
@@ -142,7 +141,6 @@ def get_fairchem_configs(
         nsteps (int): number of steps
         temperatures (float | list[float]): temperature(s) in K
         pressure (float): pressure in GPa
-        stress_weight (float | None): stress weight
         addn_args (dict): additional arguments (kwargs to pass to say the pre-relaxer)
 
     Returns:
@@ -202,7 +200,6 @@ def get_fairchem_configs(
     architecture_configs["md_configs"]["steps"] = nsteps
     architecture_configs["md_configs"]["temperatures"] = temperatures
     architecture_configs["md_configs"]["pressure"] = pressure
-    architecture_configs["md_configs"]["stress_weight"] = stress_weight
     architecture_configs["md_configs"]["addn_args"] = addn_args
 
     return architecture_configs
