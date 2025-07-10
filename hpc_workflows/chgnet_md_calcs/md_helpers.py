@@ -464,7 +464,7 @@ def make_md_scripts(
                     key
                     for key in user_configs["md_configs"].keys()
                     if key not in md_configs_plural
-                ].extend(md_configs_singular)
+                ] + md_configs_singular
                 md_config_lines = [
                     f"{indent}    {key} = {key},\n" for key in md_configs_keys
                 ]
@@ -488,7 +488,7 @@ def make_md_scripts(
                     key
                     for key in user_configs["md_configs"].keys()
                     if key not in md_configs_plural
-                ].extend(md_configs_singular)
+                ] + md_configs_singular
                 md_config_lines = [
                     f"{indent}    {key} = {key},\n" for key in md_configs_keys
                 ]
