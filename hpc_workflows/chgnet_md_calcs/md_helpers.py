@@ -431,14 +431,14 @@ def make_md_scripts(
                 ]
                 md_script_lines[i : i + 1] = config_lines
 
-            elif 'save_log = os.path.join(curr_dir, "placeholder")' in line:
+            elif 'logfile = os.path.join(curr_dir, "placeholder")' in line:
                 md_script_lines[i] = (
-                    f"{indent}save_log = os.path.join(curr_dir, '{architecture.lower()}_{model}_md.log')\n"
+                    f"{indent}logfile = os.path.join(curr_dir, '{architecture.lower()}_{model}_md.log')\n"
                 )
 
-            elif 'save_traj = os.path.join(curr_dir, "placeholder")' in line:
+            elif 'trajfile = os.path.join(curr_dir, "placeholder")' in line:
                 md_script_lines[i] = (
-                    f"{indent}save_traj = os.path.join(curr_dir, '{architecture.lower()}_{model}_md.traj')\n"
+                    f"{indent}trajfile = os.path.join(curr_dir, '{architecture.lower()}_{model}_md.traj')\n"
                 )
 
             elif 'ensemble = "placeholder"' in line:
