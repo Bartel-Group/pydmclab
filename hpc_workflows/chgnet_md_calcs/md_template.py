@@ -54,10 +54,10 @@ def main():
         md = "placeholder"
 
         # run MD simulation
-        md.run(steps=nsteps)
+        md.run(steps=steps)
     else:
         # find steps remaining
-        remaining_steps = find_remaining_steps(logfile, trajfile, nsteps, timestep)
+        remaining_steps = find_remaining_steps(logfile, trajfile, steps, timestep)
         if remaining_steps > 0:
             # continue from existing trajectory
             continue_md = "placeholder"
