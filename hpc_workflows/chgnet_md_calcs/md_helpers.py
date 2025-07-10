@@ -315,7 +315,7 @@ def make_launch_dirs(
                             struc_id,
                             ensemble,
                             thermostat,
-                            temperature,
+                            str(temperature),
                         )
                         # make launch directory if it doesn't exist
                         if not os.path.exists(launch_dir):
