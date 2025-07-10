@@ -377,7 +377,13 @@ def make_md_scripts(
     """
 
     architecture, model = get_model(user_configs)
-    md_configs_plural = ["ensembles", "thermostats", "temperatures", "steps"]
+    md_configs_plural = [
+        "ensembles",
+        "thermostats",
+        "temperatures",
+        "steps",
+        "add_args",
+    ]
     md_configs_singular = ["ensemble", "thermostat", "temperature"]
 
     for launch_dir, settings in launch_dirs.items():
