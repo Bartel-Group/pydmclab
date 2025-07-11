@@ -122,6 +122,8 @@ def get_fairchem_configs(
     nsteps: int = 10000,
     temperatures: float | tuple[float] = 300.0,
     pressure: float = 1.01325e-4,
+    logfile: str = "md.log",
+    trajfile: str = "md.traj",
     addn_args: dict | None = None,
 ) -> dict:
     """
@@ -142,6 +144,8 @@ def get_fairchem_configs(
         nsteps (int): number of steps
         temperatures (float | tuple[float]): temperature(s) in K
         pressure (float): pressure in GPa
+        logfile (str): .log file if it exists
+        trajfile (str): .traj file if it exists
         addn_args (dict): additional arguments (kwargs to pass to say the pre-relaxer)
 
     Returns:
@@ -201,6 +205,8 @@ def get_fairchem_configs(
     architecture_configs["md_configs"]["steps"] = nsteps
     architecture_configs["md_configs"]["temperatures"] = temperatures
     architecture_configs["md_configs"]["pressure"] = pressure
+    architecture_configs["md_configs"]["logfile"] = logfile
+    architecture_configs["md_configs"]["trajfile"] = trajfile
     architecture_configs["md_configs"]["addn_args"] = addn_args
 
     return architecture_configs
