@@ -38,6 +38,7 @@ def main():
     thermostat = "placeholder"
     starting_temperature = "placeholder"
     temperature = "placeholder"
+    steps = "placeholder"
 
     # current directory
     curr_dir = os.getcwd()
@@ -61,10 +62,10 @@ def main():
         remaining_steps = find_remaining_steps(logfile, trajfile, steps, timestep)
         if remaining_steps > 0:
             # continue from existing trajectory
-            continue_md = "placeholder"
+            md_continue = "placeholder"
 
             # continue MD simulation
-            continue_md.run(steps=remaining_steps)
+            md_continue.run(steps=remaining_steps)
 
     # collect results locally
     amd = AnalyzeMD(logfile=logfile, trajfile=trajfile)

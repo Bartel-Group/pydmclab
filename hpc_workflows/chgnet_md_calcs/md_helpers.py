@@ -475,6 +475,11 @@ def make_md_scripts(
                     f'{indent}temperature = {settings["temperature"]}\n'
                 )
 
+            elif 'steps = "placeholder"' in line:
+                md_script_lines[i] = (
+                    f'{indent}steps = {user_configs["md_configs"]["steps"]}\n'
+                )
+
             elif 'md = "placeholder"' in line:
                 class_call_line = [f"{indent}md = {architecture}MD(ini_struc,\n"]
                 calculator_config_lines = [
@@ -497,9 +502,9 @@ def make_md_scripts(
                     + end_call_line
                 )
 
-            elif 'continue_md = "placeholder"' in line:
+            elif 'md_continue = "placeholder"' in line:
                 class_call_line = [
-                    f"{indent}continue_md = {architecture}MD.continue_from_traj(\n"
+                    f"{indent}md_continue = {architecture}MD.continue_from_traj(\n"
                 ]
                 calculator_config_lines = [
                     f"{indent}    {key} = {key},\n"
