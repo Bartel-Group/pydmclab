@@ -448,16 +448,6 @@ def make_md_scripts(
                 ]
                 md_script_lines[i : i + 1] = config_lines
 
-            elif 'logfile = os.path.join(curr_dir, "placeholder")' in line:
-                md_script_lines[i] = (
-                    f"{indent}logfile = os.path.join(curr_dir, '{architecture.lower()}_{model}_md.log')\n"
-                )
-
-            elif 'trajfile = os.path.join(curr_dir, "placeholder")' in line:
-                md_script_lines[i] = (
-                    f"{indent}trajfile = os.path.join(curr_dir, '{architecture.lower()}_{model}_md.traj')\n"
-                )
-
             elif 'ensemble = "placeholder"' in line:
                 md_script_lines[i] = f'{indent}ensemble = "{settings["ensemble"]}"\n'
 

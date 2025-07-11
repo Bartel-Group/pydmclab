@@ -46,10 +46,6 @@ def main():
     # initial struc
     ini_struc = StrucTools(os.path.join(curr_dir, "ini_struc.json")).structure
 
-    # trajectory and log files
-    trajfile = os.path.join(curr_dir, "placeholder")
-    logfile = os.path.join(curr_dir, "placeholder")
-
     # running MD simulation
     if not os.path.exists(trajfile):
         # Initialize MD object
