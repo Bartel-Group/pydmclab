@@ -248,7 +248,6 @@ class AnalyzePhonons(object):
             if not hasattr(self, '_band_structure') or self._band_structure_cache_key != cache_key:
                 print("Calculating band structure...")
                 
-                # Method 1: Use the same interpolation approach as hiPhive example
                 interpolated_paths = []
                 for path in paths:
                     start_point = np.array(path[0])
