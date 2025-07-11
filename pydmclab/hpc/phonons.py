@@ -191,31 +191,81 @@ class AnalyzePhonons(object):
         
         return self._thermal_properties
 
-    def band_structure(
-        self,
-        paths: list =[
-            [[0.0, 0.0, 0.0], [0.5, 0.0, 0.0]],  # Γ to X
-            [[0.5, 0.0, 0.0], [0.5, 0.5, 0.5]],  # X to L
-            [[0.5, 0.5, 0.5], [0.0, 0.0, 0.0]],  # L to Γ
-            [[0.5, 0.0, 0.0], [0.5, 0.25, 0.75]],  # X to W
-        ],
-    ):
-        """
-        Returns the band structure for the phonon object in a dictionary
-        Args:
-            paths (list):
-                List of paths in reciprocal space. e.g. [[[0.0, 0.0, 0.0], [0.5, 0.0, 0.0]], [[0.5, 0.0, 0.0], [0.5, 0.5, 0.5]], ...]
+    # def band_structure(
+    #     self,
+    #     paths: list =[
+    #         [[0.0, 0.0, 0.0], [0.5, 0.0, 0.0]],  # Γ to X
+    #         [[0.5, 0.0, 0.0], [0.5, 0.5, 0.5]],  # X to L
+    #         [[0.5, 0.5, 0.5], [0.0, 0.0, 0.0]],  # L to Γ
+    #         [[0.5, 0.0, 0.0], [0.5, 0.25, 0.75]],  # X to W
+    #     ],
+    # ):
+    #     """
+    #     Returns the band structure for the phonon object in a dictionary
+    #     Args:
+    #         paths (list):
+    #             List of paths in reciprocal space. e.g. [[[0.0, 0.0, 0.0], [0.5, 0.0, 0.0]], [[0.5, 0.0, 0.0], [0.5, 0.5, 0.5]], ...]
 
-        Returns:
-            {'qpoints': arrays of q points, 'distances': arrays of distances, 'frequencies': arrays of frequencies, 'eigenvectors': arrays of eigenvectors, group_velocities': arrays of group velocities}
-        """
-        if not hasattr(self, '_band_structure') or self._band_structure_paths != paths:
-            print("Calculating band structure...")
-            _ = self.phonon.run_band_structure(paths)
-            self._band_structure = self.phonon.get_band_structure_dict()
-            self._band_structure_paths = paths  
+    #     Returns:
+    #         {'qpoints': arrays of q points, 'distances': arrays of distances, 'frequencies': arrays of frequencies, 'eigenvectors': arrays of eigenvectors, group_velocities': arrays of group velocities}
+    #     """
+    #     if not hasattr(self, '_band_structure') or self._band_structure_paths != paths:
+    #         print("Calculating band structure...")
+    #         _ = self.phonon.run_band_structure(paths)
+    #         self._band_structure = self.phonon.get_band_structure_dict()
+    #         self._band_structure_paths = paths  
         
-        return self._band_structure
+    #     return self._band_structure
+
+    def band_structure(
+            self,
+            paths: list = [
+                [[0.0, 0.0, 0.0], [0.5, 0.0, 0.0]],  # Γ to X
+                [[0.5, 0.0, 0.0], [0.5, 0.5, 0.5]],  # X to L
+                [[0.5, 0.5, 0.5], [0.0, 0.0, 0.0]],  # L to Γ
+                [[0.5, 0.0, 0.0], [0.5, 0.25, 0.75]],  # X to W
+            ],
+            npoints: int = 51,  # Number of interpolation points per path segment
+        ):
+            """
+            Returns the band structure for the phonon object in a dictionary with interpolated paths
+            
+            Args:
+                paths (list):
+                            List of paths in reciprocal space. Each path is defined by start and end points at high symmetry points. 
+                                e.g. [[[0.0, 0.0, 0.0], [0.5, 0.0, 0.0]], [[0.5, 0.0, 0.0], [0.5, 0.5, 0.5]], ...]
+                npoints (int): 
+                            Number of points to interpolate along each path segment
+                
+            Returns:
+                dict: {'qpoints': arrays of q points, 'distances': arrays of distances, 
+                    'frequencies': arrays of frequencies, 'eigenvectors': arrays of eigenvectors, 
+                    'group_velocities': arrays of group velocities}
+            """
+            # Create a cache key that includes both paths and npoints
+            cache_key = (tuple(tuple(tuple(point) for point in path) for path in paths), npoints)
+            
+            if not hasattr(self, '_band_structure') or self._band_structure_cache_key != cache_key:
+                print("Calculating band structure...")
+                
+                # Method 1: Use the same interpolation approach as hiPhive example
+                interpolated_paths = []
+                for path in paths:
+                    start_point = np.array(path[0])
+                    end_point = np.array(path[1])
+                    # Linear interpolation between start and end points
+                    interpolated_path = np.array([
+                        start_point + (end_point - start_point) * i / (npoints - 1) 
+                        for i in range(npoints)
+                    ])
+                    interpolated_paths.append(interpolated_path)
+                
+                # Run band structure calculation with interpolated paths
+                _ = self.phonon.run_band_structure(interpolated_paths)
+                self._band_structure = self.phonon.get_band_structure_dict()
+                self._band_structure_cache_key = cache_key
+                
+            return self._band_structure
 
     @property
     def total_dos(self):
