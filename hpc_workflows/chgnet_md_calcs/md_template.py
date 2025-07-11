@@ -36,6 +36,7 @@ def main():
     md_configs = "placeholder"
     ensemble = "placeholder"
     thermostat = "placeholder"
+    starting_temperature = "placeholder"
     temperature = "placeholder"
 
     # current directory

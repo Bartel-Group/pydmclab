@@ -115,7 +115,7 @@ def get_fairchem_configs(
     overrides: dict | None = None,
     ensembles: str | tuple[str] = "nvt",
     thermostats: str | tuple[str] = "bi",
-    starting_temperature: int | None = None,
+    starting_temperature: float | None = 300.0,
     taut: float | None = None,
     timestep: float = 1.0,
     loginterval: int = 10,
@@ -135,11 +135,12 @@ def get_fairchem_configs(
         optimizer: default is "FIRE", see pydmclab.mlp.dynamics for more options
         ensembles (str | tuple): 'nvt', 'npt', or 'nve'
         thermostats (str | tuple): 'nh' for Nose-Hoover, 'b' for Berendsen, or 'bi' for Berendsen_inhomogeneous
+        starting_temperature (float | None): starting temperature in K. if None, defaults to temperature of the simulation
         taut (float): time constant for temperature coupling in fs
         timestep (float): timestep in fs
         loginterval (int): interval for logging in steps
         nsteps (int): number of steps
-        temperatures (float | list[float]): temperature(s) in K
+        temperatures (float | tuple[float]): temperature(s) in K
         pressure (float): pressure in GPa
         addn_args (dict): additional arguments (kwargs to pass to say the pre-relaxer)
 
@@ -377,14 +378,20 @@ def make_md_scripts(
     """
 
     architecture, model = get_model(user_configs)
-    md_configs_plural = [
+    md_configs_leave_out = [
         "ensembles",
         "thermostats",
+        "starting_temperature",
         "temperatures",
         "steps",
         "addn_args",
     ]
-    md_configs_singular = ["ensemble", "thermostat", "temperature"]
+    md_configs_add_in = [
+        "ensemble",
+        "thermostat",
+        "starting_temperature",
+        "temperature",
+    ]
 
     for launch_dir, settings in launch_dirs.items():
 
@@ -431,6 +438,7 @@ def make_md_scripts(
                 config_lines = [
                     f"{indent}{key} = {repr(value)}\n"
                     for key, value in user_configs["md_configs"].items()
+                    if key not in md_configs_leave_out
                 ]
                 md_script_lines[i : i + 1] = config_lines
 
@@ -452,6 +460,16 @@ def make_md_scripts(
                     f'{indent}thermostat = "{settings["thermostat"]}"\n'
                 )
 
+            elif 'starting_temperature = "placeholder"' in line:
+                if user_configs["md_configs"]["starting_temperature"] is None:
+                    md_script_lines[i] = (
+                        f'{indent}starting_temperature = {settings["temperature"]}\n'
+                    )
+                else:
+                    md_script_lines[i] = (
+                        f'{indent}starting_temperature = {user_configs["md_configs"]["starting_temperature"]}\n'
+                    )
+
             elif 'temperature = "placeholder"' in line:
                 md_script_lines[i] = (
                     f'{indent}temperature = {settings["temperature"]}\n'
@@ -466,8 +484,8 @@ def make_md_scripts(
                 md_configs_keys = [
                     key
                     for key in user_configs["md_configs"].keys()
-                    if key not in md_configs_plural
-                ] + md_configs_singular
+                    if key not in md_configs_leave_out
+                ] + md_configs_add_in
                 md_config_lines = [
                     f"{indent}    {key} = {key},\n" for key in md_configs_keys
                 ]
@@ -481,7 +499,7 @@ def make_md_scripts(
 
             elif 'continue_md = "placeholder"' in line:
                 class_call_line = [
-                    f"{indent}md = {architecture}MD.continue_from_traj(\n"
+                    f"{indent}continue_md = {architecture}MD.continue_from_traj(\n"
                 ]
                 calculator_config_lines = [
                     f"{indent}    {key} = {key},\n"
@@ -490,8 +508,8 @@ def make_md_scripts(
                 md_configs_keys = [
                     key
                     for key in user_configs["md_configs"].keys()
-                    if key not in md_configs_plural
-                ] + md_configs_singular
+                    if key not in md_configs_leave_out
+                ] + md_configs_add_in
                 md_config_lines = [
                     f"{indent}    {key} = {key},\n" for key in md_configs_keys
                 ]
