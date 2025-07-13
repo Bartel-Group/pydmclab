@@ -128,7 +128,9 @@ def get_fairchem_configs(
     return architecture_configs
 
 
-def get_launch_configs(batch_size: int = 100, save_interval: int = 5):
+def get_launch_configs(
+    batch_size: int = 100, batch_id: int = 0, save_interval: int = 5
+):
     """
     Args:
         batch_size (int): the number of structures to relax per job
@@ -151,6 +153,7 @@ def get_launch_configs(batch_size: int = 100, save_interval: int = 5):
     launch_configs = {}
 
     launch_configs["batch_size"] = batch_size
+    launch_configs["batch_id"] = batch_id
     launch_configs["save_interval"] = save_interval
 
     return launch_configs
@@ -229,7 +232,11 @@ def get_torch_configs(
     return torch_configs
 
 
-def batch_strucs(strucs: dict, batch_size: int) -> dict:
+def batch_strucs(
+    strucs: dict,
+    batch_size: int,
+    batch_id: int,
+) -> dict:
     """
     Args:
         strucs (dict): {formula: {struc_id: {Structure.as_dict()}}}
@@ -239,7 +246,7 @@ def batch_strucs(strucs: dict, batch_size: int) -> dict:
         batched_strucs (dict): {batch_id: {formula_struc_id: {Structure.as_dict()}}}
     """
 
-    batch_id = 0
+    batch_id = batch_id
     batched_strucs = {}
     current_batch = {}
 
@@ -312,7 +319,11 @@ def setup_job(
         return read_json(fjson)
 
     # batch the input structures
-    batched_strucs = batch_strucs(strucs=strucs, batch_size=user_configs["batch_size"])
+    batched_strucs = batch_strucs(
+        strucs=strucs,
+        batch_size=user_configs["batch_size"],
+        batch_id=user_configs["batch_id"],
+    )
 
     # run directory setup
     batching = make_launch_dirs(batched_strucs=batched_strucs, calcs_dir=calcs_dir)
