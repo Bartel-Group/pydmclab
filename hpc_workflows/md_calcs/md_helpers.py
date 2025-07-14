@@ -20,12 +20,15 @@ def get_chgnet_configs(
     relax_first: bool = True,
     ensembles: str | tuple[str] = "nvt",
     thermostats: str | tuple[str] = "bi",
+    starting_temperature: float | None = None,
     taut: float | None = None,
     timestep: float = 1.0,
     loginterval: int = 10,
     nsteps: int = 10000,
     temperatures: float | tuple[float] = 300.0,
     pressure: float = 1.01325e-4,
+    logfile: str = "md.log",
+    trajfile: str = "md.traj",
     addn_args: dict | None = None,
 ) -> dict:
     """
@@ -39,12 +42,15 @@ def get_chgnet_configs(
         relax_first (bool): if True, relax structures before MD
         ensembles (str | tuple): 'nvt', 'npt', or 'nve'
         thermostats (str | tuple): 'nh' for Nose-Hoover, 'b' for Berendsen, or 'bi' for Berendsen_inhomogeneous
+        starting_temperature (float | None): starting temperature in K. if None, defaults to temperature of the simulation
         taut (float): time constant for temperature coupling in fs
         timestep (float): timestep in fs
         loginterval (int): interval for logging in steps
         nsteps (int): number of steps
         temperatures (float | list[float]): temperature(s) in K
         pressure (float): pressure in GPa
+        logfile (str): .log file if it exists
+        trajfile (str): .traj file if it exists
         addn_args (dict): additional arguments (kwargs to pass to say the pre-relaxer)
 
     Returns:
@@ -96,13 +102,15 @@ def get_chgnet_configs(
     architecture_configs["md_configs"]["relax_first"] = relax_first
     architecture_configs["md_configs"]["ensembles"] = ensembles
     architecture_configs["md_configs"]["thermostats"] = tuple(thermostat_full_names)
+    architecture_configs["md_configs"]["starting_temperature"] = starting_temperature
     architecture_configs["md_configs"]["taut"] = taut
     architecture_configs["md_configs"]["timestep"] = timestep
     architecture_configs["md_configs"]["loginterval"] = loginterval
     architecture_configs["md_configs"]["steps"] = nsteps
     architecture_configs["md_configs"]["temperatures"] = temperatures
     architecture_configs["md_configs"]["pressure"] = pressure
-    architecture_configs["md_configs"]["stress_weight"] = stress_weight
+    architecture_configs["md_configs"]["logfile"] = logfile
+    architecture_configs["md_configs"]["trajfile"] = trajfile
     architecture_configs["md_configs"]["addn_args"] = addn_args
 
     return architecture_configs
@@ -115,7 +123,7 @@ def get_fairchem_configs(
     overrides: dict | None = None,
     ensembles: str | tuple[str] = "nvt",
     thermostats: str | tuple[str] = "bi",
-    starting_temperature: float | None = 300.0,
+    starting_temperature: float | None = None,
     taut: float | None = None,
     timestep: float = 1.0,
     loginterval: int = 10,

@@ -44,7 +44,7 @@ ARCHITECTURE_CONFIGS = get_fairchem_configs(
     task_name="omat",
     ensembles=("nvt",),
     thermostats=("nh",),
-    starting_temperature=300,
+    starting_temperature=None,
     taut=100,
     timestep=2.0,
     loginterval=100,
@@ -57,7 +57,7 @@ ARCHITECTURE_CONFIGS = get_fairchem_configs(
 # set slurm submission script configs
 SLURM_CONFIGS = get_slurm_configs(
     total_nodes=1,
-    cores_per_node=16,
+    cores_per_node=8,
     walltime_in_hours=24,
     mem_per_core_in_MB=3900,
     partition="preempt,msismall,msidmc",
@@ -68,7 +68,7 @@ SLURM_CONFIGS = get_slurm_configs(
 
 # set torch configs
 TORCH_CONFIGS = get_torch_configs(
-    slurm_configs=SLURM_CONFIGS, num_intraop_threads=4, num_interop_threads=4
+    slurm_configs=SLURM_CONFIGS, num_intraop_threads=8, num_interop_threads=8
 )
 
 # collect all user configs
