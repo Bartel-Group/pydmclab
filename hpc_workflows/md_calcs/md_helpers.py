@@ -565,8 +565,8 @@ def make_submission_scripts(
         if os.path.exists(md_launcher) and not remake:
             continue
 
-        formula = launch_dir.split("/")[-4]
-        struc_id = launch_dir.split("/")[-3]
+        formula = launch_dir.split("/")[-5]
+        struc_id = launch_dir.split("/")[-4]
         job_name = f'{architecture.lower()}_{model}_md_{formula}_{struc_id}_{settings["ensemble"]}_{settings["thermostat"]}_{settings["temperature"]}'
 
         with open(md_launcher, "w", encoding="utf-8") as f:
