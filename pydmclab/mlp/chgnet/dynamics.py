@@ -307,7 +307,15 @@ class CHGNetRelaxer:
         batch_size: int = 16,
     ) -> dict[str, Tensor] | list[dict[str, Tensor]]:
         """Predict the properties of a structure or list of structures."""
-        return self.model.predict_structure(
+
+        key_mapping = {
+            "e": "energy",
+            "f": "forces",
+            "s": "stresses",
+            "m": "magmoms",
+        }
+
+        results_dict = self.model.predict_structure(
             structure,
             task=task,
             return_site_energies=return_site_energies,
@@ -315,6 +323,12 @@ class CHGNetRelaxer:
             return_crystal_feas=return_crystal_feas,
             batch_size=batch_size,
         )
+
+        reformatted_results = {
+            key_mapping.get(key, key): value for key, value in results_dict.items()
+        }
+
+        return reformatted_results
 
     def relax(
         self,
