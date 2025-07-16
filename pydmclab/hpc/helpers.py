@@ -215,6 +215,7 @@ def get_sub_configs(
     vasp_version=6,
     lobster_version=4,
     struc_src_for_hse="metagga-relax",
+    xc_calc_src_for_lobster=None,
 ):
     """
     configs related to generating submission scripts
@@ -288,6 +289,7 @@ def get_sub_configs(
     sub_configs["vasp_version"] = vasp_version
     sub_configs["lobster_version"] = lobster_version
     sub_configs["struc_src_for_hse"] = struc_src_for_hse
+    sub_configs["xc_calc_src_for_lobster"] = xc_calc_src_for_lobster
 
     if prioritize_relaxes:
         sub_configs["run_static_addons_before_all_relaxes"] = False

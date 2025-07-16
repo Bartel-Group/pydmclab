@@ -1,6 +1,7 @@
 import os
 from pydmclab.core.struc import StrucTools
-from pydmclab.mlp.fairchem.dynamics import FAIRChemMD, AnalyzeMD
+from pydmclab.mlp.fairchem.dynamics import FAIRChemMD
+from pydmclab.mlp.analyze import AnalyzeMD
 
 
 DATA_DIR = os.path.join("output", "mlp-md")

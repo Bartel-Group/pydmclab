@@ -1,7 +1,8 @@
 import os
 import shutil
 from pydmclab.core.struc import StrucTools
-from pydmclab.mlp.chgnet.dynamics import CHGNetMD, AnalyzeMD
+from pydmclab.mlp.chgnet.dynamics import CHGNetMD
+from pydmclab.mlp.analyze import AnalyzeMD
 
 DATA_DIR = os.path.join("output", "mlp-continue-md")
 if not os.path.exists(DATA_DIR):

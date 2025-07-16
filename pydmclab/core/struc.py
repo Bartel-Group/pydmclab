@@ -235,6 +235,7 @@ class StrucTools(object):
         algo: Literal[0, 1, 2] = 0,
         decorate: bool = True,
         n_strucs: int = 1,
+        scaling_factor: int = 1000,
         verbose: bool = True,
     ) -> dict[int, dict]:
         """
@@ -252,6 +253,10 @@ class StrucTools(object):
             n_strucs (int)
                 number of ordered structures to return
 
+            scaling_factor (int)
+                (n_strucs x scaling_factor) structures are initially generated
+                to ensure sufficient sampling of ordered strucs
+
         Returns:
             dict of ordered structures
             {index : structure (Structure.as_dict())}
@@ -268,7 +273,7 @@ class StrucTools(object):
             structure = self.structure
 
         # only return one structure if n_strucs = 1
-        return_ranked_list = n_strucs * 1000 if n_strucs > 1 else False
+        return_ranked_list = n_strucs * scaling_factor if n_strucs > 1 else False
 
         # generate ordered structure
         if verbose:
