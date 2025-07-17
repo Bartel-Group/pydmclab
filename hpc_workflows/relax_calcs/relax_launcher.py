@@ -67,7 +67,8 @@ LAUNCH_CONFIGS = get_launch_configs(batch_size=100, batch_id=0, save_interval=10
 # set slurm submission script configs
 SLURM_CONFIGS = get_slurm_configs(
     total_nodes=1,
-    cores_per_node=8,
+    tasks_per_node=1,
+    cores_per_task=8,
     walltime_in_hours=12,
     mem_per_core_in_MB=3900,
     partition="preempt,msismall,msidmc",
