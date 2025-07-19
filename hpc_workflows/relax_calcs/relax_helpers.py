@@ -218,12 +218,14 @@ def get_torch_configs(
 
     if (
         isinstance(num_intraop_threads, int)
-        and num_intraop_threads > slurm_configs["ntasks"]
+        and num_intraop_threads
+        > slurm_configs["ntasks"] * slurm_configs["cores_per_task"]
     ):
         raise ValueError("num_intraop_threads must be less than or equal to ntasks")
     if (
         isinstance(num_interop_threads, int)
-        and num_interop_threads > slurm_configs["ntasks"]
+        and num_interop_threads
+        > slurm_configs["ntasks"] * slurm_configs["cores_per_task"]
     ):
         raise ValueError("num_interop_threads must be less than or equal to ntasks")
 
