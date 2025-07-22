@@ -5,7 +5,7 @@ from pydmclab.utils.handy import read_json
 from pydmclab.hpc.helpers import check_strucs, check_launch_dirs
 
 HOME_PATH = os.environ["HOME"]
-MD_HELPERS_DIR = "%s/bin/pydmclab/hpc_workflows/chgnet_md_calcs" % HOME_PATH
+MD_HELPERS_DIR = "%s/bin/pydmclab/hpc_workflows/md_calcs" % HOME_PATH
 
 if MD_HELPERS_DIR not in sys.path:
     sys.path.append(MD_HELPERS_DIR)
@@ -44,7 +44,7 @@ ARCHITECTURE_CONFIGS = get_fairchem_configs(
     task_name="omat",
     ensembles=("nvt",),
     thermostats=("nh",),
-    starting_temperature=1200.0,
+    starting_temperature=None,
     taut=100,
     timestep=2.0,
     loginterval=100,
