@@ -76,7 +76,7 @@ TORCH_CONFIGS = get_torch_configs(
 USER_CONFIGS = {**ARCHITECTURE_CONFIGS, **SLURM_CONFIGS, **TORCH_CONFIGS}
 
 # location of md_template.py
-MD_TEMPLATE = "%s/bin/pydmclab/hpc_workflows/chgnet_md_calcs/md_template.py" % HOME_PATH
+MD_TEMPLATE = "%s/bin/pydmclab/hpc_workflows/md_calcs/md_template.py" % HOME_PATH
 
 
 def main():
