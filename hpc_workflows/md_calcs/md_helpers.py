@@ -782,10 +782,7 @@ def check_collected_results(results: dict, launch_dirs: dict) -> None:
         for formula in results["md_results"]
         for struc_id in results["md_results"][formula]
         for ensemble in results["md_results"][formula][struc_id]
-        for thermostat in results["md_results"][formula][struc_id][thermostat]
-        for temperature in results["md_results"][formula][struc_id][thermostat][
-            temperature
-        ]
+        for thermostat in results["md_results"][formula][struc_id][ensemble]
     )
     print(
         f"\nCollected results for {results_collected} / {results_possible} MD simulations"
