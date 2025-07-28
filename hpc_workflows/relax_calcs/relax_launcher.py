@@ -79,7 +79,7 @@ SLURM_CONFIGS = get_slurm_configs(
 
 # set torch configs
 TORCH_CONFIGS = get_torch_configs(
-    slurm_configs=SLURM_CONFIGS, num_intraop_threads=8, num_interop_threads=8
+    slurm_configs=SLURM_CONFIGS, num_intraop_threads=None, num_interop_threads=None
 )
 
 # collect all user configs
