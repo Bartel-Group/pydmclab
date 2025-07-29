@@ -59,18 +59,100 @@ pip install .
 
 ### Machine Learning Potentials
 
+- **[`fairchem`](pydmclab/mlp/fairchem/)**: UMA (Universal Models for Atoms) neutral network potential integration
+  - **[`dynamics`](pydmclab/mlp/fairchem/dynamics.py)**: Molecular dynamics simulations, structure relaxation, energy/force predictions
+  - **[`utils.py`](pydmclab/mlp/fairchem/utils.py)**: Helper functions for error handling
+  - Consider citing
+    ```bibtex
+    @misc{wood_2025_uma,
+        title={UMA: A Family of Universal Models for Atoms},
+        DOI={10.48550/arXiv.2506.23971},
+        author={Wood, Brandon M. and Dzamba, Misko and Fu, Xiang and Gao, Meng and Shuaibi, Muhammed and Barroso-Luque, Luis and Abdelmaqsoud, Kareem and Gharakhanyan, Vahe and Kitchin, John R. and Levine, Daniel S. and Michel, Kyle and Sriram, Anuroop and Cohen, Taco and Das, Abhishek and Rizvi, Ammar and Sahoo, Sushree Jagriti and Ulissi, Zachary W. and Zitnick, C. Lawrence},
+        year={2025},
+        eprint={2506.23971},
+        archiveprefix={arXiv}
+    }
+    ```
+
 - **[`mace`](pydmclab/mlp/mace)**: MACE (Many-body Atomistic Conformal Embedding) neural network potential integration
   - **[`dynamics.py`](pydmclab/mlp/mace/dynamics.py)**: Structure relaxation, energy/force predictions, committee models for uncertainty quantification (untested), stress tensor calculation, and dispersion corrections
   - **[`utils.py`](pydmclab/mlp/mace/utils.py)**: Helper functions for model type determination and data conversion
   - Supports multiple optimization algorithms (FIRE, BFGS, LBFGS)
   - Provides access to pretrained models via `MACELoader` with various model sizes
+  - Consider citing
+    ```bibtex
+    @inproceedings{batatia_2022_mace,
+        title={MACE: Higher Order Equivariant Message Passing Neural Networks for Fast and Accurate Force Fields},
+        booktitle={Advances in Neural Information Processing Systems},
+        author={Batatia, Ilyes and Kovacs, David Peter and Simm, Gregor N. C. and Ortner, Christoph and Csanyi, Gabor},
+        editor={Oh, Alice H. and Agarwal, Alekh and Belgrave, Danielle and Cho, Kyunghyun},
+        year={2022},
+        url={https://openreview.net/forum?id=YPpSngE-ZU}
+    }
+
+    @misc{batatia_2022_design_space,
+        title={The Design Space of E(3)-Equivariant Atom-Centered Interatomic Potentials},
+        DOI={10.48550/arXiv.2205.06643},
+        author={Batatia, Ilyes and Batzner, Simon and Kov{\'a}cs, D{\'a}vid P{\'e}ter and Musaelian, Albert and Simm, Gregor N. C. and Drautz, Ralf and Ortner, Christoph and Kozinsky, Boris and Cs{\'a}nyi, G{\'a}bor},
+        year={2022},
+        eprint={2205.06643},
+        archiveprefix={arXiv}
+    }
+    ```
 
 - **[`chgnet`](pydmclab/mlp/chgnet)**: CHGNet (Crystal Hamiltonian Graph Neural Network) potential integration
   - **[`dynamics.py`](pydmclab/mlp/chgnet/dynamics.py)**: Molecular dynamics simulations with various ensembles (NVT, NPT), structure relaxation, and trajectory analysis tools
   - **[`enums.py`](pydmclab/mlp/chgnet/enums.py)**: Enumeration classes for optimizers and learning rate schedulers
   - **[`trainer.py`](pydmclab/mlp/chgnet/trainer.py)**: Tools for training custom CHGNet models with various loss functions and optimization strategies
+  - Consider citing
+    ```bibtex
+    @article{deng_2023_chgnet,
+        title={CHGNet as a pretrained universal neural network potential for charge-informed atomistic modelling},
+        DOI={10.1038/s42256-023-00716-3},
+        journal={Nature Machine Intelligence},
+        author={Deng, Bowen and Zhong, Peichen and Jun, KyuJung and Riebesell, Janosh and Han, Kevin and Bartel, Christopher J. and Ceder, Gerbrand},
+        year={2023},
+        pages={1–11}
+    }
+    ```
+
+- **[`analyze.py`](pydmclab/mlp/analyze.py)**: Common analysis tools for ASE molecular dynamic simulations with machine learning potential calculators.
+  - Consider citing
+    ```bibtex 
+    @article{deng_2016_alkali_superionic,
+        title={Data-Driven First-Principles Methods for the Study and Design of Alkali Superionic Conductors},
+        DOI={10.1021/acs.chemmater.6b02648},
+        journal={Chemistry of Materials},
+        author={Deng, Zhi and Zhu, Zhenbin and Chu, I.-Hung and Ong, Shyue Ping},
+        year={2016}
+    }
+    ```
 
 - **[`utils.py`](pydmclab/mlp/utils.py)**: Common utilities for machine learning potentials including file handling and data preparation
+
+- For general use of the MLP functionality, consider citing
+  ```bibtex
+  @article{ong_2013_pymatgen,
+      title={Python Materials Genomics (pymatgen): A robust, open-source python library for materials analysis},
+      DOI={10.1016/j.commatsci.2012.10.028},
+      journal={Computational Materials Science},
+      volume={68},
+      pages={314--319},
+      author={Ong, Shyue Ping and Richards, William Davidson and Jain, Anubhav and Hautier, Geoffroy and Kocher, Michael and Cholia, Shreyas and Gunter, Dan and Chevrier, Vincent L. and Persson, Kristin A. and Ceder, Gerbrand},
+      year={2013}
+  }
+
+  @article{larsen_2017_ase,
+      title={The atomic simulation environment—a Python library for working with atoms},
+      DOI={10.1088/1361-648X/aa680e},
+      journal={Journal of Physics: Condensed Matter},
+      volume={29},
+      number={27},
+      pages={273002},
+      author={Ask Hjorth Larsen and Jens Jørgen Mortensen and Jakob Blomqvist and Ivano E Castelli and Rune Christensen and Marcin Dułak and Jesper Friis and Michael N Groves and Bjørk Hammer and Cory Hargus and Eric D Hermes and Paul C Jennings and Peter Bjerre Jensen and James Kermode and John R Kitchin and Esben Leonhard Kolsbjerg and Joseph Kubal and Kristen Kaasbjerg and Steen Lysgaard and Jón Bergmann Maronsson and Tristan Maxson and Thomas Olsen and Lars Pastewka and Andrew Peterson and Carsten Rostgaard and Jakob Schiøtz and Ole Schütt and Mikkel Strange and Kristian S Thygesen and Tejs Vegge and Lasse Vilhelmsen and Michael Walter and Zhenhua Zeng and Karsten W Jacobsen},
+      year={2017}
+  }
+  ```
 
 @todo: Add citation information for machine learning potentials
 
