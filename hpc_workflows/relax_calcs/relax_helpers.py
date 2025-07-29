@@ -503,7 +503,7 @@ def make_submission_scripts(
             f.write("#!/bin/bash -l\n")
             f.write(f"#SBATCH --nodes={user_configs['nodes']}\n")
             f.write(f"#SBATCH --ntasks={user_configs['ntasks']}\n")
-            f.write(f"#SBATCH --cpus-per-task={user_configs["cores_per_task"]}\n")
+            f.write(f"#SBATCH --cpus-per-task={user_configs['cores_per_task']}\n")
             f.write(f"#SBATCH --time={user_configs['time']}\n")
             f.write(f"#SBATCH --mem-per-cpu={user_configs['mem_per_core']}\n")
             f.write(f"#SBATCH --error={user_configs['error_file']}\n")
