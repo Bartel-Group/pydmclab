@@ -1,22 +1,82 @@
 import os
 import numpy as np
 import matplotlib.pyplot as plt
-from pydmclab.plotting.utils import get_colors, set_rc_params
+from pydmclab.plotting.utils import get_colors, set_rc_params, get_label
 from matplotlib.ticker import MaxNLocator
+# from scipy.constants import hbar, e
+from scipy.constants import physical_constants
+from scipy.integrate import trapezoid
+
 
 
 from pydmclab.utils.handy import read_json, write_json
+from pydmclab.core.struc import StrucTools
+from pydmclab.core.comp import CompTools
+from pymatgen.core.composition import Composition
 
-from phonopy import Phonopy
-from phonopy.interface.vasp import read_vasp, parse_force_constants
+from phonopy import Phonopy, PhonopyQHA
+from phonopy.interface.vasp import read_vasp, parse_force_constants, parse_set_of_forces
+
+from ase.phonons import Phonons
+from ase.thermochemistry import CrystalThermo
+
+from pymatgen.io.ase import AseAtomsAdaptor
+from pymatgen.analysis.eos import Murnaghan, Vinet
 
 set_rc_params()
 COLORS = get_colors(palette="tab10")
 
+def get_forces_finite_displacement(calc_dir: str, num_atoms: int, savename: str = "forces.json", remake: bool = False):
+    fjson = os.path.join(calc_dir, savename)
+    if os.path.exists(fjson) and not remake:
+        return read_json(fjson)
+
+    list_of_folders = os.listdir(os.path.join(calc_dir, "../")) #check how far back you need to go
+    list_of_files = [os.path.join(folder, "vasprun.xml") for folder in list_of_folders]
+    forces = parse_set_of_forces(list_of_files, num_atoms=num_atoms)
+    
+    if not forces:
+        print("Warning: Failed to parse forces. Returning None.")
+        return None
+
+    out = {"forces": forces, "calc_method": "finite_displacement", "num_atoms": num_atoms}
+    write_json(out, fjson)
+    return read_json(fjson)
+
+def get_force_constants_dfpt(calc_dir: str, savename: str = "force_constants.json", remake: bool = False):
+    fjson = os.path.join(calc_dir, savename)
+    if os.path.exists(fjson) and not remake:
+        return read_json(fjson)
+    
+    force_constants_path = os.path.join(calc_dir, "vasprun.xml")
+    if not os.path.exists(force_constants_path):
+        print(f"Warning: vasprun.xml file not found in {calc_dir}. Returning None.")
+        return None
+    
+    force_constants_dict = parse_force_constants(force_constants_path)
+    if not force_constants_dict:
+        print("Warning: Failed to parse force constants. Returning None.")
+        return None
+    
+    force_constants = force_constants_dict[0]
+    atoms = force_constants_dict[1]
+    out = {"force_constants": force_constants, "calc_method": "dfpt", "atoms": atoms}
+
+    write_json(out, fjson)
+    # Then make sure the collector grabs it from calc_dir and sends it to data_dir! -- Ask ChrisC, she did it for cohp calcs
+    # Make sure the remake flag for results.json also remakes the forces.json file -- can possibly also ask ChrisC about this
+
+    return read_json(fjson)
+
+def get_force_constants_hiphive(calc_dir: str, savename: str = "force_constants.json", remake: bool = False):
+    #workflow for getting force constants from a hiphive calculation
+    return None #This is a placeholder, need to implement this function
+
+
 class AnalyzePhonons(object):
     def __init__(self, calc_dir: str, 
                  supercell_matrix: list = None, 
-                 mesh: int|list|float=100):
+                 mesh: int|list|float=[30, 30, 30]):
         """
         Class to analyze phonon data from a VASP calculation using Phonopy, Can return force constants, dynamical matrix, mesh data, thermal properties, band structure, and total density of states.
         Args:
@@ -45,23 +105,13 @@ class AnalyzePhonons(object):
             self.phonon = None
             return  # Early exit from the initialization if POSCAR is missing
 
-        unitcell = read_vasp(poscar_path)
-        phonon = Phonopy(unitcell, supercell_matrix)
+        unitcell = read_vasp(poscar_path) #Still need to get the original unitcell somehow when doing finite displacement. Potentially could just save original in calc_dir? 
+        phonon = Phonopy(unitcell, supercell_matrix) #And also need to make sure I have this for finite displacement the way it was originally done when generating the displacements
         self.unitcell = unitcell
 
-        force_constants_path = os.path.join(calc_dir, "vasprun.xml")
-        if not os.path.exists(force_constants_path):
-            print(f"Warning: vasprun.xml file not found in {calc_dir}. Returning None.")
-            self.phonon = None
-            return  # Early exit if force constants are missing
+        force_constants = get_force_constants_dfpt(calc_dir, savename="force_constants.json", remake=False)
 
-        force_constants_dict = parse_force_constants(force_constants_path)
-        if not force_constants_dict:
-            print("Warning: Failed to parse force constants. Returning None.")
-            self.phonon = None
-            return  # Exit if force constants parsing fails
-
-        phonon.force_constants = force_constants_dict[0]
+        phonon.force_constants = force_constants['force_constants'] if force_constants else None
         self.force_constants = phonon.force_constants #This is just a setter for the force constants, need it to make the dynamical matrix
 
         self.dynamical_matrix = phonon.dynamical_matrix # This is just a phonopy.dynamical_matrix.DynamicalMatrix object. Need it to run mesh.
