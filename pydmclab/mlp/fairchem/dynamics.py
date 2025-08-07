@@ -9,6 +9,7 @@ import inspect
 import warnings
 import pickle as pkl
 from enum import Enum
+from math import sqrt
 from functools import partial
 from typing import TYPE_CHECKING, Literal
 
@@ -354,6 +355,7 @@ class FAIRChemObserver:
         self.atoms = atoms
         self.energies: list[float] = []
         self.forces: list[np.ndarray] = []
+        self.fmaxs: list[float] = []
         self.stresses: list[np.ndarray] = []
         self.atomic_numbers: list[int] = []
         self.atom_positions: list[np.ndarray] = []
@@ -363,6 +365,7 @@ class FAIRChemObserver:
         """The logic for saving the properties of an Atoms during the relaxation."""
         self.energies.append(self.atoms.get_potential_energy())
         self.forces.append(self.atoms.get_forces())
+        self.fmaxs.append(sqrt((self.atoms.get_forces() ** 2).sum(axis=1).max()))
         self.stresses.append(self.atoms.get_stress())
         self.atomic_numbers.append(self.atoms.get_atomic_numbers())
         self.atom_positions.append(self.atoms.get_positions())
@@ -380,6 +383,7 @@ class FAIRChemObserver:
             ),  # returns the atoms object as a str representation
             "energies": self.energies,
             "forces": self.forces,
+            "fmaxs": self.fmaxs,
             "stresses": self.stresses,
             "atomic_numbers": self.atomic_numbers,
             "atom_positions": self.atom_positions,
@@ -392,6 +396,7 @@ class FAIRChemObserver:
         obs = cls(decode(data_dict["atoms"]))
         obs.energies = data_dict["energies"]
         obs.forces = data_dict["forces"]
+        obs.fmaxs = data_dict["fmaxs"]
         obs.stresses = data_dict["stresses"]
         obs.atomic_numbers = data_dict["atomic_numbers"]
         obs.atom_positions = data_dict["atom_positions"]
@@ -472,6 +477,7 @@ class FAIRChemRelaxer:
         ase_filter: str | None = "FrechetCellFilter",
         params_asefilter: dict | None = None,
         traj_path: str | None = None,
+        include_obs_in_results: bool = True,
         interval: int | None = 1,
         verbose: bool = True,
         convert_to_native_types: bool = True,
@@ -529,7 +535,8 @@ class FAIRChemRelaxer:
         return {
             "final_structure": struc,
             "final_energy": obs.energies[-1],
-            "trajectory": obs,
+            "converged": obs.fmaxs[-1] < fmax if obs.fmaxs else False,
+            "trajectory": obs if include_obs_in_results else None,
         }
 
 
