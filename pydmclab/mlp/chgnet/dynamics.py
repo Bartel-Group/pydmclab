@@ -7,6 +7,7 @@ import inspect
 import contextlib
 import pickle as pkl
 from enum import Enum
+from math import sqrt
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Literal
 
@@ -180,6 +181,7 @@ class CHGNetObserver:
         self.atoms = atoms
         self.energies: list[float] = []
         self.forces: list[np.ndarray] = []
+        self.fmaxs: list[float] = []
         self.stresses: list[np.ndarray] = []
         self.magmoms: list[np.ndarray] = []
         self.atomic_numbers: list[int] = []
@@ -190,6 +192,7 @@ class CHGNetObserver:
         """The logic for saving the properties of an Atoms during the relaxation."""
         self.energies.append(self.atoms.get_potential_energy())
         self.forces.append(self.atoms.get_forces())
+        self.fmaxs.append(sqrt((self.atoms.get_forces() ** 2).sum(axis=1).max()))
         self.stresses.append(self.atoms.get_stress())
         self.magmoms.append(self.atoms.get_magnetic_moments())
         self.atomic_numbers.append(self.atoms.get_atomic_numbers())
@@ -208,6 +211,7 @@ class CHGNetObserver:
             ),  # returns the atoms object as a str representation
             "energies": self.energies,
             "forces": self.forces,
+            "fmaxs": self.fmaxs,
             "stresses": self.stresses,
             "magmoms": self.magmoms,
             "atomic_numbers": self.atomic_numbers,
@@ -221,6 +225,7 @@ class CHGNetObserver:
         obs = cls(decode(data["atoms"]))
         obs.energies = data["energies"]
         obs.forces = data["forces"]
+        obs.fmaxs = data["fmaxs"]
         obs.stresses = data["stresses"]
         obs.magmoms = data["magmoms"]
         obs.atomic_numbers = data["atomic_numbers"]
@@ -376,6 +381,7 @@ class CHGNetRelaxer:
         ase_filter: str | None = "FrechetCellFilter",
         params_asefilter: dict | None = None,
         traj_path: str | None = None,
+        include_obs_in_results: bool = True,
         interval: int | None = 1,
         verbose: bool = True,
         convert_to_native_types: bool = True,
@@ -432,7 +438,8 @@ class CHGNetRelaxer:
         return {
             "final_structure": struc,
             "final_energy": obs.energies[-1],
-            "trajectory": obs,
+            "coverged": obs.fmaxs[-1] < fmax if obs.fmaxs else False,
+            "trajectory": obs if include_obs_in_results else None,
         }
 
 
