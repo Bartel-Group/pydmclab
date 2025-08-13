@@ -336,6 +336,8 @@ class SubmitTools(object):
                 return "%s/vasp.5.4.4.pl2" % preamble
             elif version == 6:
                 return "%s/vasp.6.4.1" % preamble
+            elif version == 7:
+                return "%s/vasp.6.5.1" % preamble
         elif machine == "bridges2":
             if version == 6:
                 return "/opt/packages/VASP/VASP6/6.4.1/INTEL"
