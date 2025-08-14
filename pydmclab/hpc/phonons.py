@@ -12,23 +12,24 @@ from scipy.integrate import trapezoid
 from pydmclab.utils.handy import read_json, write_json
 from pydmclab.core.struc import StrucTools
 from pydmclab.core.comp import CompTools
-from pymatgen.core.structure import Structure
-from phonopy.structure.atoms import PhonopyAtoms
+from pydmclab.mlp.fairchem.dynamics import FAIRChemRelaxer
 
-from phonopy import Phonopy, PhonopyQHA
+
+from pymatgen.core.structure import Structure
+from pymatgen.io.ase import AseAtomsAdaptor
+from pymatgen.analysis.eos import Murnaghan, Vinet
+from pymatgen.io.phonopy import get_phonopy_structure, get_pmg_structure
+
+# from phonopy.structure.atoms import PhonopyAtoms
+from phonopy import Phonopy
 from phonopy.interface.vasp import read_vasp, parse_force_constants, _get_forces_points_and_energy, check_forces
 
 from ase.phonons import Phonons
 from ase.thermochemistry import CrystalThermo
+from ase.build import get_primitive_cell
 
-from pymatgen.io.ase import AseAtomsAdaptor
-from pymatgen.analysis.eos import Murnaghan, Vinet
 
 from hiphive.structure_generation import generate_mc_rattled_structures, generate_rattled_structures
-from pymatgen.io.ase import AseAtomsAdaptor
-from pymatgen.io.phonopy import get_phonopy_structure, get_pmg_structure
-from pydmclab.mlp.fairchem.dynamics import FAIRChemRelaxer
-
 from hiphive import ForceConstantPotential
 from hiphive import ClusterSpace, StructureContainer, ForceConstantPotential
 from hiphive.utilities import prepare_structures
@@ -106,7 +107,8 @@ def get_displacements_for_phonons(
     write_json(out, fjson)
     return read_json(fjson)
 
-def get_force_data_mlp(displaced_structures, name_or_path = "uma-s-1", task_name = "omat"):
+def get_force_data_mlp(displaced_structures: list[dict|Atoms], 
+                       name_or_path: str = "uma-s-1", task_name: str = "omat"):
     """
     Get force data from MLP for displaced structures.
     Args:
@@ -140,7 +142,11 @@ def get_force_data_mlp(displaced_structures, name_or_path = "uma-s-1", task_name
         out["results"] = []
         
     for displaced_struc in displaced_structures:
-        atoms_displaced_strucs = AseAtomsAdaptor.get_atoms(displaced_struc)
+        if isinstance(displaced_struc, dict):
+            displaced_struc = StrucTools(displaced_struc).structure
+            atoms_displaced_strucs = AseAtomsAdaptor.get_atoms(displaced_struc)
+        else:
+            atoms_displaced_strucs = displaced_struc
         prediction = relaxer.predict_structure(atoms_displaced_strucs)
         forces = prediction['forces']
         energy = prediction['energy']
@@ -154,7 +160,6 @@ def get_force_data_mlp(displaced_structures, name_or_path = "uma-s-1", task_name
     return out
 
 def get_forces_one_calc(
-    num_atoms: int,
     calc_dir: str = None,
     use_expat: bool = True,
     verbose: bool = True,
@@ -165,6 +170,15 @@ def get_forces_one_calc(
     
     vasprun_path = os.path.join(calc_dir, "vasprun.xml")
     is_parsed = True
+
+    poscar_path = os.path.join(calc_dir, "POSCAR")
+    st = StrucTools(poscar_path)
+    num_atoms = len(st.structure.sites)
+
+    if not os.path.exists(vasprun_path) or not os.path.exists(poscar_path):
+        if verbose:
+            print(f"Warning: {vasprun_path} or {poscar_path} does not exist. Returning empty dictionary.")
+        return {}
 
     with open(vasprun_path, "rb") as fp:
         forces, points, energy = _get_forces_points_and_energy(
@@ -252,40 +266,46 @@ def get_force_constants_dfpt(calc_dir: str, savename: str = "force_constants.jso
     return read_json(fjson)
     
 
-def get_force_constants_hiphive(supercell, 
-                                displaced_strucs, 
-                                forces, 
-                                data_dir: str, 
-                                savename: str = "force_constants.json", 
-                                remake: bool = False,
-                                cutoffs: list[float] | Cutoffs = [3.5, 3.0]):
+def get_fcp_hiphive(ideal_supercell: Atoms, 
+                    rattled_structures: list[Atoms], 
+                    force_sets: list[np.ndarray],
+                    primitive_cell: Atoms | None = None,
+                    cutoffs: list[float] | Cutoffs = [3.5, 3.0]):
     """
+        Workflow for getting force constant potential object for a hiphive calculation. 
+        With this fcp object, you can compute force constants for any size supercell, not necessarily just the size you used to create the original supercell and rattled structures.
+        can generate force constant array with `fcp.get_force_constants(supercell)` implemented in get_force_constants_hiphive()
         Args:
-        rattled_structures (list): List of rattled structures as Atoms or MSONAtoms objects.
-                                   These should have the already calculated forces stored in the arrays['forces'] attribute.
-        
-        primitive_cell (Atoms | MSONAtoms): The primitive cell structure.
-        
-        ideal_supercell (Atoms | MSONAtoms): The ideal supercell structure (no rattling).
-
-        cutoffs (list | Cutoffs): List of cutoff distances for the cluster space, in order of increasing order starting with second order.
-                        This can be either manually specified or a Cutoffs object. I think Cutoffs is a class that hiphive has made to help automatically determine cutoffs. Still looking into it.
+            ideal_supercell (Atoms | MSONAtoms): 
+                The ideal supercell structure (no rattling).
+            rattled_structures (list): 
+                List of rattled structures as Atoms or MSONAtoms objects.
+            force_sets (list): 
+                List of force sets corresponding to the rattled structures. Must be in the same order as rattled_structures!
+            primitive_cell (Atoms | MSONAtoms): 
+                The primitive cell structure. If None is given then it will be calculated from the ideal supercell using ASE and spglib.
+            cutoffs (list | Cutoffs): 
+                List of cutoff distances for the cluster space, in order of increasing order starting with second order.
+                This can be either manually specified or a Cutoffs object. I think Cutoffs is a class that hiphive has made to help automatically determine cutoffs. Still looking into it.
+        Returns:
+            ForceConstantPotential: The constructed hiphive force constant potential object.
     """
-    displaced_strucs = [AseAtomsAdaptor.get_atoms(struc) for struc in displaced_strucs]
-    supercell_atoms = AseAtomsAdaptor.get_atoms(supercell)
-    
-    from ase.build import get_primitive_cell
-    primitive = get_primitive_cell(supercell_atoms, symprec=1e-5)
-    
+    if len(rattled_structures) != len(force_sets):
+        raise ValueError("The length of rattled_structures and force_sets must be the same.")
+
+    if primitive_cell is None:
+        primitive_cell = get_primitive_cell(ideal_supercell, symprec=1e-5)
+
     cs = ClusterSpace(primitive_cell, cutoffs)
     print(cs)
     cs.print_orbits()
 
-    for structure in rattled_structures:
+    for i, structure in enumerate(rattled_structures):
         #remove calculator from atoms object so that it does not interfere with how hiphive prepares structures
         #See https://gitlab.com/materials-modeling/hiphive/-/blob/master/hiphive/utilities.py to see how it works
         #It seems safest to store the forces in the structure arrays and then setting calculator to None means that the forces are not recalculated and they just grab them from the stored arrays
         structure.calc = None
+        structure.arrays['forces'] = force_sets[i] #This is where the forces are stored in the structure, so hiphive can use them to calculate force constants.
 
     # ... and structure container
     structures = prepare_structures(rattled_structures, ideal_supercell)
@@ -305,7 +325,28 @@ def get_force_constants_hiphive(supercell,
     fcp.write(os.path.join(DATA_DIR, 'fcc-nickel.fcp'))
     print(fcp)
 
-    return None #This is a placeholder, need to implement this function
+    return fcp 
+
+def get_force_constants_hiphive(fcp, 
+                                supercell, order=2):
+    """
+    Obtain force constants array from a hiphive force constant potential object.
+    Args:
+        fcp (ForceConstantPotential): 
+            The force constant potential object.
+        supercell (Atoms): 
+            The supercell structure to compute the force constants for. 
+            This does not necessarily need to match the supercell used to obtain the forces and generate the ForceConstantPotential object.
+        order (int): 
+            The order of the force constants to compute.
+    """
+    fcs = fcp.get_force_constants(supercell)
+    print(fcs)
+    # access specific parts of the force constant matrix
+    fcs.print_force_constant((0, 1))
+    fcs.print_force_constant((10, 12))
+    fcs = fcs.get_fc_array(order=order)
+    return fcs
 
 
 class AnalyzePhonons(object):
@@ -364,7 +405,7 @@ class AnalyzePhonons(object):
 
         pymatgen_struc = StrucTools(unitcell).structure
 
-        unitcell = get_phonopy_structure(pymatgen_struc)
+        unitcell = get_phonopy_structure(pymatgen_struc) #PhonopyAtoms structure object
 
         phonon = Phonopy(unitcell, supercell_matrix) #And also need to make sure I have this for finite displacement the way it was originally done when generating the displacements
         self.unitcell = unitcell
@@ -375,7 +416,7 @@ class AnalyzePhonons(object):
 
         if force_data is not None:
             arr = np.array(force_data)
-            natoms = struc.num_sites
+            natoms = pymatgen_struc.num_sites
 
             if arr.ndim == 3 and arr.shape[1:] == (natoms, 3):
                 # Looks like forces from displacements
@@ -1445,3 +1486,10 @@ class QHA(object):
 
         # Display the plot
         plt.show()
+
+
+"""
+To do: 
+make sure the structures that are taken in are consistent and properly formatted across the helper functions.
+also ensure that the outputs are in a consistent format.
+"""
