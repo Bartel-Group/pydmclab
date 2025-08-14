@@ -24,15 +24,32 @@ from ase.thermochemistry import CrystalThermo
 from pymatgen.io.ase import AseAtomsAdaptor
 from pymatgen.analysis.eos import Murnaghan, Vinet
 
+from hiphive.structure_generation import generate_mc_rattled_structures, generate_rattled_structures
+from pymatgen.io.ase import AseAtomsAdaptor
+from pymatgen.io.phonopy import get_phonopy_structure, get_pmg_structure
+from pydmclab.mlp.fairchem.dynamics import FAIRChemRelaxer
+
+from hiphive import ForceConstantPotential
+from hiphive import ClusterSpace, StructureContainer, ForceConstantPotential
+from hiphive.utilities import prepare_structures
+from trainstation import Optimizer
+
 set_rc_params()
 COLORS = get_colors(palette="tab10")
 
 #Helper functions to make displacements, these will likely go into helpers.py in the future
-def get_displacements(
+def get_displacements_for_phonons(
                     unitcell: str|dict,
-                    supercell_matrix: list|None = None,
                     method: str,
-                    mlp: str = None
+                    data_dir: str,
+                    savename: str = 'displacements.json',
+                    remake: bool = False,
+                    supercell_matrix: list|None = None,
+                    distance: float|None = None,
+                    mc: bool = False,
+                    n_structures: int|None = None,
+                    rattle_std: float|None = None,
+                    minimum_distance: float|None = None,
                     ):
     """    Get the displacements for a given unitcell and method.
     Args:
@@ -42,12 +59,99 @@ def get_displacements(
         method (str):
             Method to use for displacements. Options are 'finite_displacement' or 'hiphive'.
             REMINDER: finite_displacement creates many unitcells with one displacement each, while hiphive creates many unitcells with multiple random displacements.
-        mlp (str, optional):
-            Path to the machine learning potential file. Only used for 'finite_displacement' method.
+
     Returns:
-        displacements (list):
-            List of displacements for the unitcell.
+        displacements_data (dict):
+            {
+                "unitcell": The original supercell structure pre-displacements (as dict),
+                "displaced_strucs": The list of displaced structures (as dict),
+                "dataset": Only for finite displacement. The dataset containing displacement information obtained from phonopy,
+                            this is needed to feed to AnalyzePhonons if want to obtain thermal properties from finite displacement, 
+                            could optionally contain forces if calculating with mlp, but this would be in a separate function.
+            }
     """
+    fjson = os.path.join(data_dir, savename)
+    if os.path.exists(fjson) and not remake:
+        return read_json(fjson)
+
+    st = StrucTools(unitcell)
+    pymatgen_struc = st.structure
+
+    out = {}
+    out['unitcell'] = pymatgen_struc.as_dict()
+
+    if method == "finite_displacement":
+        unitcell = get_phonopy_structure(pymatgen_struc)
+        phonon = Phonopy(unitcell=unitcell, supercell_matrix=supercell_matrix)
+
+        displacement_data = phonon.generate_displacements(distance=distance)
+        supercells_with_displacements = phonon.supercells_with_displacements #returns a list of PhonopyAtoms supercells
+        pmg_displaced_strucs = [get_pmg_structure(struc) for struc in supercells_with_displacements]
+
+        dataset = phonon.dataset
+        out["dataset"] = dataset
+
+    if method == "hiphive":
+        #turn unitcell to AseAtoms
+        atoms = AseAtomsAdaptor.get_atoms(pymatgen_struc)
+        if mc:
+            structures = generate_mc_rattled_structures(atoms, n_structures, rattle_std, minimum_distance)
+        else:
+            structures = generate_rattled_structures(atoms, n_structures, rattle_std)
+
+        pmg_displaced_strucs = [AseAtomsAdaptor.get_structure(struc) for struc in structures]
+
+    out["displaced_structures"] = pmg_displaced_strucs
+
+    write_json(out, fjson)
+    return read_json(fjson)
+
+def get_force_data_mlp(displaced_structures, name_or_path = "uma-s-1", task_name = "omat"):
+    """
+    Get force data from MLP for displaced structures.
+    Args:
+        displaced_structures (list or dict): 
+            The displaced structures to get force data for.
+                If list, each element is a structure with displacements.
+                If dict, must contain "displaced_structures" key. Usually generated with get_displacements(),
+                this way it contains all of the other information in the dict (original unitcell, dataset for phonopy).
+        name_or_path (str): 
+            The name or path to the MLP model.
+        task_name (str): 
+            The task name for the MLP model.
+
+    Returns:
+        dict: The force data for the displaced structures as a list of dictionaries.
+            {"results": [{'structure': displaced_struc, 
+                          'forces': forces, 
+                          'energy': energy}, .....],
+            "unitcell": unitcell,
+            "dataset": dataset,
+            "any other keys": "..."
+            }
+    """
+    relaxer = FAIRChemRelaxer(name_or_path=name_or_path, task_name=task_name)
+
+    if isinstance(displaced_structures, list):
+        out = {"results": []}
+    elif isinstance(displaced_structures, dict):
+        out = displaced_structures
+        displaced_structures = out.pop("displaced_structures", None)
+        out["results"] = []
+        
+    for displaced_struc in displaced_structures:
+        atoms_displaced_strucs = AseAtomsAdaptor.get_atoms(displaced_struc)
+        prediction = relaxer.predict_structure(atoms_displaced_strucs)
+        forces = prediction['forces']
+        energy = prediction['energy']
+        #could also get stresses if wanted from prediction
+        out['results'].append({
+            "structure": displaced_struc,
+            "forces": forces,
+            "energy": energy
+        })
+
+    return out
 
 def get_forces_one_calc(
     num_atoms: int,
@@ -146,14 +250,66 @@ def get_force_constants_dfpt(calc_dir: str, savename: str = "force_constants.jso
     # Make sure the remake flag for results.json also remakes the forces.json file -- can possibly also ask ChrisC about this
 
     return read_json(fjson)
+    
 
-def get_force_constants_hiphive(calc_dir: str, savename: str = "force_constants.json", remake: bool = False):
-    #workflow for getting force constants from a hiphive calculation
+def get_force_constants_hiphive(supercell, 
+                                displaced_strucs, 
+                                forces, 
+                                data_dir: str, 
+                                savename: str = "force_constants.json", 
+                                remake: bool = False,
+                                cutoffs: list[float] | Cutoffs = [3.5, 3.0]):
+    """
+        Args:
+        rattled_structures (list): List of rattled structures as Atoms or MSONAtoms objects.
+                                   These should have the already calculated forces stored in the arrays['forces'] attribute.
+        
+        primitive_cell (Atoms | MSONAtoms): The primitive cell structure.
+        
+        ideal_supercell (Atoms | MSONAtoms): The ideal supercell structure (no rattling).
+
+        cutoffs (list | Cutoffs): List of cutoff distances for the cluster space, in order of increasing order starting with second order.
+                        This can be either manually specified or a Cutoffs object. I think Cutoffs is a class that hiphive has made to help automatically determine cutoffs. Still looking into it.
+    """
+    displaced_strucs = [AseAtomsAdaptor.get_atoms(struc) for struc in displaced_strucs]
+    supercell_atoms = AseAtomsAdaptor.get_atoms(supercell)
+    
+    from ase.build import get_primitive_cell
+    primitive = get_primitive_cell(supercell_atoms, symprec=1e-5)
+    
+    cs = ClusterSpace(primitive_cell, cutoffs)
+    print(cs)
+    cs.print_orbits()
+
+    for structure in rattled_structures:
+        #remove calculator from atoms object so that it does not interfere with how hiphive prepares structures
+        #See https://gitlab.com/materials-modeling/hiphive/-/blob/master/hiphive/utilities.py to see how it works
+        #It seems safest to store the forces in the structure arrays and then setting calculator to None means that the forces are not recalculated and they just grab them from the stored arrays
+        structure.calc = None
+
+    # ... and structure container
+    structures = prepare_structures(rattled_structures, ideal_supercell)
+
+    sc = StructureContainer(cs)
+    for structure in structures:
+        sc.add_structure(structure)
+    print(sc)
+
+    # train model
+    opt = Optimizer(sc.get_fit_data())
+    opt.train()
+    print(opt)
+
+    # construct force constant potential
+    fcp = ForceConstantPotential(cs, opt.parameters)
+    fcp.write(os.path.join(DATA_DIR, 'fcc-nickel.fcp'))
+    print(fcp)
+
     return None #This is a placeholder, need to implement this function
 
 
 class AnalyzePhonons(object):
-    def __init__(self, unitcell: str|dict = None,
+    def __init__(self, unitcell: str|dict,
                  force_data: np.array_like|list = None, 
                  supercell_matrix: list = None,
                  mesh: int|list|float=[30, 30, 30],
@@ -206,50 +362,48 @@ class AnalyzePhonons(object):
                 "Mesh should be a list of three integers or an int."
             )
 
-        struc = StrucTools(unitcell).structure
+        pymatgen_struc = StrucTools(unitcell).structure
 
-        unitcell = PhonopyAtoms(
-                    symbols=[site.specie.symbol for site in struc],
-                    cell=struc.lattice.matrix,
-                    scaled_positions=struc.frac_coords,
-                    magnetic_moments=struc.site_properties.get("magmom", None)
-                )
+        unitcell = get_phonopy_structure(pymatgen_struc)
 
         phonon = Phonopy(unitcell, supercell_matrix) #And also need to make sure I have this for finite displacement the way it was originally done when generating the displacements
         self.unitcell = unitcell
 
-        # force_constants = get_force_constants_dfpt(calc_dir, savename="force_constants.json", remake=False)
-        arr = np.array(force_data)
-        natoms = struc.num_sites
+        #If a dataset is provided, use it; otherwise, generate displacements and return 
+        phonon.dataset = dataset if dataset is not None else phonon.generate_displacements()
 
-        if arr.ndim == 3 and arr.shape[1:] == (natoms, 3):
-            # Looks like forces from displacements
-            print(f"Detected forces from {arr.shape[0]} displacement calculations")
-            self.forces = arr
-            phonon.forces = arr 
-            phonon.dataset = dataset if dataset is not None else phonon.dataset
-            if phonon.dataset is None:
-                raise ValueError("Unable to set dataset for phonon calculation. Please provide a valid dataset or force constants.")
-            self.force_constants = phonon.force_constants
 
-        elif arr.shape == (natoms, natoms, 3, 3):
-            # Looks like force constants
-            print(f"Detected force constants in full form")
-            phonon.force_constants = arr
-            self.force_constants = arr
-        else:
-            raise ValueError(
-                f"Unrecognized force_data shape: {arr.shape}\n"
-                f"Expected one of:\n"
-                f"  - Forces: (N_displacements, {natoms}, 3)\n"
-                f"  - Force constants: ({natoms}, {natoms}, 3, 3)\n"
-                f"\nBased on supercell with {natoms} atoms"
-            )
+        if force_data is not None:
+            arr = np.array(force_data)
+            natoms = struc.num_sites
 
-        self.dynamical_matrix = phonon.dynamical_matrix # This is just a phonopy.dynamical_matrix.DynamicalMatrix object. Need it to run mesh.
-        _mesh_out = phonon.run_mesh(mesh) #Need to run this in order to get mesh data, thermal properties, band structure, and total density of states
+            if arr.ndim == 3 and arr.shape[1:] == (natoms, 3):
+                # Looks like forces from displacements
+                print(f"Detected forces from {arr.shape[0]} displacement calculations")
+                self.forces = arr
+                phonon.forces = arr 
+                if phonon.dataset is None:
+                    raise ValueError("Unable to set dataset for phonon calculation. Please provide a valid dataset or force constants.")
+                self.force_constants = phonon.force_constants
 
-        self.phonon = phonon
+            elif arr.shape == (natoms, natoms, 3, 3):
+                # Looks like force constants
+                print(f"Detected force constants in full form")
+                phonon.force_constants = arr
+                self.force_constants = arr
+            else:
+                raise ValueError(
+                    f"Unrecognized force_data shape: {arr.shape}\n"
+                    f"Expected one of:\n"
+                    f"  - Forces: (N_displacements, {natoms}, 3)\n"
+                    f"  - Force constants: ({natoms}, {natoms}, 3, 3)\n"
+                    f"\nBased on supercell with {natoms} atoms"
+                )
+
+            self.dynamical_matrix = phonon.dynamical_matrix # This is just a phonopy.dynamical_matrix.DynamicalMatrix object. Need it to run mesh.
+            _mesh_out = phonon.run_mesh(mesh) #Need to run this in order to get mesh data, thermal properties, band structure, and total density of states
+
+            self.phonon = phonon
 
     @property
     def mesh_dict(self):
