@@ -262,6 +262,10 @@ def get_force_constants_hiphive(supercell,
     """
         Args:
         rattled_structures (list): List of rattled structures as Atoms or MSONAtoms objects.
+                                   These should have the already calculated forces stored in the arrays['forces'] attribute.
+        
+        primitive_cell (Atoms | MSONAtoms): The primitive cell structure.
+        
         ideal_supercell (Atoms | MSONAtoms): The ideal supercell structure (no rattling).
 
         cutoffs (list | Cutoffs): List of cutoff distances for the cluster space, in order of increasing order starting with second order.
