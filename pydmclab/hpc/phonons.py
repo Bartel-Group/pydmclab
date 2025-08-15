@@ -586,13 +586,12 @@ class AnalyzePhonons(object):
             qpoints = get_band(np.array(path[0]), np.array(path[1]), Nq)
             bands.append(qpoints)
 
-
         bands_equal = (
             len(self._band_structure_paths) == len(bands)
             and all(np.array_equal(a1, a2) for a1, a2 in zip(self._band_structure_paths, bands))
         ) if self._band_structure_paths else False
 
-        if self._band_structure is None or not bands_equal:
+        if not bands_equal:
             print("Calculating band structure...")
             _ = self.phonon.run_band_structure(bands)
             self._band_structure_paths = bands        
