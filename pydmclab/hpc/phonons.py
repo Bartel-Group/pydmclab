@@ -22,17 +22,18 @@ from pymatgen.io.phonopy import get_phonopy_structure, get_pmg_structure
 
 # from phonopy.structure.atoms import PhonopyAtoms
 from phonopy import Phonopy
-from phonopy.interface.vasp import read_vasp, parse_force_constants, _get_forces_points_and_energy, check_forces
+from phonopy.interface.vasp import read_vasp, parse_force_constants, parse_set_of_forces, check_forces
 
 from ase.phonons import Phonons
 from ase.thermochemistry import CrystalThermo
-from ase.build import get_primitive_cell
-
+from ase.spacegroup import get_spacegroup
+from ase import Atoms
 
 from hiphive.structure_generation import generate_mc_rattled_structures, generate_rattled_structures
 from hiphive import ForceConstantPotential
 from hiphive import ClusterSpace, StructureContainer, ForceConstantPotential
 from hiphive.utilities import prepare_structures
+from hiphive.cutoffs import Cutoffs
 from trainstation import Optimizer
 
 set_rc_params()
@@ -159,6 +160,21 @@ def get_force_data_mlp(displaced_structures: list[dict|Atoms],
 
     return out
 
+def make_json_serializable(data):
+    """
+    Makes the data JSON serializable by converting NumPy arrays to lists.
+    """
+
+    if isinstance(data, dict):
+        return {key: make_json_serializable(value) for key, value in data.items()}
+    elif isinstance(data, list):
+        return [make_json_serializable(item) for item in data]
+    elif isinstance(data, np.ndarray):
+        return data.tolist() 
+    else:
+        return data
+  
+
 def get_forces_one_calc(
     calc_dir: str = None,
     use_expat: bool = True,
@@ -180,29 +196,11 @@ def get_forces_one_calc(
             print(f"Warning: {vasprun_path} or {poscar_path} does not exist. Returning empty dictionary.")
         return {}
 
-    with open(vasprun_path, "rb") as fp:
-        forces, points, energy = _get_forces_points_and_energy(
-            fp, use_expat=use_expat, filename=vasprun_path
-        )
+    results = parse_set_of_forces([vasprun_path])
+    results = {key: value[0] for key, value in results.items()}
 
-    if not forces or not points or not energy:
-        is_parsed = False
+    return results
 
-    if not check_forces(forces, num_atoms, calc_dir):
-        is_parsed = False
-
-    if verbose:
-        print("")
-
-    if is_parsed:
-        return {
-            "forces": forces,
-            "points": points,
-            "supercell_energy": energy,
-        }
-    else:
-        return {}
-    
 def get_set_of_forces(results, mpid, xc: str = "metagga"):
     '''
     Get the set of calculated forces from multiple structures with displacements for a specific MPID and return as a list of arrays.
@@ -258,6 +256,8 @@ def get_force_constants_dfpt(calc_dir: str, savename: str = "force_constants.jso
     force_constants = force_constants_dict[0]
     atoms = force_constants_dict[1]
     out = {"force_constants": force_constants, "calc_method": "dfpt", "atoms": atoms}
+    # Convert to JSON serializable format
+    out = make_json_serializable(out)
 
     write_json(out, fjson)
     # Then make sure the collector grabs it from calc_dir and sends it to data_dir! -- Ask ChrisC, she did it for cohp calcs
@@ -294,7 +294,8 @@ def get_fcp_hiphive(ideal_supercell: Atoms,
         raise ValueError("The length of rattled_structures and force_sets must be the same.")
 
     if primitive_cell is None:
-        primitive_cell = get_primitive_cell(ideal_supercell, symprec=1e-5)
+        spg = get_spacegroup(ideal_supercell, symprec=1e-5)
+        primitive_cell = spg.get_primitive_cell(ideal_supercell)
 
     cs = ClusterSpace(primitive_cell, cutoffs)
     print(cs)
@@ -351,7 +352,7 @@ def get_force_constants_hiphive(fcp,
 
 class AnalyzePhonons(object):
     def __init__(self, unitcell: str|dict,
-                 force_data: np.array_like|list = None, 
+                 force_data: np.ndarray|list = None, 
                  supercell_matrix: list = None,
                  mesh: int|list|float=[30, 30, 30],
                  dataset: dict = None,
@@ -397,6 +398,9 @@ class AnalyzePhonons(object):
         self.force_data = force_data
         self.supercell_matrix = supercell_matrix
         self.dataset = dataset
+
+        self._band_structure = None
+        self._band_structure_paths = None
 
         if isinstance(mesh, (list, tuple)) and len(mesh) != 3:
             raise ValueError(
@@ -557,11 +561,11 @@ class AnalyzePhonons(object):
     def band_structure(
         self,
         paths: list =[
-            [[0.0, 0.0, 0.0], [0.5, 0.0, 0.0]],  # Γ to X
-            [[0.5, 0.0, 0.0], [0.5, 0.5, 0.5]],  # X to L
-            [[0.5, 0.5, 0.5], [0.0, 0.0, 0.0]],  # L to Γ
-            [[0.5, 0.0, 0.0], [0.5, 0.25, 0.75]],  # X to W
+            [[0.0, 0.0, 0.0], [0.5, 0.5, 0.0]],  # Γ to X
+            [[0.5, 0.5, 1.0], [0, 0, 0]],  # X to K to Γ
+            [[0.0, 0.0, 0.0], [0.5, 0.5, 0.5]],  # G to L
         ],
+        Nq: int = 100
     ):
         """
         Returns the band structure for the phonon object in a dictionary
@@ -572,12 +576,28 @@ class AnalyzePhonons(object):
         Returns:
             {'qpoints': arrays of q points, 'distances': arrays of distances, 'frequencies': arrays of frequencies, 'eigenvectors': arrays of eigenvectors, group_velocities': arrays of group velocities}
         """
-        if not hasattr(self, '_band_structure') or self._band_structure_paths != paths:
+        # FCC q-point paths
+        def get_band(q_start, q_stop, N):
+            """ Return path between q_start and q_stop """
+            return np.array([q_start + (q_stop-q_start)*i/(N-1) for i in range(N)])
+
+        bands = []
+        for path in paths:
+            qpoints = get_band(np.array(path[0]), np.array(path[1]), Nq)
+            bands.append(qpoints)
+
+
+        bands_equal = (
+            len(self._band_structure_paths) == len(bands)
+            and all(np.array_equal(a1, a2) for a1, a2 in zip(self._band_structure_paths, bands))
+        ) if self._band_structure_paths else False
+
+        if self._band_structure is None or not bands_equal:
             print("Calculating band structure...")
-            _ = self.phonon.run_band_structure(paths)
+            _ = self.phonon.run_band_structure(bands)
+            self._band_structure_paths = bands        
             self._band_structure = self.phonon.get_band_structure_dict()
-            self._band_structure_paths = paths  
-        
+
         return self._band_structure
 
     @property
@@ -722,7 +742,8 @@ class AnalyzePhonons(object):
 
     @property
     def plot_band_structure(self):
-        self.band_structure()
+        if self._band_structure is None:
+            self.band_structure()
         self.phonon.plot_band_structure()
 
     @property
@@ -732,7 +753,8 @@ class AnalyzePhonons(object):
     
     @property
     def plot_band_structure_and_dos(self):
-        self.band_structure(paths = self._band_structure_paths)
+        if self._band_structure is None:
+            self.band_structure()
         self.total_dos
         self.phonon.plot_band_structure_and_dos()
 
