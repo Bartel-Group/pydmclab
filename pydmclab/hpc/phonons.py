@@ -180,7 +180,13 @@ def get_forces_one_calc(
     use_expat: bool = True,
     verbose: bool = True,
 ) -> dict:
-    """Parse forces from a single calculation. This will be called by analyze.py and will store the forces in forces.json in the results.json."""
+    """Parse forces from a single calculation. This will be called by analyze.py and will store the forces in forces.json in the results.json.
+    Returns:
+        dict: A dictionary containing the parsed forces.
+            { "forces": ArrayLike,
+              "points": list,
+              "energy": int}
+    """
     if verbose:
         print("counter (file index): ", end="")
     
@@ -198,6 +204,9 @@ def get_forces_one_calc(
 
     results = parse_set_of_forces([vasprun_path])
     results = {key: value[0] for key, value in results.items()}
+
+    if "supercell_energies" in results:
+        results["energy"] = results.pop("supercell_energies")
 
     return results
 
@@ -563,7 +572,7 @@ class AnalyzePhonons(object):
         paths: list =[
             [[0.0, 0.0, 0.0], [0.5, 0.5, 0.0]],  # Γ to X
             [[0.5, 0.5, 1.0], [0, 0, 0]],  # X to K to Γ
-            [[0.0, 0.0, 0.0], [0.5, 0.5, 0.5]],  # G to L
+            [[0.0, 0.0, 0.0], [0.5, 0.5, 0.5]],  # Γ to L
         ],
         Nq: int = 100
     ):
