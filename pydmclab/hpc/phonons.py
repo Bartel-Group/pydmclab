@@ -102,7 +102,8 @@ def get_displacements_for_phonons(
             structures = generate_rattled_structures(atoms, n_structures, rattle_std)
 
         pmg_displaced_strucs = [AseAtomsAdaptor.get_structure(struc) for struc in structures]
-
+    
+    pmg_displaced_strucs = [struc.as_dict() for struc in pmg_displaced_strucs]
     out["displaced_structures"] = pmg_displaced_strucs
 
     write_json(out, fjson)
@@ -114,7 +115,7 @@ def get_force_data_mlp(displaced_structures: list[dict|Atoms],
     Get force data from MLP for displaced structures.
     Args:
         displaced_structures (list or dict): 
-            The displaced structures to get force data for.
+            The displaced structures to get force data for as an Atoms object.
                 If list, each element is a structure with displacements.
                 If dict, must contain "displaced_structures" key. Usually generated with get_displacements(),
                 this way it contains all of the other information in the dict (original unitcell, dataset for phonopy).
@@ -349,6 +350,8 @@ def get_force_constants_hiphive(fcp,
             This does not necessarily need to match the supercell used to obtain the forces and generate the ForceConstantPotential object.
         order (int): 
             The order of the force constants to compute.
+    Returns:
+        np.ndarray: The computed force constants array.
     """
     fcs = fcp.get_force_constants(supercell)
     print(fcs)
