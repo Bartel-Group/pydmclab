@@ -278,7 +278,10 @@ def get_fcp_hiphive(ideal_supercell: Atoms,
                     rattled_structures: list[Atoms], 
                     force_sets: list[np.ndarray],
                     primitive_cell: Atoms | None = None,
-                    cutoffs: list[float] | Cutoffs = [3.5, 3.0]):
+                    cutoffs: list[float] | Cutoffs = [3.5, 3.0],
+                    data_dir: str = None,
+                    savename: str = "fcp.fcp",
+                    remake: bool = False):
     """
         Workflow for getting force constant potential object for a hiphive calculation. 
         With this fcp object, you can compute force constants for any size supercell, not necessarily just the size you used to create the original supercell and rattled structures.
@@ -298,6 +301,10 @@ def get_fcp_hiphive(ideal_supercell: Atoms,
         Returns:
             ForceConstantPotential: The constructed hiphive force constant potential object.
     """
+    fcp_dir = os.path.join(data_dir, savename)
+    if os.path.exists(fcp_dir) and not remake:
+        return ForceConstantPotential.read(fcp_dir)
+
     if len(rattled_structures) != len(force_sets):
         raise ValueError("The length of rattled_structures and force_sets must be the same.")
 
@@ -331,7 +338,7 @@ def get_fcp_hiphive(ideal_supercell: Atoms,
 
     # construct force constant potential
     fcp = ForceConstantPotential(cs, opt.parameters)
-    fcp.write(os.path.join(DATA_DIR, 'fcc-nickel.fcp'))
+    fcp.write(fcp_dir)
     print(fcp)
 
     return fcp 
