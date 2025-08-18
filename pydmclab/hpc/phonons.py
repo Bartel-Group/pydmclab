@@ -135,9 +135,10 @@ def get_force_data_mlp(displaced_structures: list[dict|Atoms],
             "any other keys": "..."
             }
     """
-    fjson = os.path.join(data_dir, savename)
-    if os.path.exists(fjson) and not remake:
-        return read_json(fjson)
+    if data_dir is not None:
+        fjson = os.path.join(data_dir, savename)
+        if os.path.exists(fjson) and not remake:
+            return read_json(fjson)
     
     relaxer = FAIRChemRelaxer(name_or_path=name_or_path, task_name=task_name)
 
@@ -168,8 +169,11 @@ def get_force_data_mlp(displaced_structures: list[dict|Atoms],
         })
 
     out = convert_numpy_to_native(out)  # Make sure the output is JSON serializable
-    write_json(out, fjson)
-    return read_json(fjson)
+    if data_dir is not None:
+        write_json(out, fjson)
+        return read_json(fjson)
+    else:
+        return out
 
 def get_forces_one_calc(
     calc_dir: str = None,
