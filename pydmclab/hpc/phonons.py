@@ -110,7 +110,8 @@ def get_displacements_for_phonons(
     return read_json(fjson)
 
 def get_force_data_mlp(displaced_structures: list[dict|Atoms], 
-                       name_or_path: str = "uma-s-1", task_name: str = "omat"):
+                       name_or_path: str = "uma-s-1", task_name: str = "omat",
+                       data_dir: str = None, savename: str = "force_data.json", remake: bool = False):
     """
     Get force data from MLP for displaced structures.
     Args:
@@ -134,6 +135,10 @@ def get_force_data_mlp(displaced_structures: list[dict|Atoms],
             "any other keys": "..."
             }
     """
+    fjson = os.path.join(data_dir, savename)
+    if os.path.exists(fjson) and not remake:
+        return read_json(fjson)
+    
     relaxer = FAIRChemRelaxer(name_or_path=name_or_path, task_name=task_name)
 
     if isinstance(displaced_structures, list):
@@ -145,22 +150,26 @@ def get_force_data_mlp(displaced_structures: list[dict|Atoms],
         
     for displaced_struc in displaced_structures:
         if isinstance(displaced_struc, dict):
-            displaced_struc = StrucTools(displaced_struc).structure
-            atoms_displaced_strucs = AseAtomsAdaptor.get_atoms(displaced_struc)
+            st = StrucTools(displaced_struc)
+            displaced_struc = st.structure
+            atoms_displaced_struc = AseAtomsAdaptor.get_atoms(displaced_struc)
         else:
-            atoms_displaced_strucs = displaced_struc
-        prediction = relaxer.predict_structure(atoms_displaced_strucs)
+            atoms_displaced_struc = displaced_struc
+            pmg_displaced_struc = AseAtomsAdaptor.get_structure(displaced_struc)
+            st = StrucTools(pmg_displaced_struc)
+        prediction = relaxer.predict_structure(atoms_displaced_struc)
         forces = prediction['forces']
         energy = prediction['energy']
         #could also get stresses if wanted from prediction
         out['results'].append({
-            "structure": displaced_struc,
+            "structure": st.structure_as_dict,
             "forces": forces,
             "energy": energy
         })
 
     out = convert_numpy_to_native(out)  # Make sure the output is JSON serializable
-    return out
+    write_json(out, fjson)
+    return read_json(fjson)
 
 def get_forces_one_calc(
     calc_dir: str = None,
