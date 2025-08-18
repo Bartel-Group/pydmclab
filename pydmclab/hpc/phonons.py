@@ -6,7 +6,7 @@ from matplotlib.ticker import MaxNLocator
 # from scipy.constants import hbar, e
 from scipy.constants import physical_constants
 from scipy.integrate import trapezoid
-
+from monty.json import jsanitize
 
 
 from pydmclab.utils.handy import read_json, write_json
@@ -102,10 +102,11 @@ def get_displacements_for_phonons(
             structures = generate_rattled_structures(atoms, n_structures, rattle_std)
 
         pmg_displaced_strucs = [AseAtomsAdaptor.get_structure(struc) for struc in structures]
-    
+
     pmg_displaced_strucs = [struc.as_dict() for struc in pmg_displaced_strucs]
     out["displaced_structures"] = pmg_displaced_strucs
 
+    out = jsanitize(out, strict=True)  # Make sure the output is JSON serializable
     write_json(out, fjson)
     return read_json(fjson)
 
@@ -159,22 +160,8 @@ def get_force_data_mlp(displaced_structures: list[dict|Atoms],
             "energy": energy
         })
 
+    out = jsanitize(out, strict=True)  # Make sure the output is JSON serializable
     return out
-
-def make_json_serializable(data):
-    """
-    Makes the data JSON serializable by converting NumPy arrays to lists.
-    """
-
-    if isinstance(data, dict):
-        return {key: make_json_serializable(value) for key, value in data.items()}
-    elif isinstance(data, list):
-        return [make_json_serializable(item) for item in data]
-    elif isinstance(data, np.ndarray):
-        return data.tolist() 
-    else:
-        return data
-  
 
 def get_forces_one_calc(
     calc_dir: str = None,
@@ -267,7 +254,7 @@ def get_force_constants_dfpt(calc_dir: str, savename: str = "force_constants.jso
     atoms = force_constants_dict[1]
     out = {"force_constants": force_constants, "calc_method": "dfpt", "atoms": atoms}
     # Convert to JSON serializable format
-    out = make_json_serializable(out)
+    out = jsanitize(out, strict=True)
 
     write_json(out, fjson)
     # Then make sure the collector grabs it from calc_dir and sends it to data_dir! -- Ask ChrisC, she did it for cohp calcs
