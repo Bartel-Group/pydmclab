@@ -6,10 +6,9 @@ from matplotlib.ticker import MaxNLocator
 # from scipy.constants import hbar, e
 from scipy.constants import physical_constants
 from scipy.integrate import trapezoid
-from monty.json import jsanitize
 
 
-from pydmclab.utils.handy import read_json, write_json
+from pydmclab.utils.handy import read_json, write_json, convert_numpy_to_native
 from pydmclab.core.struc import StrucTools
 from pydmclab.core.comp import CompTools
 from pydmclab.mlp.fairchem.dynamics import FAIRChemRelaxer
@@ -106,7 +105,7 @@ def get_displacements_for_phonons(
     pmg_displaced_strucs = [struc.as_dict() for struc in pmg_displaced_strucs]
     out["displaced_structures"] = pmg_displaced_strucs
 
-    out = jsanitize(out, strict=True)  # Make sure the output is JSON serializable
+    out = convert_numpy_to_native(out)  # Make sure the output is JSON serializable
     write_json(out, fjson)
     return read_json(fjson)
 
@@ -160,7 +159,7 @@ def get_force_data_mlp(displaced_structures: list[dict|Atoms],
             "energy": energy
         })
 
-    out = jsanitize(out, strict=True)  # Make sure the output is JSON serializable
+    out = convert_numpy_to_native(out)  # Make sure the output is JSON serializable
     return out
 
 def get_forces_one_calc(
@@ -253,9 +252,8 @@ def get_force_constants_dfpt(calc_dir: str, savename: str = "force_constants.jso
     force_constants = force_constants_dict[0]
     atoms = force_constants_dict[1]
     out = {"force_constants": force_constants, "calc_method": "dfpt", "atoms": atoms}
-    # Convert to JSON serializable format
-    out = jsanitize(out, strict=True)
 
+    out = convert_numpy_to_native(out)  # Make sure the output is JSON serializable
     write_json(out, fjson)
     # Then make sure the collector grabs it from calc_dir and sends it to data_dir! -- Ask ChrisC, she did it for cohp calcs
     # Make sure the remake flag for results.json also remakes the forces.json file -- can possibly also ask ChrisC about this
@@ -612,24 +610,9 @@ class AnalyzePhonons(object):
 
         return self._total_dos
 
-
-    def make_json_serializable(self, data):
-        """
-        Makes the data JSON serializable by converting NumPy arrays to lists.
-        """
-
-        if isinstance(data, dict):
-            return {key: self.make_json_serializable(value) for key, value in data.items()}
-        elif isinstance(data, list):
-            return [self.make_json_serializable(item) for item in data]
-        elif isinstance(data, np.ndarray):
-            return data.tolist() 
-        else:
-            return data
-  
-
     def summary(
         self,
+        calc_dir: str = None,
         savename: str = "phonons.json",
         remake: bool = False,
         include_force_constants: bool= True,
@@ -676,23 +659,21 @@ class AnalyzePhonons(object):
             {'force_constants': array of force constances, 'mesh': mesh array, 'thermal_properties': dictionary of thermal properties, 'band_structure': band structure data, 'total_dos': dos data}
 
         """
+        if calc_dir is not None:
+            fjson = os.path.join(calc_dir, savename)
+            if os.path.exists(fjson) and not remake:
+                return read_json(fjson)
         
-        calc_dir = self.calc_dir
-        fjson = os.path.join(calc_dir, savename)
-        if os.path.exists(fjson) and not remake:
-            return read_json(fjson)
         data = {}
     
 
         if include_force_constants:
             fc = self.force_constants
-            force_constants = self.make_json_serializable(fc)
-            data["force_constants"] = force_constants
+            data["force_constants"] = fc
 
         if include_mesh:
             mesh_array = self.mesh_dict
-            mesh_list = self.make_json_serializable(mesh_array)
-            data["mesh"] = mesh_list
+            data["mesh"] = mesh_array
 
         if include_thermal_properties:
             thermal_properties_kwargs = {}
@@ -719,19 +700,24 @@ class AnalyzePhonons(object):
 
         if include_band_structure:
             if paths:
-                band_struc = self.make_json_serializable(self.band_structure(paths=paths))
+                band_struc = self.band_structure(paths=paths)
             else:
-                band_struc = self.make_json_serializable(self.band_structure())
+                band_struc = self.band_structure()
 
             data["band_structure"] = band_struc
 
         if include_total_dos:
-            total_dos = self.make_json_serializable(self.total_dos)
+            total_dos = self.total_dos
             data["total_dos"] = total_dos
 
-        write_json(data, fjson)
-        return read_json(fjson)
-    
+        data = convert_numpy_to_native(data)  # Convert to JSON serializable format
+
+        if calc_dir is not None:
+            write_json(data, fjson)
+            return read_json(fjson)
+        else:
+            return data
+
     #Plotting functions are just using phonopy's built in plotting functions for the moment, need to updgrade this in the future
     @property
     def plot_thermal_properties(self):
