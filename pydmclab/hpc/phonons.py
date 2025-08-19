@@ -446,6 +446,7 @@ class AnalyzePhonons(object):
                 phonon.forces = arr 
                 if phonon.dataset is None:
                     raise ValueError("Unable to set dataset for phonon calculation. Please provide a valid dataset or force constants.")
+                phonon.produce_force_constants()
                 self.force_constants = phonon.force_constants
 
             elif arr.shape == (natoms, natoms, 3, 3):
