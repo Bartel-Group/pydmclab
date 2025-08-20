@@ -1333,13 +1333,11 @@ class AnalyzeVASP(object):
                 data["pcobi"] = None
         if include_entry:
             data["entry"] = self.computed_structure_entry
-
         if include_phonons:
             if convergence:
                 data["phonons"] = self.phonons(supercell_matrix=None, mesh=100)
             else:
                 data["phonons"] = None
-
         if include_forces:
             if convergence:
                 data["forces"] = self.forces
