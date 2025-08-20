@@ -1158,20 +1158,50 @@ class AnalyzeVASP(object):
         entry.data["queried"] = False
         return entry.as_dict()
 
-    def phonons(
+    def summarize_phonons_dfpt(
         self,
         supercell_matrix=None,
         mesh=100,
     ):
+        """
+        Returns summary of phonon data and corresponding thermal properties data from a dfpt calculation.
+        """
 
         from pydmclab.hpc.phonons import AnalyzePhonons
+        from phonopy.interface.vasp import read_vasp
 
-        ap = AnalyzePhonons(self.calc_dir, supercell_matrix=supercell_matrix, mesh=mesh)
+        vr = self.outputs.vasprun
+        supercell = read_vasp(os.path.join(self.calc_dir, "POSCAR"))
+        force_constants = vr.force_constants
+
+        ap = AnalyzePhonons(unitcell=supercell, force_data=force_constants, supercell_matrix=supercell_matrix, mesh=mesh)
         if not ap:
             return None
 
-        return ap.summary()
+        return ap.summary(calc_dir=self.calc_dir, savename="phonons.json") #Analyze phonons has functionality for saving the data already
 
+    @property
+    def forces(self):
+        """
+        Returns final ionic forces from vasprun.xml (preferred) or OUTCAR.
+        Returns:
+            np.ndarray of shape (N_atoms, 3) or None if forces not available
+        This can be for use in finite displacement or hiphive phonon calculations
+        """
+        vr = self.outputs.vasprun
+        if vr and hasattr(vr, 'ionic_steps') and vr.ionic_steps:
+            try:
+                return vr.ionic_steps[-1]["forces"]
+            except (KeyError, IndexError):
+                pass
+        
+        # Fallback to OUTCAR
+        outcar = self.outputs.outcar
+        if outcar and hasattr(outcar, 'forces') and outcar.forces:
+            return outcar.forces[-1]  # Last set of forces
+        
+        return None
+    
     def summary(
         self,
         include_meta=False,
@@ -1192,6 +1222,7 @@ class AnalyzeVASP(object):
         include_pcobi=False,
         include_entry=False,
         include_phonons=False,
+        include_forces=False,
     ):
         """
         Returns all desired data for post-processing DFT calculations
@@ -1308,6 +1339,12 @@ class AnalyzeVASP(object):
                 data["phonons"] = self.phonons(supercell_matrix=None, mesh=100)
             else:
                 data["phonons"] = None
+
+        if include_forces:
+            if convergence:
+                data["forces"] = self.forces
+            else:
+                data["forces"] = None
 
         return data
 
