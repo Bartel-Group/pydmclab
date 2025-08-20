@@ -801,6 +801,7 @@ class SubmitTools(object):
                     "incar_mods": incar_mods,
                     "launch_dir": launch_dir,
                     "struc_src_for_hse": configs["struc_src_for_hse"],
+                    "xc_calc_src_for_lobster": configs["xc_calc_src_for_lobster"],
                 }
                 passer_dict_as_str = json.dumps(passer_dict)
 
@@ -826,7 +827,7 @@ class SubmitTools(object):
                     f.write(self.lobster_command)
 
                 # run bader for all static jobs
-                if calc_to_run == "static":
+                if calc_to_run in ["static", "lobster"]:
                     f.write(self.bader_command)
 
                 # execute the collector

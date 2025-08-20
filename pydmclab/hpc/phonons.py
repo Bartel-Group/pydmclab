@@ -2,6 +2,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 from pydmclab.plotting.utils import get_colors, set_rc_params, get_label
+from pydmclab.plotting.utils import get_colors, set_rc_params, get_label
 from matplotlib.ticker import MaxNLocator
 # from scipy.constants import hbar, e
 from scipy.constants import physical_constants
@@ -20,7 +21,7 @@ from pymatgen.analysis.eos import Murnaghan, Vinet
 from pymatgen.io.phonopy import get_phonopy_structure, get_pmg_structure
 
 # from phonopy.structure.atoms import PhonopyAtoms
-from phonopy import Phonopy
+from phonopy import Phonopy, PhonopyQHA
 from phonopy.interface.vasp import read_vasp, parse_force_constants, parse_set_of_forces, check_forces
 
 from ase.phonons import Phonons
