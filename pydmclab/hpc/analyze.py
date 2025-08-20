@@ -1335,7 +1335,7 @@ class AnalyzeVASP(object):
             data["entry"] = self.computed_structure_entry
         if include_phonons:
             if convergence:
-                data["phonons"] = self.phonons(supercell_matrix=None, mesh=100)
+                data["phonons"] = self.summarize_phonons_dfpt(supercell_matrix=None, mesh=100)
             else:
                 data["phonons"] = None
         if include_forces:
