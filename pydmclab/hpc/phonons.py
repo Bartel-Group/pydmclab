@@ -65,7 +65,7 @@ def get_displacements_for_phonons(
         displacements_data (dict):
             {
                 "unitcell": The original supercell structure pre-displacements (as dict),
-                "displaced_strucs": The list of displaced structures (as dict),
+                "displaced_structures": The list of displaced structures (as dict),
                 "dataset": Only for finite displacement. The dataset containing displacement information obtained from phonopy,
                             this is needed to feed to AnalyzePhonons if want to obtain thermal properties from finite displacement, 
                             could optionally contain forces if calculating with mlp, but this would be in a separate function.
