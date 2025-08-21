@@ -78,7 +78,7 @@ def get_displacements_for_phonons(
     pymatgen_struc = st.structure
 
     out = {}
-    out['unitcell'] = pymatgen_struc.as_dict()
+    out['unitcell'] = st.structure_as_dict
 
     if method == "finite_displacement":
         unitcell = get_phonopy_structure(pymatgen_struc)
