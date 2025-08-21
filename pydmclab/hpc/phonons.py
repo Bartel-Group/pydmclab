@@ -12,8 +12,6 @@ from scipy.integrate import trapezoid
 from pydmclab.utils.handy import read_json, write_json, convert_numpy_to_native
 from pydmclab.core.struc import StrucTools
 from pydmclab.core.comp import CompTools
-from pydmclab.mlp.fairchem.dynamics import FAIRChemRelaxer
-
 
 from pymatgen.core.structure import Structure
 from pymatgen.io.ase import AseAtomsAdaptor
@@ -136,6 +134,8 @@ def get_force_data_mlp(displaced_structures: list[dict|Atoms],
             "any other keys": "..."
             }
     """
+    from pydmclab.mlp.fairchem.dynamics import FAIRChemRelaxer #Putting in this for now bc importing this requires installing the fairchem extension
+
     if data_dir is not None:
         fjson = os.path.join(data_dir, savename)
         if os.path.exists(fjson) and not remake:
