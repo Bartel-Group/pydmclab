@@ -1234,7 +1234,8 @@ class AnalyzeVASP(object):
             include_mag (bool, optional): _description_. Defaults to False.
             include_dos (bool, optional): _description_. Defaults to False.
             include_gap (bool, optional): _description_. Defaults to True.
-            include_phonons (bool, optional): _description_. Defaults to False.
+            include_phonons_dfpt (bool, optional): _description_. Defaults to False.
+            include_forces (bool, optional): _description_. Defaults to False.
         Raises:
             NotImplementedError: _description_
 

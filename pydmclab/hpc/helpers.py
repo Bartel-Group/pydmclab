@@ -375,6 +375,10 @@ def get_analysis_configs(
             True to include pdos, tdos in your results
         analyze_bonding (bool):
             True to include tcohp, pcohp, tcoop, pcoop, tcobi, pcobi in your results
+        analyze_phonons_dfpt (bool):
+            True to include phonon data and thermal properties from a dfpt calculation
+        analyze_forces (bool):
+            True to include forces in your results
         exclude (list):
             list of strings to exclude from analysis
                 overwrites other options
