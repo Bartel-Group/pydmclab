@@ -1221,7 +1221,7 @@ class AnalyzeVASP(object):
         include_tcobi=False,
         include_pcobi=False,
         include_entry=False,
-        include_phonons=False,
+        include_phonons_dfpt=False,
         include_forces=False,
     ):
         """
@@ -1333,11 +1333,11 @@ class AnalyzeVASP(object):
                 data["pcobi"] = None
         if include_entry:
             data["entry"] = self.computed_structure_entry
-        if include_phonons:
+        if include_phonons_dfpt:
             if convergence:
-                data["phonons"] = self.summarize_phonons_dfpt(supercell_matrix=None, mesh=100)
+                data["phonons_dfpt"] = self.summarize_phonons_dfpt(supercell_matrix=None, mesh=100)
             else:
-                data["phonons"] = None
+                data["phonons_dfpt"] = None
         if include_forces:
             if convergence:
                 data["forces"] = self.forces

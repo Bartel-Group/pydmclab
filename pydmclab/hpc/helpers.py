@@ -346,7 +346,7 @@ def get_analysis_configs(
     analyze_charge=False,
     analyze_dos=False,
     analyze_bonding=False,
-    analyze_phonons=False,
+    analyze_phonons_dfpt=False,
     analyze_forces=False,
     exclude=None,
     remake_results=False,
@@ -411,8 +411,8 @@ def get_analysis_configs(
     if analyze_bonding:
         includes.extend(["tcohp", "pcohp", "tcoop", "pcoop", "tcobi", "pcobi"])
 
-    if analyze_phonons:
-        includes.append("phonons")
+    if analyze_phonons_dfpt:
+        includes.append("phonons_dfpt")
 
     if analyze_forces:
         includes.append("forces")

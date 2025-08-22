@@ -79,7 +79,7 @@ class Collector(object):
         include_tcobi = configs["include_tcobi"]
         include_pcobi = configs["include_pcobi"]
         include_entry = configs["include_entry"]
-        include_phonons = configs["include_phonons"]
+        include_phonons_dfpt = configs["include_phonons_dfpt"]
         include_forces = configs["include_forces"]
         check_relax = configs["check_relax_energy"]
         create_cif = configs["create_cif"]
@@ -104,7 +104,7 @@ class Collector(object):
             include_tcobi=include_tcobi,
             include_pcobi=include_pcobi,
             include_entry=include_entry,
-            include_phonons=include_phonons,
+            include_phonons_dfpt=include_phonons_dfpt,
             include_forces=include_forces,
         )
 
