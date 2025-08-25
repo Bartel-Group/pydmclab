@@ -41,9 +41,9 @@ COLORS = get_colors(palette="tab10")
 def get_displacements_for_phonons(
                     unitcell: str|dict,
                     method: str,
-                    data_dir: str,
-                    savename: str = 'displacements.json',
-                    remake: bool = False,
+                    data_dir: str|None,
+                    savename: str|None = 'displacements.json',
+                    remake: bool|None = False,
                     supercell_matrix: list|None = None,
                     distance: float|None = None,
                     mc: bool = False,
@@ -70,9 +70,10 @@ def get_displacements_for_phonons(
                             could optionally contain forces if calculating with mlp, but this would be in a separate function.
             }
     """
-    fjson = os.path.join(data_dir, savename)
-    if os.path.exists(fjson) and not remake:
-        return read_json(fjson)
+    if data_dir is not None:
+        fjson = os.path.join(data_dir, savename)
+        if os.path.exists(fjson) and not remake:
+            return read_json(fjson)
 
     st = StrucTools(unitcell)
     pymatgen_struc = st.structure
@@ -105,8 +106,12 @@ def get_displacements_for_phonons(
     out["displaced_structures"] = pmg_displaced_strucs
 
     out = convert_numpy_to_native(out)  # Make sure the output is JSON serializable
-    write_json(out, fjson)
-    return read_json(fjson)
+
+    if data_dir is not None:
+        write_json(out, fjson)
+        return read_json(fjson)
+    else:
+        return out
 
 def get_force_data_mlp(displaced_structures: list[dict|Atoms], 
                        name_or_path: str = "uma-s-1", task_name: str = "omat",
