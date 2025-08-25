@@ -238,7 +238,7 @@ def get_set_of_forces(results, mpid, xc: str = "metagga"):
         if mpid_minus_disp != mpid:
             continue
             
-        forces = results[key]["results"]["forces"]
+        forces = results[key]["forces"]
         if not forces:
             print(f"Warning: No forces found for {key}. Returning None.")
             return None
