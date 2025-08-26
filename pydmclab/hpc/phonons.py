@@ -113,109 +113,6 @@ def get_displacements_for_phonons(
     else:
         return out
 
-def get_force_data_mlp(displaced_structures: list[dict|Atoms], 
-                       name_or_path: str = "uma-s-1", task_name: str = "omat",
-                       data_dir: str = None, savename: str = "force_data.json", remake: bool = False):
-    """
-    Get force data from MLP for displaced structures.
-    Args:
-        displaced_structures (list or dict): 
-            The displaced structures to get force data for as an Atoms object.
-                If list, each element is a structure with displacements.
-                If dict, must contain "displaced_structures" key. Usually generated with get_displacements(),
-                this way it contains all of the other information in the dict (original unitcell, dataset for phonopy).
-        name_or_path (str): 
-            The name or path to the MLP model.
-        task_name (str): 
-            The task name for the MLP model.
-
-    Returns:
-        dict: The force data for the displaced structures as a list of dictionaries.
-            {"results": [{'structure': displaced_struc, 
-                          'forces': forces, 
-                          'energy': energy}, .....],
-            "unitcell": unitcell,
-            "dataset": dataset,
-            "any other keys": "..."
-            }
-    """
-    from pydmclab.mlp.fairchem.dynamics import FAIRChemRelaxer #Putting in this for now bc importing this requires installing the fairchem extension
-
-    if data_dir is not None:
-        fjson = os.path.join(data_dir, savename)
-        if os.path.exists(fjson) and not remake:
-            return read_json(fjson)
-    
-    relaxer = FAIRChemRelaxer(name_or_path=name_or_path, task_name=task_name)
-
-    if isinstance(displaced_structures, list):
-        out = {"results": []}
-    elif isinstance(displaced_structures, dict):
-        out = displaced_structures
-        displaced_structures = out.pop("displaced_structures", None)
-        out["results"] = []
-        
-    for displaced_struc in displaced_structures:
-        if isinstance(displaced_struc, dict):
-            st = StrucTools(displaced_struc)
-            displaced_struc = st.structure
-            atoms_displaced_struc = AseAtomsAdaptor.get_atoms(displaced_struc)
-        else:
-            atoms_displaced_struc = displaced_struc
-            pmg_displaced_struc = AseAtomsAdaptor.get_structure(displaced_struc)
-            st = StrucTools(pmg_displaced_struc)
-        prediction = relaxer.predict_structure(atoms_displaced_struc)
-        forces = prediction['forces']
-        energy = prediction['energy']
-        #could also get stresses if wanted from prediction
-        out['results'].append({
-            "structure": st.structure_as_dict,
-            "forces": forces,
-            "energy": energy
-        })
-
-    out = convert_numpy_to_native(out)  # Make sure the output is JSON serializable
-    if data_dir is not None:
-        write_json(out, fjson)
-        return read_json(fjson)
-    else:
-        return out
-
-def get_forces_one_calc(
-    calc_dir: str = None,
-    use_expat: bool = True,
-    verbose: bool = True,
-) -> dict:
-    """Parse forces from a single calculation. This will be called by analyze.py and will store the forces in forces.json in the results.json.
-    Returns:
-        dict: A dictionary containing the parsed forces.
-            { "forces": ArrayLike,
-              "points": list,
-              "energy": int}
-    """
-    if verbose:
-        print("counter (file index): ", end="")
-    
-    vasprun_path = os.path.join(calc_dir, "vasprun.xml")
-    is_parsed = True
-
-    poscar_path = os.path.join(calc_dir, "POSCAR")
-    st = StrucTools(poscar_path)
-    num_atoms = len(st.structure.sites)
-
-    if not os.path.exists(vasprun_path) or not os.path.exists(poscar_path):
-        if verbose:
-            print(f"Warning: {vasprun_path} or {poscar_path} does not exist. Returning empty dictionary.")
-        return {}
-
-    results = parse_set_of_forces([vasprun_path])
-    results = {key: value[0] for key, value in results.items()}
-
-    if "supercell_energies" in results:
-        results["energy"] = results.pop("supercell_energies")
-
-    return results
-
 def get_set_of_forces(results, mpid, xc: str = "metagga"):
     '''
     Get the set of calculated forces from multiple structures with displacements for a specific MPID and return as a list of arrays.
@@ -332,7 +229,7 @@ def get_fcp_hiphive(ideal_supercell: Atoms|dict|str,
     rattled_structures = [to_atoms(s) for s in rattled_structures]
     if primitive_cell is not None:
         primitive_cell = to_atoms(primitive_cell)
-        
+
     force_sets = np.array(force_sets)
 
     if primitive_cell is None:
