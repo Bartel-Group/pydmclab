@@ -281,8 +281,8 @@ def get_force_constants_dfpt(calc_dir: str, savename: str = "force_constants.jso
     return read_json(fjson)
     
 
-def get_fcp_hiphive(ideal_supercell: Atoms, 
-                    rattled_structures: list[Atoms], 
+def get_fcp_hiphive(ideal_supercell: Atoms|dict|str, 
+                    rattled_structures: list[Atoms|dict|str], 
                     force_sets: list|np.ndarray,
                     primitive_cell: Atoms | None = None,
                     cutoffs: list[float] | Cutoffs = [3.5, 3.0],
@@ -294,14 +294,14 @@ def get_fcp_hiphive(ideal_supercell: Atoms,
         With this fcp object, you can compute force constants for any size supercell, not necessarily just the size you used to create the original supercell and rattled structures.
         can generate force constant array with `fcp.get_force_constants(supercell)` implemented in get_force_constants_hiphive()
         Args:
-            ideal_supercell (Atoms | MSONAtoms): 
-                The ideal supercell structure (no rattling).
+            ideal_supercell (Atoms | dict | str): 
+                The ideal supercell structure (no rattling). Can be provided as an Atoms or Structure object, a dictionary, or a path to a structure file.
             rattled_structures (list): 
-                List of rattled structures as Atoms or MSONAtoms objects.
+                List of rattled structures as Atoms, Structure objects, dictionaries, or paths to structure files.
             force_sets (list): 
                 List of force sets corresponding to the rattled structures. Must be in the same order as rattled_structures!
             primitive_cell (Atoms | MSONAtoms): 
-                The primitive cell structure. If None is given then it will be calculated from the ideal supercell using ASE and spglib.
+                The primitive cell structure. If None is given then it will be calculated from the ideal supercell using spglib. Can be provided as an Atoms or Structure object, a dictionary, or a path to a structure file.
             cutoffs (list | Cutoffs): 
                 List of cutoff distances for the cluster space, in order of increasing order starting with second order.
                 This can be either manually specified or a Cutoffs object. I think Cutoffs is a class that hiphive has made to help automatically determine cutoffs. Still looking into it.
@@ -315,13 +315,31 @@ def get_fcp_hiphive(ideal_supercell: Atoms,
     if len(rattled_structures) != len(force_sets):
         raise ValueError("The length of rattled_structures and force_sets must be the same.")
 
+    def to_atoms(structure):
+        """Convert various structure formats to ASE Atoms object."""
+        if isinstance(structure, Atoms):
+            return structure
+        elif isinstance(structure, Structure):
+            return AseAtomsAdaptor.get_atoms(structure)
+        elif isinstance(structure, (dict, str)):
+            pmg_structure = StrucTools(structure).structure
+            return AseAtomsAdaptor.get_atoms(pmg_structure)
+        else:
+            raise TypeError(f"Unsupported structure type: {type(structure)}")
+
+    # Convert all structures to Atoms objects
+    ideal_supercell = to_atoms(ideal_supercell)
+    rattled_structures = [to_atoms(s) for s in rattled_structures]
+    if primitive_cell is not None:
+        primitive_cell = to_atoms(primitive_cell)
+        
     force_sets = np.array(force_sets)
 
     if primitive_cell is None:
         cs = ClusterSpace(ideal_supercell, cutoffs)
     else:
         cs = ClusterSpace(primitive_cell, cutoffs)
-        
+
     print(cs)
     cs.print_orbits()
 
