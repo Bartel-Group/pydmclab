@@ -239,7 +239,7 @@ def get_set_of_forces(results, mpid, xc: str = "metagga"):
             continue
 
         r_mpid = key.split("--")[1]
-        mpid_minus_disp = "_".join(r_mpid.split("_")[:-1])
+        mpid_minus_disp = "_".join(r_mpid.split("_")[:1])
         if mpid_minus_disp != mpid:
             continue
             
@@ -247,6 +247,7 @@ def get_set_of_forces(results, mpid, xc: str = "metagga"):
         if not forces:
             print(f"Warning: No forces found for {key}. Returning None.")
             return None
+        print(f"Including forces for {key} with shape {np.array(forces).shape}")
         set_of_forces.append(forces)
     return set_of_forces
 
@@ -282,7 +283,7 @@ def get_force_constants_dfpt(calc_dir: str, savename: str = "force_constants.jso
 
 def get_fcp_hiphive(ideal_supercell: Atoms, 
                     rattled_structures: list[Atoms], 
-                    force_sets: list[np.ndarray],
+                    force_sets: list|np.ndarray,
                     primitive_cell: Atoms | None = None,
                     cutoffs: list[float] | Cutoffs = [3.5, 3.0],
                     data_dir: str = None,
@@ -313,6 +314,8 @@ def get_fcp_hiphive(ideal_supercell: Atoms,
 
     if len(rattled_structures) != len(force_sets):
         raise ValueError("The length of rattled_structures and force_sets must be the same.")
+
+    force_sets = np.array(force_sets)
 
     if primitive_cell is None:
         spg = get_spacegroup(ideal_supercell, symprec=1e-5)
