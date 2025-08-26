@@ -318,10 +318,10 @@ def get_fcp_hiphive(ideal_supercell: Atoms,
     force_sets = np.array(force_sets)
 
     if primitive_cell is None:
-        spg = get_spacegroup(ideal_supercell, symprec=1e-5)
-        primitive_cell = spg.get_primitive_cell(ideal_supercell)
-
-    cs = ClusterSpace(primitive_cell, cutoffs)
+        cs = ClusterSpace(ideal_supercell, cutoffs)
+    else:
+        cs = ClusterSpace(primitive_cell, cutoffs)
+        
     print(cs)
     cs.print_orbits()
 
