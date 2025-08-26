@@ -216,9 +216,7 @@ def get_fcp_hiphive(ideal_supercell: Atoms|dict|str,
         """Convert various structure formats to ASE Atoms object."""
         if isinstance(structure, Atoms):
             return structure
-        elif isinstance(structure, Structure):
-            return AseAtomsAdaptor.get_atoms(structure)
-        elif isinstance(structure, (dict, str)):
+        elif isinstance(structure, (dict, str, Structure)):
             pmg_structure = StrucTools(structure).structure
             return AseAtomsAdaptor.get_atoms(pmg_structure)
         else:
@@ -274,7 +272,7 @@ def get_force_constants_hiphive(fcp,
     Args:
         fcp (ForceConstantPotential): 
             The force constant potential object.
-        supercell (Atoms): 
+        supercell (Atoms|Structure|dict|str): 
             The supercell structure to compute the force constants for. 
             This does not necessarily need to match the supercell used to obtain the forces and generate the ForceConstantPotential object.
         order (int): 
@@ -282,6 +280,10 @@ def get_force_constants_hiphive(fcp,
     Returns:
         np.ndarray: The computed force constants array.
     """
+    if isinstance(supercell, (dict, str, Structure)):
+        pmg_supercell = StrucTools(supercell).structure
+        supercell = AseAtomsAdaptor.get_atoms(pmg_supercell)
+
     fcs = fcp.get_force_constants(supercell)
     print(fcs)
     # access specific parts of the force constant matrix
