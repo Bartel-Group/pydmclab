@@ -567,8 +567,8 @@ class AnalyzePhonons(object):
         include_thermal_properties: bool = True,
         include_band_structure = True,
         include_total_dos: bool = True,
-        thermal_properties_kwargs: dict = None,
-        band_structure_kwargs: dict = None
+        thermal_properties_kwargs: dict | None = None,
+        band_structure_kwargs: dict | None = None
     ):
         """
         Returns all desired data for post-processing DFT calculations
