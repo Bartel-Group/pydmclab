@@ -567,14 +567,9 @@ class AnalyzePhonons(object):
         include_thermal_properties: bool = True,
         include_band_structure = True,
         include_total_dos: bool = True,
-        paths: list = None, 
-        temperatures: list|int|float|np.ndarray = None,
-        cutoff_frequency: int|float = None,
-        pretend_real: bool = None,
-        band_indices: bool = None,
-        is_projection: bool = None,
+        thermal_properties_kwargs: dict = None,
+        band_structure_kwargs: dict = None
     ):
-        
         """
         Returns all desired data for post-processing DFT calculations
 
@@ -590,16 +585,12 @@ class AnalyzePhonons(object):
                 Include band structure in the output. Default is True.
             include_total_dos (bool, optional):         
                 Include total density of states in the output. Default is True.
-            paths (list, optional):
-                List of paths in reciprocal space. Default is None.
-            temperatures (array-like, optional):
-                Temperature points where thermal properties are calculated. Default is None.
-            cutoff_frequency (float, optional):
-                Ignore phonon modes whose frequencies are smaller than this value. Default is None.
-            pretend_real (bool, optional):
-                Use absolute value of phonon frequency when True. Default is False.
-            band_indices (array-like, optional):    
-                Band indices starting with 0. 
+            thermal_properties_kwargs (dict, optional): 
+               Additional arguments for thermal properties calculation. See
+               `self.thermal_properties` for details.
+            band_structure_kwargs (dict, optional): 
+               Additional arguments for band structure calculation. See
+               `self.band_structure` for details.
 
         Returns:
             Dictionary with the specified information
@@ -623,34 +614,12 @@ class AnalyzePhonons(object):
             data["mesh"] = mesh_array
 
         if include_thermal_properties:
-            thermal_properties_kwargs = {}
-
-            if temperatures is not None:
-                thermal_properties_kwargs["temperatures"] = temperatures
-            if cutoff_frequency is not None:
-                thermal_properties_kwargs["cutoff_frequency"] = cutoff_frequency
-            if pretend_real is not None:
-                thermal_properties_kwargs["pretend_real"] = pretend_real
-            if band_indices is not None:
-                thermal_properties_kwargs["band_indices"] = band_indices
-            if is_projection is not None:
-                thermal_properties_kwargs["is_projection"] = is_projection
-
-            # Pass the arguments dynamically
-            if thermal_properties_kwargs:
-                tp = self.thermal_properties(**thermal_properties_kwargs, force_rerun=True)
-            else:
-                tp = self.thermal_properties()
-            
+            force_rerun = True if thermal_properties_kwargs else False
+            tp = self.thermal_properties(**(thermal_properties_kwargs or {}), force_rerun=force_rerun)
             data["thermal_properties"] = tp
 
-
         if include_band_structure:
-            if paths:
-                band_struc = self.band_structure(paths=paths)
-            else:
-                band_struc = self.band_structure()
-
+            band_struc = self.band_structure(**(band_structure_kwargs or {}))
             data["band_structure"] = band_struc
 
         if include_total_dos:
