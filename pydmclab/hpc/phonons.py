@@ -19,8 +19,8 @@ from pymatgen.analysis.eos import Murnaghan, Vinet
 from pymatgen.io.phonopy import get_phonopy_structure, get_pmg_structure
 
 # from phonopy.structure.atoms import PhonopyAtoms
-from phonopy import Phonopy,
-from phonopy.interface.vasp import, parse_force_constants, parse_set_of_forces, check_forces
+from phonopy import Phonopy
+from phonopy.interface.vasp import parse_force_constants
 
 from ase.thermochemistry import CrystalThermo
 from ase import Atoms

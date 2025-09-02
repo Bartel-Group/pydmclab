@@ -18,7 +18,7 @@ from hiphive.cutoffs import Cutoffs
 from trainstation import Optimizer
 from hiphive.structure_generation import generate_mc_rattled_structures, generate_rattled_structures
 
-from phonopy import Phonopy,
+from phonopy import Phonopy
 
 def get_displacements_for_phonons(
                     unitcell: str|dict,
