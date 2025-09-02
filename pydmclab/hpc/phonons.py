@@ -19,12 +19,10 @@ from pymatgen.analysis.eos import Murnaghan, Vinet
 from pymatgen.io.phonopy import get_phonopy_structure, get_pmg_structure
 
 # from phonopy.structure.atoms import PhonopyAtoms
-from phonopy import Phonopy, PhonopyQHA
-from phonopy.interface.vasp import read_vasp, parse_force_constants, parse_set_of_forces, check_forces
+from phonopy import Phonopy,
+from phonopy.interface.vasp import, parse_force_constants, parse_set_of_forces, check_forces
 
-from ase.phonons import Phonons
 from ase.thermochemistry import CrystalThermo
-from ase.spacegroup import get_spacegroup
 from ase import Atoms
 
 from hiphive.structure_generation import generate_mc_rattled_structures, generate_rattled_structures

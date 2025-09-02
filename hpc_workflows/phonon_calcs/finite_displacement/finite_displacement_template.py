@@ -12,6 +12,7 @@ from pydmclab.hpc.phonons import AnalyzePhonons
 
 HOME_PATH = os.environ["HOME"]
 PHONON_HELPERS_DIR = "%s/bin/pydmclab/hpc_workflows/phonon_calcs" % HOME_PATH
+# PHONON_HELPERS_DIR = "/Users/carr0770/mydrive/bartel-group/pydmclab/hpc_workflows/phonon_calcs"
 
 if PHONON_HELPERS_DIR not in sys.path:
     sys.path.append(PHONON_HELPERS_DIR)
@@ -23,31 +24,6 @@ from phonon_helpers import (
 
 SCRIPT_DIR = os.getcwd()
 DATA_DIR = SCRIPT_DIR.replace('scripts', 'data')
-
-def calculate_phonon_properties(results: dict, 
-                                mpid: str, 
-                                displacements: dict,
-                                xc_wanted: str = "metagga",
-                                init_kwargs = {}, 
-                                thermal_properties_kwargs = None, 
-                                band_structure_kwargs = None):
-    
-    forces = get_set_of_forces(results, mpid, xc=xc_wanted)
-    print(f"Forces for {mpid} found with shape {np.array(forces).shape}")
-    supercell = displacements[mpid]['unitcell']
-    dataset = displacements[mpid]['dataset']
-
-    analyzer = AnalyzePhonons(
-        unitcell=supercell,
-        force_data=forces,
-        dataset=dataset,
-        **init_kwargs
-    )
-
-    summary = analyzer.summary(thermal_properties_kwargs=thermal_properties_kwargs,
-                                band_structure_kwargs=band_structure_kwargs)
-
-    return summary, analyzer
 
 def compute_all_phonon_properties(results,
                                   displacements,
@@ -65,15 +41,25 @@ def compute_all_phonon_properties(results,
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
 
-    mpids_w_disp = [key.split('--')[1] for key in results]
-    raw_mpids = list(set(['_'.join(mpid.split('_')[:1]) for mpid in mpids_w_disp]))
+    out = {}
 
-    for mpid in raw_mpids:
-        summary, analyzer = calculate_phonon_properties(results=results, mpid=mpid, displacements=displacements,
-                                               xc_wanted=xc_wanted,
-                                               init_kwargs=init_kwargs,
-                                               thermal_properties_kwargs=thermal_properties_kwargs,
-                                               band_structure_kwargs=band_structure_kwargs)
+    sets_of_forces = get_set_of_forces(results, mpid=None, xc=xc_wanted)
+
+    for key in sets_of_forces:
+        mpid = key.split('--')[1]
+        forces = sets_of_forces[key]['forces']
+        supercell = displacements[mpid]['unitcell']
+        dataset = displacements[mpid]['dataset']
+
+        analyzer = AnalyzePhonons(
+            unitcell=supercell,
+            force_data=forces,
+            dataset=dataset,
+            **init_kwargs
+        )
+
+        summary = analyzer.summary(thermal_properties_kwargs=thermal_properties_kwargs,
+                                    band_structure_kwargs=band_structure_kwargs)
 
         if plot_band_structure:
             analyzer.plot_band_structure
@@ -81,8 +67,11 @@ def compute_all_phonon_properties(results,
         if plot_thermal_properties:
             analyzer.plot_thermal_properties
 
-    write_json(summary, fjson)
+        out[key] = {'phonons': summary}
+
+    write_json(out, fjson)
     return read_json(fjson)
+
 
 
 def main():

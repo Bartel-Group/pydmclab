@@ -7,6 +7,7 @@ from pydmclab.core.comp import CompTools
 
 from pymatgen.core.structure import Structure
 from pymatgen.io.ase import AseAtomsAdaptor
+from pymatgen.io.phonopy import get_phonopy_structure, get_pmg_structure
 
 from ase import Atoms
 
@@ -15,8 +16,10 @@ from hiphive import ClusterSpace, StructureContainer, ForceConstantPotential
 from hiphive.utilities import prepare_structures
 from hiphive.cutoffs import Cutoffs
 from trainstation import Optimizer
+from hiphive.structure_generation import generate_mc_rattled_structures, generate_rattled_structures
 
-#Helper functions to make displacements, these will likely go into helpers.py in the future
+from phonopy import Phonopy,
+
 def get_displacements_for_phonons(
                     unitcell: str|dict,
                     method: str,
@@ -48,6 +51,11 @@ def get_displacements_for_phonons(
                             this is needed to feed to AnalyzePhonons if want to obtain thermal properties from finite displacement, 
                             could optionally contain forces if calculating with mlp, but this would be in a separate function.
             }
+
+    When creating MPIDs for the displaced structures (this would be once you are creating your get_strucs() or something), the original MPID should be used as a base, with an index appended for each displacement, always set at the end. 
+    For example, if the base MPID is 'S3Sr1Zr1_needle', the displaced structures could be named 'S3Sr1Zr1_needle_01', 'S3Sr1Zr1_needle_02', etc.
+    Or for QHA, where there is also indexing for the different volumes: 'S3Sr1Zr1_needle_01_01', 'S3Sr1Zr1_needle_01_02', etc.
+    Then the helper get_set_of_forces() can be used to extract the forces within each mpid using the "raw" mpid as a key by checking against mpid minus the last underscore and everything after it.
     """
     if data_dir is not None:
         fjson = os.path.join(data_dir, savename)
@@ -92,39 +100,65 @@ def get_displacements_for_phonons(
     else:
         return out
 
-def get_set_of_forces(results, mpid, xc: str = "metagga"):
+def get_set_of_forces(results, mpid=None, xc: str = "metagga"):
     '''
     Get the set of calculated forces from multiple structures with displacements for a specific MPID and return as a list of arrays.
     This is for the finite displacement method, where forces will be stored in the results.json under 'results'.
     Args:
         results (dict):
             Dictionary containing results from multiple calculations, usually generated with get_results().
-        mpid (str):
-            The base MPID of the structure for which to extract forces (without displacement suffix). E.g., 'S3Sr1Zr1_needle'.
+        mpid (str or None):
+            The base MPID of the structure for which to extract forces (without displacement suffix). E.g., 'S3Sr1Zr1_needle' or 'S3Sr1Zr1_needle_01' if running QHA and have an index for the volume.
+            If None, will create sets of forces for all mpids and save to a dictionary.
         xc (str):
             The exchange-correlation functional used in the calculations, e.g., 'gga', 'metagga'.
     Returns:
-        list:
-            A list of arrays containing the forces for each structure with displacements. If no forces are found, returns None.
+        list or dict:
+            If mpid is specified: A list of arrays (or None for missing forces) containing the forces for each structure with displacements.
+            If mpid is None: A dictionary where keys follow the results.json format but use base mpids (without displacement suffixes), 
+                             and each key['forces'] leads to a set of forces for all the displacements of the corresponding mpid.
+                             e.g. {SrZrS3--SrZrS3_needle--etc : {'forces': [list of arrays]}}
     REMINDER: When you generate the displacements, you do ONLY static calculations on those displaced structures to get the forces (no relaxation).
     '''
-    set_of_forces = []
+    if mpid is None:
+        set_of_forces = {}
+    else:
+        set_of_forces = []
+
     for key in results:
         calc_type = key.split("--")[-1]
         if calc_type != f"{xc}-static":
             continue
 
         r_mpid = key.split("--")[1]
-        mpid_minus_disp = "_".join(r_mpid.split("_")[:1])
-        if mpid_minus_disp != mpid:
+        mpid_minus_disp = "_".join(r_mpid.split("_")[:-1])
+
+        # Skip if we're looking for a specific mpid and this doesn't match
+        if mpid is not None and mpid_minus_disp != mpid:
             continue
-            
-        forces = results[key]["forces"]
+
+        # Extract forces
+        forces = results[key].get("forces")
         if not forces:
-            print(f"Warning: No forces found for {key}. Returning None.")
-            return None
-        print(f"Including forces for {key} with shape {np.array(forces).shape}")
-        set_of_forces.append(forces)
+            print(f"Warning: No forces found for {key}. Adding None to maintain indexing.")
+            forces = None
+
+        if forces is not None:
+            print(f"Including forces for {key} with shape {np.array(forces).shape}")
+        
+        if mpid is None:
+            new_key = key.replace(r_mpid, mpid_minus_disp) #replace with base mpid for output dictionary
+            if new_key not in set_of_forces:
+                set_of_forces[new_key] = {'forces': []}
+            set_of_forces[new_key]['forces'].append(forces)
+        else:
+            set_of_forces.append(forces)
+
+    # Return None if no forces found for specific mpid
+    if mpid is not None and not set_of_forces:
+        print(f"No forces found for mpid: {mpid}")
+        return None
+    
     return set_of_forces
 
 def get_fcp_hiphive(ideal_supercell: Atoms|dict|str, 

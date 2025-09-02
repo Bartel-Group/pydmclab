@@ -3,7 +3,7 @@ import sys
 import numpy as np
 import matplotlib.pyplot as plt
 from pydmclab.utils.handy import read_json, write_json
-# from pydmclab.hpc.phonons import AnalyzePhonons, get_set_of_forces, get_fcp_hiphive, get_force_constants_hiphive
+from pydmclab.hpc.phonons import AnalyzePhonons
 
 # from pydmclab.core.struc import StrucTools
 # from pymatgen.core import Structure
@@ -78,15 +78,37 @@ def compute_all_phonon_properties(results,
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
 
-    mpids_w_disp = [key.split('--')[1] for key in results]
-    raw_mpids = list(set(['_'.join(mpid.split('_')[:1]) for mpid in mpids_w_disp]))
+    out = {}
 
-    for mpid in raw_mpids:
-        summary, analyzer = calculate_phonon_properties(results=results, mpid=mpid, displacements=displacements,
-                                               xc_wanted=xc_wanted, cutoffs=cutoffs,
-                                               init_kwargs=init_kwargs,
-                                               thermal_properties_kwargs=thermal_properties_kwargs,
-                                               band_structure_kwargs=band_structure_kwargs)
+    set_of_forces = get_set_of_forces(results, mpid=None, xc=xc_wanted)
+
+    for key in set_of_forces:
+        mpid = key.split('--')[1]
+        forces = set_of_forces[key]['forces']
+        print(f"Forces for {mpid} found with shape {np.array(forces).shape}")
+        supercell = displacements[mpid]['unitcell']
+        disp_strucs = displacements[mpid]['displaced_structures']
+
+        fcp = get_fcp_hiphive(ideal_supercell=supercell,
+                            rattled_structures=disp_strucs,
+                            force_sets=forces,
+                            cutoffs=cutoffs,
+                            data_dir=data_dir,
+                            savename=f"fcp_{mpid}.fcp",
+                            remake=False)
+
+        force_constants = get_force_constants_hiphive(fcp, supercell)
+
+        analyzer = AnalyzePhonons(
+            unitcell=supercell,
+            force_data=force_constants,
+            **init_kwargs
+        )
+
+        summary = analyzer.summary(thermal_properties_kwargs=thermal_properties_kwargs,
+                                    band_structure_kwargs=band_structure_kwargs)
+
+        out[key] = {'phonons': summary}
 
         if plot_band_structure:
             analyzer.plot_band_structure
@@ -94,8 +116,10 @@ def compute_all_phonon_properties(results,
         if plot_thermal_properties:
             analyzer.plot_thermal_properties
 
-    write_json(summary, fjson)
+    write_json(out, fjson)
     return read_json(fjson)
+
+
 
 def main():
     remake_phonons = False

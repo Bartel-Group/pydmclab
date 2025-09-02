@@ -1,4 +1,5 @@
 import os
+import sys
 from shutil import copyfile
 from pydmclab.data.configs import load_base_configs
 
@@ -36,9 +37,6 @@ from pydmclab.core.comp import CompTools
 from pydmclab.core.struc import StrucTools
 from pydmclab.hpc.analyze import AnalyzeVASP
 
-#importing for phonon stuff
-from pydmclab.hpc.phonons import get_displacements_for_phonons
-
 # set up some paths that will point to where your data/calculations will live
 #  these are just defaults, you can change the `_DIR` variables to point to wherever you want
 #
@@ -46,6 +44,17 @@ from pydmclab.hpc.phonons import get_displacements_for_phonons
 #   pydmclab is assumed to be in /users/{number}/{username}/bin/pydmclab
 #   and $HOME points to /users/{number}/{username}
 HOME_PATH = os.environ["HOME"]
+
+#importing phonon helpers
+PHONON_HELPERS_DIR = "%s/bin/pydmclab/hpc_workflows/phonon_calcs" % HOME_PATH
+
+if PHONON_HELPERS_DIR not in sys.path:
+    sys.path.append(PHONON_HELPERS_DIR)
+
+from phonon_helpers import (
+    get_displacements_for_phonons,
+)
+
 _, _, _, USER_NAME = HOME_PATH.split("/")
 SCRATCH_PATH = os.path.join(os.environ["SCRATCH_GLOBAL"], USER_NAME)
 
