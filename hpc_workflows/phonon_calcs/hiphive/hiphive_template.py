@@ -25,42 +25,6 @@ from phonon_helpers import (
     get_force_constants_hiphive
 )
 
-
-def calculate_phonon_properties(results: dict, 
-                                mpid: str, 
-                                displacements: dict,
-                                xc_wanted: str = "metagga",
-                                cutoffs = [3.5, 3.0], 
-                                init_kwargs = {}, 
-                                thermal_properties_kwargs = None, 
-                                band_structure_kwargs = None):
-    
-    forces = get_set_of_forces(results, mpid, xc=xc_wanted)
-    print(f"Forces for {mpid} found with shape {np.array(forces).shape}")
-    supercell = displacements[mpid]['unitcell']
-    disp_strucs = displacements[mpid]['displaced_structures']
-
-    fcp = get_fcp_hiphive(ideal_supercell=supercell,
-                          rattled_structures=disp_strucs,
-                          force_sets=forces,
-                          cutoffs=cutoffs,
-                          data_dir=DATA_DIR,
-                          savename=f"fcp_{mpid}.fcp",
-                          remake=False)
-
-    force_constants = get_force_constants_hiphive(fcp, supercell)
-
-    analyzer = AnalyzePhonons(
-        unitcell=supercell,
-        force_data=force_constants,
-        **init_kwargs
-    )
-
-    summary = analyzer.summary(thermal_properties_kwargs=thermal_properties_kwargs,
-                                band_structure_kwargs=band_structure_kwargs)
-
-    return summary, analyzer
-
 def compute_all_phonon_properties(results,
                                   displacements,
                                   xc_wanted="metagga",
