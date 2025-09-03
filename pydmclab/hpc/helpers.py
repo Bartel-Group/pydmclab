@@ -717,8 +717,7 @@ def check_strucs(strucs):
 
 def get_qha_strucs(info: dict, dict_type='strucs',
                    scale=np.linspace(0.96, 1.04, 5),
-                   write=True,
-                   data_dir=os.getcwd().replace("scripts", "data"),
+                   data_dir: str|None = os.getcwd().replace("scripts", "data"),
                    savename="QHA_strucs.json",
                    remake=False):
     """
@@ -738,10 +737,8 @@ def get_qha_strucs(info: dict, dict_type='strucs',
             Type of dictionary ('strucs' or 'query') you are feeding for info.
         scale (list): 
             List of scale factors to apply to the structure volume. For QHA, you need at least 5 volume points.
-        write (bool): 
-            If True, writes the scaled structures to a JSON file.
         data_dir (str): 
-            Directory to save the JSON file.
+            Directory to save the JSON file. If None is provided, it will not save the file.
         savename (str): 
             filename for fjson in DATA_DIR  
         remake (bool): 
@@ -755,8 +752,8 @@ def get_qha_strucs(info: dict, dict_type='strucs',
             {'Cl3Cs1Pb1' : {'mp-1234_1.02' : Structure.as_dict}, {'mp-1234_1.04' : Structure.as_dict}, ...} 
     """
 
-    fjson = os.path.join(data_dir, savename)
-    if os.path.exists(fjson) and not remake and write:
+    fjson = os.path.join(data_dir, savename) if data_dir else None
+    if os.path.exists(fjson) and not remake and fjson:
         return read_json(fjson)
 
     QHA_strucs = {}
@@ -781,7 +778,7 @@ def get_qha_strucs(info: dict, dict_type='strucs',
             scale_and_update(mpid, info[mpid]['structure'])
 
     # Write to JSON if needed
-    if write:
+    if fjson:
         write_json(QHA_strucs, fjson)
         return read_json(fjson)
     
