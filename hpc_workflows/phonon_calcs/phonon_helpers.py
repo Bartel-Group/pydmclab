@@ -54,7 +54,7 @@ def get_displacements_for_phonons(
 
     When creating MPIDs for the displaced structures (this would be once you are creating your get_strucs() or something), the original MPID should be used as a base, with an index appended for each displacement, always set at the end. 
     For example, if the base MPID is 'S3Sr1Zr1_needle', the displaced structures could be named 'S3Sr1Zr1_needle_01', 'S3Sr1Zr1_needle_02', etc.
-    Or for QHA, where there is also indexing for the different volumes: 'S3Sr1Zr1_needle_01_01', 'S3Sr1Zr1_needle_01_02', etc.
+    Or for QHA, where there is also a suffix for the scaling of the different volumes: 'S3Sr1Zr1_needle_1.2_01', 'S3Sr1Zr1_needle_1.2_02', etc.
     Then the helper get_set_of_forces() can be used to extract the forces within each mpid using the "raw" mpid as a key by checking against mpid minus the last underscore and everything after it.
     """
     if data_dir is not None:
@@ -108,7 +108,7 @@ def get_set_of_forces(results, mpid=None, xc: str = "metagga"):
         results (dict):
             Dictionary containing results from multiple calculations, usually generated with get_results().
         mpid (str or None):
-            The base MPID of the structure for which to extract forces (without displacement suffix). E.g., 'S3Sr1Zr1_needle' or 'S3Sr1Zr1_needle_01' if running QHA and have an index for the volume.
+            The base MPID of the structure for which to extract forces (without displacement suffix). E.g., 'S3Sr1Zr1_needle' or 'S3Sr1Zr1_needle_1.2' if running QHA and have a suffix for the volume scale.
             If None, will create sets of forces for all mpids and save to a dictionary.
         xc (str):
             The exchange-correlation functional used in the calculations, e.g., 'gga', 'metagga'.
