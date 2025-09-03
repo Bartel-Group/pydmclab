@@ -67,6 +67,7 @@ def get_displacements_for_phonons(
 
     out = {}
     out['unitcell'] = st.structure_as_dict
+    out['calc_method'] = method
 
     if method == "finite_displacement":
         unitcell = get_phonopy_structure(pymatgen_struc)
@@ -100,7 +101,9 @@ def get_displacements_for_phonons(
     else:
         return out
 
-def get_set_of_forces(results, mpid=None, xc: str = "metagga"):
+def get_set_of_forces(results,
+                      mpid=None,
+                      xc: str = "metagga"):
     '''
     Get the set of calculated forces from multiple structures with displacements for a specific MPID and return as a list of arrays.
     This is for the finite displacement method, where forces will be stored in the results.json under 'results'.
@@ -147,10 +150,10 @@ def get_set_of_forces(results, mpid=None, xc: str = "metagga"):
             print(f"Including forces for {key} with shape {np.array(forces).shape}")
         
         if mpid is None:
-            new_key = key.replace(r_mpid, mpid_minus_disp) #replace with base mpid for output dictionary
-            if new_key not in set_of_forces:
-                set_of_forces[new_key] = {'forces': []}
-            set_of_forces[new_key]['forces'].append(forces)
+            new_key = key.replace(r_mpid, mpid_minus_disp)
+            if mpid_minus_disp not in set_of_forces:
+                set_of_forces[mpid_minus_disp] = {'forces': [], 'key': new_key}
+            set_of_forces[mpid_minus_disp]['forces'].append(forces)
         else:
             set_of_forces.append(forces)
 
