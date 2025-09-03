@@ -659,6 +659,7 @@ class AnalyzePhonons(object):
 class Helmholtz():
 
     def __init__(self, phonon_dos, temperatures=np.linspace(0, 2000, 100), formula_units = None):
+
         self.phonon_dos = phonon_dos
         self.temperatures = temperatures
         self.formula_units = formula_units
@@ -867,8 +868,9 @@ class QHA(object):
         parsed_results = {}
 
         for key in results:
-            # Only proceed with keys that have "dfpt" at the end and obtain the E_per_at from static calculations
-            if key.split("--")[-1].split("-")[-1] != "dfpt":
+            # Only proceed with keys that have "dfpt", "finite_displacement", or "hiphive" at the end and obtain the E_per_at from static calculations
+            calc_method = key.split("--")[-1].split("-")[-1]
+            if calc_method not in ["dfpt", "finite_displacement", "hiphive"]:
                 continue
             formula, mpid = key.split("--")[0], key.split("--")[1]
             xc = key.split("--")[-1].split("-")[0]
