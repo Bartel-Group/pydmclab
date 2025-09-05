@@ -106,6 +106,7 @@ def main():
 
     results = read_json(os.path.join(DATA_DIR, "results.json"))
     displacements = read_json(os.path.join(DATA_DIR, "displacements.json"))
+    query = read_json(os.path.join(DATA_DIR, "query.json"))
 
     xc_wanted = "metagga"
     cutoffs = [3.5, 3.0]
@@ -124,6 +125,7 @@ def main():
                                   init_kwargs=init_kwargs,
                                   thermal_properties_kwargs=thermal_properties_kwargs,
                                   band_structure_kwargs=band_structure_kwargs,
+                                  query=query,
                                   savename='phonons.json',
                                   data_dir=DATA_DIR,
                                   remake=remake_phonons,
