@@ -46,13 +46,15 @@ def compute_all_phonon_properties(results,
 
     sets_of_forces = get_set_of_forces(results, mpid=None, xc=xc_wanted)
 
-    mpids = sets_of_forces.keys()
-    keys_without_disp = set([key.replace(key.split('--')[1], mpid) for key in results for mpid in mpids if mpid in key])
+    for mpid in sets_of_forces:
+        forces = sets_of_forces[mpid]['forces']
+        static_key = sets_of_forces[mpid]['key']
 
-    for key in keys_without_disp:
-        forces = sets_of_forces[key]['forces']
-        supercell = displacements[key]['unitcell']
-        dataset = displacements[key]['dataset']
+        supercell = displacements[mpid]['unitcell']
+        dataset = displacements[mpid]['dataset']
+        calc_method = displacements[mpid]['calc_method']
+
+        phonon_key = static_key.replace("static", calc_method)
 
         analyzer = AnalyzePhonons(
             unitcell=supercell,
@@ -63,6 +65,14 @@ def compute_all_phonon_properties(results,
 
         summary = analyzer.summary(thermal_properties_kwargs=thermal_properties_kwargs,
                                     band_structure_kwargs=band_structure_kwargs)
+        
+        if query:
+            E_per_at = query[mpid]['E_per_at']
+            struc = query[mpid]['structure']
+
+            out[static_key] = {'results': 
+                               {'E_per_at': E_per_at}, 
+                               'structure': struc}
 
         if plot_band_structure:
             analyzer.plot_band_structure
@@ -70,7 +80,7 @@ def compute_all_phonon_properties(results,
         if plot_thermal_properties:
             analyzer.plot_thermal_properties
 
-        out[key] = {'phonons': summary}
+        out[phonon_key] = {'phonons': summary}
 
     write_json(out, fjson)
     return read_json(fjson)
@@ -78,12 +88,13 @@ def compute_all_phonon_properties(results,
 
 
 def main():
-    remake_phonons = False
+    remake_phonons = True
 
     xc_wanted = "metagga"
 
     results = read_json(os.path.join(DATA_DIR, "results.json"))
     displacements = read_json(os.path.join(DATA_DIR, "displacements.json"))
+    query = read_json(os.path.join(DATA_DIR, "query.json"))
 
     init_kwargs = {}
     thermal_properties_kwargs = None
@@ -98,6 +109,7 @@ def main():
                                   init_kwargs=init_kwargs,
                                   thermal_properties_kwargs=thermal_properties_kwargs,
                                   band_structure_kwargs=band_structure_kwargs,
+                                  query=query,
                                   savename='phonons.json',
                                   data_dir=DATA_DIR,
                                   remake=remake_phonons,
