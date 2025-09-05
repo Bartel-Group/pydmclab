@@ -38,6 +38,61 @@ def compute_all_phonon_properties(results,
                                   plot_band_structure=True,
                                   plot_thermal_properties=True):
 
+    """
+    Compute all phonon properties from VASP results and displacements dictionary.
+    Args:
+        results (dict): 
+            Results dictionary from DFT calcs on displaced structures. Usually generated from get_results() in pydmclab.hpc.helpers
+        displacements (dict): 
+            Displacements dictionary. Usually generated with get_displacements_for_phonons() in phonon_helpers in hpc_workflows --> phonon_calcs
+                {
+                    "unitcell": The original supercell structure pre-displacements (as dict),
+                    "displaced_structures": The list of displaced structures (as dict),
+                    "dataset": Only for finite displacement. The dataset containing displacement information obtained from phonopy.
+                }
+        xc_wanted (str): 
+            Exchange-correlation functional to retrieve information from. This will grab xc-static data from results dictionary.
+        init_kwargs (dict): 
+            Initialization arguments for AnalyzePhonons. See pydmclab.hpc.phonons.AnalyzePhonons for more details.
+        thermal_properties_kwargs (dict): 
+            Arguments for thermal properties calculation. See pydmclab.hpc.phonons.AnalyzePhonons.thermal_properties() for more details.
+        band_structure_kwargs (dict): 
+            Arguments for band structure calculation. See pydmclab.hpc.phonons.AnalyzePhonons.band_structure() for more details.
+        query (dict): 
+            Query dictionary used for DFT calculations (usually from your get_query() function). 
+            If None is given, information will not be retrieved for static calculations.
+            This is to retrieve data from the static calculations (pre-displacements) that might be necessary in the case of running a QHA calculation.
+            In QHA calculations need energy of original cell + phonon information.
+            This dictionary should have the same mpids as the results dictionary but without the displacement suffixes.
+            e.g. SrZrS3_needle, SrZrS3_perovskite for query keys and SrZrS3_needle_01, SrZrS3_perovskite_01 for mpid in results dictionary keys.
+        savename (str): 
+            Name of the output JSON file.
+        data_dir (str): 
+            Directory to save the output JSON file to.
+        remake (bool): 
+            Whether to remake the phonon properties.
+        plot_band_structure (bool): 
+            Whether to plot the band structure.
+        plot_thermal_properties (bool): 
+            Whether to plot the thermal properties.
+
+    Returns:
+        dict: A dictionary containing the computed phonon properties. e.g.:
+        {
+        'SrZrS3--SrZrS3_needle--nm--metagga-finite_displacement': {
+            'phonons': {
+                'frequencies': [...],
+                'total_dos': [...],
+                ...
+            }
+        },
+        'SrZrS3--SrZrS3_needle--nm--metagga-static': {
+            'results': {'E_per_at': ...,},
+            'structure': ...,
+        }
+
+    """
+
     fjson = os.path.join(data_dir, savename)
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
