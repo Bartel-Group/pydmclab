@@ -164,6 +164,19 @@ def get_set_of_forces(results,
     
     return set_of_forces
 
+def to_atoms(structure):
+    """Convert various structure formats to ASE Atoms object."""
+    if isinstance(structure, Atoms):
+        return structure
+    elif isinstance(structure, Structure):
+        return AseAtomsAdaptor.get_atoms(structure)
+    elif isinstance(structure, (dict, str)):
+        pmg_structure = StrucTools(structure).structure
+        return AseAtomsAdaptor.get_atoms(pmg_structure)
+    else:
+        raise TypeError(f"Unsupported structure type: {type(structure)}")
+
+
 def get_fcp_hiphive(ideal_supercell: Atoms|dict|str, 
                     rattled_structures: list[Atoms|dict|str], 
                     force_sets: list|np.ndarray,
@@ -197,18 +210,6 @@ def get_fcp_hiphive(ideal_supercell: Atoms|dict|str,
 
     if len(rattled_structures) != len(force_sets):
         raise ValueError("The length of rattled_structures and force_sets must be the same.")
-
-    def to_atoms(structure):
-        """Convert various structure formats to ASE Atoms object."""
-        if isinstance(structure, Atoms):
-            return structure
-        elif isinstance(structure, Structure):
-            return AseAtomsAdaptor.get_atoms(structure)
-        elif isinstance(structure, (dict, str)):
-            pmg_structure = StrucTools(structure).structure
-            return AseAtomsAdaptor.get_atoms(pmg_structure)
-        else:
-            raise TypeError(f"Unsupported structure type: {type(structure)}")
 
     # Convert all structures to Atoms objects
     ideal_supercell = to_atoms(ideal_supercell)
@@ -268,6 +269,7 @@ def get_force_constants_hiphive(fcp,
     Returns:
         np.ndarray: The computed force constants array.
     """
+    supercell = to_atoms(supercell)
     fcs = fcp.get_force_constants(supercell)
     print(fcs)
     # access specific parts of the force constant matrix

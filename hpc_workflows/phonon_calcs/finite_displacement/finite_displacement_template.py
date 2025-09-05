@@ -31,6 +31,7 @@ def compute_all_phonon_properties(results,
                                   init_kwargs={},
                                   thermal_properties_kwargs=None,
                                   band_structure_kwargs=None,
+                                  query=None,
                                   savename='phonons.json',
                                   data_dir=DATA_DIR,
                                   remake=False,
@@ -45,11 +46,13 @@ def compute_all_phonon_properties(results,
 
     sets_of_forces = get_set_of_forces(results, mpid=None, xc=xc_wanted)
 
-    for key in sets_of_forces:
-        mpid = key.split('--')[1]
+    mpids = sets_of_forces.keys()
+    keys_without_disp = set([key.replace(key.split('--')[1], mpid) for key in results for mpid in mpids if mpid in key])
+
+    for key in keys_without_disp:
         forces = sets_of_forces[key]['forces']
-        supercell = displacements[mpid]['unitcell']
-        dataset = displacements[mpid]['dataset']
+        supercell = displacements[key]['unitcell']
+        dataset = displacements[key]['dataset']
 
         analyzer = AnalyzePhonons(
             unitcell=supercell,
