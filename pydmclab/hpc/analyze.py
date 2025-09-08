@@ -1512,7 +1512,7 @@ def _results_for_calc_dir(calc_dir, configs):
     #     configs["include_structure"] = False
 
     if calc != "dfpt":
-        configs["include_phonons"] = False
+        configs["include_phonons_dfpt"] = False
 
     verbose = configs["verbose"]
     include_meta = configs["include_metadata"]
@@ -1529,7 +1529,7 @@ def _results_for_calc_dir(calc_dir, configs):
     include_tcobi = configs["include_tcobi"]
     include_pcobi = configs["include_pcobi"]
     include_entry = configs["include_entry"]
-    include_phonons = configs["include_phonons"]
+    include_phonons_dfpt = configs["include_phonons_dfpt"]
     check_relax = configs["check_relax_energy"]
     create_cif = configs["create_cif"]
 
@@ -1553,7 +1553,7 @@ def _results_for_calc_dir(calc_dir, configs):
         include_tcobi=include_tcobi,
         include_pcobi=include_pcobi,
         include_entry=include_entry,
-        include_phonons=include_phonons,
+        include_phonons_dfpt=include_phonons_dfpt,
     )
 
     # store the relax energy if we asked to
