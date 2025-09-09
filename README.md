@@ -58,19 +58,19 @@ The PyDMCLab core modules rely heavily on [pymatgen](https://github.com/material
 - **[`comp`](pydmclab/core/comp.py)**: Composition analysis tools including formula normalization, element stoichiometry calculation, molecular fraction calculation, chemical system handling, and oxidation state prediction
 - **[`struc`](pydmclab/core/struc.py)**: Structure manipulation including structure creation, transformation, symmetry analysis, site manipulation, solid solution generation, and slab generation for surface studies
 
-  @todo: AJ - add sqs citation info here
   - If you use the `core.SolidSolutionGenerator` class, please consider citing:
 
     ```bibtex
-    @article{,
-        title={},
-        DOI={},
-        journal={},
-        volume={},
-        issue={},
-        pages={},
-        author={},
-        year={}
+    @article{sqsgen,
+        doi = {10.1016/j.cpc.2023.108664},
+        url = {https://doi.org/10.1016/j.cpc.2023.108664},
+        year = {2023},
+        month = jan,
+        publisher = {Elsevier {BV}},
+        pages = {108664},
+        author = {Dominik Gehringer and Martin Fri{\'{a}}k and David Holec},
+        title = {Models of configurationally-complex alloys made simple},
+        journal = {Computer Physics Communications}
     }
     ```
 
@@ -80,14 +80,14 @@ The PyDMCLab core modules rely heavily on [pymatgen](https://github.com/material
 
     ```bibtex
     @article{bartel_2018_physical_descriptor,
-        title={Physical descriptor for the Gibbs energy of inorganic crystalline solids and temperature-dependent materials chemistry},
-        DOI={},
-        journal={Nature Communications},
-        volume={9},
-        issue={1},
-        pages={4168},
-        author={Bartel, Christopher J. and Millican, Samantha L. and Deml, Ann M. and Rumptz, John R. and Tumas, William and Weimer, Alan W. and Lany, Stephan and Stevanovi{\'c}, Vladan and Musgrave, Charles B. and Holder, Aaron M.},
-        year={2018}
+      title={Physical descriptor for the Gibbs energy of inorganic crystalline solids and temperature-dependent materials chemistry},
+      DOI={},
+      journal={Nature Communications},
+      volume={9},
+      issue={1},
+      pages={4168},
+      author={Bartel, Christopher J. and Millican, Samantha L. and Deml, Ann M. and Rumptz, John R. and Tumas, William and Weimer, Alan W. and Lany, Stephan and Stevanovi{\'c}, Vladan and Musgrave, Charles B. and Holder, Aaron M.},
+      year={2018}
     }
     ```
 
@@ -97,14 +97,14 @@ The PyDMCLab core modules rely heavily on [pymatgen](https://github.com/material
 
     ```bibtex
     @article{bartel_2022_computational_approaches,
-        title={Review of computational approaches to predict the thermodynamic stability of inorganic solids},
-        DOI={10.1007/s10853-022-06915-4},
-        journal={Journal of Materials Science},
-        volume={57},
-        issue={23},
-        pages={10475--10498},
-        author={Bartel, Christopher J.},
-        year={2022}
+      title={Review of computational approaches to predict the thermodynamic stability of inorganic solids},
+      DOI={10.1007/s10853-022-06915-4},
+      journal={Journal of Materials Science},
+      volume={57},
+      issue={23},
+      pages={10475--10498},
+      author={Bartel, Christopher J.},
+      year={2022}
     }
     ```
 
@@ -143,19 +143,39 @@ The PyDMCLab core modules rely heavily on [pymatgen](https://github.com/material
 
 - **[`defects`](pydmclab/core/defects.py)**: Tools for generating and analyzing defect structures including substitutions, vacancies, and interstitials, with support for structure distortion
 
-  @todo: AJ - add doped citation info here
   - If you use the `defects` module, please consider citing:
 
     ```bibtex
-    @article{,
-        title={},
-        DOI={},
-        journal={},
-        volume={},
-        issue={},
-        pages={},
-        author={},
-        year={}
+    @article{Kavanagh2024,
+      title = {doped: Python toolkit for robust and repeatable charged
+    defect supercell calculations},
+      volume = {9},
+      ISSN = {2475-9066},
+      url = {http://dx.doi.org/10.21105/joss.06433},
+      DOI = {10.21105/joss.06433},
+      number = {96},
+      journal = {Journal of Open Source Software},
+      publisher = {The Open Journal},
+      author = {Kavanagh,  Seán R. and Squires,  Alexander G. and Nicolson,  Adair and Mosquera-Lois,  Irea and Ganose,  Alex M. and Zhu,  Bonan and Brlec,  Katarina and Walsh,  Aron and Scanlon,  David O.},
+      year = {2024},
+      month = apr,
+      pages = {6433}
+    }
+
+    @article{MosqueraLois2022,
+      title = {ShakeNBreak: Navigating the defect configurational
+    landscape},
+      volume = {7},
+      ISSN = {2475-9066},
+      url = {http://dx.doi.org/10.21105/joss.04817},
+      DOI = {10.21105/joss.04817},
+      number = {80},
+      journal = {Journal of Open Source Software},
+      publisher = {The Open Journal},
+      author = {Mosquera-Lois,  Irea and Kavanagh,  Seán R. and Walsh,  Aron and Scanlon,  David O.},
+      year = {2022},
+      month = dec,
+      pages = {4817}
     }
     ```
 
