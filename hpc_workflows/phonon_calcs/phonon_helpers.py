@@ -41,6 +41,22 @@ def get_displacements_for_phonons(
         method (str):
             Method to use for displacements. Options are 'finite_displacement' or 'hiphive'.
             REMINDER: finite_displacement creates many unitcells with one displacement each, while hiphive creates many unitcells with multiple random displacements.
+        data_dir (str or None):
+            Path to directory where displacement data will be saved. If None, data will not be saved to disk.
+        savename (str or None):
+            Name of the file to save displacement data.
+        remake (bool or None):
+            If True, will remake the displacement data even if it exists.
+        supercell_matrix (list or None):
+            Supercell matrix to use for generating supercells. Highly recommend not using as to not cause confusion. Feed a structured that has already been supercelled.
+        distance (float or None):
+            Distance for finite displacement only.
+        mc (bool):
+            If True, will use Monte Carlo method for generating displacements. For hiphive only.
+        rattle_std (float or None):
+            Standard deviation for random rattling displacements.
+        minimum_distance (float or None):
+            Minimum distance for hiphive displacement generation only if doing Monte Carlo.
 
     Returns:
         displacements_data (dict):
@@ -287,7 +303,7 @@ def get_force_data_mlp(displaced_structures: list[dict|Atoms],
         displaced_structures (list or dict): 
             The displaced structures to get force data for as an Atoms object.
                 If list, each element is a structure with displacements.
-                If dict, must contain "displaced_structures" key. Usually generated with get_displacements(),
+                If dict, must contain "displaced_structures" key. Usually generated with get_displacements_for_phonons(),
                 this way it contains all of the other information in the dict (original unitcell, dataset for phonopy).
         name_or_path (str): 
             The name or path to the MLP model.
