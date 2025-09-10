@@ -306,7 +306,7 @@ def get_force_constants_hiphive(fcp,
     fcs = fcs.get_fc_array(order=order)
     return fcs
 
-def get_force_data_mlp(displaced_structures: list[dict|Atoms], 
+def get_force_data_mlp(displaced_structures: list[dict|Atoms], relaxer: object = None,
                        name_or_path: str = "uma-s-1", task_name: str = "omat",
                        data_dir: str = None, savename: str = "force_data.json", remake: bool = False):
     """
@@ -317,6 +317,9 @@ def get_force_data_mlp(displaced_structures: list[dict|Atoms],
                 If list, each element is a structure with displacements.
                 If dict, must contain "displaced_structures" key. Usually generated with get_displacements_for_phonons(),
                 this way it contains all of the other information in the dict (original unitcell, dataset for phonopy).
+        relaxer (object): 
+            The MLP relaxer object. If None, will load fairchemRelaxer model using name_or_path and task_name.
+        data_dir (str or None):
         name_or_path (str): 
             The name or path to the MLP model.
         task_name (str): 
@@ -332,14 +335,15 @@ def get_force_data_mlp(displaced_structures: list[dict|Atoms],
             "any other keys": "..."
             }
     """
-    from pydmclab.mlp.fairchem.dynamics import FAIRChemRelaxer #Putting in this for now bc importing this requires installing the fairchem extension
 
     if data_dir is not None:
         fjson = os.path.join(data_dir, savename)
         if os.path.exists(fjson) and not remake:
             return read_json(fjson)
     
-    relaxer = FAIRChemRelaxer(name_or_path=name_or_path, task_name=task_name)
+    if relaxer is None:
+        from pydmclab.mlp.fairchem.dynamics import FAIRChemRelaxer #Putting in this for now bc importing this requires installing the fairchem extension
+        relaxer = FAIRChemRelaxer(name_or_path=name_or_path, task_name=task_name)
 
     if isinstance(displaced_structures, list):
         out = {"results": []}
