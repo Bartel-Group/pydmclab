@@ -14,7 +14,7 @@ from ase import Atoms
 from hiphive import ForceConstantPotential
 from hiphive import ClusterSpace, StructureContainer, ForceConstantPotential
 from hiphive.utilities import prepare_structures
-from hiphive.cutoffs import Cutoffs
+from hiphive.cutoffs import estimate_maximum_cutoff
 from trainstation import Optimizer
 from hiphive.structure_generation import generate_mc_rattled_structures, generate_rattled_structures
 
@@ -198,7 +198,7 @@ def get_fcp_hiphive(ideal_supercell: Atoms|dict|str,
                     rattled_structures: list[Atoms|dict|str], 
                     force_sets: list|np.ndarray,
                     primitive_cell: Atoms | None = None,
-                    cutoffs: list[float] | Cutoffs = [3.5, 3.0],
+                    cutoffs: list[float] |str = "auto",
                     data_dir: str = None,
                     savename: str = "fcp.fcp",
                     remake: bool = False):
@@ -215,9 +215,9 @@ def get_fcp_hiphive(ideal_supercell: Atoms|dict|str,
                 List of force sets corresponding to the rattled structures. Must be in the same order as rattled_structures!
             primitive_cell (Atoms | MSONAtoms): 
                 The primitive cell structure. If None is given then it will be calculated from the ideal supercell using spglib. Can be provided as an Atoms or Structure object, a dictionary, or a path to a structure file.
-            cutoffs (list | Cutoffs): 
+            cutoffs (list | str): 
                 List of cutoff distances for the cluster space, in order of increasing order starting with second order.
-                This can be either manually specified or a Cutoffs object. I think Cutoffs is a class that hiphive has made to help automatically determine cutoffs. Still looking into it.
+                This can be either manually specified or "auto". If auto is given, it will estimate the maximum cutoff based on the ideal supercell structure. Which is the most rigorous/expensive cutoff you can use.
         Returns:
             ForceConstantPotential: The constructed hiphive force constant potential object.
     """
@@ -236,7 +236,11 @@ def get_fcp_hiphive(ideal_supercell: Atoms|dict|str,
         primitive_cell = to_atoms(primitive_cell)
         
     force_sets = np.array(force_sets)
-
+    if cutoffs == "auto":
+        max_cutoff = estimate_maximum_cutoff(ideal_supercell)
+        print(f"Estimated maximum cutoff: {max_cutoff} Å")
+        cutoffs = [max_cutoff]  # Example: second order cutoffs, could add higher order if were doing third order + force constants. Right now only doing second order.
+        print(f"Using cutoffs: {cutoffs} Å")
     if primitive_cell is None:
         cs = ClusterSpace(ideal_supercell, cutoffs)
     else:
