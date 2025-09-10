@@ -66,6 +66,7 @@ def get_displacements_for_phonons(
                 "dataset": Only for finite displacement. The dataset containing displacement information obtained from phonopy,
                             this is needed to feed to AnalyzePhonons if want to obtain thermal properties from finite displacement, 
                             could optionally contain forces if calculating with mlp, but this would be in a separate function.
+                "calc_method": method used for calculating displacements: finite_displacement or hiphive
             }
 
     When creating MPIDs for the displaced structures (this would be once you are creating your get_strucs() or something), the original MPID should be used as a base, with an index appended for each displacement, always set at the end. 
@@ -220,9 +221,10 @@ def get_fcp_hiphive(ideal_supercell: Atoms|dict|str,
         Returns:
             ForceConstantPotential: The constructed hiphive force constant potential object.
     """
-    fcp_dir = os.path.join(data_dir, savename)
-    if os.path.exists(fcp_dir) and not remake:
-        return ForceConstantPotential.read(fcp_dir)
+    if data_dir is not None:
+        fcp_dir = os.path.join(data_dir, savename)
+        if os.path.exists(fcp_dir) and not remake:
+            return ForceConstantPotential.read(fcp_dir)
 
     if len(rattled_structures) != len(force_sets):
         raise ValueError("The length of rattled_structures and force_sets must be the same.")
@@ -265,8 +267,11 @@ def get_fcp_hiphive(ideal_supercell: Atoms|dict|str,
 
     # construct force constant potential
     fcp = ForceConstantPotential(cs, opt.parameters)
-    fcp.write(fcp_dir)
     print(fcp)
+    
+    if data_dir is not None:
+        fcp.write(fcp_dir)
+        return fcp.read(fcp_dir)
 
     return fcp 
 
