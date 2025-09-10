@@ -217,7 +217,9 @@ def get_fcp_hiphive(ideal_supercell: Atoms|dict|str,
                 The primitive cell structure. If None is given then it will be calculated from the ideal supercell using spglib. Can be provided as an Atoms or Structure object, a dictionary, or a path to a structure file.
             cutoffs (list | str): 
                 List of cutoff distances for the cluster space, in order of increasing order starting with second order.
-                This can be either manually specified or "auto". If auto is given, it will estimate the maximum cutoff based on the ideal supercell structure. Which is the most rigorous/expensive cutoff you can use.
+                This can be either manually specified or "auto". 
+                If auto is given, it will estimate the maximum cutoff based on the ideal supercell structure and takes a factor 0.95 of it for safety.
+                Which is the most rigorous/expensive cutoff you can use.
         Returns:
             ForceConstantPotential: The constructed hiphive force constant potential object.
     """
@@ -238,8 +240,9 @@ def get_fcp_hiphive(ideal_supercell: Atoms|dict|str,
     force_sets = np.array(force_sets)
     if cutoffs == "auto":
         max_cutoff = estimate_maximum_cutoff(ideal_supercell)
+        safety_factor = 0.95
         print(f"Estimated maximum cutoff: {max_cutoff} Å")
-        cutoffs = [max_cutoff]  # Example: second order cutoffs, could add higher order if were doing third order + force constants. Right now only doing second order.
+        cutoffs = [max_cutoff * safety_factor]  # Example: second order cutoffs, could add higher order if were doing third order + force constants. Right now only doing second order.
         print(f"Using cutoffs: {cutoffs} Å")
     if primitive_cell is None:
         cs = ClusterSpace(ideal_supercell, cutoffs)
