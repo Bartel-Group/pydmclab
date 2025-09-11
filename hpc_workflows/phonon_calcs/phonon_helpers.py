@@ -127,6 +127,7 @@ def get_set_of_forces(results,
     Args:
         results (dict):
             Dictionary containing results from multiple calculations, usually generated with get_results().
+            Keys will have mpid with displacement suffixes, e.g., 'SrZrS3--SrZrS3_needle_01--etc' or 'SrZrS3--SrZrS3_needle_1.2_01--etc' if running QHA.
         mpid (str or None):
             The base MPID of the structure for which to extract forces (without displacement suffix). E.g., 'S3Sr1Zr1_needle' or 'S3Sr1Zr1_needle_1.2' if running QHA and have a suffix for the volume scale.
             If None, will create sets of forces for all mpids and save to a dictionary.
@@ -278,9 +279,9 @@ def get_fcp_hiphive(ideal_supercell: Atoms|dict|str,
     
     if data_dir is not None:
         fcp.write(fcp_dir)
-        return fcp.read(fcp_dir)
+        return fcp.read(fcp_dir), cs
 
-    return fcp 
+    return fcp, cs
 
 def get_force_constants_hiphive(fcp, 
                                 supercell, order=2):
