@@ -389,6 +389,8 @@ def get_fcp_uncertainty(ideal_supercell, rattled_structures, force_sets,
     """
     # Create the ClusterSpace once (this defines your basis)
     ideal_supercell = to_atoms(ideal_supercell)
+    rattled_structures = [to_atoms(s) for s in rattled_structures]
+    force_sets = np.array(force_sets)
     if kwargs.get('cutoffs') == "auto":
         max_cutoff = estimate_maximum_cutoff(ideal_supercell)
         cutoffs = [max_cutoff * 0.95]
@@ -402,8 +404,6 @@ def get_fcp_uncertainty(ideal_supercell, rattled_structures, force_sets,
     force_constant_results = []
     fcp_parameters = []
 
-    ideal_supercell = to_atoms(ideal_supercell)
-    rattled_structures = [to_atoms(s) for s in rattled_structures]
 
     for fold_idx, (train_idx, val_idx) in enumerate(kf.split(rattled_structures)):
         print(f"Training fold {fold_idx + 1}/{n_folds}")
