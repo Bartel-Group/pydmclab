@@ -227,7 +227,7 @@ def get_fcp_hiphive(ideal_supercell: Atoms|dict|str,
     if data_dir is not None:
         fcp_dir = os.path.join(data_dir, savename)
         if os.path.exists(fcp_dir) and not remake:
-            return ForceConstantPotential.read(fcp_dir)
+            return ForceConstantPotential.read(fcp_dir), cs
 
     if len(rattled_structures) != len(force_sets):
         raise ValueError("The length of rattled_structures and force_sets must be the same.")
