@@ -436,6 +436,8 @@ def get_fcp_uncertainty(ideal_supercell, rattled_structures, force_sets,
     parameters_array = np.array(fcp_parameters)
     mean_parameters = np.mean(parameters_array, axis=0)
     std_parameters = np.std(parameters_array, axis=0)
+    overall_std_mean = np.mean(std_parameters)
+
     # force_constants_array = np.array(force_constant_results)
     # mean_force_constants = np.mean(force_constants_array, axis=0)
     # std_force_constants = np.std(force_constants_array, axis=0)
@@ -446,6 +448,7 @@ def get_fcp_uncertainty(ideal_supercell, rattled_structures, force_sets,
     return final_fcp, cs, {
         'mean_parameters': mean_parameters,
         'std_parameters': std_parameters,
+        'overall_std_mean': overall_std_mean,
         'all_parameters': parameters_array,
         'cv_results': final_fcp.get_force_constants(ideal_supercell).get_fc_array(order=2) # Example for second order
     }
