@@ -19,6 +19,8 @@ from trainstation import Optimizer
 from hiphive.structure_generation import generate_mc_rattled_structures, generate_rattled_structures
 
 from phonopy import Phonopy
+from sklearn.model_selection import KFold
+
 
 def get_displacements_for_phonons(
                     unitcell: str|dict,
@@ -378,3 +380,71 @@ def get_force_data_mlp(displaced_structures: list[dict|Atoms], relaxer: object =
         return read_json(fjson)
     else:
         return out
+    
+
+def get_fcp_uncertainty(ideal_supercell, rattled_structures, force_sets, 
+                    n_folds=5, **kwargs):
+    """
+    Get force constant potential with uncertainty via cross-validation
+    """
+    # Create the ClusterSpace once (this defines your basis)
+    ideal_supercell = to_atoms(ideal_supercell)
+    if kwargs.get('cutoffs') == "auto":
+        max_cutoff = estimate_maximum_cutoff(ideal_supercell)
+        cutoffs = [max_cutoff * 0.95]
+    else:
+        cutoffs = kwargs.get('cutoffs')
+
+    cs = ClusterSpace(ideal_supercell, cutoffs)
+
+    # Set up cross-validation
+    kf = KFold(n_splits=n_folds, shuffle=True, random_state=42)
+    force_constant_results = []
+    fcp_parameters = []
+
+    rattled_structures = [to_atoms(s) for s in rattled_structures]
+
+    for fold_idx, (train_idx, val_idx) in enumerate(kf.split(rattled_structures)):
+        print(f"Training fold {fold_idx + 1}/{n_folds}")
+        
+        # Get training data for this fold
+        train_structures = [rattled_structures[i] for i in train_idx]
+        train_forces = [force_sets[i] for i in train_idx]
+
+        for i, structure in enumerate(train_structures):
+            structure.calc = None
+            structure.arrays['forces'] = train_forces[i]
+
+        structures = prepare_structures(train_structures, ideal_supercell)
+        sc = StructureContainer(cs)  # Same ClusterSpace for all folds!
+        for structure in structures:
+            sc.add_structure(structure)
+            
+        opt = Optimizer(sc.get_fit_data())
+        opt.train()
+        
+        # Store the trained parameters
+        fcp_parameters.append(opt.parameters.copy())
+        
+        # # Create FCP and get force constants for uncertainty analysis
+        # fcp = ForceConstantPotential(cs, opt.parameters)
+        # # Store whatever you want to analyze uncertainty for
+        # force_constant_results.append(fcp.get_force_constants(ideal_supercell).get_fc_array(order=2)) # Example for second order
+
+    # Calculate statistics
+    parameters_array = np.array(fcp_parameters)
+    mean_parameters = np.mean(parameters_array, axis=0)
+    std_parameters = np.std(parameters_array, axis=0)
+    # force_constants_array = np.array(force_constant_results)
+    # mean_force_constants = np.mean(force_constants_array, axis=0)
+    # std_force_constants = np.std(force_constants_array, axis=0)
+
+    # Create final model with mean parameters
+    final_fcp = ForceConstantPotential(cs, mean_parameters)
+
+    return final_fcp, cs, {
+        'mean_parameters': mean_parameters,
+        'std_parameters': std_parameters,
+        'all_parameters': parameters_array,
+        'cv_results': final_fcp.get_force_constants(ideal_supercell).get_fc_array(order=2) # Example for second order
+    }
