@@ -196,6 +196,22 @@ def to_atoms(structure):
     else:
         raise TypeError(f"Unsupported structure type: {type(structure)}")
 
+def get_cluster_space_hiphive(ideal_supercell: Atoms|dict|str,
+                              cutoffs: list[float]|str = "auto",
+                              primitive_cell: Atoms|dict|str|None = None):
+    
+    ideal_supercell = to_atoms(ideal_supercell)
+    if cutoffs == "auto":
+        max_cutoff = estimate_maximum_cutoff(ideal_supercell)
+        safety_factor = 0.95
+        print(f"Estimated maximum cutoff: {max_cutoff} Å")
+        cutoffs = [max_cutoff * safety_factor]  # Example: second order cutoffs, could add higher order if were doing third order + force constants. Right now only doing second order.
+        print(f"Using cutoffs: {cutoffs} Å")
+    if primitive_cell is None:
+        cs = ClusterSpace(ideal_supercell, cutoffs)
+    else:
+        cs = ClusterSpace(primitive_cell, cutoffs)
+    return cs
 
 def get_fcp_hiphive(ideal_supercell: Atoms|dict|str, 
                     rattled_structures: list[Atoms|dict|str], 
@@ -241,16 +257,7 @@ def get_fcp_hiphive(ideal_supercell: Atoms|dict|str,
         primitive_cell = to_atoms(primitive_cell)
         
     force_sets = np.array(force_sets)
-    if cutoffs == "auto":
-        max_cutoff = estimate_maximum_cutoff(ideal_supercell)
-        safety_factor = 0.95
-        print(f"Estimated maximum cutoff: {max_cutoff} Å")
-        cutoffs = [max_cutoff * safety_factor]  # Example: second order cutoffs, could add higher order if were doing third order + force constants. Right now only doing second order.
-        print(f"Using cutoffs: {cutoffs} Å")
-    if primitive_cell is None:
-        cs = ClusterSpace(ideal_supercell, cutoffs)
-    else:
-        cs = ClusterSpace(primitive_cell, cutoffs)
+    cs = get_cluster_space_hiphive(ideal_supercell, cutoffs=cutoffs, primitive_cell=primitive_cell)
 
     print(cs)
     cs.print_orbits()
@@ -383,7 +390,7 @@ def get_force_data_mlp(displaced_structures: list[dict|Atoms], relaxer: object =
     
 
 def get_fcp_uncertainty(ideal_supercell, rattled_structures, force_sets, 
-                    n_folds=5, **kwargs):
+                    n_folds=5, **kwargs,):
     """
     Get force constant potential with uncertainty via cross-validation
     """
@@ -391,11 +398,7 @@ def get_fcp_uncertainty(ideal_supercell, rattled_structures, force_sets,
     ideal_supercell = to_atoms(ideal_supercell)
     rattled_structures = [to_atoms(s) for s in rattled_structures]
     force_sets = np.array(force_sets)
-    if kwargs.get('cutoffs') == "auto":
-        max_cutoff = estimate_maximum_cutoff(ideal_supercell)
-        cutoffs = [max_cutoff * 0.95]
-    else:
-        cutoffs = kwargs.get('cutoffs')
+    cutoffs = kwargs.get('cutoffs')
 
     cs = ClusterSpace(ideal_supercell, cutoffs)
 
