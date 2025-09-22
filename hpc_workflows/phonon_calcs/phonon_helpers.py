@@ -465,7 +465,7 @@ def get_fcp_uncertainty(ideal_supercell, rattled_structures, force_sets,
             phonon_results['free_energy'].append(free_energies)
             phonon_results['heat_capacity'].append(heat_capacities)
             phonon_results['entropy'].append(entropies)
-            phonon_results['total_dos'].append(total_dos)
+            phonon_results['total_dos']['total_dos'].append(total_dos)
 
 
     # Calculate statistics
