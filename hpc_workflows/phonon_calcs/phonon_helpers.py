@@ -461,11 +461,11 @@ def get_fcp_uncertainty(ideal_supercell, rattled_structures, force_sets,
             free_energies = [tp['free_energy'] for tp in summary['thermal_properties']]
             heat_capacities = [tp['heat_capacity'] for tp in summary['thermal_properties']]
             entropies = [tp['entropy'] for tp in summary['thermal_properties']]
-            total_dos = summary.get('total_dos', None)
+            total_dos = summary['total_dos']['total_dos']
             phonon_results['free_energy'].append(free_energies)
             phonon_results['heat_capacity'].append(heat_capacities)
             phonon_results['entropy'].append(entropies)
-            phonon_results['total_dos']['total_dos'].append(total_dos)
+            phonon_results['total_dos'].append(total_dos)
 
 
     # Calculate statistics
