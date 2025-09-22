@@ -4,6 +4,7 @@ import numpy as np
 from pydmclab.utils.handy import read_json, write_json, convert_numpy_to_native
 from pydmclab.core.struc import StrucTools
 from pydmclab.core.comp import CompTools
+from pydmclab.hpc.phonons import AnalyzePhonons
 
 from pymatgen.core.structure import Structure
 from pymatgen.io.ase import AseAtomsAdaptor
@@ -390,7 +391,7 @@ def get_force_data_mlp(displaced_structures: list[dict|Atoms], relaxer: object =
     
 
 def get_fcp_uncertainty(ideal_supercell, rattled_structures, force_sets, 
-                    n_folds=5, **kwargs,):
+                    n_folds=5, **kwargs, calculate_phonons=False):
     """
     Get force constant potential with uncertainty via cross-validation
     """
@@ -406,6 +407,7 @@ def get_fcp_uncertainty(ideal_supercell, rattled_structures, force_sets,
     kf = KFold(n_splits=n_folds, shuffle=True, random_state=42)
     force_constant_results = []
     fcp_parameters = []
+    phonon_results = {'free_energy': [], 'heat_capacity': [], 'entropy': []}
 
 
     for fold_idx, (train_idx, val_idx) in enumerate(kf.split(rattled_structures)):
@@ -430,28 +432,77 @@ def get_fcp_uncertainty(ideal_supercell, rattled_structures, force_sets,
         # Store the trained parameters
         fcp_parameters.append(opt.parameters.copy())
         
-        # # Create FCP and get force constants for uncertainty analysis
-        # fcp = ForceConstantPotential(cs, opt.parameters)
-        # # Store whatever you want to analyze uncertainty for
-        # force_constant_results.append(fcp.get_force_constants(ideal_supercell).get_fc_array(order=2)) # Example for second order
+        # Create FCP and get force constants for uncertainty analysis
+        fcp = ForceConstantPotential(cs, opt.parameters)
+        force_constants = fcp.get_force_constants(ideal_supercell).get_fc_array(order=2) # Example for second order
+        # Store whatever you want to analyze uncertainty for
+        force_constant_results.append(force_constants) # Example for second order
+
+        if calculate_phonons:
+            analyzer = AnalyzePhonons(
+                unitcell=ideal_supercell,
+                force_data=force_constants,
+            )
+
+            summary = analyzer.summary()
+
+            # Normalize thermal properties by n_atoms
+            n_atoms = len(ideal_supercell['sites'])
+            if n_atoms:
+                if 'thermal_properties' in summary and isinstance(summary['thermal_properties'], list):
+                    for tp in summary['thermal_properties']:
+                        if 'free_energy' in tp:
+                            tp['free_energy'] /= n_atoms
+                        if 'heat_capacity' in tp:
+                            tp['heat_capacity'] /= n_atoms
+                        if 'entropy' in tp:
+                            tp['entropy'] /= n_atoms
+
+            free_energies = [tp['free_energy'] for tp in summary['thermal_properties']]
+            heat_capacities = [tp['heat_capacity'] for tp in summary['thermal_properties']]
+            entropies = [tp['entropy'] for tp in summary['thermal_properties']]
+            phonon_results['free_energy'].append(free_energies)
+            phonon_results['heat_capacity'].append(heat_capacities)
+            phonon_results['entropy'].append(entropies)
+
 
     # Calculate statistics
     parameters_array = np.array(fcp_parameters)
     mean_parameters = np.mean(parameters_array, axis=0)
     std_parameters = np.std(parameters_array, axis=0)
-    overall_std_mean = np.mean(std_parameters)
+    overall_param_std_mean = np.mean(std_parameters)
 
-    # force_constants_array = np.array(force_constant_results)
-    # mean_force_constants = np.mean(force_constants_array, axis=0)
-    # std_force_constants = np.std(force_constants_array, axis=0)
+    force_constants_array = np.array(force_constant_results)
+    mean_force_constants = np.mean(force_constants_array, axis=0)
+    std_force_constants = np.std(force_constants_array, axis=0)
+    overall_fc_std_mean = np.mean(std_force_constants)
 
     # Create final model with mean parameters
     final_fcp = ForceConstantPotential(cs, mean_parameters)
 
-    return final_fcp, cs, {
+    out = {
         'mean_parameters': mean_parameters,
         'std_parameters': std_parameters,
-        'overall_std_mean': overall_std_mean,
+        'overall_param_std_mean': overall_param_std_mean,
+        'overall_fc_std_mean': overall_fc_std_mean,
         'all_parameters': parameters_array,
         'cv_results': final_fcp.get_force_constants(ideal_supercell).get_fc_array(order=2) # Example for second order
     }
+
+    if calculate_phonons:
+        free_energy_array = np.array(phonon_results['free_energy'])
+        heat_capacity_array = np.array(phonon_results['heat_capacity'])
+        entropy_array = np.array(phonon_results['entropy'])
+        out['phonon_results'] = {
+            'free_energy_mean': np.mean(free_energy_array, axis=0),
+            'free_energy_std': np.std(free_energy_array, axis=0),
+            'overall_free_energy_std_mean': np.mean(np.std(free_energy_array, axis=0)),
+            'heat_capacity_mean': np.mean(heat_capacity_array, axis=0),
+            'heat_capacity_std': np.std(heat_capacity_array, axis=0),
+            'overall_heat_capacity_std_mean': np.mean(np.std(heat_capacity_array, axis=0)),
+            'entropy_mean': np.mean(entropy_array, axis=0),
+            'entropy_std': np.std(entropy_array, axis=0),
+            'overall_entropy_std_mean': np.mean(np.std(entropy_array, axis=0)),
+        }
+
+    return final_fcp, cs, out
