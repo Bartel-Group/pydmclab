@@ -407,7 +407,7 @@ def get_fcp_uncertainty(ideal_supercell, rattled_structures, force_sets,
     kf = KFold(n_splits=n_folds, shuffle=True, random_state=42)
     force_constant_results = []
     fcp_parameters = []
-    phonon_results = {'free_energy': [], 'heat_capacity': [], 'entropy': []}
+    phonon_results = {'free_energy': [], 'heat_capacity': [], 'entropy': [], 'total_dos': []}
 
 
     for fold_idx, (train_idx, val_idx) in enumerate(kf.split(rattled_structures)):
@@ -461,9 +461,11 @@ def get_fcp_uncertainty(ideal_supercell, rattled_structures, force_sets,
             free_energies = [tp['free_energy'] for tp in summary['thermal_properties']]
             heat_capacities = [tp['heat_capacity'] for tp in summary['thermal_properties']]
             entropies = [tp['entropy'] for tp in summary['thermal_properties']]
+            total_dos = summary.get('total_dos', None)
             phonon_results['free_energy'].append(free_energies)
             phonon_results['heat_capacity'].append(heat_capacities)
             phonon_results['entropy'].append(entropies)
+            phonon_results['total_dos'].append(total_dos)
 
 
     # Calculate statistics
@@ -493,6 +495,7 @@ def get_fcp_uncertainty(ideal_supercell, rattled_structures, force_sets,
         free_energy_array = np.array(phonon_results['free_energy'])
         heat_capacity_array = np.array(phonon_results['heat_capacity'])
         entropy_array = np.array(phonon_results['entropy'])
+        total_dos_array = np.array(phonon_results['total_dos'])
         out['phonon_results'] = {
             'free_energy_mean': np.mean(free_energy_array, axis=0),
             'free_energy_std': np.std(free_energy_array, axis=0),
@@ -503,6 +506,9 @@ def get_fcp_uncertainty(ideal_supercell, rattled_structures, force_sets,
             'entropy_mean': np.mean(entropy_array, axis=0),
             'entropy_std': np.std(entropy_array, axis=0),
             'overall_entropy_std_mean': np.mean(np.std(entropy_array, axis=0)),
+            'total_dos_mean': np.mean(total_dos_array, axis=0) if total_dos_array.size else None,
+            'total_dos_std': np.std(total_dos_array, axis=0) if total_dos_array.size else None, 
+            'overall_total_dos_std_mean': np.mean(np.std(total_dos_array, axis=0)) if total_dos_array.size else None,
         }
 
     return final_fcp, cs, out
