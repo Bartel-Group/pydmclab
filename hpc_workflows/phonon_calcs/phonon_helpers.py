@@ -391,7 +391,7 @@ def get_force_data_mlp(displaced_structures: list[dict|Atoms], relaxer: object =
     
 
 def get_fcp_uncertainty(ideal_supercell, rattled_structures, force_sets, 
-                    n_folds=5, **kwargs, calculate_phonons=False):
+                    n_folds=5, calculate_phonons=False, **kwargs):
     """
     Get force constant potential with uncertainty via cross-validation
     """
