@@ -396,12 +396,12 @@ def get_fcp_uncertainty(ideal_supercell, rattled_structures, force_sets,
     Get force constant potential with uncertainty via cross-validation
     """
     # Create the ClusterSpace once (this defines your basis)
-    ideal_supercell = to_atoms(ideal_supercell)
+    atoms_ideal_supercell = to_atoms(ideal_supercell)
     rattled_structures = [to_atoms(s) for s in rattled_structures]
     force_sets = np.array(force_sets)
     cutoffs = kwargs.get('cutoffs')
 
-    cs = get_cluster_space_hiphive(ideal_supercell, cutoffs)
+    cs = get_cluster_space_hiphive(atoms_ideal_supercell, cutoffs)
 
     # Set up cross-validation
     kf = KFold(n_splits=n_folds, shuffle=True, random_state=42)
@@ -421,7 +421,7 @@ def get_fcp_uncertainty(ideal_supercell, rattled_structures, force_sets,
             structure.calc = None
             structure.arrays['forces'] = train_forces[i]
 
-        structures = prepare_structures(train_structures, ideal_supercell)
+        structures = prepare_structures(train_structures, atoms_ideal_supercell)
         sc = StructureContainer(cs)  # Same ClusterSpace for all folds!
         for structure in structures:
             sc.add_structure(structure)
@@ -434,7 +434,7 @@ def get_fcp_uncertainty(ideal_supercell, rattled_structures, force_sets,
         
         # Create FCP and get force constants for uncertainty analysis
         fcp = ForceConstantPotential(cs, opt.parameters)
-        force_constants = fcp.get_force_constants(ideal_supercell).get_fc_array(order=2) # Example for second order
+        force_constants = fcp.get_force_constants(atoms_ideal_supercell).get_fc_array(order=2) # Example for second order
         # Store whatever you want to analyze uncertainty for
         force_constant_results.append(force_constants) # Example for second order
 
@@ -488,7 +488,7 @@ def get_fcp_uncertainty(ideal_supercell, rattled_structures, force_sets,
         'overall_param_std_mean': overall_param_std_mean,
         'overall_fc_std_mean': overall_fc_std_mean,
         'all_parameters': parameters_array,
-        'cv_results': final_fcp.get_force_constants(ideal_supercell).get_fc_array(order=2) # Example for second order
+        'cv_results': final_fcp.get_force_constants(atoms_ideal_supercell).get_fc_array(order=2) # Example for second order
     }
 
     if calculate_phonons:
