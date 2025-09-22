@@ -401,7 +401,7 @@ def get_fcp_uncertainty(ideal_supercell, rattled_structures, force_sets,
     force_sets = np.array(force_sets)
     cutoffs = kwargs.get('cutoffs')
 
-    cs = ClusterSpace(ideal_supercell, cutoffs)
+    cs = get_cluster_space_hiphive(ideal_supercell, cutoffs)
 
     # Set up cross-validation
     kf = KFold(n_splits=n_folds, shuffle=True, random_state=42)
