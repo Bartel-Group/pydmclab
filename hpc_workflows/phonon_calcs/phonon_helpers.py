@@ -122,9 +122,9 @@ def get_displacements_for_phonons(
     else:
         return out
 
-def get_rattle_std(structure: str|dict, percent: float) -> float:
+def estimate_rattle_std(structure: str|dict, fraction: float) -> float:
     """
-    Estimate the rattle standard deviation based on a percentage of the minimum interatomic distance in the structure.
+    Estimate the rattle standard deviation based on a fraction of the minimum interatomic distance in the structure.
     Note: at the moment just auto detects oxidation states and assigns formal charges. This could be improved in the future.
     """
     nn = CrystalNN()
@@ -141,8 +141,8 @@ def get_rattle_std(structure: str|dict, percent: float) -> float:
             dist = site1.distance(site2)
             if dist < min_dist:
                 min_dist = dist
-    
-    return min_dist * percent
+
+    return min_dist * fraction
 
 def get_set_of_forces(results,
                       mpid=None,
