@@ -9,6 +9,7 @@ from pydmclab.hpc.phonons import AnalyzePhonons
 from pymatgen.core.structure import Structure
 from pymatgen.io.ase import AseAtomsAdaptor
 from pymatgen.io.phonopy import get_phonopy_structure, get_pmg_structure
+from pymatgen.analysis.local_env import CrystalNN
 
 from ase import Atoms
 
@@ -121,6 +122,28 @@ def get_displacements_for_phonons(
     else:
         return out
 
+def get_rattle_std(structure: str|dict, percent: float) -> float:
+    """
+    Estimate the rattle standard deviation based on a percentage of the minimum interatomic distance in the structure.
+    Note: at the moment just auto detects oxidation states and assigns formal charges. This could be improved in the future.
+    """
+    nn = CrystalNN()
+    st = StrucTools(structure)
+    struc = st.decorate_with_ox_states
+    
+    nn_info = nn.get_all_nn_info(struc)
+    
+    min_dist = float("inf")
+    for i, neighbors in enumerate(nn_info):  # Fixed enumerate usage
+        site1 = struc.sites[i]
+        for neighbor in neighbors:
+            site2 = neighbor['site']
+            dist = site1.distance(site2)
+            if dist < min_dist:
+                min_dist = dist
+    
+    return min_dist * percent
+
 def get_set_of_forces(results,
                       mpid=None,
                       xc: str = "metagga"):
@@ -199,12 +222,12 @@ def to_atoms(structure):
 
 def get_cluster_space_hiphive(ideal_supercell: Atoms|dict|str,
                               cutoffs: list[float]|str = "auto",
+                                safety_factor: float = 0.95,
                               primitive_cell: Atoms|dict|str|None = None):
     
     ideal_supercell = to_atoms(ideal_supercell)
     if cutoffs == "auto":
         max_cutoff = estimate_maximum_cutoff(ideal_supercell)
-        safety_factor = 0.95
         print(f"Estimated maximum cutoff: {max_cutoff} Å")
         cutoffs = [max_cutoff * safety_factor]  # Example: second order cutoffs, could add higher order if were doing third order + force constants. Right now only doing second order.
         print(f"Using cutoffs: {cutoffs} Å")
@@ -219,6 +242,7 @@ def get_fcp_hiphive(ideal_supercell: Atoms|dict|str,
                     force_sets: list|np.ndarray,
                     primitive_cell: Atoms | None = None,
                     cutoffs: list[float] |str = "auto",
+                    safety_factor: float = 0.95,
                     data_dir: str = None,
                     savename: str = "fcp.fcp",
                     remake: bool = False):
@@ -240,6 +264,8 @@ def get_fcp_hiphive(ideal_supercell: Atoms|dict|str,
                 This can be either manually specified or "auto". 
                 If auto is given, it will estimate the maximum cutoff based on the ideal supercell structure and takes a factor 0.95 of it for safety.
                 Which is the most rigorous/expensive cutoff you can use.
+            safety_factor (float):
+                Safety factor to apply when estimating maximum cutoff if cutoffs="auto". Default is 0.95.
         Returns:
             ForceConstantPotential: The constructed hiphive force constant potential object.
     """
@@ -258,7 +284,7 @@ def get_fcp_hiphive(ideal_supercell: Atoms|dict|str,
         primitive_cell = to_atoms(primitive_cell)
         
     force_sets = np.array(force_sets)
-    cs = get_cluster_space_hiphive(ideal_supercell, cutoffs=cutoffs, primitive_cell=primitive_cell)
+    cs = get_cluster_space_hiphive(ideal_supercell, cutoffs=cutoffs, safety_factor=safety_factor, primitive_cell=primitive_cell)
 
     print(cs)
     cs.print_orbits()
@@ -393,7 +419,49 @@ def get_force_data_mlp(displaced_structures: list[dict|Atoms], relaxer: object =
 def get_fcp_uncertainty(ideal_supercell, rattled_structures, force_sets, 
                     n_folds=5, calculate_phonons=False, **kwargs):
     """
-    Get force constant potential with uncertainty via cross-validation
+    Get force constant potential with uncertainty via cross-validation.
+    Args:
+        ideal_supercell (Atoms | dict | str): 
+            The ideal supercell structure (no rattling). Can be provided as an Atoms or Structure object, a dictionary, or a path to a structure file.
+        rattled_structures (list): 
+            List of rattled structures as Atoms, Structure objects, dictionaries, or paths to structure files.
+        force_sets (list): 
+            List of force sets corresponding to the rattled structures. Must be in the same order as rattled_structures!
+        n_folds (int): 
+            Number of folds for cross-validation.
+        calculate_phonons (bool): 
+            If True, will calculate phonon properties for each fold and return statistics.
+        **kwargs: 
+            Additional keyword arguments to pass to get_cluster_space_hiphive(), e.g., cutoffs.
+    Returns:
+        final_fcp (ForceConstantPotential): 
+            The final force constant potential object trained on the mean parameters from cross-validation.
+        cs (ClusterSpace): 
+            The cluster space used for the force constant potential.
+        out (dict): 
+            Dictionary containing statistics from cross-validation:
+            {
+                'mean_parameters': Mean of the fitted parameters across folds,
+                'std_parameters': Standard deviation of the fitted parameters across folds,
+                'overall_param_std_mean': Mean of the standard deviations of the parameters,
+                'overall_fc_std_mean': Mean of the standard deviations of the force constants,
+                'all_parameters': Array of all fitted parameters from each fold,
+                'cv_results': Force constants from the final model,
+                'phonon_results': {
+                    'free_energy_mean': Mean free energy across folds,
+                    'free_energy_std': Standard deviation of free energy across folds,
+                    'overall_free_energy_std_mean': Mean of the standard deviations of free energy,
+                    'heat_capacity_mean': Mean heat capacity across folds,
+                    'heat_capacity_std': Standard deviation of heat capacity across folds,
+                    'overall_heat_capacity_std_mean': Mean of the standard deviations of heat capacity,
+                    'entropy_mean': Mean entropy across folds,
+                    'entropy_std': Standard deviation of entropy across folds,
+                    'overall_entropy_std_mean': Mean of the standard deviations of entropy,
+                    'total_dos_mean': Mean total DOS across folds,
+                    'total_dos_std': Standard deviation of total DOS across folds,
+                    'overall_total_dos_std_mean': Mean of the standard deviations of total DOS,
+                }
+            }
     """
     # Create the ClusterSpace once (this defines your basis)
     atoms_ideal_supercell = to_atoms(ideal_supercell)
