@@ -338,6 +338,8 @@ class SubmitTools(object):
                 return "%s/vasp.6.4.1" % preamble
             elif version == 7:
                 return "%s/vasp.6.5.1" % preamble
+            else:
+                raise NotImplementedError(f"VASP version {version} not supported on MSI")
         elif machine == "bridges2":
             if version == 6:
                 return "/opt/packages/VASP/VASP6/6.4.1/INTEL"
