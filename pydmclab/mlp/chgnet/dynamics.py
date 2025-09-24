@@ -435,10 +435,13 @@ class CHGNetRelaxer:
             native_obs = convert_numpy_to_native(obs.as_dict())
             obs = CHGNetObserver.from_dict(native_obs)
 
+        # Ensure structure is JSON serializable by converting to dict
+        serializable_structure = struc.as_dict() if hasattr(struc, 'as_dict') else struc
+
         return {
-            "final_structure": struc,
+            "final_structure": serializable_structure,
             "final_energy": obs.energies[-1],
-            "coverged": obs.fmaxs[-1] < fmax if obs.fmaxs else False,
+            "converged": obs.fmaxs[-1] < fmax if obs.fmaxs else False,
             "trajectory": obs if include_obs_in_results else None,
         }
 
