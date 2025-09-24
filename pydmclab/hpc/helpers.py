@@ -256,7 +256,7 @@ def get_sub_configs(
         mpi_command (str):
             the command to use for mpi (eg mpirun, srun, etc)
         vasp_version (int):
-            5 for 5.4.4 or 6 for 6.4.1
+            5 for 5.4.4, 6 for 6.4.1, or 7 for 6.5.1
         lobster_version (int):
             4 for 4.1.0 or 5 for 5.1.0
     Returns:
