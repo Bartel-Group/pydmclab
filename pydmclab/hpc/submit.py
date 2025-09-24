@@ -744,7 +744,7 @@ class SubmitTools(object):
                 if configs["machine"] == "msi":
                     if configs["vasp_version"] == 5:
                         f.write("module load impi/2018/release_multithread\n")
-                    elif configs["vasp_version"] == 6:
+                    elif configs["vasp_version"] == 6 or configs["vasp_version"] == 7:
                         unload = [
                             "mkl",
                             "intel/2018.release",
