@@ -18,6 +18,14 @@
 # A robust, open-source python library for materials analysis." Computational
 # Materials Science 68 (2013): 314-319.
 
+
+##########################################################
+#                                                        #
+#            Modified Diffusion Analysis Code            #
+#                                                        #
+##########################################################
+
+
 from __future__ import division, unicode_literals
 import numpy as np
 from monty.json import MSONable
@@ -537,10 +545,10 @@ def _get_vasprun(args):
     return Vasprun(args[0], ionic_step_skip=args[1], parse_dos=False, parse_eigen=False)
 
 
-class ArreheniusAnalyzer(object):
+class ArrheniusAnalyzer(object):
     def __init__(self, temperatures, diffusivities, diffusivity_errors=None):
         """
-        Fitting arrehenius relationship from temperatures, diffusivities and diffusivity_error
+        Fitting arrhenius relationship from temperatures, diffusivities and diffusivity_error
         :param temperatures (List): list of temperatures
         :param diffusivities (List): list of diffusivities at different temperatures
         :param diffusivity_errors (List): optional, list of diffusivity error at different temperatures
