@@ -336,6 +336,10 @@ class SubmitTools(object):
                 return "%s/vasp.5.4.4.pl2" % preamble
             elif version == 6:
                 return "%s/vasp.6.4.1" % preamble
+            elif version == 7:
+                return "%s/vasp.6.5.1" % preamble
+            else:
+                raise NotImplementedError(f"VASP version {version} not supported on MSI")
         elif machine == "bridges2":
             if version == 6:
                 return "/opt/packages/VASP/VASP6/6.4.1/INTEL"
@@ -740,7 +744,7 @@ class SubmitTools(object):
                 if configs["machine"] == "msi":
                     if configs["vasp_version"] == 5:
                         f.write("module load impi/2018/release_multithread\n")
-                    elif configs["vasp_version"] == 6:
+                    elif configs["vasp_version"] == 6 or configs["vasp_version"] == 7:
                         unload = [
                             "mkl",
                             "intel/2018.release",
@@ -801,6 +805,7 @@ class SubmitTools(object):
                     "incar_mods": incar_mods,
                     "launch_dir": launch_dir,
                     "struc_src_for_hse": configs["struc_src_for_hse"],
+                    "xc_calc_src_for_lobster": configs["xc_calc_src_for_lobster"],
                 }
                 passer_dict_as_str = json.dumps(passer_dict)
 
@@ -826,7 +831,7 @@ class SubmitTools(object):
                     f.write(self.lobster_command)
 
                 # run bader for all static jobs
-                if calc_to_run == "static":
+                if calc_to_run in ["static", "lobster"]:
                     f.write(self.bader_command)
 
                 # execute the collector

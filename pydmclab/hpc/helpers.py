@@ -215,6 +215,7 @@ def get_sub_configs(
     vasp_version=6,
     lobster_version=4,
     struc_src_for_hse="metagga-relax",
+    xc_calc_src_for_lobster=None,
 ):
     """
     configs related to generating submission scripts
@@ -255,7 +256,7 @@ def get_sub_configs(
         mpi_command (str):
             the command to use for mpi (eg mpirun, srun, etc)
         vasp_version (int):
-            5 for 5.4.4 or 6 for 6.4.1
+            5 for 5.4.4, 6 for 6.4.1, or 7 for 6.5.1
         lobster_version (int):
             4 for 4.1.0 or 5 for 5.1.0
     Returns:
@@ -288,6 +289,7 @@ def get_sub_configs(
     sub_configs["vasp_version"] = vasp_version
     sub_configs["lobster_version"] = lobster_version
     sub_configs["struc_src_for_hse"] = struc_src_for_hse
+    sub_configs["xc_calc_src_for_lobster"] = xc_calc_src_for_lobster
 
     if prioritize_relaxes:
         sub_configs["run_static_addons_before_all_relaxes"] = False

@@ -62,6 +62,7 @@ class Passer(object):
         self.incar_mods = passer_dict["incar_mods"]
         self.launch_dir = passer_dict["launch_dir"]
         self.struc_src_for_hse = passer_dict["struc_src_for_hse"]
+        self.xc_calc_src_for_lobster = passer_dict["xc_calc_src_for_lobster"]
 
     @property
     def prev_xc_calc(self) -> str:
@@ -151,6 +152,11 @@ class Passer(object):
                 # for hse06-parchg, inherit from hse06-static; for other addons in hse06, inherit from preggastatic
                 prev_xc_calc = curr_xc_calc.replace(curr_calc, "preggastatic")
                 return prev_xc_calc
+
+        if curr_calc == "prelobster" and self.xc_calc_src_for_lobster is not None:
+            # user can set custom inheritance for non-hse lobster
+            # e.g., inheriting from ggau-relax instead of ggau-static
+            return self.xc_calc_src_for_lobster
 
         if curr_calc in ["parchg"]:
             # for parchg, inherit from lobster

@@ -52,7 +52,7 @@ ARCHITECTURE_CONFIGS = get_fairchem_configs(
     inference_settings="default",
     overrides=None,
     optimizer="FIRE",
-    fmax=0.1,
+    fmax=0.03,
     steps=500,
     relax_cell=True,
     ase_filter="FrechetCellFilter",
@@ -62,15 +62,16 @@ ARCHITECTURE_CONFIGS = get_fairchem_configs(
 )
 
 # set launch configs
-LAUNCH_CONFIGS = get_launch_configs(batch_size=100, save_interval=10)
+LAUNCH_CONFIGS = get_launch_configs(batch_size=100, batch_id=0, save_interval=10)
 
 # set slurm submission script configs
 SLURM_CONFIGS = get_slurm_configs(
     total_nodes=1,
-    cores_per_node=16,
-    walltime_in_hours=6,
-    mem_per_core_in_MB=1900,
-    partition="msismall,msidmc",
+    tasks_per_node=1,
+    cores_per_task=8,
+    walltime_in_hours=12,
+    mem_per_core_in_MB=3900,
+    partition="preempt,msismall,msidmc",
     error_file="log.e",
     output_file="log.o",
     account="cbartel",
@@ -78,7 +79,7 @@ SLURM_CONFIGS = get_slurm_configs(
 
 # set torch configs
 TORCH_CONFIGS = get_torch_configs(
-    slurm_configs=SLURM_CONFIGS, num_intraop_threads=4, num_interop_threads=4
+    slurm_configs=SLURM_CONFIGS, num_intraop_threads=None, num_interop_threads=None
 )
 
 # collect all user configs

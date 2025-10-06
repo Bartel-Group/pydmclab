@@ -7,6 +7,7 @@ import inspect
 import contextlib
 import pickle as pkl
 from enum import Enum
+from math import sqrt
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Literal
 
@@ -22,14 +23,13 @@ from ase.filters import Filter
 from ase.calculators.calculator import Calculator, all_changes, all_properties
 from ase.io.trajectory import Trajectory
 from ase.io.jsonio import encode, decode
-from ase.io import write
 
 from pymatgen.core.structure import Structure
 from pymatgen.io.ase import AseAtomsAdaptor
-from pymatgen.analysis.diffusion.aimd.pathway import ProbabilityDensityAnalysis
 
 from torch import Tensor
 
+from pydmclab.mlp.chgnet.utils import get_total_energy_correction
 from pydmclab.utils.handy import convert_numpy_to_native
 
 if TYPE_CHECKING:
@@ -69,6 +69,7 @@ class CHGNetCalculator(Calculator):
         check_cuda_mem: bool = False,
         stress_weight: float | None = 1 / 160.21766208,
         on_isolated_atoms: Literal["ignore", "warn", "error"] = "warn",
+        return_uncorrected_energies: bool = True,
         **kwargs,
     ) -> None:
 
@@ -77,6 +78,7 @@ class CHGNetCalculator(Calculator):
         device = determine_device(use_device=use_device, check_cuda_mem=check_cuda_mem)
         self.device = device
         self.stress_weight = stress_weight
+        self.return_uncorrected_energies = return_uncorrected_energies
 
         if isinstance(model, str):
             self.model = CHGNet.load(model_name=model, verbose=False).to(self.device)
@@ -150,8 +152,14 @@ class CHGNetCalculator(Calculator):
 
         # Convert Result
         factor = 1 if not self.model.is_intensive else structure.composition.num_atoms
+        total_energy = model_prediction["e"] * factor
+
+        if self.return_uncorrected_energies:
+            total_energy_correction = get_total_energy_correction(structure)
+            total_energy -= total_energy_correction
+
         self.results.update(
-            energy=model_prediction["e"] * factor,
+            energy=total_energy,
             forces=model_prediction["f"],
             magmoms=model_prediction["m"],
             stress=model_prediction["s"] * self.stress_weight,
@@ -173,6 +181,7 @@ class CHGNetObserver:
         self.atoms = atoms
         self.energies: list[float] = []
         self.forces: list[np.ndarray] = []
+        self.fmaxs: list[float] = []
         self.stresses: list[np.ndarray] = []
         self.magmoms: list[np.ndarray] = []
         self.atomic_numbers: list[int] = []
@@ -183,6 +192,7 @@ class CHGNetObserver:
         """The logic for saving the properties of an Atoms during the relaxation."""
         self.energies.append(self.atoms.get_potential_energy())
         self.forces.append(self.atoms.get_forces())
+        self.fmaxs.append(sqrt((self.atoms.get_forces() ** 2).sum(axis=1).max()))
         self.stresses.append(self.atoms.get_stress())
         self.magmoms.append(self.atoms.get_magnetic_moments())
         self.atomic_numbers.append(self.atoms.get_atomic_numbers())
@@ -201,6 +211,7 @@ class CHGNetObserver:
             ),  # returns the atoms object as a str representation
             "energies": self.energies,
             "forces": self.forces,
+            "fmaxs": self.fmaxs,
             "stresses": self.stresses,
             "magmoms": self.magmoms,
             "atomic_numbers": self.atomic_numbers,
@@ -214,6 +225,7 @@ class CHGNetObserver:
         obs = cls(decode(data["atoms"]))
         obs.energies = data["energies"]
         obs.forces = data["forces"]
+        obs.fmaxs = data["fmaxs"]
         obs.stresses = data["stresses"]
         obs.magmoms = data["magmoms"]
         obs.atomic_numbers = data["atomic_numbers"]
@@ -243,7 +255,10 @@ class CHGNetRelaxer:
         check_cuda_mem: bool = False,
         stress_weight: float | None = 1 / 160.21766208,
         on_isolated_atoms: Literal["ignore", "warn", "error"] = "warn",
+        return_uncorrected_energies: bool = True,
     ) -> None:
+
+        self.return_uncorrected_energies = return_uncorrected_energies
 
         self.optimizer: ASEOptimizer = (
             OPTIMIZERS[optimizer.lower()].value
@@ -261,6 +276,7 @@ class CHGNetRelaxer:
                 check_cuda_mem=check_cuda_mem,
                 stress_weight=stress_weight,
                 on_isolated_atoms=on_isolated_atoms,
+                return_uncorrected_energies=self.return_uncorrected_energies,
             )
             self.model = self.calculator.model
 
@@ -307,7 +323,15 @@ class CHGNetRelaxer:
         batch_size: int = 16,
     ) -> dict[str, Tensor] | list[dict[str, Tensor]]:
         """Predict the properties of a structure or list of structures."""
-        return self.model.predict_structure(
+
+        key_mapping = {
+            "e": "energy",
+            "f": "forces",
+            "s": "stresses",
+            "m": "magmoms",
+        }
+
+        results = self.model.predict_structure(
             structure,
             task=task,
             return_site_energies=return_site_energies,
@@ -315,6 +339,37 @@ class CHGNetRelaxer:
             return_crystal_feas=return_crystal_feas,
             batch_size=batch_size,
         )
+
+        if isinstance(results, list):
+            for i, res in enumerate(results):
+                factor = (
+                    1
+                    if not self.model.is_intensive
+                    else structure[i].composition.num_atoms
+                )
+                results[i]["e"] = res["e"] * factor
+
+                if self.return_uncorrected_energies:
+                    total_energy_correction = get_total_energy_correction(structure[i])
+                    results[i]["e"] -= total_energy_correction
+
+                results[i] = {
+                    key_mapping.get(key, key): value for key, value in res.items()
+                }
+
+        else:
+            factor = (
+                1 if not self.model.is_intensive else structure.composition.num_atoms
+            )
+            results["e"] = results["e"] * factor
+
+            if self.return_uncorrected_energies:
+                total_energy_correction = get_total_energy_correction(structure)
+                results["e"] -= total_energy_correction
+
+        results = {key_mapping.get(key, key): value for key, value in results.items()}
+
+        return results
 
     def relax(
         self,
@@ -326,6 +381,7 @@ class CHGNetRelaxer:
         ase_filter: str | None = "FrechetCellFilter",
         params_asefilter: dict | None = None,
         traj_path: str | None = None,
+        include_obs_in_results: bool = True,
         interval: int | None = 1,
         verbose: bool = True,
         convert_to_native_types: bool = True,
@@ -382,7 +438,8 @@ class CHGNetRelaxer:
         return {
             "final_structure": struc,
             "final_energy": obs.energies[-1],
-            "trajectory": obs,
+            "coverged": obs.fmaxs[-1] < fmax if obs.fmaxs else False,
+            "trajectory": obs if include_obs_in_results else None,
         }
 
 

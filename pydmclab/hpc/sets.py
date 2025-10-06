@@ -262,6 +262,7 @@ class GetSet(object):
             new_settings["LREAL"] = False
             new_settings["LVHAR"] = True
             new_settings["ICORELEVEL"] = 0
+            new_settings["LAECHG"] = True  # to enable Bader charge analysis
 
             if "charged" in calc:
                 pass

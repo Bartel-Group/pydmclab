@@ -15,8 +15,10 @@ def main():
     inter_op_threads = "placeholder"
 
     # set torch setings
-    torch.set_num_threads(intra_op_threads)
-    torch.set_num_interop_threads(inter_op_threads)
+    if intra_op_threads is not None:
+        torch.set_num_threads(intra_op_threads)
+    if inter_op_threads is not None:
+        torch.set_num_interop_threads(inter_op_threads)
 
     # architecture type
     architecture = "placeholder"
