@@ -497,10 +497,12 @@ class ShakeDefectiveStrucs(object):
                 formula_of_defective_structure = CompTools(
                     StrucTools(shaken_strucs_as_list[0]).structure.formula
                 ).clean
-                shaken_strucs[formula_of_defective_structure] = (
+
+                if formula_of_defective_structure not in shaken_strucs:
+                    shaken_strucs[formula_of_defective_structure] = {}    
+                shaken_strucs[formula_of_defective_structure].update(
                     set_of_shaken_strucs_of_interest
                 )
-
         return shaken_strucs
 
 
