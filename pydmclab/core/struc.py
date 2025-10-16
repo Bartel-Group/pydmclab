@@ -15,7 +15,6 @@ import numpy as np
 
 from math import lcm
 from pathlib import Path
-from sqsgenerator import load_result_pack
 
 from pydmclab.utils.handy import write_json
 
@@ -783,6 +782,7 @@ class SolidSolutionGenerator:
         Raises:
             ValueError: If endmembers list doesn't contain exactly 2 structures.
         """
+        from sqsgenerator import load_result_pack
         if len(endmembers) != 2:
             raise ValueError(
                 f"Expected exactly 2 endmembers, got {len(endmembers)}"
