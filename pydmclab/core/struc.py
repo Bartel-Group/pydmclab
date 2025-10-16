@@ -781,7 +781,6 @@ class SolidSolutionGenerator:
             ValueError: If endmembers list doesn't contain exactly 2 structures.
         """
         from sqsgenerator import load_result_pack
-        from pydmclab.utils.handy import write_json
         if len(endmembers) != 2:
             raise ValueError(
                 f"Expected exactly 2 endmembers, got {len(endmembers)}"
@@ -1112,7 +1111,9 @@ class SolidSolutionGenerator:
             "max_results_per_objective": 5
         }
         
-        write_json(data, output_path)
+        with open(output_path, "w", encoding="utf-8") as file:
+            json.dump(data, file, indent=4)
+
 
     def generate_sqs(self) -> Tuple[List[Structure], List[Dict[str, Any]]]:
         """Generate special quasirandom structures (SQS) from ordered solutions.
@@ -1252,7 +1253,8 @@ class SolidSolutionGenerator:
         
         # Save summary data
         summary_path = os.path.join(self.dirs["sqs"], "sqs_summary.json")
-        write_json(sqs_data, summary_path)
+        with open(output_path, "w", encoding="utf-8") as file:
+            json.dump(data, file, indent=4)
         
         print(f"\nSQS generation complete! Results saved to {self.dirs['sqs']}/")
         
