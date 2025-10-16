@@ -16,8 +16,6 @@ import numpy as np
 from math import lcm
 from pathlib import Path
 
-from pydmclab.utils.handy import write_json
-
 from pymatgen.core import Structure, PeriodicSite, Composition
 from pymatgen.core.surface import SlabGenerator
 from pymatgen.transformations.standard_transformations import (
@@ -783,6 +781,7 @@ class SolidSolutionGenerator:
             ValueError: If endmembers list doesn't contain exactly 2 structures.
         """
         from sqsgenerator import load_result_pack
+        from pydmclab.utils.handy import write_json
         if len(endmembers) != 2:
             raise ValueError(
                 f"Expected exactly 2 endmembers, got {len(endmembers)}"
