@@ -309,6 +309,8 @@ def get_fcp_hiphive(ideal_supercell: Atoms|dict|str,
     opt.train()
 
     opt_summary = opt.summary
+    keep = ['n_target_values', 'n_parameters', 'rmse_train', 'R2_train', 'rmse_test', 'R2_test']
+    opt_summary = {k: v for k, v in opt_summary.items() if k in keep}
     
     print(opt)
 
