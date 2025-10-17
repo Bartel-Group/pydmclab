@@ -223,7 +223,7 @@ def to_atoms(structure):
 def get_cluster_space_hiphive(ideal_supercell: Atoms|dict|str,
                               cutoffs: list[float]|str = "auto",
                                 safety_factor: float = 0.95,
-                              primitive_cell: Atoms|dict|str|None = None):
+                              primitive_cell: Atoms|dict|str|None = None,):
     
     ideal_supercell = to_atoms(ideal_supercell)
     if cutoffs == "auto":
@@ -272,7 +272,7 @@ def get_fcp_hiphive(ideal_supercell: Atoms|dict|str,
     if data_dir is not None:
         fcp_dir = os.path.join(data_dir, savename)
         if os.path.exists(fcp_dir) and not remake:
-            return ForceConstantPotential.read(fcp_dir)
+            return ForceConstantPotential.read(fcp_dir), None, None
 
     if len(rattled_structures) != len(force_sets):
         raise ValueError("The length of rattled_structures and force_sets must be the same.")
@@ -307,7 +307,17 @@ def get_fcp_hiphive(ideal_supercell: Atoms|dict|str,
     # train model
     opt = Optimizer(sc.get_fit_data())
     opt.train()
+
+    optim = {'n_parameters': opt.n_parameters,
+             'n_target_values': opt.n_target_values,
+             'rmse_train': opt.rmse_train,
+             'rmse_test': opt.rmse_test,
+             'r2_train': opt.r2_train,
+             'r2_test': opt.r2_test}
+    
+    
     print(opt)
+
 
     # construct force constant potential
     fcp = ForceConstantPotential(cs, opt.parameters)
@@ -315,9 +325,9 @@ def get_fcp_hiphive(ideal_supercell: Atoms|dict|str,
     
     if data_dir is not None:
         fcp.write(fcp_dir)
-        return fcp.read(fcp_dir), cs
+        return fcp.read(fcp_dir), cs, opt
 
-    return fcp, cs
+    return fcp, cs, optim
 
 def get_force_constants_hiphive(fcp, 
                                 supercell, order=2):
