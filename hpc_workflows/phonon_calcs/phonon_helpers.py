@@ -308,13 +308,7 @@ def get_fcp_hiphive(ideal_supercell: Atoms|dict|str,
     opt = Optimizer(sc.get_fit_data())
     opt.train()
 
-    optim = {'n_parameters': opt.n_parameters,
-             'n_target_values': opt.n_target_values,
-             'rmse_train': opt.rmse_train,
-             'rmse_test': opt.rmse_test,
-             'r2_train': opt.r2_train,
-             'r2_test': opt.r2_test}
-    
+    opt_summary = opt.summary
     
     print(opt)
 
@@ -325,9 +319,9 @@ def get_fcp_hiphive(ideal_supercell: Atoms|dict|str,
     
     if data_dir is not None:
         fcp.write(fcp_dir)
-        return fcp.read(fcp_dir), cs, opt
+        return fcp.read(fcp_dir), cs, opt_summary
 
-    return fcp, cs, optim
+    return fcp, cs, opt_summary
 
 def get_force_constants_hiphive(fcp, 
                                 supercell, order=2):
