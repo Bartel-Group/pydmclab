@@ -81,7 +81,7 @@ class FAIRChemCalculator(Calculator):
         inference_settings: InferenceSettings | str = "default",
         overrides: dict | None = None,
         device: Literal["cuda", "cpu"] | None = None,
-        seed: int = 42,
+        seed: int | None = None,
     ):
         """
         UMA ASE Calculator
@@ -158,7 +158,7 @@ class FAIRChemCalculator(Calculator):
             )  # free_energy is a copy of energy, see calculate method docstring
 
         self.predictor = predict_unit
-        self.predictor.seed(seed)
+        # self.predictor.seed(seed)
 
         self.a2g = partial(
             AtomicData.from_ase,
