@@ -105,8 +105,10 @@ def get_displacements_for_phonons(
         #turn unitcell to AseAtoms
         atoms = AseAtomsAdaptor.get_atoms(pymatgen_struc)
         if mc:
+            print("Generating displacements using Monte Carlo rattling method.")
             structures = generate_mc_rattled_structures(atoms, n_structures, rattle_std, minimum_distance)
         else:
+            print("Generating displacements using simple random rattling method.")
             structures = generate_rattled_structures(atoms, n_structures, rattle_std)
 
         pmg_displaced_strucs = [AseAtomsAdaptor.get_structure(struc) for struc in structures]
