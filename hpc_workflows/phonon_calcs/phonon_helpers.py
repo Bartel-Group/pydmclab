@@ -222,8 +222,9 @@ def to_atoms(structure):
 
 def get_cluster_space_hiphive(ideal_supercell: Atoms|dict|str,
                               cutoffs: list[float]|str = "auto",
-                                safety_factor: float = 0.95,
-                              primitive_cell: Atoms|dict|str|None = None,):
+                              safety_factor: float = 0.95,
+                              primitive_cell: Atoms|dict|str|None = None,
+                              symprec : float = 1e-5):
     
     ideal_supercell = to_atoms(ideal_supercell)
     if cutoffs == "auto":
@@ -232,9 +233,9 @@ def get_cluster_space_hiphive(ideal_supercell: Atoms|dict|str,
         cutoffs = [max_cutoff * safety_factor]  # Example: second order cutoffs, could add higher order if were doing third order + force constants. Right now only doing second order.
         print(f"Using cutoffs: {cutoffs} Å")
     if primitive_cell is None:
-        cs = ClusterSpace(ideal_supercell, cutoffs)
+        cs = ClusterSpace(ideal_supercell, cutoffs, symprec=symprec)
     else:
-        cs = ClusterSpace(primitive_cell, cutoffs)
+        cs = ClusterSpace(primitive_cell, cutoffs, symprec=symprec)
     return cs
 
 def get_fcp_hiphive(ideal_supercell: Atoms|dict|str, 
@@ -243,6 +244,7 @@ def get_fcp_hiphive(ideal_supercell: Atoms|dict|str,
                     primitive_cell: Atoms | None = None,
                     cutoffs: list[float] |str = "auto",
                     safety_factor: float = 0.95,
+                    symprec : float = 1e-5,
                     data_dir: str = None,
                     savename: str = "fcp.fcp",
                     remake: bool = False):
@@ -258,7 +260,8 @@ def get_fcp_hiphive(ideal_supercell: Atoms|dict|str,
             force_sets (list): 
                 List of force sets corresponding to the rattled structures. Must be in the same order as rattled_structures!
             primitive_cell (Atoms | MSONAtoms): 
-                The primitive cell structure. If None is given then it will be calculated from the ideal supercell using spglib. Can be provided as an Atoms or Structure object, a dictionary, or a path to a structure file.
+                The primitive cell structure. If None is given then it will be calculated from the ideal supercell using spglib. 
+                Can be provided as an Atoms or Structure object, a dictionary, or a path to a structure file.
             cutoffs (list | str): 
                 List of cutoff distances for the cluster space, in order of increasing order starting with second order.
                 This can be either manually specified or "auto". 
@@ -266,6 +269,9 @@ def get_fcp_hiphive(ideal_supercell: Atoms|dict|str,
                 Which is the most rigorous/expensive cutoff you can use.
             safety_factor (float):
                 Safety factor to apply when estimating maximum cutoff if cutoffs="auto". Default is 0.95.
+            symprec (float):
+                Symmetry precision for spglib when determining symmetry of the structure. Default is 1e-5. 
+                Sometimes may need to increase if structure is slightly distorted, because this will affect the amount of orbits detected.
         Returns:
             ForceConstantPotential: The constructed hiphive force constant potential object.
     """
@@ -284,7 +290,11 @@ def get_fcp_hiphive(ideal_supercell: Atoms|dict|str,
         primitive_cell = to_atoms(primitive_cell)
         
     force_sets = np.array(force_sets)
-    cs = get_cluster_space_hiphive(ideal_supercell, cutoffs=cutoffs, safety_factor=safety_factor, primitive_cell=primitive_cell)
+    cs = get_cluster_space_hiphive(ideal_supercell, 
+                                   cutoffs=cutoffs, 
+                                   safety_factor=safety_factor, 
+                                   primitive_cell=primitive_cell, 
+                                   symprec=symprec)
 
     print(cs)
     cs.print_orbits()
