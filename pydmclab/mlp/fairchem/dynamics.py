@@ -81,7 +81,7 @@ class FAIRChemCalculator(Calculator):
         inference_settings: InferenceSettings | str = "default",
         overrides: dict | None = None,
         device: Literal["cuda", "cpu"] | None = None,
-        seed: int = 42,
+        seed: int|None = None,
     ):
         """
         UMA ASE Calculator
@@ -139,14 +139,14 @@ class FAIRChemCalculator(Calculator):
 
         if task_name is not None:
             assert (
-                task_name in predict_unit.datasets
-            ), f"Given: {task_name}, Valid options are {predict_unit.datasets}"
+                task_name in list(predict_unit.dataset_to_tasks.keys())
+            ), f"Given: {task_name}, Valid options are {list(predict_unit.dataset_to_tasks.keys())}"
             self._task_name = task_name
-        elif len(predict_unit.datasets) == 1:
-            self._task_name = predict_unit.datasets[0]
+        elif len(list(predict_unit.dataset_to_tasks.keys())) == 1:
+            self._task_name = list(predict_unit.dataset_to_tasks.keys())[0]
         else:
             raise RuntimeError(
-                f"A task name must be provided. Valid options are {predict_unit.datasets}"
+                f"A task name must be provided. Valid options are {list(predict_unit.dataset_to_tasks.keys())}"
             )
 
         self.implemented_properties = [
@@ -158,7 +158,7 @@ class FAIRChemCalculator(Calculator):
             )  # free_energy is a copy of energy, see calculate method docstring
 
         self.predictor = predict_unit
-        self.predictor.seed(seed)
+        # self.predictor.seed(seed)
 
         self.a2g = partial(
             AtomicData.from_ase,
