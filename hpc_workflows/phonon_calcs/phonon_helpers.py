@@ -32,7 +32,7 @@ def get_displacements_for_phonons(
                     remake: bool|None = False,
                     supercell_matrix: list|None = None,
                     distance: float|None = None,
-                    mc: bool = False,
+                    mc: bool = True,
                     n_structures: int|None = None,
                     rattle_std: float|None = None,
                     minimum_distance: float|None = None,
@@ -52,7 +52,7 @@ def get_displacements_for_phonons(
         remake (bool or None):
             If True, will remake the displacement data even if it exists.
         supercell_matrix (list or None):
-            Supercell matrix to use for generating supercells. Highly recommend not using as to not cause confusion. Feed a structured that has already been supercelled.
+            Supercell matrix to use for generating supercells. Highly recommend not using as to not cause confusion. Feed a structure that has already been supercelled.
         distance (float or None):
             Distance for finite displacement only.
         mc (bool):
@@ -60,7 +60,7 @@ def get_displacements_for_phonons(
         rattle_std (float or None):
             Standard deviation for random rattling displacements.
         minimum_distance (float or None):
-            Minimum distance for hiphive displacement generation only if doing Monte Carlo.
+            Minimum distance for hiphive displacement generation only if doing Monte Carlo. See hiphive.structure_generation.rattle.generate_mc_rattled_structures() for more details.
 
     Returns:
         displacements_data (dict):
@@ -122,7 +122,7 @@ def get_displacements_for_phonons(
     else:
         return out
 
-def estimate_rattle_std(structure: str|dict, fraction: float) -> float:
+def estimate_rattle_std(structure: str|dict, fraction: float, include_min_dist_for_mc = True, min_dist_factor = 3.0) -> float:
     """
     Estimate the rattle standard deviation based on a fraction of the minimum interatomic distance in the structure.
     Note: at the moment just auto detects oxidation states and assigns formal charges. This could be improved in the future.
@@ -142,7 +142,12 @@ def estimate_rattle_std(structure: str|dict, fraction: float) -> float:
             if dist < min_dist:
                 min_dist = dist
 
-    return min_dist * fraction
+    rattle_std = min_dist * fraction
+    if include_min_dist_for_mc:
+        min_dist = min_dist - min_dist_factor * rattle_std
+        return rattle_std, min_dist
+
+    return rattle_std
 
 def get_set_of_forces(results,
                       mpid=None,
