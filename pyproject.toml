@@ -25,6 +25,7 @@ classifiers = [
 [project.optional-dependencies]
 mlp = ["chgnet", "mace-torch<=0.3.12", "pymatgen-analysis-diffusion"]
 fairchem = ["fairchem-core"]
+matgl = ["matgl"]
 defects = ["doped"]
 phonons = ["phonopy"]
 

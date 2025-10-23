@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from typing import Literal, get_args
 
-import ase.io
-
 Versions = Literal["0.2.0", "0.3.0"]
 Devices = Literal["mps", "cuda", "cpu"]
 
