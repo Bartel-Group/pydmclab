@@ -2162,21 +2162,17 @@ def get_slabs(
 
     if isinstance(min_slab_sizes, int):
         min_slab_sizes = [min_slab_sizes]
-    elif isinstance(min_slab_sizes, list) and not all(
-        isinstance(s, int) for s in min_slab_sizes
-    ):
-        raise ValueError("min_slab_sizes must be an integer or list of integers.")
+    elif isinstance(min_slab_sizes, (list, tuple)) and all(isinstance(s, int) for s in min_slab_sizes):
+        min_slab_sizes = list(min_slab_sizes)  # Convert tuple to list if needed
     else:
-        raise ValueError("min_slab_sizes must be an integer or list of integers.")
+        raise ValueError("min_slab_sizes must be an integer, list of integers, or tuple of integers.")
 
     if isinstance(vacuum_sizes, int):
         vacuum_sizes = [vacuum_sizes]
-    elif isinstance(vacuum_sizes, list) and not all(
-        isinstance(v, int) for v in vacuum_sizes
-    ):
-        raise ValueError("vacuum_sizes must be an integer or list of integers.")
+    elif isinstance(vacuum_sizes, (list, tuple)) and all(isinstance(v, int) for v in vacuum_sizes):
+        vacuum_sizes = list(vacuum_sizes)  # Convert tuple to list if needed
     else:
-        raise ValueError("vacuum_sizes must be an integer or list of integers.")
+        raise ValueError("vacuum_sizes must be an integer, list of integers, or tuple of integers.")
 
     slabs = {}
     metadata = {}
