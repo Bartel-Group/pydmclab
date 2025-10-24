@@ -325,7 +325,7 @@ class MatGLRelaxer:
         include_obs_in_results: bool = True,
         interval: int = 1,
         verbose: bool = False,
-        ase_filter: Literal["Frechet", "Exp"] = "Frechet",
+        ase_filter: Literal["FrechetCellFilter", "Exp"] = "FrechetCellFilter",
         params_asefilter: dict | None = None,
         convert_to_native_types: bool = True,
         **kwargs,
