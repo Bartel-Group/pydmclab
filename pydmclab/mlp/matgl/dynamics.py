@@ -272,7 +272,6 @@ class MatGLRelaxer:
         potential: Potential | PretrainedPotentials,
         state_attr: torch.Tensor | None = None,
         optimizer: Optimizer | str = "FIRE",
-        relax_cell: bool = True,
         stress_weight: float = 1 / 160.21766208,
     ):
         """
@@ -295,7 +294,6 @@ class MatGLRelaxer:
             state_attr=state_attr,
             stress_weight=stress_weight,  # type: ignore
         )
-        self.relax_cell = relax_cell
         self.ase_adaptor = AseAtomsAdaptor()
 
 
@@ -322,12 +320,13 @@ class MatGLRelaxer:
         atoms: Atoms | Structure | Molecule,
         fmax: float = 0.1,
         steps: int = 500,
+        relax_cell: bool = True,
         traj_path: str | None = None,
         include_obs_in_results: bool = True,
         interval: int = 1,
         verbose: bool = False,
-        ase_cellfilter: Literal["Frechet", "Exp"] = "Frechet",
-        params_asecellfilter: dict | None = None,
+        ase_filter: Literal["Frechet", "Exp"] = "Frechet",
+        params_asefilter: dict | None = None,
         convert_to_native_types: bool = True,
         **kwargs,
     ):
@@ -355,7 +354,7 @@ class MatGLRelaxer:
         params_asecellfilter = params_asecellfilter or {}
         with contextlib.redirect_stdout(stream):
             obs = MatGLObserver(atoms)
-            if self.relax_cell:
+            if relax_cell:
                 atoms = FrechetCellFilter(
                     atoms, **params_asecellfilter
                 )  # type:ignore[assignment]
