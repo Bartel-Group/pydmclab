@@ -509,6 +509,7 @@ class StrucTools(object):
         max_normal_search: int | None = None,
         tolerance: float = 0.1,
         ftolerance: float = 0.1,
+        supercell_grid = list | None,
     ) -> dict[str, dict]:
         """
         Args:
@@ -553,9 +554,17 @@ class StrucTools(object):
         )
 
         slabs = slabgen.get_slabs(symmetrize=symmetrize, tol=tolerance, ftol=ftolerance)
-
+        
         miller_str = "".join([str(i) for i in miller])
 
+        if supercell_grid:
+            for entry in slabs[miller_str]:
+                slab = Slab.from_dict(slabs[miller_str][entry]['slab'])
+                slab.make_supercell(supercell_grid)
+                slabs[miller_str][entry]['slab'] = slab.as_dict()
+        else:
+            slabs = slabs
+        
         out = {miller_str: {}, "bulk_template": bulk.as_dict()}
         for i, slab in enumerate(slabs):
             out[miller_str][i] = {}
