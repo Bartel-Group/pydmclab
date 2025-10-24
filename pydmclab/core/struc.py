@@ -29,6 +29,9 @@ from pymatgen.analysis.structure_matcher import StructureMatcher
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from pymatgen.analysis.diffraction.xrd import XRDCalculator
 
+from sqsgenerator import load_result_pack
+
+
 from pydmclab.core import struc as pydmc_struc
 from pydmclab.core.comp import CompTools
 
@@ -781,7 +784,6 @@ class SolidSolutionGenerator:
         Raises:
             ValueError: If endmembers list doesn't contain exactly 2 structures.
         """
-        from sqsgenerator import load_result_pack
         if len(endmembers) != 2:
             raise ValueError(
                 f"Expected exactly 2 endmembers, got {len(endmembers)}"
