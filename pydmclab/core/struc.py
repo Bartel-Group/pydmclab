@@ -554,16 +554,14 @@ class StrucTools(object):
         )
 
         slabs = slabgen.get_slabs(symmetrize=symmetrize, tol=tolerance, ftol=ftolerance)
-        
-        miller_str = "".join([str(i) for i in miller])
 
         if supercell_grid:
-            for entry in slabs[miller_str]:
-                slab = Slab.from_dict(slabs[miller_str][entry]['slab'])
-                slab.make_supercell(supercell_grid)
-                slabs[miller_str][entry]['slab'] = slab.as_dict()
+            for entry in slabs:
+                entry.make_supercell(supercell_grid)
         else:
             slabs = slabs
+        
+        miller_str = "".join([str(i) for i in miller])
         
         out = {miller_str: {}, "bulk_template": bulk.as_dict()}
         for i, slab in enumerate(slabs):
