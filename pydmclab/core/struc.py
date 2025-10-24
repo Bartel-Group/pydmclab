@@ -17,7 +17,7 @@ from math import lcm
 from pathlib import Path
 
 from pymatgen.core import Structure, PeriodicSite, Composition
-from pymatgen.core.surface import SlabGenerator
+from pymatgen.core.surface import SlabGenerator, Slab
 from pymatgen.transformations.standard_transformations import (
     OrderDisorderedStructureTransformation,
     AutoOxiStateDecorationTransformation,
