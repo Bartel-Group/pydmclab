@@ -1262,8 +1262,8 @@ class SolidSolutionGenerator:
         
         # Save summary data
         summary_path = os.path.join(self.dirs["sqs"], "sqs_summary.json")
-        with open(output_path, "w", encoding="utf-8") as file:
-            json.dump(data, file, indent=4)
+        with open(summary_path, "w", encoding="utf-8") as f:
+            json.dump(sqs_data, f, indent=4)
         
         print(f"\nSQS generation complete! Results saved to {self.dirs['sqs']}/")
         
