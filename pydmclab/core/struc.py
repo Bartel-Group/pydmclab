@@ -792,6 +792,8 @@ class SolidSolutionGenerator:
 
         self.endmembers = endmembers
         self.supercell_dim = supercell_dim or [2, 2, 2]
+        self.data_dir = Path(data_dir)
+
 
         # Initialize attributes that will be set during processing
         self.element_a: Optional[str] = None
