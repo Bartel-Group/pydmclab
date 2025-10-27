@@ -29,7 +29,9 @@ from phonon_helpers import (
 def compute_all_phonon_properties(results,
                                   displacements,
                                   xc_wanted="metagga",
-                                  cutoffs=[3.5, 3.0],
+                                  cutoffs="auto",
+                                  safety_factor=0.85,
+                                  symprec=1e-5,
                                   init_kwargs={},
                                   thermal_properties_kwargs=None,
                                   band_structure_kwargs=None,
@@ -106,6 +108,16 @@ def compute_all_phonon_properties(results,
 
     sets_of_forces = get_set_of_forces(results, mpid=None, xc=xc_wanted)
 
+    filtered_forces = {}
+    for mpid, data in sets_of_forces.items():
+        forces = data.get('forces')
+        if forces is None or (hasattr(forces, "__len__") and len(forces) == 0):
+            print(f"Forces for mpid {mpid} not converged, skipping for now. Remake phonons once converged.")
+            continue
+        filtered_forces[mpid] = data
+
+    sets_of_forces = filtered_forces
+    
     for mpid in sets_of_forces:
         forces = sets_of_forces[mpid]['forces']
         static_key = sets_of_forces[mpid]['key']
@@ -117,10 +129,12 @@ def compute_all_phonon_properties(results,
 
         phonon_key = static_key.replace("static", calc_method)
 
-        fcp = get_fcp_hiphive(ideal_supercell=supercell,
+        fcp, cs, opt = get_fcp_hiphive(ideal_supercell=supercell,
                             rattled_structures=disp_strucs,
                             force_sets=forces,
                             cutoffs=cutoffs,
+                            safety_factor=safety_factor,
+                            symprec=symprec,
                             data_dir=data_dir,
                             savename=f"fcp_{mpid}.fcp",
                             remake=remake_fcp)
@@ -158,15 +172,17 @@ def compute_all_phonon_properties(results,
 
 
 def main():
-    remake_phonons = False
-    remake_fcp = False
+    remake_phonons = True
+    remake_fcp = True
 
     results = read_json(os.path.join(DATA_DIR, "results.json"))
     displacements = read_json(os.path.join(DATA_DIR, "displacements.json"))
     query = read_json(os.path.join(DATA_DIR, "query.json"))
 
     xc_wanted = "metagga"
-    cutoffs = [3.5, 3.0]
+    cutoffs = "auto"
+    safety_factor=0.85
+    symprec=1.5e-3
 
     init_kwargs = {}
     thermal_properties_kwargs = None
@@ -179,6 +195,8 @@ def main():
                                   displacements=displacements,
                                   xc_wanted=xc_wanted,
                                   cutoffs=cutoffs,
+                                  safety_factor=safety_factor,
+                                  symprec=symprec,
                                   init_kwargs=init_kwargs,
                                   thermal_properties_kwargs=thermal_properties_kwargs,
                                   band_structure_kwargs=band_structure_kwargs,
@@ -189,6 +207,10 @@ def main():
                                   remake_fcp=remake_fcp,
                                   plot_band_structure=plot_band_structure,
                                   plot_thermal_properties=plot_thermal_properties)
+    
+    phonons = read_json(os.path.join(DATA_DIR, "phonons.json"))
+
+    return phonons
 
 if __name__ == "__main__":
     main()
