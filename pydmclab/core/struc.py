@@ -29,9 +29,6 @@ from pymatgen.analysis.structure_matcher import StructureMatcher
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from pymatgen.analysis.diffraction.xrd import XRDCalculator
 
-from sqsgenerator import load_result_pack
-
-
 from pydmclab.core import struc as pydmc_struc
 from pydmclab.core.comp import CompTools
 
@@ -1167,6 +1164,7 @@ class SolidSolutionGenerator:
             os.chdir(abs_temp_dir)
 
             try:
+                from sqsgenerator import load_result_pack
                 # Run sqsgen
                 print(f"Running SQS optimization for composition {num_struc}...")
                 subprocess.run(
@@ -1250,6 +1248,8 @@ class SolidSolutionGenerator:
 
             except subprocess.CalledProcessError as e:
                 print(f"Error running sqsgen for {fname}: {e.stderr}")
+            except ImportError as e:
+                print(f"sqsgenerator package is not installed: {e}")
             except Exception as e:
                 print(f"Error processing {fname}: {e}")
                 
