@@ -59,7 +59,7 @@ fresh_restart: # if you want to start certain calcs over set them in a list here
 
 # what kind of VASP to use
 vasp: vasp_std # use vasp_gam for "loose" calcs (havent implemented yet)
-vasp_version: 6 # version of VASP (can be 5 for 5.4.4 or 6 for 6.4.1)
+vasp_version: 6 # version of VASP (can be 5 for 5.4.4 or 6 for 6.4.1 or 7 for 6.5.1)
 
 # what kind of LOBSTER to use
 lobster_version: 4 # version of LOBSTER (can be 4 for 4.1.0 or 5 for 5.1.0)
