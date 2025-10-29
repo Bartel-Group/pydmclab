@@ -1003,9 +1003,9 @@ class AnalyzeVASP(object):
         """
         E_per_at = self.E_per_at
         if self.calc == "static":
-            if os.path.exists(self.calc_dir.replace("static", "relax")) and isinstance(
-                relax_static_energy_diff_tol, (int, float)
-            ):
+            if os.path.exists(self.calc_dir.replace("static", "relax")) and type(
+                relax_static_energy_diff_tol
+            ) in (int, float):
                 E_relax = AnalyzeVASP(self.calc_dir.replace("static", "relax")).E_per_at
                 if (
                     E_relax
