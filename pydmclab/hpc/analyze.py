@@ -1003,12 +1003,13 @@ class AnalyzeVASP(object):
         """
         E_per_at = self.E_per_at
         if self.calc == "static":
-            if os.path.exists(self.calc_dir.replace("static", "relax")):
+            if os.path.exists(self.calc_dir.replace("static", "relax")) and isinstance(
+                relax_static_energy_diff_tol, (int, float)
+            ):
                 E_relax = AnalyzeVASP(self.calc_dir.replace("static", "relax")).E_per_at
                 if (
                     E_relax
                     and E_per_at
-                    and isinstance(relax_static_energy_diff_tol, (int, float))
                     and (abs(E_relax - E_per_at) <= relax_static_energy_diff_tol)
                 ):
                     convergence = True
