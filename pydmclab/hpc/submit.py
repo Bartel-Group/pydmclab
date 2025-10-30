@@ -339,7 +339,9 @@ class SubmitTools(object):
             elif version == 7:
                 return "%s/vasp.6.5.1" % preamble
             else:
-                raise NotImplementedError(f"VASP version {version} not supported on MSI")
+                raise NotImplementedError(
+                    f"VASP version {version} not supported on MSI"
+                )
         elif machine == "bridges2":
             if version == 6:
                 return "/opt/packages/VASP/VASP6/6.4.1/INTEL"
@@ -539,12 +541,16 @@ class SubmitTools(object):
             #     continue
 
             # (2) check convergence of current calc
-            E_per_at = AnalyzeVASP(calc_dir).E_per_at
-            convergence = True if E_per_at else False
+
+            # basic_info has additional criteria for evaluating convergence (e.g., static vs relax energy diff)
+            basic_info = AnalyzeVASP(calc_dir).basic_info(
+                relax_static_energy_diff_tol=configs["relax_static_energy_diff_tol"]
+            )
+            convergence = basic_info["convergence"]
+
             if convergence:
                 # if calc is converged
                 statuses[xc_calc] = "done"
-
             else:
                 # now we're dealing with calcs that are not converged
 
