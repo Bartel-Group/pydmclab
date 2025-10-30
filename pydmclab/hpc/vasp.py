@@ -334,8 +334,10 @@ class VASPSetUp(object):
             "elf_kpar": ["ELF: KPAR>1 not implemented"],
             "elf_ncl": ["WARNING: ELF not implemented for non collinear case"],
             "rhosyg": ["RHOSYG internal error"],
-            "posmap": ["POSMAP internal error: symmetry equivalent atom not found",
-                       "internal error in subroutine POSMAP"],
+            "posmap": [
+                "POSMAP internal error: symmetry equivalent atom not found",
+                "internal error in subroutine POSMAP",
+            ],
             "point_group": ["Error: point group operation missing"],
             "ibzkpt": ["internal error in subroutine IBZKPT"],
             "bad_sym": [
@@ -392,21 +394,20 @@ class VASPSetUp(object):
         # if relax calculation exists, compare energies
         # if they differ by more than specified tolerance (default = 0.1 eV/atom), add to unconverged
         # if we specified a tolerance for this
+        relax_static_energy_diff_tol = configs["relax_static_energy_diff_tol"]
         if (
             ("static" in calc_dir)
             and os.path.exists(calc_dir.replace("static", "relax"))
-            and configs["relax_static_energy_diff_tol"]
+            and type(relax_static_energy_diff_tol) in (int, float)
         ):
             relax_dir = calc_dir.replace("static", "relax")
             E_relax = AnalyzeVASP(relax_dir).E_per_at
 
-            # make sure relax has an energy
-            if E_relax:
-                # make sure static has an energy
-                if Etot:
-                    # compare the two; if too high, call static unconverged
-                    if abs(E_relax - Etot) > configs["relax_static_energy_diff_tol"]:
-                        unconverged.append("static_energy_changed_alot")
+            # make sure relax and static both have energies
+            if E_relax and Etot:
+                # compare the two; if too high, call static unconverged
+                if abs(E_relax - Etot) > relax_static_energy_diff_tol:
+                    unconverged.append("static_energy_changed_alot")
 
         # if calc is fully converged (ionically and electronically), return empty list (calc is done)
         if analyzer.is_converged:
