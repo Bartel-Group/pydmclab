@@ -784,18 +784,12 @@ def collect_results(
             )
 
             for formula_struc_id, prediction_result in batch_prediction_results.items():
-                formula, mpid, word_clean, facet_id, word_step, step_idx = formula_struc_id.split("_")
+                formula, struc_id = formula_struc_id.split("_", 1)
                 if formula not in results["prediction_results"]:
                     results["prediction_results"][formula] = {}
                 
-                if mpid not in results["prediction_results"][formula]:
-                    results["prediction_results"][formula][mpid] = {}
-                
-                if facet_id not in results["prediction_results"][formula][mpid]:
-                    results["prediction_results"][formula][mpid][facet_id] = {}
-                            
                 prediction_result["batch_id"] = batch_id
-                results["prediction_results"][formula][mpid][facet_id][step_idx] = prediction_result
+                results["prediction_results"][formula][struc_id] = prediction_result
             pbar.update(1)
 
     write_json(results, fjson)
@@ -816,12 +810,10 @@ def check_collected_results(results: dict, batching: dict) -> None:
 
     unique_batch_ids = set()
     for formula in results["prediction_results"]:
-        for mpid in results["prediction_results"][formula]:
-            for facet_id in results["prediction_results"][formula][mpid]: 
-                for step_idx in results["prediction_results"][formula][mpid][facet_id]:
-                    unique_batch_ids.add(
-                        results["prediction_results"][formula][mpid][facet_id][step_idx]["batch_id"]
-                    )
+        for struc_id in results["prediction_results"][formula]:
+            unique_batch_ids.add(
+                results["prediction_results"][formula][struc_id]["batch_id"]
+            )
 
     results_collected = len(unique_batch_ids)
 
