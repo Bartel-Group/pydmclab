@@ -231,7 +231,10 @@ class VASPSetUp(object):
                 lobsterin_dict = lobsterin.as_dict()
 
                 # adjust COHPSteps based on how fine of a COHP/DOS user wants
+                # adjust start and end of COHP analysis
                 lobsterin_dict["COHPSteps"] = configs["COHPSteps"]
+                lobsterin_dict["COHPstartEnergy"] = configs["COHPstartEnergy"]
+                lobsterin_dict["COHPendEnergy"] = configs["COHPendEnergy"]
                 lobsterin = Lobsterin.from_dict(lobsterin_dict)
 
             # if getting bandstructure, need Lobsterin to do more work for us

@@ -32,6 +32,8 @@ bs_line_density: 20 # kpoint line density for bs calculation
 
 # related to LOBSTER calculations (calc = 'lobster')
 COHPSteps: 2000 # how fine of a LOBSTER DOS do you want (more = more detailed)
+COHPstartEnergy: -35.0 # starting energy relative to Fermi level (0.0 eV)
+COHPendEnergy: 5.0 # ending energy relative to Fermi level (0.0 eV)
 reciprocal_kpoints_density_for_lobster: 100 # KPOINTS density for LOBSTER
 
 # related to error handling
