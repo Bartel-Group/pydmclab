@@ -2162,21 +2162,17 @@ def get_slabs(
 
     if isinstance(min_slab_sizes, int):
         min_slab_sizes = [min_slab_sizes]
-    elif isinstance(min_slab_sizes, list) and not all(
-        isinstance(s, int) for s in min_slab_sizes
-    ):
-        raise ValueError("min_slab_sizes must be an integer or list of integers.")
+    elif isinstance(min_slab_sizes, (list, tuple)) and all(isinstance(s, int) for s in min_slab_sizes):
+        min_slab_sizes = list(min_slab_sizes)  # Convert tuple to list if needed
     else:
-        raise ValueError("min_slab_sizes must be an integer or list of integers.")
+        raise ValueError("min_slab_sizes must be an integer, list of integers, or tuple of integers.")
 
     if isinstance(vacuum_sizes, int):
         vacuum_sizes = [vacuum_sizes]
-    elif isinstance(vacuum_sizes, list) and not all(
-        isinstance(v, int) for v in vacuum_sizes
-    ):
-        raise ValueError("vacuum_sizes must be an integer or list of integers.")
+    elif isinstance(vacuum_sizes, (list, tuple)) and all(isinstance(v, int) for v in vacuum_sizes):
+        vacuum_sizes = list(vacuum_sizes)  # Convert tuple to list if needed
     else:
-        raise ValueError("vacuum_sizes must be an integer or list of integers.")
+        raise ValueError("vacuum_sizes must be an integer, list of integers, or tuple of integers.")
 
     slabs = {}
     metadata = {}
@@ -2193,14 +2189,21 @@ def get_slabs(
             st = StrucTools(strucs[cmpd][struc_id])
 
             evaluated_miller_indices = set()
-            for m in miller_indices:
-                if isinstance(m, int):
-                    distinct_miller_indices = get_symmetrically_distinct_miller_indices(
-                        st.structure, m
-                    )
-                    evaluated_miller_indices.update(distinct_miller_indices)
-                else:
-                    evaluated_miller_indices.add(tuple(m))
+
+            if isinstance(miller_indices, int):
+                distinct_miller_indices = get_symmetrically_distinct_miller_indices(
+                    st.structure, miller_indices
+                )
+                evaluated_miller_indices.update(distinct_miller_indices)
+            elif isinstance(miller_indices, list):
+                for m in miller_indices:
+                    if isinstance(m, int):
+                        distinct_miller_indices = (
+                            get_symmetrically_distinct_miller_indices(st.structure, m)
+                        )
+                        evaluated_miller_indices.update(distinct_miller_indices)
+                    else:
+                        evaluated_miller_indices.add(tuple(m))
             evaluated_miller_indices = sorted(list(evaluated_miller_indices))
 
             for em in evaluated_miller_indices:
