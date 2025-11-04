@@ -254,6 +254,7 @@ def get_fcp_hiphive(ideal_supercell: Atoms|dict|str,
                     symprec : float = 1e-5,
                     data_dir: str = None,
                     savename: str = "fcp.fcp",
+                    opt_savename: str = "fcp_optimization_summary.json",
                     remake: bool = False):
     """
         Workflow for getting force constant potential object for a hiphive calculation. 
@@ -284,8 +285,9 @@ def get_fcp_hiphive(ideal_supercell: Atoms|dict|str,
     """
     if data_dir is not None:
         fcp_dir = os.path.join(data_dir, savename)
+        opt_dir = os.path.join(data_dir, opt_savename)
         if os.path.exists(fcp_dir) and not remake:
-            return ForceConstantPotential.read(fcp_dir), None, None
+            return ForceConstantPotential.read(fcp_dir), None, read_json(opt_dir)
 
     if len(rattled_structures) != len(force_sets):
         raise ValueError("The length of rattled_structures and force_sets must be the same.")
@@ -328,6 +330,7 @@ def get_fcp_hiphive(ideal_supercell: Atoms|dict|str,
     opt_summary = opt.summary
     keep = ['n_target_values', 'n_parameters', 'rmse_train', 'R2_train', 'rmse_test', 'R2_test']
     opt_summary = {k: v for k, v in opt_summary.items() if k in keep}
+    write_json(opt_summary, os.path.join(data_dir, opt_savename)) if data_dir is not None else None
     
     print(opt)
 
@@ -338,7 +341,7 @@ def get_fcp_hiphive(ideal_supercell: Atoms|dict|str,
     
     if data_dir is not None:
         fcp.write(fcp_dir)
-        return fcp.read(fcp_dir), cs, opt_summary
+        return fcp.read(fcp_dir), cs, read_json(opt_dir)
 
     return fcp, cs, opt_summary
 
