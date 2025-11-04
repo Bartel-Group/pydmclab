@@ -510,7 +510,7 @@ class StrucTools(object):
         max_normal_search: int | None = None,
         tolerance: float = 0.1,
         ftolerance: float = 0.1,
-        supercell_grid = list | None,
+        supercell_grid = list | None = None,
     ) -> dict[str, dict]:
         """
         Args:
