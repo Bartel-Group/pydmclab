@@ -303,7 +303,7 @@ class MatGLRelaxer:
     ) -> dict[str, Structure]:
 
         if isinstance(atoms, Structure):
-            atoms = AseAtomsAdaptor().get_atoms(atoms)
+            atoms = self.ase_adaptor.get_atoms(atoms)
 
         atoms.calc = self.calculator
 
@@ -342,7 +342,7 @@ class MatGLRelaxer:
             interval (int): the step interval for saving the trajectories
             verbose (bool): Whether to have verbose output.
             ase_cellfilter (literal): which filter is used for variable cell relaxation. Default is Frechet.
-            params_asecellfilter (dict): Parameters to be passed to FrechetCellFilter. Allows
+            params_asefilter (dict): Parameters to be passed to FrechetCellFilter. Allows
                 setting of constant pressure or constant volume relaxations, for example. Refer to
                 https://wiki.fysik.dtu.dk/ase/ase/filters.html#FrechetCellFilter for more information.
             **kwargs: Kwargs pass-through to optimizer.
@@ -351,12 +351,12 @@ class MatGLRelaxer:
             atoms = self.ase_adaptor.get_atoms(atoms)
         atoms.set_calculator(self.calculator)
         stream = sys.stdout if verbose else io.StringIO()
-        params_asecellfilter = params_asecellfilter or {}
+        params_asefilter = params_asefilter or {}
         with contextlib.redirect_stdout(stream):
             obs = MatGLObserver(atoms)
             if relax_cell:
                 atoms = FrechetCellFilter(
-                    atoms, **params_asecellfilter
+                    atoms, **params_asefilter
                 )  # type:ignore[assignment]
 
             optimizer = self.optimizer(atoms, **kwargs)  # type:ignore[operator]
@@ -388,7 +388,7 @@ class MatGLRelaxer:
             obs = MatGLObserver.from_dict(native_obs)
 
         return {
-            "final_structure": final_structure,
+            "final_structure": final_structure.as_dict(),
             "final_energy": obs.energies[-1],
             "coverged": obs.fmaxs[-1] < fmax if obs.fmaxs else False,
             "trajectory": obs if include_obs_in_results else None,
