@@ -132,7 +132,7 @@ SLURM_CONFIGS = get_slurm_configs(
 #  kpoint grid is based on previous calculations and is not necessarily the best choice
 #  consider additional convergence testing if you are unsure of what is best for your system
 INCAR_MODS = {"all-all": {"NELM": 60}}
-KPOINTS_MODS = {"all-all": {"grid": [5, 5, 1]}}
+KPOINTS_MODS = {"all-all": {"grid": [6, 6, 1]}}
 POTCAR_MODS = None
 
 VASP_CONFIGS = get_vasp_configs(
@@ -253,12 +253,14 @@ def main():
     slabs = get_slabs(
         strucs=strucs,
         miller_indices="{{MILLER_INDICES}}",
-        min_slab_sizes=10,
-        vacuum_sizes=3,
+        min_slab_sizes=6,
+        vacuum_sizes=4,
+        force_orthogonal_c=True,
         data_dir=DATA_DIR,
         savename="slabs.json",
         metadata_savename="slab_metadata.json",
         generate_reference_bulks=True,
+        sort_slab_strucs=True,
         remake=remake_slabs,
     )
     if print_slabs_check:

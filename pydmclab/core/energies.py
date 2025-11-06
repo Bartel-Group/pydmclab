@@ -12,6 +12,7 @@ from pydmclab.data.thermochem import (
     mus_at_0K,
     mus_at_T,
     mus_from_mp_no_corrections,
+    mus_from_omat,
     #    mus_from_bartel2019_npj,
 )
 from pydmclab.data.features import atomic_masses
@@ -127,6 +128,9 @@ class ChemPots(object):
                 all_mus = all_mus[standard]
                 els = sorted(list(all_mus[functional].keys()))
                 mus = {el: all_mus[functional][el]["mu"] for el in els}
+            elif standard == "omat":
+                # use OMat data
+                mus = mus_from_omat()
             else:
                 # use MP data
                 mus = mus_from_mp_no_corrections()
