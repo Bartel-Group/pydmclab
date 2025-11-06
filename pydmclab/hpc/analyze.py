@@ -795,7 +795,7 @@ class AnalyzeVASP(object):
             tmp_cohp = np.zeros(len(out["E"]))
             tmp_icohp = np.zeros(len(out["E"]))
             for site_tag in pcohp[el_tag]:
-                #for spin in pcohp[el_tag][site_tag]["cohp"]:
+                # for spin in pcohp[el_tag][site_tag]["cohp"]:
                 cohp_to_add = np.array(pcohp[el_tag][site_tag]["cohp"]["total"])
                 #                    print(cohp_to_add)
                 if len(cohp_to_add) == len(tmp_cohp):
@@ -993,8 +993,7 @@ class AnalyzeVASP(object):
         else:
             return None
 
-    @property
-    def basic_info(self):
+    def basic_info(self, relax_static_energy_diff_tol=0.1):
         """
         Returns:
             {'convergence' : True if calc converged else False,
@@ -1004,9 +1003,15 @@ class AnalyzeVASP(object):
         """
         E_per_at = self.E_per_at
         if self.calc == "static":
-            if os.path.exists(self.calc_dir.replace("static", "relax")):
+            if os.path.exists(self.calc_dir.replace("static", "relax")) and type(
+                relax_static_energy_diff_tol
+            ) in (int, float):
                 E_relax = AnalyzeVASP(self.calc_dir.replace("static", "relax")).E_per_at
-                if E_relax and E_per_at and (abs(E_relax - E_per_at) < 0.1):
+                if (
+                    E_relax
+                    and E_per_at
+                    and (abs(E_relax - E_per_at) <= relax_static_energy_diff_tol)
+                ):
                     convergence = True
                 else:
                     convergence = False
@@ -1204,6 +1209,7 @@ class AnalyzeVASP(object):
     
     def summary(
         self,
+        relax_static_energy_diff_tol=0.1,
         include_meta=False,
         include_calc_setup=False,
         include_structure=False,
@@ -1243,7 +1249,9 @@ class AnalyzeVASP(object):
             _type_: _description_
         """
         data = {}
-        data["results"] = self.basic_info
+        data["results"] = self.basic_info(
+            relax_static_energy_diff_tol=relax_static_energy_diff_tol
+        )
 
         convergence = data["results"]["convergence"]
 
@@ -1515,6 +1523,7 @@ def _results_for_calc_dir(calc_dir, configs):
         configs["include_phonons_dfpt"] = False
 
     verbose = configs["verbose"]
+    relax_static_energy_diff_tol = configs["relax_static_energy_diff_tol"]
     include_meta = configs["include_metadata"]
     include_calc_setup = configs["include_calc_setup"]
     include_structure = configs["include_structure"]
@@ -1540,6 +1549,7 @@ def _results_for_calc_dir(calc_dir, configs):
 
     # collect the data we asked for
     summary = analyzer.summary(
+        relax_static_energy_diff_tol=relax_static_energy_diff_tol,
         include_meta=include_meta,
         include_calc_setup=include_calc_setup,
         include_structure=include_structure,

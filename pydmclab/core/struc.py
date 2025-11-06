@@ -18,7 +18,7 @@ from math import lcm
 from pathlib import Path
 
 from pymatgen.core import Structure, PeriodicSite, Composition
-from pymatgen.core.surface import SlabGenerator
+from pymatgen.core.surface import SlabGenerator, Slab
 from pymatgen.transformations.standard_transformations import (
     OrderDisorderedStructureTransformation,
     AutoOxiStateDecorationTransformation,
@@ -510,6 +510,7 @@ class StrucTools(object):
         max_normal_search: int | None = None,
         tolerance: float = 0.1,
         ftolerance: float = 0.1,
+        supercell_grid: list | None = None,
     ) -> dict[str, dict]:
         """
         Args:
@@ -554,6 +555,12 @@ class StrucTools(object):
         )
 
         slabs = slabgen.get_slabs(symmetrize=symmetrize, tol=tolerance, ftol=ftolerance)
+
+        if supercell_grid:
+            for entry in slabs:
+                entry.make_supercell(supercell_grid)
+        else:
+            slabs = slabs
 
         miller_str = "".join([str(i) for i in miller])
 
@@ -738,6 +745,7 @@ class SiteTools(object):
                 ox += entry["oxidation_state"] * entry["occu"]
         return ox
 
+
 class SolidSolutionGenerator:
     """Generate quasi-random solid solutions (SQS) between two crystal structures.
 
@@ -783,9 +791,7 @@ class SolidSolutionGenerator:
             ValueError: If endmembers list doesn't contain exactly 2 structures.
         """
         if len(endmembers) != 2:
-            raise ValueError(
-                f"Expected exactly 2 endmembers, got {len(endmembers)}"
-            )
+            raise ValueError(f"Expected exactly 2 endmembers, got {len(endmembers)}")
 
         self.endmembers = endmembers
         self.supercell_dim = supercell_dim or [2, 2, 2]
@@ -873,7 +879,7 @@ class SolidSolutionGenerator:
         struc_B_super = struc_B.copy()
         struc_A_super.make_supercell(self.supercell_dim)
         struc_B_super.make_supercell(self.supercell_dim)
-        
+
         num_differing_sites = 0
         for site_A, site_B in zip(struc_A_super, struc_B_super):
             if str(site_A.specie) != str(site_B.specie):
@@ -881,7 +887,9 @@ class SolidSolutionGenerator:
 
         # Determine number of solutions automatically
         self.num_solns = num_differing_sites
-        print(f"Automatically determined {self.num_solns} intermediate compositions based on differing sites in supercell {self.supercell_dim}.")
+        print(
+            f"Automatically determined {self.num_solns} intermediate compositions based on differing sites in supercell {self.supercell_dim}."
+        )
 
         # Create dummy structures while saving original species and occupancies
         A_species, B_species = [], []
@@ -1101,25 +1109,23 @@ class SolidSolutionGenerator:
                 "lattice": lattice,
                 "coords": coords,
                 "species": species,
-                "supercell": [1, 1, 1]
+                "supercell": [1, 1, 1],
             },
             "iterations": 1000000,
             "sublattice_mode": "split",
-            "shell_weights": {
-                "1": 1.0,
-                "2": 0.5
-            },
-            "composition": [{
-                "sites": [self.element_a, self.element_b],
-                self.element_a: element_a_count,
-                self.element_b: element_b_count
-            }],
-            "max_results_per_objective": 5
+            "shell_weights": {"1": 1.0, "2": 0.5},
+            "composition": [
+                {
+                    "sites": [self.element_a, self.element_b],
+                    self.element_a: element_a_count,
+                    self.element_b: element_b_count,
+                }
+            ],
+            "max_results_per_objective": 5,
         }
-        
+
         with open(output_path, "w", encoding="utf-8") as file:
             json.dump(data, file, indent=4)
-
 
     def generate_sqs(self) -> Tuple[List[Structure], List[Dict[str, Any]]]:
         """Generate special quasirandom structures (SQS) from ordered solutions.
@@ -1149,22 +1155,25 @@ class SolidSolutionGenerator:
         sqs_data = []
 
         # Filter to only process .json files
-        json_files = sorted([f for f in os.listdir(self.dirs["json"]) if f.endswith(".json")])
+        json_files = sorted(
+            [f for f in os.listdir(self.dirs["json"]) if f.endswith(".json")]
+        )
 
         for fname in json_files:
             json_path = os.path.join(self.dirs["json"], fname)
             num_struc = fname.split(".")[0]
-            
+
             # Use absolute paths for clarity
             abs_json_path = os.path.abspath(json_path)
             abs_temp_dir = os.path.abspath(self.dirs["temp"])
-            
+
             # Change to temp directory for sqsgen execution
             original_dir = os.getcwd()
             os.chdir(abs_temp_dir)
 
             try:
                 from sqsgenerator import load_result_pack
+
                 # Run sqsgen
                 print(f"Running SQS optimization for composition {num_struc}...")
                 subprocess.run(
@@ -1186,32 +1195,35 @@ class SolidSolutionGenerator:
                 # Extract SRO parameters (handle different result types)
                 try:
                     sro_full = best_solution.sro()  # Full array
-                    sro_pair = best_solution.sro(self.element_a, self.element_b)  # List for each shell
+                    sro_pair = best_solution.sro(
+                        self.element_a, self.element_b
+                    )  # List for each shell
                 except AttributeError:
                     # For sublattice mode, SRO parameters may not be available or have different interface
                     sro_full = None
                     sro_pair = None
-                
+
                 # Get objective function values
                 objectives = []
                 for obj, solutions in pack:
-                    objectives.append({
-                        "objective": float(obj),
-                        "num_solutions": len(solutions)
-                    })
-                
+                    objectives.append(
+                        {"objective": float(obj), "num_solutions": len(solutions)}
+                    )
+
                 # Store data
                 data_dict = {
                     "composition_index": int(num_struc),
                     "best_objective": float(pack[0][0]),
-                    "all_objectives": objectives
+                    "all_objectives": objectives,
                 }
 
                 # Add SRO parameters if available
                 if sro_full is not None and sro_pair is not None:
                     data_dict["sro_parameters"] = {
                         "full_array": sro_full.tolist(),
-                        f"{self.element_a}_{self.element_b}": [float(x) for x in sro_pair]
+                        f"{self.element_a}_{self.element_b}": [
+                            float(x) for x in sro_pair
+                        ],
                     }
                 else:
                     data_dict["sro_parameters"] = None
@@ -1233,18 +1245,24 @@ class SolidSolutionGenerator:
                 if os.path.exists(default_cif_filename):
                     os.rename(default_cif_filename, target_cif_filename)
                 else:
-                    raise FileNotFoundError(f"Expected CIF file {default_cif_filename} was not created by sqsgen")
+                    raise FileNotFoundError(
+                        f"Expected CIF file {default_cif_filename} was not created by sqsgen"
+                    )
 
                 # Read with pymatgen and save as VASP
                 struc = Structure.from_file(target_cif_filename)
-                output_path = os.path.join(original_dir, self.dirs["sqs"], f"{num_struc}.vasp")
+                output_path = os.path.join(
+                    original_dir, self.dirs["sqs"], f"{num_struc}.vasp"
+                )
                 struc.to(filename=output_path, fmt="poscar")
                 sqs_solns.append(struc)
 
                 # Clean up CIF file
                 os.remove(target_cif_filename)
 
-                print(f"Completed SQS for composition {num_struc}: objective = {data_dict['best_objective']:.6f}")
+                print(
+                    f"Completed SQS for composition {num_struc}: objective = {data_dict['best_objective']:.6f}"
+                )
 
             except subprocess.CalledProcessError as e:
                 print(f"Error running sqsgen for {fname}: {e.stderr}")
@@ -1252,21 +1270,21 @@ class SolidSolutionGenerator:
                 print(f"sqsgenerator package is not installed: {e}")
             except Exception as e:
                 print(f"Error processing {fname}: {e}")
-                
+
             finally:
                 # Return to original directory
                 os.chdir(original_dir)
 
         self.sqs_solns = sqs_solns
         self.sqs_data = sqs_data
-        
+
         # Save summary data
         summary_path = os.path.join(self.dirs["sqs"], "sqs_summary.json")
         with open(summary_path, "w", encoding="utf-8") as f:
             json.dump(sqs_data, f, indent=4)
         
         print(f"\nSQS generation complete! Results saved to {self.dirs['sqs']}/")
-        
+
         return sqs_solns, sqs_data
 
     def cleanup(self) -> None:
@@ -1304,6 +1322,7 @@ class SolidSolutionGenerator:
 
         return self.disordered_solns, self.ordered_solns, self.sqs_solns, self.sqs_data
 
+
 class SlabTools(object):
     """
     A class for manipulating slabs and computing their properties.
@@ -1314,7 +1333,8 @@ class SlabTools(object):
         slab_structure: Structure | dict | str,
         slab_e_per_at: float,
         *,
-        unreduced_bulk_composition: Composition | dict | str = None,
+        unreduced_bulk_composition: Composition | Structure | dict | str = None,
+        reduced_bulk_composition: Composition | Structure | dict | str = None,
         bulk_e_per_at: float = None,
     ) -> None:
         """
@@ -1328,43 +1348,126 @@ class SlabTools(object):
             bulk_e_per_at (float, optional): Energy per atom of the bulk. Defaults to None.
         """
 
-        slab_structure = StrucTools(slab_structure).structure
+        if not isinstance(slab_structure, Structure):
+            slab_structure = StrucTools(slab_structure).structure
 
         self.slab_structure = slab_structure
         self.slab_e_per_at = slab_e_per_at
 
+        if not (unreduced_bulk_composition or reduced_bulk_composition):
+            raise ValueError(
+                "Please provide an unreduced_bulk_composition or a reduced_bulk_composition. \n It is recommended to use the unreduced bulk composition, if known."
+            )
+
+        if unreduced_bulk_composition and reduced_bulk_composition:
+            raise ValueError(
+                "Please provide either an unreduced_bulk_composition or a reduced_bulk_composition, not both. \n The unreduced bulk composition is recommended."
+            )
+
         if isinstance(unreduced_bulk_composition, (dict, str)):
             unreduced_bulk_composition = Composition(unreduced_bulk_composition)
+        elif isinstance(unreduced_bulk_composition, Structure):
+            unreduced_bulk_composition = unreduced_bulk_composition.composition
+
+        if isinstance(reduced_bulk_composition, (dict, str)):
+            reduced_bulk_composition = Composition(reduced_bulk_composition)
+        elif isinstance(reduced_bulk_composition, Structure):
+            reduced_bulk_composition = (
+                reduced_bulk_composition.composition.reduced_composition
+            )
+
+        if unreduced_bulk_composition and not reduced_bulk_composition:
+            reduced_bulk_composition = unreduced_bulk_composition.reduced_composition
 
         self.unreduced_bulk_composition = unreduced_bulk_composition
+        self.reduced_bulk_composition = reduced_bulk_composition
         self.bulk_e_per_at = bulk_e_per_at
 
     @property
     def is_stoich(self) -> bool:
         """
-        Check if the slab is stoichiometric with respect to the bulk composition.
+        Check if the slab is stoichiometric with respect to the reduced bulk composition.
         """
-        if not self.unreduced_bulk_composition:
-            raise ValueError(
-                "Unreduced bulk composition must be provided to check stoichiometry."
-            )
 
-        return self.slab_structure.composition == self.unreduced_bulk_composition
+        return (
+            self.slab_structure.composition.reduced_composition
+            == self.reduced_bulk_composition
+        ) or (
+            self.reduced_bulk_composition
+            == self.slab_structure.composition.reduced_composition
+        )
 
     @property
-    def off_stoichiometry(self) -> dict[str, float]:
+    def exact_off_stoichiometry(self) -> dict[str, float]:
         """
-        Calculate the off-stoichiometry of the slab with respect to the bulk composition.
+        Calculate the exact off-stoichiometry of the slab with respect to the unreduced bulk composition.
         """
         if not self.unreduced_bulk_composition:
             raise ValueError(
-                "Unreduced bulk composition must be provided to calculate off-stoichiometry."
+                "An unreduced bulk composition must be provided to calculate the exact off-stoichiometry. \n If you have a reduced bulk composition, use SlabTools.possible_off_stoichiometries."
             )
 
         unreduced_slab_composition = self.slab_structure.composition
         unreduced_slab_composition.allow_negative = True
 
         return (unreduced_slab_composition - self.unreduced_bulk_composition).as_dict()
+
+    @property
+    def possible_off_stoichiometries(self) -> list[dict[str, float]]:
+        """
+        Calculate the possible off-stoichiometries of the slab with respect to the reduced bulk composition.
+        This is useful when the unreduced bulk composition is not known.
+        """
+
+        slab_amts = self.slab_structure.composition.get_el_amt_dict()
+        bulk_amts = self.reduced_bulk_composition.get_el_amt_dict()
+        overlapping_elements = set(slab_amts.keys()).intersection(set(bulk_amts.keys()))
+
+        scale_estimates = []
+        for el in overlapping_elements:
+            scale_estimate = slab_amts[el] / bulk_amts[el]
+            scale_estimates.append(scale_estimate)
+
+        min_scale = max(1, int(np.floor(min(scale_estimates))))
+        max_scale = int(np.ceil(max(scale_estimates)))
+
+        scale_values = set(range(min_scale, max_scale + 1))
+        scale_values.update(scale_estimates)
+        scale_values = sorted(scale_values)
+
+        scenarios = []
+
+        for scale in scale_values:
+            scaled_bulk_composition = {el: amt * scale for el, amt in bulk_amts.items()}
+            excess_or_deficient_amts = {
+                el: slab_amts[el] - scaled_bulk_composition.get(el, 0)
+                for el in slab_amts
+            }
+
+            has_fractional_values = any(
+                not float(amt).is_integer() for amt in scaled_bulk_composition.values()
+            ) or any(
+                not float(amt).is_integer() for amt in excess_or_deficient_amts.values()
+            )
+
+            if has_fractional_values:
+                continue
+
+            total_deviation = sum(abs(v) for v in excess_or_deficient_amts.values())
+
+            scenario_data = {
+                "excess_or_deficient_amts": excess_or_deficient_amts,
+                "bulk_scale_factor": scale,
+                "scaled_bulk_composition": Composition(
+                    scaled_bulk_composition
+                ).as_dict(),
+                "total_deviation": total_deviation,
+            }
+            scenarios.append(scenario_data)
+
+        scenarios.sort(key=lambda x: x["total_deviation"])
+
+        return scenarios
 
     def surface_area(
         self, vacuum_axis: Literal["a", "b", "c", "auto"] = "auto", verbose: bool = True
@@ -1419,24 +1522,65 @@ class SlabTools(object):
         *,
         vacuum_axis: Literal["a", "b", "c", "auto"] = "auto",
         ref_potentials: ChemPots | dict = None,
+        variable_element: str = None,
         verbose: bool = True,
         **kwargs,
     ) -> float:
 
-        if not (self.unreduced_bulk_composition and self.bulk_e_per_at):
+        if not self.bulk_e_per_at:
             raise ValueError(
-                "Unreduced bulk composition and bulk energy per atom must be provided to calculate surface energy."
+                "Bulk energy per atom must be provided to calculate surface energy."
             )
-
-        slab_e_tot = self.slab_e_per_at * len(self.slab_structure)
-        bulk_e_tot = self.bulk_e_per_at * self.unreduced_bulk_composition.num_atoms
 
         surface_area = self.surface_area(vacuum_axis=vacuum_axis, verbose=verbose)
 
         if not self.is_stoich:
+
             from pydmclab.core.energies import ChemPots
 
-            excess_or_deficient_amts = self.off_stoichiometry
+            slab_e_tot = self.slab_e_per_at * len(self.slab_structure)
+
+            if self.unreduced_bulk_composition:
+                bulk_e_tot = (
+                    self.bulk_e_per_at * self.unreduced_bulk_composition.num_atoms
+                )
+                excess_or_deficient_amts = self.exact_off_stoichiometry
+            else:
+                possible_scenarios = self.possible_off_stoichiometries
+
+                if not possible_scenarios:
+                    raise ValueError(
+                        f"No possible off-stoichiometries found with deviation less than {sum(self.reduced_bulk_composition.get_el_amt_dict()).values()} total atoms."
+                    )
+
+                if variable_element:
+                    for scenario in possible_scenarios:
+                        excess_or_deficient_amts = scenario["excess_or_deficient_amts"]
+                        total_atoms = sum(
+                            abs(amt) for amt in excess_or_deficient_amts.values()
+                        )
+                        variable_element_count = abs(
+                            excess_or_deficient_amts.get(variable_element, 0)
+                        )
+                        scenario["variable_element_percentage"] = (
+                            (variable_element_count / total_atoms) * 100
+                            if total_atoms > 0
+                            else 0
+                        )
+
+                    possible_scenarios.sort(
+                        key=lambda x: x["variable_element_percentage"], reverse=True
+                    )
+
+                bulk_e_tot = (
+                    self.bulk_e_per_at
+                    * Composition.from_dict(
+                        possible_scenarios[0]["scaled_bulk_composition"]
+                    ).num_atoms
+                )
+                excess_or_deficient_amts = possible_scenarios[0][
+                    "excess_or_deficient_amts"
+                ]
 
             if not ref_potentials:
                 temperature = kwargs.pop("temperature", None)
@@ -1474,4 +1618,9 @@ class SlabTools(object):
 
             return (slab_e_tot - bulk_e_tot - delta_mu_sum) / (2 * surface_area)
 
-        return (slab_e_tot - bulk_e_tot) / (2 * surface_area)
+        scale = (
+            self.slab_structure.composition.get_reduced_composition_and_factor()[1]
+            * self.slab_structure.composition.reduced_composition.num_atoms
+        )
+
+        return ((self.slab_e_per_at - self.bulk_e_per_at) * scale) / (2 * surface_area)
