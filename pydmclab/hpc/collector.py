@@ -65,6 +65,7 @@ class Collector(object):
             configs["include_phonons"] = False
 
         verbose = configs["verbose"]
+        relax_static_energy_diff_tol = configs["relax_static_energy_diff_tol"]
         include_meta = configs["include_metadata"]
         include_calc_setup = configs["include_calc_setup"]
         include_structure = configs["include_structure"]
@@ -89,6 +90,7 @@ class Collector(object):
 
         # collect the data we asked for
         summary = analyzer.summary(
+            relax_static_energy_diff_tol=relax_static_energy_diff_tol,
             include_meta=include_meta,
             include_calc_setup=include_calc_setup,
             include_structure=include_structure,

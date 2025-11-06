@@ -3,20 +3,22 @@ from __future__ import annotations
 import os
 import subprocess
 import yaml
+import json
 import random
 import warnings
 
 from typing import TYPE_CHECKING
 from collections import Counter, defaultdict
 from shutil import copyfile, rmtree
-from typing import List, Tuple, Dict, Literal
+from typing import Any, List, Tuple, Dict, Literal, Optional, Union
 
 import numpy as np
 
 from math import lcm
+from pathlib import Path
 
 from pymatgen.core import Structure, PeriodicSite, Composition
-from pymatgen.core.surface import SlabGenerator
+from pymatgen.core.surface import SlabGenerator, Slab
 from pymatgen.transformations.standard_transformations import (
     OrderDisorderedStructureTransformation,
     AutoOxiStateDecorationTransformation,
@@ -508,6 +510,7 @@ class StrucTools(object):
         max_normal_search: int | None = None,
         tolerance: float = 0.1,
         ftolerance: float = 0.1,
+        supercell_grid: list | None = None,
     ) -> dict[str, dict]:
         """
         Args:
@@ -552,6 +555,12 @@ class StrucTools(object):
         )
 
         slabs = slabgen.get_slabs(symmetrize=symmetrize, tol=tolerance, ftol=ftolerance)
+
+        if supercell_grid:
+            for entry in slabs:
+                entry.make_supercell(supercell_grid)
+        else:
+            slabs = slabs
 
         miller_str = "".join([str(i) for i in miller])
 
@@ -738,67 +747,82 @@ class SiteTools(object):
 
 
 class SolidSolutionGenerator:
-    """
-    Generate quasi-random solid solutions (SQS) between two crystal structures.
-    This is accomplished using the sqsgenerator package.
+    """Generate quasi-random solid solutions (SQS) between two crystal structures.
+
+    This class uses the sqsgenerator package to create special quasi-random
+    structures that mimic random solid solutions while maintaining specific
+    short-range order parameters.
 
     Attributes:
-        endmembers (List[Structure]): List of two endmember structures.
-        num_solns (int): Number of solutions to generate.
-        supercell_dim (List[int]): Dimensions of the supercell.
-        element_A (str): Element that differs in the first endmember.
-        element_B (str): Element that differs in the second endmember.
-        disordered_solns (List[Structure]): List of disordered solid solution structures.
-        ordered_solns (List[Structure]): List of ordered solid solution structures.
-        sqs_solns (List[Structure]): List of special quasirandom structures (SQS).
-        dirs (Dict[str, str]): Dictionary of directory paths used in the process.
+        endmembers: List of two endmember structures.
+        supercell_dim: Dimensions of the supercell.
+        element_a: Element that differs in the first endmember.
+        element_b: Element that differs in the second endmember.
+        disordered_solns: List of disordered solid solution structures.
+        ordered_solns: List of ordered solid solution structures.
+        sqs_solns: List of special quasirandom structures (SQS).
+        sqs_data: List of dictionaries containing SQS results data.
+        dirs: Dictionary of directory paths used in the process.
 
-    Example usage:
-        struc_A = Structure.from_file('Endmembers/SrRuO3.cif')
-        struc_B = Structure.from_file('Endmembers/SrZrO3.cif')
-        generator = SolidSolutionGenerator(endmembers=[struc_A, struc_B], num_solns=15, supercell_dim=[2, 1, 2])
-        disordered, ordered, sqs = generator.run(sqsgen_path='/path/to/sqsgen')
-
-    Note:
-        '/path/to/sqsgen' should be replaced with the location of your sqsgen installation.
+    Example:
+        >>> from pymatgen.core import Structure
+        >>> struc_a = Structure.from_file('endmember_a.cif')
+        >>> struc_b = Structure.from_file('endmember_b.cif')
+        >>> generator = SolidSolutionGenerator(
+        ...     endmembers=[struc_a, struc_b],
+        ...     supercell_dim=[2, 1, 2]
+        ... )
+        >>> disordered, ordered, sqs, data = generator.run()
     """
 
     def __init__(
         self,
         endmembers: List[Structure],
-        num_solns: int = 15,
-        supercell_dim: List[int] = [2, 2, 2],
-    ):
-        """
-        Initialize the SolidSolutionGenerator.
+        supercell_dim: Optional[List[int]] = None,
+    ) -> None:
+        """Initialize the SolidSolutionGenerator.
 
         Args:
-            endmembers (List[Structure]): List of two endmember structures.
-            num_solns (int, optional): Number of solutions to generate. Defaults to 15.
-            supercell_dim (List[int], optional): Dimensions of the supercell. Defaults to [2, 2, 2].
+            endmembers: List of exactly two endmember structures.
+            supercell_dim: Dimensions of the supercell. Defaults to [2, 2, 2].
+
+        Raises:
+            ValueError: If endmembers list doesn't contain exactly 2 structures.
         """
+        if len(endmembers) != 2:
+            raise ValueError(f"Expected exactly 2 endmembers, got {len(endmembers)}")
+
         self.endmembers = endmembers
-        self.num_solns = num_solns
-        self.supercell_dim = supercell_dim
-        self.element_A: str = None
-        self.element_B: str = None
-        self.disordered_solns: List[Structure] = None
-        self.ordered_solns: List[Structure] = None
-        self.sqs_solns: List[Structure] = None
+        self.supercell_dim = supercell_dim or [2, 2, 2]
+
+        # Initialize attributes that will be set during processing
+        self.element_a: Optional[str] = None
+        self.element_b: Optional[str] = None
+        self.disordered_solns: Optional[List[Structure]] = None
+        self.ordered_solns: Optional[List[Structure]] = None
+        self.sqs_solns: Optional[List[Structure]] = None
+        self.sqs_data: Optional[List[Dict[str, Any]]] = None
+        self.num_solns: Optional[int] = None
 
         # Create necessary directories
         self.dirs: Dict[str, str] = {
             "output": "Ordered_Solutions",
-            "yaml": "yaml_files",
+            "json": "json_files",
             "sqs": "SQS",
             "temp": "working_dir",
         }
-        for dir_name in self.dirs.values():
-            os.makedirs(dir_name, exist_ok=True)
+        self._create_directories()
+
+    def _create_directories(self) -> None:
+        """Create necessary working directories."""
+        for dir_path in self.dirs.values():
+            Path(dir_path).mkdir(exist_ok=True)
 
     def generate_solid_solutions(self) -> List[Structure]:
         """
         Generate disordered solid solutions between the two endmember structures.
+        The number of solutions is automatically determined based on the number of
+        sites that differ between the matched endmembers in the supercell.
 
         Returns:
             List[Structure]: List of disordered solid solution structures.
@@ -841,8 +865,25 @@ class SolidSolutionGenerator:
             )
 
         # Map differing elements to variables
-        self.element_A = differing_elements.intersection(elements_A).pop()
-        self.element_B = differing_elements.intersection(elements_B).pop()
+        self.element_a = differing_elements.intersection(elements_A).pop()
+        self.element_b = differing_elements.intersection(elements_B).pop()
+
+        # Count the number of differing sites in the supercell
+        struc_A_super = struc_A.copy()
+        struc_B_super = struc_B.copy()
+        struc_A_super.make_supercell(self.supercell_dim)
+        struc_B_super.make_supercell(self.supercell_dim)
+
+        num_differing_sites = 0
+        for site_A, site_B in zip(struc_A_super, struc_B_super):
+            if str(site_A.specie) != str(site_B.specie):
+                num_differing_sites += 1
+
+        # Determine number of solutions automatically
+        self.num_solns = num_differing_sites
+        print(
+            f"Automatically determined {self.num_solns} intermediate compositions based on differing sites in supercell {self.supercell_dim}."
+        )
 
         # Create dummy structures while saving original species and occupancies
         A_species, B_species = [], []
@@ -898,20 +939,17 @@ class SolidSolutionGenerator:
         return interp_structs
 
     def order_disordered_structure(self, disordered_structure: Structure) -> Structure:
-        """
-        Convert a disordered pymatgen Structure object to an ordered one
-        by assigning species to sites according to their fractional occupancies.
+        """Convert a disordered Structure to an ordered one.
 
-        For this class, the precise ordering does not matter. But the sqsgen
-        package requires the structure to be ordered. All that matters is the
-        relative number of each species on the sites to be disordered, which is
-        automatically determined by the fractional occupancies in disordered_structure.
+        Assigns species to sites according to their fractional occupancies.
+        The precise ordering is randomized, but the total composition is preserved.
+        This is required by the sqsgen package which operates on ordered structures.
 
         Args:
-            disordered_structure (Structure): The input disordered structure.
+            disordered_structure: The input disordered structure.
 
         Returns:
-            Structure: An ordered version of the input structure.
+            An ordered version of the input structure with the same composition.
         """
         # Initialize an empty structure with the same lattice
         ordered_structure: Structure = Structure(disordered_structure.lattice, [], [])
@@ -977,11 +1015,13 @@ class SolidSolutionGenerator:
         return ordered_structure
 
     def generate_ordered_solutions(self) -> List[Structure]:
-        """
-        Generate ordered solid solutions from the disordered solutions.
+        """Generate ordered solid solutions from the disordered solutions.
+
+        Creates supercells and converts disordered structures to ordered ones
+        by randomly assigning species according to fractional occupancies.
 
         Returns:
-            List[Structure]: List of ordered solid solution structures.
+            List of ordered solid solution structures.
         """
         if self.disordered_solns is None:
             self.generate_solid_solutions()
@@ -989,7 +1029,7 @@ class SolidSolutionGenerator:
         ordered_solns = []
         for i, interp_struc in enumerate(self.disordered_solns):
             interp_struc.make_supercell(self.supercell_dim)
-            inerp_struc = interp_struc.remove_oxidation_states()
+            interp_struc = interp_struc.remove_oxidation_states()
             ordered_struc = self.order_disordered_structure(interp_struc)
             ordered_solns.append(ordered_struc)
             ordered_struc.to(
@@ -1000,171 +1040,281 @@ class SolidSolutionGenerator:
         return ordered_solns
 
     def _parse_structure(
-        self, file_path: str
+        self, file_path: Union[str, Path]
     ) -> Tuple[List[List[float]], List[List[float]], List[str], Structure]:
-        """
-        Parse a structure file and extract lattice, coordinates, species, and structure object.
+        """Parse a structure file and extract components.
 
         Args:
-            file_path (str): Path to the structure file.
+            file_path: Path to the structure file.
 
         Returns:
-            Tuple[List[List[float]], List[List[float]], List[str], Structure]:
-                Lattice matrix, fractional coordinates, species list, and Structure object.
+            Tuple containing:
+                - Lattice matrix as nested list
+                - Fractional coordinates as nested list
+                - Species list
+                - Structure object
         """
-        structure = Structure.from_file(file_path)
+        try:
+            structure = Structure.from_file(file_path)
+        except Exception as e:
+            raise ValueError(f"Failed to read structure from {file_path}: {e}") from e
+
         structure.remove_oxidation_states()
         lattice = structure.lattice.matrix.tolist()
         species = [str(site.specie) for site in structure]
         coords = [site.frac_coords.tolist() for site in structure]
         return lattice, coords, species, structure
 
-    def _write_output_file(
+    def _write_json_file(
         self,
-        output_path: str,
+        output_path: Union[str, Path],
         lattice: List[List[float]],
         coords: List[List[float]],
         species: List[str],
     ) -> None:
-        """
-        Write the structure information to a YAML file for SQS generation.
+        """Write structure information to a JSON file for SQS generation.
 
         Args:
-            output_path (str): Path to write the output YAML file.
-            lattice (List[List[float]]): Lattice matrix.
-            coords (List[List[float]]): Fractional coordinates of sites.
-            species (List[str]): List of species on each site.
+            output_path: Path to write the output JSON file.
+            lattice: Lattice matrix as nested list.
+            coords: Fractional coordinates of sites as nested list.
+            species: List of species on each site.
         """
         composition_dict = dict(Counter(species))
-        filtered_composition = {
-            self.element_A: composition_dict.get(self.element_A, 0),
-            self.element_B: composition_dict.get(self.element_B, 0),
-        }
-        species = [
-            self.element_A if specie == self.element_B else specie for specie in species
-        ]
+
+        # Get the differing elements that should be optimized in SQS
+        if self.element_a is None or self.element_b is None:
+            raise ValueError(
+                "Differing elements not determined. Call generate_solid_solutions() first."
+            )
+
+        element_a_count = composition_dict.get(self.element_a, 0)
+        element_b_count = composition_dict.get(self.element_b, 0)
+
+        if element_a_count == 0 or element_b_count == 0:
+            raise ValueError(
+                f"Structure does not contain both differing elements "
+                f"({self.element_a}, {self.element_b})"
+            )
+
+        # Create the JSON structure with sublattice mode
         data = {
             "structure": {
-                "supercell": [1, 1, 1],
                 "lattice": lattice,
                 "coords": coords,
                 "species": species,
+                "supercell": [1, 1, 1],
             },
-            "iterations": 1e6,
-            "shell_weights": {1: 1.0},
-            "which": self.element_A,
-            "composition": filtered_composition,
+            "iterations": 1000000,
+            "sublattice_mode": "split",
+            "shell_weights": {"1": 1.0, "2": 0.5},
+            "composition": [
+                {
+                    "sites": [self.element_a, self.element_b],
+                    self.element_a: element_a_count,
+                    self.element_b: element_b_count,
+                }
+            ],
+            "max_results_per_objective": 5,
         }
-        with open(output_path, "w") as file:
-            yaml.dump(data, file, default_flow_style=False)
 
-    def generate_sqs(self, sqsgen_path: str = "path/to/sqsgen") -> List[Structure]:
-        """
-        Generate special quasirandom structures (SQS) from the ordered solutions.
+        with open(output_path, "w", encoding="utf-8") as file:
+            json.dump(data, file, indent=4)
 
-        Args:
-            sqsgen_path (str, optional): Path to the sqsgen executable. Defaults to "path/to/sqsgen".
+    def generate_sqs(self) -> Tuple[List[Structure], List[Dict[str, Any]]]:
+        """Generate special quasirandom structures (SQS) from ordered solutions.
+
+        Uses the sqsgenerator package to optimize structures for minimal
+        short-range order parameters while maintaining the target composition.
 
         Returns:
-            List[Structure]: List of SQS structures.
+            Tuple containing:
+                - List of best SQS structures
+                - List of dictionaries with SQS optimization data
         """
         if self.ordered_solns is None:
             self.generate_ordered_solutions()
 
-        # Convert ordered structures to YAML format
+        # Convert ordered structures to JSON format
         for i, fname in enumerate(os.listdir(self.dirs["output"])):
             input_file = os.path.join(self.dirs["output"], fname)
             output_file = os.path.join(
-                self.dirs["yaml"], f"{os.path.splitext(fname)[0]}.yaml"
+                self.dirs["json"], f"{os.path.splitext(fname)[0]}.json"
             )
             lattice, coords, species, structure = self._parse_structure(input_file)
-            self._write_output_file(output_file, lattice, coords, species)
+            self._write_json_file(output_file, lattice, coords, species)
 
-        # Generate an SQS from each YAML file
-        calc_sqs = [
-            os.path.join(sqsgen_path, "sqsgen"),
-            "run",
-            "iteration",
-            "sqs_input.yaml",
-        ]
-        export_sqs = [
-            os.path.join(sqsgen_path, "sqsgen"),
-            "export",
-            "sqs_input.result.yaml",
-        ]
+        # Generate an SQS from each JSON file
         sqs_solns = []
+        sqs_data = []
 
-        for fname in os.listdir(self.dirs["yaml"]):
-            # Copy YAML input to temp_dir
-            copyfile(
-                os.path.join(self.dirs["yaml"], fname),
-                os.path.join(self.dirs["temp"], "sqs_input.yaml"),
-            )
-            os.chdir(self.dirs["temp"])
+        # Filter to only process .json files
+        json_files = sorted(
+            [f for f in os.listdir(self.dirs["json"]) if f.endswith(".json")]
+        )
 
-            # Run sqsgen and export CIF(s)
-            subprocess.run(
-                calc_sqs,
-                check=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-            )
-            subprocess.run(
-                export_sqs,
-                check=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-            )
-
-            # Copy one SQS to the sqs_dir
-            cif_filenames = [
-                filename for filename in os.listdir(".") if filename.endswith(".cif")
-            ]
-            struc = Structure.from_file(cif_filenames[0])
+        for fname in json_files:
+            json_path = os.path.join(self.dirs["json"], fname)
             num_struc = fname.split(".")[0]
-            struc.to(filename=f'../{self.dirs["sqs"]}/{num_struc}.vasp', fmt="poscar")
-            sqs_solns.append(struc)
 
-            # Clean up by removing all files in temp_dir
-            for existing_fname in os.listdir("."):
-                os.remove(existing_fname)
+            # Use absolute paths for clarity
+            abs_json_path = os.path.abspath(json_path)
+            abs_temp_dir = os.path.abspath(self.dirs["temp"])
 
-            os.chdir("..")
+            # Change to temp directory for sqsgen execution
+            original_dir = os.getcwd()
+            os.chdir(abs_temp_dir)
+
+            try:
+                from sqsgenerator import load_result_pack
+
+                # Run sqsgen
+                print(f"Running SQS optimization for composition {num_struc}...")
+                subprocess.run(
+                    ["sqsgen", "run", "-i", abs_json_path],
+                    check=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                )
+
+                # Load the result pack for data extraction
+                mpack_file = abs_json_path.replace(".json", ".mpack")
+                with open(mpack_file, "rb") as f:
+                    pack = load_result_pack(f.read())
+
+                # Get the best solution
+                best_solution = pack.best()
+
+                # Extract SRO parameters (handle different result types)
+                try:
+                    sro_full = best_solution.sro()  # Full array
+                    sro_pair = best_solution.sro(
+                        self.element_a, self.element_b
+                    )  # List for each shell
+                except AttributeError:
+                    # For sublattice mode, SRO parameters may not be available or have different interface
+                    sro_full = None
+                    sro_pair = None
+
+                # Get objective function values
+                objectives = []
+                for obj, solutions in pack:
+                    objectives.append(
+                        {"objective": float(obj), "num_solutions": len(solutions)}
+                    )
+
+                # Store data
+                data_dict = {
+                    "composition_index": int(num_struc),
+                    "best_objective": float(pack[0][0]),
+                    "all_objectives": objectives,
+                }
+
+                # Add SRO parameters if available
+                if sro_full is not None and sro_pair is not None:
+                    data_dict["sro_parameters"] = {
+                        "full_array": sro_full.tolist(),
+                        f"{self.element_a}_{self.element_b}": [
+                            float(x) for x in sro_pair
+                        ],
+                    }
+                else:
+                    data_dict["sro_parameters"] = None
+                sqs_data.append(data_dict)
+
+                # Export the best structure using sqsgen output structure
+                subprocess.run(
+                    ["sqsgen", "output", "-o", mpack_file, "structure", "-f", "cif"],
+                    check=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                )
+
+                # sqsgen always creates sqs-0-0.cif, so we need to rename it immediately
+                default_cif_filename = "sqs-0-0.cif"
+                target_cif_filename = f"sqs-{num_struc}-0.cif"
+
+                if os.path.exists(default_cif_filename):
+                    os.rename(default_cif_filename, target_cif_filename)
+                else:
+                    raise FileNotFoundError(
+                        f"Expected CIF file {default_cif_filename} was not created by sqsgen"
+                    )
+
+                # Read with pymatgen and save as VASP
+                struc = Structure.from_file(target_cif_filename)
+                output_path = os.path.join(
+                    original_dir, self.dirs["sqs"], f"{num_struc}.vasp"
+                )
+                struc.to(filename=output_path, fmt="poscar")
+                sqs_solns.append(struc)
+
+                # Clean up CIF file
+                os.remove(target_cif_filename)
+
+                print(
+                    f"Completed SQS for composition {num_struc}: objective = {data_dict['best_objective']:.6f}"
+                )
+
+            except subprocess.CalledProcessError as e:
+                print(f"Error running sqsgen for {fname}: {e.stderr}")
+            except ImportError as e:
+                print(f"sqsgenerator package is not installed: {e}")
+            except Exception as e:
+                print(f"Error processing {fname}: {e}")
+
+            finally:
+                # Return to original directory
+                os.chdir(original_dir)
 
         self.sqs_solns = sqs_solns
-        return sqs_solns
+        self.sqs_data = sqs_data
+
+        # Save summary data
+        summary_path = os.path.join(self.dirs["sqs"], "sqs_summary.json")
+        with open(output_path, "w", encoding="utf-8") as file:
+            json.dump(data, file, indent=4)
+
+        print(f"\nSQS generation complete! Results saved to {self.dirs['sqs']}/")
+
+        return sqs_solns, sqs_data
 
     def cleanup(self) -> None:
         """
         Remove all directories created during the process.
         """
         for dir_name in self.dirs.values():
-            rmtree(dir_name)
+            if os.path.exists(dir_name):
+                rmtree(dir_name)
 
     def run(
-        self, sqsgen_path: str = "path/to/sqsgen", cleanup: bool = True
-    ) -> Tuple[List[Structure], List[Structure], List[Structure]]:
-        """
-        Run the entire solid solution generation process.
+        self, cleanup: bool = True
+    ) -> Tuple[List[Structure], List[Structure], List[Structure], List[Dict[str, Any]]]:
+        """Run the entire solid solution generation process.
+
+        Executes the complete workflow: generates disordered solutions,
+        converts to ordered structures, optimizes SQS, and optionally cleans up.
 
         Args:
-            sqsgen_path (str, optional): Path to the sqsgen executable. Defaults to "path/to/sqsgen".
-            cleanup (bool, optional): Whether to remove temporary directories after completion. Defaults to True.
+            cleanup: Whether to remove temporary directories after completion.
 
         Returns:
-            Tuple[List[Structure], List[Structure], List[Structure]]:
-                Lists of disordered, ordered, and SQS structures.
+            Tuple containing:
+                - List of disordered solution structures
+                - List of ordered solution structures
+                - List of SQS structures
+                - List of SQS optimization data dictionaries
         """
         self.generate_solid_solutions()
         self.generate_ordered_solutions()
-        self.generate_sqs(sqsgen_path)
+        self.generate_sqs()
 
         if cleanup:
             self.cleanup()
 
-        return self.disordered_solns, self.ordered_solns, self.sqs_solns
+        return self.disordered_solns, self.ordered_solns, self.sqs_solns, self.sqs_data
 
 
 class SlabTools(object):
@@ -1177,7 +1327,8 @@ class SlabTools(object):
         slab_structure: Structure | dict | str,
         slab_e_per_at: float,
         *,
-        unreduced_bulk_composition: Composition | dict | str = None,
+        unreduced_bulk_composition: Composition | Structure | dict | str = None,
+        reduced_bulk_composition: Composition | Structure | dict | str = None,
         bulk_e_per_at: float = None,
     ) -> None:
         """
@@ -1191,43 +1342,126 @@ class SlabTools(object):
             bulk_e_per_at (float, optional): Energy per atom of the bulk. Defaults to None.
         """
 
-        slab_structure = StrucTools(slab_structure).structure
+        if not isinstance(slab_structure, Structure):
+            slab_structure = StrucTools(slab_structure).structure
 
         self.slab_structure = slab_structure
         self.slab_e_per_at = slab_e_per_at
 
+        if not (unreduced_bulk_composition or reduced_bulk_composition):
+            raise ValueError(
+                "Please provide an unreduced_bulk_composition or a reduced_bulk_composition. \n It is recommended to use the unreduced bulk composition, if known."
+            )
+
+        if unreduced_bulk_composition and reduced_bulk_composition:
+            raise ValueError(
+                "Please provide either an unreduced_bulk_composition or a reduced_bulk_composition, not both. \n The unreduced bulk composition is recommended."
+            )
+
         if isinstance(unreduced_bulk_composition, (dict, str)):
             unreduced_bulk_composition = Composition(unreduced_bulk_composition)
+        elif isinstance(unreduced_bulk_composition, Structure):
+            unreduced_bulk_composition = unreduced_bulk_composition.composition
+
+        if isinstance(reduced_bulk_composition, (dict, str)):
+            reduced_bulk_composition = Composition(reduced_bulk_composition)
+        elif isinstance(reduced_bulk_composition, Structure):
+            reduced_bulk_composition = (
+                reduced_bulk_composition.composition.reduced_composition
+            )
+
+        if unreduced_bulk_composition and not reduced_bulk_composition:
+            reduced_bulk_composition = unreduced_bulk_composition.reduced_composition
 
         self.unreduced_bulk_composition = unreduced_bulk_composition
+        self.reduced_bulk_composition = reduced_bulk_composition
         self.bulk_e_per_at = bulk_e_per_at
 
     @property
     def is_stoich(self) -> bool:
         """
-        Check if the slab is stoichiometric with respect to the bulk composition.
+        Check if the slab is stoichiometric with respect to the reduced bulk composition.
         """
-        if not self.unreduced_bulk_composition:
-            raise ValueError(
-                "Unreduced bulk composition must be provided to check stoichiometry."
-            )
 
-        return self.slab_structure.composition == self.unreduced_bulk_composition
+        return (
+            self.slab_structure.composition.reduced_composition
+            == self.reduced_bulk_composition
+        ) or (
+            self.reduced_bulk_composition
+            == self.slab_structure.composition.reduced_composition
+        )
 
     @property
-    def off_stoichiometry(self) -> dict[str, float]:
+    def exact_off_stoichiometry(self) -> dict[str, float]:
         """
-        Calculate the off-stoichiometry of the slab with respect to the bulk composition.
+        Calculate the exact off-stoichiometry of the slab with respect to the unreduced bulk composition.
         """
         if not self.unreduced_bulk_composition:
             raise ValueError(
-                "Unreduced bulk composition must be provided to calculate off-stoichiometry."
+                "An unreduced bulk composition must be provided to calculate the exact off-stoichiometry. \n If you have a reduced bulk composition, use SlabTools.possible_off_stoichiometries."
             )
 
         unreduced_slab_composition = self.slab_structure.composition
         unreduced_slab_composition.allow_negative = True
 
         return (unreduced_slab_composition - self.unreduced_bulk_composition).as_dict()
+
+    @property
+    def possible_off_stoichiometries(self) -> list[dict[str, float]]:
+        """
+        Calculate the possible off-stoichiometries of the slab with respect to the reduced bulk composition.
+        This is useful when the unreduced bulk composition is not known.
+        """
+
+        slab_amts = self.slab_structure.composition.get_el_amt_dict()
+        bulk_amts = self.reduced_bulk_composition.get_el_amt_dict()
+        overlapping_elements = set(slab_amts.keys()).intersection(set(bulk_amts.keys()))
+
+        scale_estimates = []
+        for el in overlapping_elements:
+            scale_estimate = slab_amts[el] / bulk_amts[el]
+            scale_estimates.append(scale_estimate)
+
+        min_scale = max(1, int(np.floor(min(scale_estimates))))
+        max_scale = int(np.ceil(max(scale_estimates)))
+
+        scale_values = set(range(min_scale, max_scale + 1))
+        scale_values.update(scale_estimates)
+        scale_values = sorted(scale_values)
+
+        scenarios = []
+
+        for scale in scale_values:
+            scaled_bulk_composition = {el: amt * scale for el, amt in bulk_amts.items()}
+            excess_or_deficient_amts = {
+                el: slab_amts[el] - scaled_bulk_composition.get(el, 0)
+                for el in slab_amts
+            }
+
+            has_fractional_values = any(
+                not float(amt).is_integer() for amt in scaled_bulk_composition.values()
+            ) or any(
+                not float(amt).is_integer() for amt in excess_or_deficient_amts.values()
+            )
+
+            if has_fractional_values:
+                continue
+
+            total_deviation = sum(abs(v) for v in excess_or_deficient_amts.values())
+
+            scenario_data = {
+                "excess_or_deficient_amts": excess_or_deficient_amts,
+                "bulk_scale_factor": scale,
+                "scaled_bulk_composition": Composition(
+                    scaled_bulk_composition
+                ).as_dict(),
+                "total_deviation": total_deviation,
+            }
+            scenarios.append(scenario_data)
+
+        scenarios.sort(key=lambda x: x["total_deviation"])
+
+        return scenarios
 
     def surface_area(
         self, vacuum_axis: Literal["a", "b", "c", "auto"] = "auto", verbose: bool = True
@@ -1282,24 +1516,65 @@ class SlabTools(object):
         *,
         vacuum_axis: Literal["a", "b", "c", "auto"] = "auto",
         ref_potentials: ChemPots | dict = None,
+        variable_element: str = None,
         verbose: bool = True,
         **kwargs,
     ) -> float:
 
-        if not (self.unreduced_bulk_composition and self.bulk_e_per_at):
+        if not self.bulk_e_per_at:
             raise ValueError(
-                "Unreduced bulk composition and bulk energy per atom must be provided to calculate surface energy."
+                "Bulk energy per atom must be provided to calculate surface energy."
             )
-
-        slab_e_tot = self.slab_e_per_at * len(self.slab_structure)
-        bulk_e_tot = self.bulk_e_per_at * self.unreduced_bulk_composition.num_atoms
 
         surface_area = self.surface_area(vacuum_axis=vacuum_axis, verbose=verbose)
 
         if not self.is_stoich:
+
             from pydmclab.core.energies import ChemPots
 
-            excess_or_deficient_amts = self.off_stoichiometry
+            slab_e_tot = self.slab_e_per_at * len(self.slab_structure)
+
+            if self.unreduced_bulk_composition:
+                bulk_e_tot = (
+                    self.bulk_e_per_at * self.unreduced_bulk_composition.num_atoms
+                )
+                excess_or_deficient_amts = self.exact_off_stoichiometry
+            else:
+                possible_scenarios = self.possible_off_stoichiometries
+
+                if not possible_scenarios:
+                    raise ValueError(
+                        f"No possible off-stoichiometries found with deviation less than {sum(self.reduced_bulk_composition.get_el_amt_dict()).values()} total atoms."
+                    )
+
+                if variable_element:
+                    for scenario in possible_scenarios:
+                        excess_or_deficient_amts = scenario["excess_or_deficient_amts"]
+                        total_atoms = sum(
+                            abs(amt) for amt in excess_or_deficient_amts.values()
+                        )
+                        variable_element_count = abs(
+                            excess_or_deficient_amts.get(variable_element, 0)
+                        )
+                        scenario["variable_element_percentage"] = (
+                            (variable_element_count / total_atoms) * 100
+                            if total_atoms > 0
+                            else 0
+                        )
+
+                    possible_scenarios.sort(
+                        key=lambda x: x["variable_element_percentage"], reverse=True
+                    )
+
+                bulk_e_tot = (
+                    self.bulk_e_per_at
+                    * Composition.from_dict(
+                        possible_scenarios[0]["scaled_bulk_composition"]
+                    ).num_atoms
+                )
+                excess_or_deficient_amts = possible_scenarios[0][
+                    "excess_or_deficient_amts"
+                ]
 
             if not ref_potentials:
                 temperature = kwargs.pop("temperature", None)
@@ -1337,4 +1612,9 @@ class SlabTools(object):
 
             return (slab_e_tot - bulk_e_tot - delta_mu_sum) / (2 * surface_area)
 
-        return (slab_e_tot - bulk_e_tot) / (2 * surface_area)
+        scale = (
+            self.slab_structure.composition.get_reduced_composition_and_factor()[1]
+            * self.slab_structure.composition.reduced_composition.num_atoms
+        )
+
+        return ((self.slab_e_per_at - self.bulk_e_per_at) * scale) / (2 * surface_area)
