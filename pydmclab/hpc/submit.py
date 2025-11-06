@@ -28,9 +28,9 @@ class SubmitTools(object):
         this class will automatically crawl through the VASP output files and figure out
             how to edit that input and submission files to finish the desired calculations
 
-    This class also makes use of pydmclab.hpc.vasp.VASPSetUp to help with the VASP input files
+    This class also makes use of pydmclab.hpc.vasp.VASPSetUp to help with the VASP input files 
 
-    """
+    """ 
 
     def __init__(
         self,
@@ -311,7 +311,7 @@ class SubmitTools(object):
         configs = self.configs.copy()
         machine = configs["machine"]
         if machine == "msi":
-            return "/home/cbartel/shared/bin"
+            return "/projects/standard/cbartel/shared/bin"
         elif machine == "bridges2":
             return "/ocean/projects/mat230011p/shared/bin"
         elif machine == "expanse":
