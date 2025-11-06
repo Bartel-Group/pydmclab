@@ -1,23 +1,19 @@
-from __future__ import annotations
+from __future__ import annotations 
 
 import os
 import subprocess
 import yaml
-import json
 import random
 import warnings
-
-from typing import TYPE_CHECKING
 from collections import Counter, defaultdict
 from shutil import copyfile, rmtree
-from typing import Any, List, Tuple, Dict, Literal, Optional, Union
-
+from typing import List, Tuple, Dict, Literal
+from collections.abc import Iterator
 import numpy as np
+from typing import Union
+from functools import cached_property
 
-from math import lcm
-from pathlib import Path
-
-from pymatgen.core import Structure, PeriodicSite, Composition
+from pymatgen.core import Structure, PeriodicSite, Composition, Element, Lattice
 from pymatgen.core.surface import SlabGenerator, Slab
 from pymatgen.transformations.standard_transformations import (
     OrderDisorderedStructureTransformation,
@@ -27,10 +23,15 @@ from pymatgen.transformations.standard_transformations import (
 from pymatgen.analysis import structure_matcher
 from pymatgen.analysis.structure_matcher import StructureMatcher
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
-from pymatgen.analysis.diffraction.xrd import XRDCalculator
+
+from pymatgen.analysis.interfaces.zsl import ZSLGenerator, fast_norm
+from pymatgen.analysis.interfaces.coherent_interfaces import CoherentInterfaceBuilder
+from pymatgen.core.interface import Interface, label_termination
 
 from pydmclab.core import struc as pydmc_struc
 from pydmclab.core.comp import CompTools
+
+from typing import TYPE_CHECKING 
 
 if TYPE_CHECKING:
     from pydmclab.core.energies import ChemPots
@@ -510,7 +511,7 @@ class StrucTools(object):
         max_normal_search: int | None = None,
         tolerance: float = 0.1,
         ftolerance: float = 0.1,
-        supercell_grid = list | None,
+        supercell_grid: list | None = None,
     ) -> dict[str, dict]:
         """
         Args:
@@ -1607,7 +1608,168 @@ class SlabTools(object):
 
         return ((self.slab_e_per_at - self.bulk_e_per_at) * scale) / (2 * surface_area)
 
-class HomoInterfaceTools:
+
+class InterfaceCompositionAnalyzer:
+    """
+    Analyzes the composition of interface structures, partitioning atoms between
+    film and substrate components.
+    """
+
+    def __init__(
+        self,
+        sub_bulk: Structure,
+        film_bulk: Structure,
+        film_elements: set,
+        substrate_elements: set,
+        shared_elements: set,
+    ) -> None:
+        """
+        Args:
+            sub_bulk: Substrate bulk structure
+            film_bulk: Film bulk structure
+            film_elements: Set of elements in the film
+            substrate_elements: Set of elements in the substrate
+            shared_elements: Set of elements shared between film and substrate
+        """
+        self.sub_bulk = sub_bulk
+        self.film_bulk = film_bulk
+        self.film_elements = film_elements
+        self.substrate_elements = substrate_elements
+        self.shared_elements = shared_elements
+
+    def analyze_interface(self, interface: Structure) -> dict:
+        """
+        Analyze interface composition and count formula units.
+        
+        Args:
+            interface: Interface structure to analyze
+            
+        Returns:
+            Dictionary with film/substrate formula units and excess atoms
+        """
+        # Get reduced formula units
+        film_fu = self.film_bulk.composition.reduced_composition
+        sub_fu = self.sub_bulk.composition.reduced_composition
+
+        # Interface total composition
+        interface_comp = interface.composition
+
+        # Convert compositions to element-only (strip oxidation states) for consistent arithmetic
+        # Use .element if it's a Species, otherwise it's already an Element
+        film_fu_elements = Composition({
+            (el.element if hasattr(el, 'element') else el): amt 
+            for el, amt in film_fu.items()
+        })
+        sub_fu_elements = Composition({
+            (el.element if hasattr(el, 'element') else el): amt 
+            for el, amt in sub_fu.items()
+        })
+        
+        # Counters
+        excess_comp = interface_comp.copy()
+
+        # Count max possible film formula units
+        film_formula_units = min(excess_comp[el] // amt for el, amt in film_fu_elements.items())
+        excess_comp -= film_fu_elements * film_formula_units
+
+        # Count max possible substrate formula units
+        sub_formula_units = min(excess_comp[el] // amt for el, amt in sub_fu_elements.items())
+        excess_comp -= sub_fu_elements * sub_formula_units
+
+        # Cleanup
+        excess_atoms = {el.symbol: int(round(amt)) for el, amt in excess_comp.items() if amt > 1e-6}
+
+        n_film = film_formula_units * sum(film_fu.values())
+        n_sub = sub_formula_units * sum(sub_fu.values())
+
+        return {
+            "film_formula_units": int(film_formula_units),
+            "sub_formula_units": int(sub_formula_units),
+            "n_film_atoms": int(n_film),
+            "n_sub_atoms": int(n_sub),
+            "excess_atoms": excess_atoms
+        }
+
+    def _split_shared_excess(
+        self, 
+        excess_count: int, 
+        film_fu: int, 
+        sub_fu: int
+    ) -> tuple[int, int]:
+        """
+        Split shared excess atoms proportionally based on formula unit ratio.
+        
+        Args:
+            excess_count: Number of excess atoms to split
+            film_fu: Number of film formula units
+            sub_fu: Number of substrate formula units
+            
+        Returns:
+            Tuple of (film_atoms, sub_atoms)
+        """
+        total_fu = film_fu + sub_fu
+        film_fraction = film_fu / total_fu
+        film_share = excess_count * film_fraction
+        
+        # Round and give remainder to the portion with more formula units
+        if film_fu > sub_fu:
+            film_atoms = round(film_share)
+            sub_atoms = excess_count - film_atoms
+        elif film_fu < sub_fu:
+            sub_atoms = round(excess_count - film_share)
+            film_atoms = excess_count - sub_atoms
+        else:
+            # Equal formula units: split evenly, remainder to film
+            film_atoms = (excess_count + 1) // 2
+            sub_atoms = excess_count // 2
+        
+        return film_atoms, sub_atoms
+
+    def partition_atoms(self, interface: Structure) -> Dict[str, int]:
+        """
+        Partition interface atoms into film and substrate portions.
+        
+        Args:
+            interface: Interface structure to analyze
+            
+        Returns:
+            Dictionary with 'n_film' and 'n_sub' atom counts
+        """
+        interface_specs = self.analyze_interface(interface)
+
+        n_sub = interface_specs["n_sub_atoms"]
+        n_film = interface_specs["n_film_atoms"]
+
+        if not interface_specs['excess_atoms']:
+            return {'n_sub': n_sub, 'n_film': n_film}
+        
+        # Assign excess atoms
+        for el_symbol, excess_count in interface_specs['excess_atoms'].items():
+            el = Element(el_symbol)
+            
+            if el in self.film_elements and el not in self.shared_elements:
+                # Unique to film
+                n_film += excess_count
+            elif el in self.substrate_elements and el not in self.shared_elements:
+                # Unique to substrate
+                n_sub += excess_count
+            elif el in self.shared_elements:
+                # Shared element: split proportionally
+                film_atoms, sub_atoms = self._split_shared_excess(
+                    excess_count,
+                    interface_specs['film_formula_units'],
+                    interface_specs['sub_formula_units']
+                )
+                n_film += film_atoms
+                n_sub += sub_atoms
+
+        return {'n_sub': n_sub, 'n_film': n_film}
+
+
+class HomoInterfaceBuilder:
+    """
+    Builds homointerface structures from substrate and film bulk structures.
+    """
 
     def __init__(
             self,
@@ -1616,7 +1778,13 @@ class HomoInterfaceTools:
             miller: tuple[int, int, int],
             vacuum: bool = False,
     ) -> None:
-        
+        """
+        Args:
+            sub_bulk: Substrate bulk structure (Structure, dict, or file path)
+            film_bulk: Film bulk structure (Structure, dict, or file path)
+            miller: Miller index for interface orientation
+            vacuum: Whether to include vacuum (for slab-like interfaces)
+        """
         # Load structures
         sub_bulk = self._load_structure(sub_bulk, "substrate")
         film_bulk = self._load_structure(film_bulk, "film")
@@ -1702,7 +1870,7 @@ class HomoInterfaceTools:
         Returns:
             interfacial area of the homointerface (cached)
         """
-        st = SlabTools(self.reoriented_substrate, slab_e_per_at=0.0)
+        st = SlabTools(self.reoriented_substrate, slab_e_per_at=0.0, reduced_bulk_composition=self.sub_bulk.reduced_formula)
         return st.surface_area(vacuum_axis="c", verbose=False)
     
     @cached_property
@@ -1716,7 +1884,7 @@ class HomoInterfaceTools:
     @property
     def strained_reoriented_film(self) -> Structure:
         """
-        Returns:
+        Returns:hit
             Film structure at substrate lattice parameters.
             Takes reoriented_substrate lattice and substitutes substrate elements with film elements.
         """
@@ -1890,6 +2058,38 @@ class HomoInterfaceTools:
 
         return template_copy
 
+    def get_substrate_slabs(self, layers: int, vacuum_size: int) -> dict[str, dict]:
+        """
+        Generate substrate slabs for the given Miller index.
+        
+        Args:
+            layers: Number of layers in the slab
+            vacuum_size: Size of vacuum region
+            
+        Returns:
+            Dictionary of substrate slabs
+        """
+        st = StrucTools(self.sub_bulk)
+        slabs = st.get_slabs(miller=self.miller, min_slab_size=layers, min_vacuum_size=vacuum_size)
+        
+        return slabs
+
+    def get_strained_film_slabs(self, layers: int, vacuum_size: int) -> dict[str, dict]:
+        """
+        Generate strained film slabs for the given Miller index.
+        
+        Args:
+            layers: Number of layers in the slab
+            vacuum_size: Size of vacuum region
+            
+        Returns:
+            Dictionary of film slabs
+        """
+        st = StrucTools(self.strained_film_bulk)
+        slabs = st.get_slabs(miller=self.miller, min_slab_size=layers, min_vacuum_size=vacuum_size)
+        
+        return slabs
+
     def build_bulklike_interface_by_fraction(
             self,
             layers: int,
@@ -1925,127 +2125,90 @@ class HomoInterfaceTools:
     
         # Build the interface by replacing atoms above sub_fraction
         return self._substitute_elements_by_fraction(interface_template, sub_fraction)
-    
-    def _analyze_interface(self, interface: Structure) -> dict:
 
-        # Get reduced formula units
-        film_fu = self.film_bulk.composition.reduced_composition
-        sub_fu = self.sub_bulk.composition.reduced_composition
-
-        # Interface total composition
-        interface_comp = interface.composition
-
-        # Convert compositions to element-only (strip oxidation states) for consistent arithmetic
-        # Use .element if it's a Species, otherwise it's already an Element
-        film_fu_elements = Composition({
-            (el.element if hasattr(el, 'element') else el): amt 
-            for el, amt in film_fu.items()
-        })
-        sub_fu_elements = Composition({
-            (el.element if hasattr(el, 'element') else el): amt 
-            for el, amt in sub_fu.items()
-        })
-        
-        # Counters
-        excess_comp = interface_comp.copy()
-
-        # Count max possible film formula units
-        film_formula_units = min(excess_comp[el] // amt for el, amt in film_fu_elements.items())
-        excess_comp -= film_fu_elements * film_formula_units
-
-        # Count max possible substrate formula units
-        sub_formula_units = min(excess_comp[el] // amt for el, amt in sub_fu_elements.items())
-        excess_comp -= sub_fu_elements * sub_formula_units
-
-        # Cleanup
-        excess_atoms = {el.symbol: int(round(amt)) for el, amt in excess_comp.items() if amt > 1e-6}
-
-        n_film = film_formula_units * sum(film_fu.values())
-        n_sub = sub_formula_units * sum(sub_fu.values())
-
-        return {
-            "film_formula_units": int(film_formula_units),
-            "sub_formula_units": int(sub_formula_units),
-            "n_film_atoms": int(n_film),
-            "n_sub_atoms": int(n_sub),
-            "excess_atoms": excess_atoms
-        }
-
-    def _split_shared_excess(
-        self, 
-        excess_count: int, 
-        film_fu: int, 
-        sub_fu: int
-    ) -> tuple[int, int]:
+    def build_slablike_interface_by_fraction(
+            self,
+            layers: int,
+            sub_fraction: float,
+            vacuum_size: int,
+            orthogonalize: bool = True,
+    ) -> dict[str, dict]:
         """
-        Split shared excess atoms proportionally based on formula unit ratio.
+        Build slab-like interface structures with vacuum.
         
         Args:
-            excess_count: Number of excess atoms to split
-            film_fu: Number of film formula units
-            sub_fu: Number of substrate formula units
+            layers: Number of layers in the interface
+            sub_fraction: Fractional c-coordinate threshold (0-1) for film substitution
+            vacuum_size: Size of vacuum region
+            orthogonalize: Whether to orthogonalize the c-axis
             
         Returns:
-            Tuple of (film_atoms, sub_atoms)
+            Dictionary of interface structures with metadata
+            
+        Raises:
+            ValueError: If vacuum is not set to True
         """
-        total_fu = film_fu + sub_fu
-        film_fraction = film_fu / total_fu
-        film_share = excess_count * film_fraction
-        
-        # Round and give remainder to the portion with more formula units
-        if film_fu > sub_fu:
-            film_atoms = round(film_share)
-            sub_atoms = excess_count - film_atoms
-        elif film_fu < sub_fu:
-            sub_atoms = round(excess_count - film_share)
-            film_atoms = excess_count - sub_atoms
-        else:
-            # Equal formula units: split evenly, remainder to film
-            film_atoms = (excess_count + 1) // 2
-            sub_atoms = excess_count // 2
-        
-        return film_atoms, sub_atoms
+        if not self.vacuum:
+            raise ValueError("Vacuum must be set True to build slablike interface")
 
-    def partition_atoms(self, interface: Structure) -> Dict[str, int]:
-        """
-        Partition interface atoms into film and substrate portions.
+        slabs = self.get_substrate_slabs(layers, vacuum_size)
+        miller_str = "".join([str(i) for i in self.miller])
+
+        self._validate_composition_compatibility()
+
+        for entry in slabs[miller_str]:
+            slab = Slab.from_dict(slabs[miller_str][entry]['slab'])
+            
+            if orthogonalize:
+                slab = self._orthogonalize_slab_lattice(slab)
+            else:
+                slab = slab
+            
+            interface = self._substitute_elements_by_fraction(slab, sub_fraction)
+
+            slabs[miller_str][entry]['interface'] = interface.as_dict()
+
+            slabs['slab_template'] = slabs[miller_str][entry]['slab']
+
+            del(slabs[miller_str][entry]['slab'])
+
+        return slabs
+
+    def build_bulklike_interface_by_atom_number(
+            self, 
+            non_gaseous_atom_count: int,
+            layers: int,
+            orthogonalize: bool = True,
+    ) -> Structure:
+
         
+
+
+
+
+        return 
+
+
+
+
+class HomoInterfaceEnergetics:
+    """
+    Calculates interfacial energies for homointerfaces.
+    """
+
+    def __init__(
+        self,
+        builder: HomoInterfaceBuilder,
+        analyzer: InterfaceCompositionAnalyzer,
+    ) -> None:
+        """
         Args:
-            interface: Interface structure to analyze
-            
-        Returns:
-            Dictionary with 'n_film' and 'n_sub' atom counts
+            builder: HomoInterfaceBuilder instance
+            analyzer: InterfaceCompositionAnalyzer instance
         """
-        interface_specs = self._analyze_interface(interface)
+        self.builder = builder
+        self.analyzer = analyzer
 
-        n_sub = interface_specs["n_sub_atoms"]
-        n_film = interface_specs["n_film_atoms"]
-
-        if not interface_specs['excess_atoms']:
-            return {'n_sub': n_sub, 'n_film': n_film}
-        
-        # Assign excess atoms
-        for el_symbol, excess_count in interface_specs['excess_atoms'].items():
-            el = Element(el_symbol)
-            
-            if el in self.film_elements and el not in self.shared_elements:
-                # Unique to film
-                n_film += excess_count
-            elif el in self.substrate_elements and el not in self.shared_elements:
-                # Unique to substrate
-                n_sub += excess_count
-            elif el in self.shared_elements:
-                # Shared element: split proportionally
-                film_atoms, sub_atoms = self._split_shared_excess(
-                    excess_count,
-                    interface_specs['film_formula_units'],
-                    interface_specs['sub_formula_units']
-                )
-                n_film += film_atoms
-                n_sub += sub_atoms
-
-        return {'n_sub': n_sub, 'n_film': n_film}
-    
     def get_bulklike_interfacial_energy(
             self,
             interface: Structure,
@@ -2079,12 +2242,12 @@ class HomoInterfaceTools:
             ValueError: If interfacial area is zero or negative
         """
         # Validate area
-        A = self.interfacial_area
+        A = self.builder.interfacial_area
         if A <= 0:
             raise ValueError(f"Interfacial area must be positive, got {A}")
 
         # Partition atoms between film and substrate
-        partitioned_atoms = self.partition_atoms(interface)
+        partitioned_atoms = self.analyzer.partition_atoms(interface)
         n_sub = partitioned_atoms['n_sub']
         n_film = partitioned_atoms['n_film']
         
@@ -2099,60 +2262,6 @@ class HomoInterfaceTools:
 
         return gamma
 
-    def get_substrate_slabs(self, layers, vacuum_size) -> dict[str, dict]:
-        """
-        Returns:
-            dict of substrate slabs for the given Miller index (cached)
-        """
-        st = StrucTools(self.sub_bulk)
-        slabs = st.get_slabs(miller=self.miller, min_slab_size=layers, min_vacuum_size=vacuum_size)
-        
-        return slabs
-
-    def get_strained_film_slabs(self, layers, vacuum_size) -> dict[str, dict]:
-        """
-        Returns:
-            dict of film slabs for the given Miller index (cached)
-        """
-
-        st = StrucTools(self.strained_film_bulk)
-        slabs = st.get_slabs(miller=self.miller, min_slab_size=layers, min_vacuum_size=vacuum_size)
-        
-        return slabs
-
-    def build_slablike_interface_by_fraction(
-            self,
-            layers: int,
-            sub_fraction: float,
-            vacuum_size: int,
-            orthogonalize: bool = True,) -> dict[str, dict]:
-        
-        if not self.vacuum:
-            raise ValueError("Vacuum must be set True to build slablike interface")
-
-        slabs = self.get_substrate_slabs(layers, vacuum_size)
-        miller_str = "".join([str(i) for i in self.miller])
-
-        self._validate_composition_compatibility()
-
-        for entry in slabs[miller_str]:
-            slab = Slab.from_dict(slabs[miller_str][entry]['slab'])
-            
-            if orthogonalize:
-                slab = self._orthogonalize_slab_lattice(slab)
-            else:
-                slab = slab
-            
-            interface = self._substitute_elements_by_fraction(slab, sub_fraction)
-
-            slabs[miller_str][entry]['interface'] = interface.as_dict()
-
-            slabs['slab_template'] = slabs[miller_str][entry]['slab']
-
-            del(slabs[miller_str][entry]['slab'])
-
-        return slabs
-
     def get_work_of_adhesion(
             self,
             interface: Structure | Slab,
@@ -2161,8 +2270,23 @@ class HomoInterfaceTools:
             strained_film_slab_e_per_at: float,
             by_excess: bool = False,
     ) -> float:
+        """
+        Calculate the work of adhesion for a slab-like interface.
         
-        if not self.vacuum:
+        Args:
+            interface: Interface structure with vacuum
+            interface_e_per_at: Energy per atom of the interface
+            sub_slab_e_per_at: Energy per atom of the substrate slab
+            strained_film_slab_e_per_at: Energy per atom of the strained film slab
+            by_excess: Whether to account for excess atoms using chemical potentials
+            
+        Returns:
+            Work of adhesion in eV/Ų
+            
+        Raises:
+            ValueError: If vacuum is not set to True
+        """
+        if not self.builder.vacuum:
             raise ValueError("Vacuum must be set True to compute work of adhesion")
 
         n_interface = len(interface)
@@ -2170,7 +2294,7 @@ class HomoInterfaceTools:
         E_interface = interface_e_per_at * n_interface
 
         if by_excess:
-            interface_specs = self._analyze_interface(interface)
+            interface_specs = self.analyzer.analyze_interface(interface)
 
             n_sub = interface_specs["n_sub_atoms"]
             n_film = interface_specs["n_film_atoms"]
@@ -2179,7 +2303,7 @@ class HomoInterfaceTools:
             E_film = strained_film_slab_e_per_at * n_film
 
             if not interface_specs['excess_atoms']:
-                W_adh = (E_sub + E_film - E_interface) / self.interfacial_area
+                W_adh = (E_sub + E_film - E_interface) / self.builder.interfacial_area
             
             else:
                 from pydmclab.core.energies import ChemPots
@@ -2190,40 +2314,50 @@ class HomoInterfaceTools:
                 for el in interface_specs['excess_atoms']:
                     excess_mu += mus[el] * interface_specs['excess_atoms'][el]
 
-                W_adh = (E_sub + E_film + excess_mu - E_interface) / self.interfacial_area
+                W_adh = (E_sub + E_film + excess_mu - E_interface) / self.builder.interfacial_area
 
         else:
-            partitioned_atoms = self.partition_atoms(interface)
+            partitioned_atoms = self.analyzer.partition_atoms(interface)
             n_sub = partitioned_atoms['n_sub']
             n_film = partitioned_atoms['n_film']
 
             E_sub = sub_slab_e_per_at * n_sub
             E_film = strained_film_slab_e_per_at * n_film
 
-            W_adh = (E_sub + E_film - E_interface) / self.interfacial_area
+            W_adh = (E_sub + E_film - E_interface) / self.builder.interfacial_area
 
         return W_adh
 
     def get_slab_surface_energy(
         self,
         slab: Structure | Slab,
+        reoriented_bulk: Structure,
         slab_e_per_at: float,
         reoriented_bulk_e_per_at: float,
     ) -> float:
+        """
+        Calculate the surface energy of a slab.
         
+        Args:
+            slab: Slab structure
+            reoriented_bulk: Reoriented bulk structure for reference
+            slab_e_per_at: Energy per atom of the slab
+            reoriented_bulk_e_per_at: Energy per atom of the reoriented bulk
+            
+        Returns:
+            Surface energy in eV/Ų
+        """
         st = SlabTools(
             slab_structure=slab,
             slab_e_per_at=slab_e_per_at,
             bulk_e_per_at=reoriented_bulk_e_per_at,
+            reduced_bulk_composition=reoriented_bulk.reduced_formula
         )
 
         sigma = st.surface_energy()
 
         return sigma
     
-    # Method for calculating the slab-like interfacial energy defined as:
-    # gamma_int = sigma_film + sigma_sub - W_adh
-
     def get_slablike_interfacial_energy(
             self,
             interface: Structure | Slab,
@@ -2236,15 +2370,35 @@ class HomoInterfaceTools:
             strained_reoriented_bulk_film_e_per_at: float,
             wad_by_excess: bool = False,
     ) -> float:
+        """
+        Calculate the slab-like interfacial energy.
         
+        Uses the formula: γ_int = σ_film + σ_sub - W_adh
+        
+        Args:
+            interface: Interface structure with vacuum
+            strained_film_slab: Strained film slab structure
+            sub_slab: Substrate slab structure
+            interface_e_per_at: Energy per atom of the interface
+            sub_slab_e_per_at: Energy per atom of the substrate slab
+            strained_film_slab_e_per_at: Energy per atom of the strained film slab
+            reoriented_bulk_sub_e_per_at: Energy per atom of the reoriented substrate bulk
+            strained_reoriented_bulk_film_e_per_at: Energy per atom of the strained reoriented film bulk
+            wad_by_excess: Whether to account for excess atoms in work of adhesion
+            
+        Returns:
+            Slab-like interfacial energy in eV/Ų
+        """
         strained_film_sigma = self.get_slab_surface_energy(
             slab=strained_film_slab,
+            reoriented_bulk=self.builder.strained_reoriented_film,
             slab_e_per_at=strained_film_slab_e_per_at,
             reoriented_bulk_e_per_at=strained_reoriented_bulk_film_e_per_at,
         )
 
         sub_slab_sigma = self.get_slab_surface_energy(
             slab=sub_slab,
+            reoriented_bulk=self.builder.reoriented_substrate,
             slab_e_per_at=sub_slab_e_per_at,
             reoriented_bulk_e_per_at=reoriented_bulk_sub_e_per_at,
         )
@@ -2260,3 +2414,196 @@ class HomoInterfaceTools:
         gamma_int = strained_film_sigma + sub_slab_sigma - W_adh
 
         return gamma_int
+
+
+class HomoInterfaceTools:
+    """
+    Convenience class that combines all homointerface functionality.
+    
+    This class provides a unified interface to building homointerface structures,
+    analyzing their composition, and calculating their energetics. It internally
+    uses HomoInterfaceBuilder, InterfaceCompositionAnalyzer, and HomoInterfaceEnergetics.
+    """
+
+    def __init__(
+            self,
+            sub_bulk: Structure | dict | str,
+            film_bulk: Structure | dict | str,
+            miller: tuple[int, int, int],
+            vacuum: bool = False,
+    ) -> None:
+        """
+        Args:
+            sub_bulk: Substrate bulk structure (Structure, dict, or file path)
+            film_bulk: Film bulk structure (Structure, dict, or file path)
+            miller: Miller index for interface orientation
+            vacuum: Whether to include vacuum (for slab-like interfaces)
+        """
+        # Initialize the builder
+        self.builder = HomoInterfaceBuilder(sub_bulk, film_bulk, miller, vacuum)
+        
+        # Initialize the composition analyzer
+        self.analyzer = InterfaceCompositionAnalyzer(
+            sub_bulk=self.builder.sub_bulk,
+            film_bulk=self.builder.film_bulk,
+            film_elements=self.builder.film_elements,
+            substrate_elements=self.builder.substrate_elements,
+            shared_elements=self.builder.shared_elements,
+        )
+        
+        # Initialize the energetics calculator
+        self.energetics = HomoInterfaceEnergetics(self.builder, self.analyzer)
+
+    # Expose builder properties for convenience
+    @property
+    def sub_bulk(self) -> Structure:
+        """Substrate bulk structure."""
+        return self.builder.sub_bulk
+    
+    @property
+    def film_bulk(self) -> Structure:
+        """Film bulk structure."""
+        return self.builder.film_bulk
+    
+    @property
+    def miller(self) -> tuple[int, int, int]:
+        """Miller index for interface orientation."""
+        return self.builder.miller
+    
+    @property
+    def vacuum(self) -> bool:
+        """Whether vacuum is included."""
+        return self.builder.vacuum
+    
+    @property
+    def reoriented_substrate(self) -> Structure:
+        """Reoriented substrate structure."""
+        return self.builder.reoriented_substrate
+    
+    @property
+    def reoriented_film(self) -> Structure:
+        """Reoriented film structure."""
+        return self.builder.reoriented_film
+    
+    @property
+    def strained_reoriented_film(self) -> Structure:
+        """Film structure strained to substrate lattice parameters."""
+        return self.builder.strained_reoriented_film
+    
+    @property
+    def strained_film_bulk(self) -> Structure:
+        """Film bulk structure strained to substrate lattice parameters."""
+        return self.builder.strained_film_bulk
+    
+    @property
+    def interfacial_area(self) -> float:
+        """Interfacial area."""
+        return self.builder.interfacial_area
+    
+    @property
+    def film_to_sub_element_mapping(self) -> Dict[str, str]:
+        """Mapping of substrate elements to film elements."""
+        return self.builder.film_to_sub_element_mapping
+    
+    @property
+    def film_elements(self) -> set:
+        """Set of elements in the film."""
+        return self.builder.film_elements
+    
+    @property
+    def substrate_elements(self) -> set:
+        """Set of elements in the substrate."""
+        return self.builder.substrate_elements
+    
+    @property
+    def shared_elements(self) -> set:
+        """Set of elements shared between film and substrate."""
+        return self.builder.shared_elements
+
+    # Expose builder methods
+    def build_bulklike_interface_by_fraction(
+            self,
+            layers: int,
+            sub_fraction: float,
+            orthogonalize: bool = True,
+    ) -> Structure:
+        """Build a bulklike interface. See HomoInterfaceBuilder for details."""
+        return self.builder.build_bulklike_interface_by_fraction(layers, sub_fraction, orthogonalize)
+    
+    def build_slablike_interface_by_fraction(
+            self,
+            layers: int,
+            sub_fraction: float,
+            vacuum_size: int,
+            orthogonalize: bool = True,
+    ) -> dict[str, dict]:
+        """Build a slablike interface. See HomoInterfaceBuilder for details."""
+        return self.builder.build_slablike_interface_by_fraction(layers, sub_fraction, vacuum_size, orthogonalize)
+    
+    def get_substrate_slabs(self, layers: int, vacuum_size: int) -> dict[str, dict]:
+        """Get substrate slabs. See HomoInterfaceBuilder for details."""
+        return self.builder.get_substrate_slabs(layers, vacuum_size)
+    
+    def get_strained_film_slabs(self, layers: int, vacuum_size: int) -> dict[str, dict]:
+        """Get strained film slabs. See HomoInterfaceBuilder for details."""
+        return self.builder.get_strained_film_slabs(layers, vacuum_size)
+
+    # Expose analyzer methods
+    def partition_atoms(self, interface: Structure) -> Dict[str, int]:
+        """Partition interface atoms. See InterfaceCompositionAnalyzer for details."""
+        return self.analyzer.partition_atoms(interface)
+
+    # Expose energetics methods
+    def get_bulklike_interfacial_energy(
+            self,
+            interface: Structure,
+            interface_e_per_at: float,
+            sub_reoriented_e_per_at: float,
+            film_strained_reoriented_e_per_at: float,
+    ) -> float:
+        """Calculate bulklike interfacial energy. See HomoInterfaceEnergetics for details."""
+        return self.energetics.get_bulklike_interfacial_energy(
+            interface, interface_e_per_at, sub_reoriented_e_per_at, film_strained_reoriented_e_per_at
+        )
+    
+    def get_work_of_adhesion(
+            self,
+            interface: Structure | Slab,
+            interface_e_per_at: float,
+            sub_slab_e_per_at: float,
+            strained_film_slab_e_per_at: float,
+            by_excess: bool = False,
+    ) -> float:
+        """Calculate work of adhesion. See HomoInterfaceEnergetics for details."""
+        return self.energetics.get_work_of_adhesion(
+            interface, interface_e_per_at, sub_slab_e_per_at, strained_film_slab_e_per_at, by_excess
+        )
+    
+    def get_slab_surface_energy(
+        self,
+        slab: Structure | Slab,
+        reoriented_bulk: Structure,
+        slab_e_per_at: float,
+        reoriented_bulk_e_per_at: float,
+    ) -> float:
+        """Calculate slab surface energy. See HomoInterfaceEnergetics for details."""
+        return self.energetics.get_slab_surface_energy(slab, reoriented_bulk, slab_e_per_at, reoriented_bulk_e_per_at)
+    
+    def get_slablike_interfacial_energy(
+            self,
+            interface: Structure | Slab,
+            strained_film_slab: Structure | Slab,
+            sub_slab: Structure | Slab,
+            interface_e_per_at: float,
+            sub_slab_e_per_at: float,
+            strained_film_slab_e_per_at: float,
+            reoriented_bulk_sub_e_per_at: float,
+            strained_reoriented_bulk_film_e_per_at: float,
+            wad_by_excess: bool = False,
+    ) -> float:
+        """Calculate slablike interfacial energy. See HomoInterfaceEnergetics for details."""
+        return self.energetics.get_slablike_interfacial_energy(
+            interface, strained_film_slab, sub_slab, interface_e_per_at,
+            sub_slab_e_per_at, strained_film_slab_e_per_at,
+            reoriented_bulk_sub_e_per_at, strained_reoriented_bulk_film_e_per_at, wad_by_excess
+        )
