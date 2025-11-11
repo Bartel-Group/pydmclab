@@ -174,10 +174,11 @@ def get_set_of_forces(results,
                              e.g. {SrZrS3--SrZrS3_needle--etc : {'forces': [list of arrays]}}
     REMINDER: When you generate the displacements, you do ONLY static calculations on those displaced structures to get the forces (no relaxation).
     '''
+    # We'll collect (index, forces, representative_key) entries so we can sort by index
     if mpid is None:
-        set_of_forces = {}
+        raw_sets = {}
     else:
-        set_of_forces = []
+        raw_list = []
 
     for key in results:
         calc_type = key.split("--")[-1]
@@ -185,7 +186,16 @@ def get_set_of_forces(results,
             continue
 
         r_mpid = key.split("--")[1]
-        mpid_minus_disp = "_".join(r_mpid.split("_")[:-1])
+        parts = r_mpid.split("_")
+
+        mpid_minus_disp = "_".join(parts[:-1])
+        index_str = parts[-1]
+
+        # Expect the MPID to have a displacement index appended after an underscore.
+        # If this is not the case, raise an error so the caller can fix the MPID naming.
+        if len(parts) < 2:
+            raise ValueError(f"Expected displaced MPID with an underscore and index (e.g. 'base_01'), got '{r_mpid}' from key '{key}'")
+
 
         # Skip if we're looking for a specific mpid and this doesn't match
         if mpid is not None and mpid_minus_disp != mpid:
@@ -198,20 +208,33 @@ def get_set_of_forces(results,
             forces = None
 
         if forces is not None:
-            print(f"Including forces for {key} with shape {np.array(forces).shape}")
-        
+            arr = np.array(forces)
+            print(f"Including forces for {key} with shape {arr.shape}")
+ 
+        # attempt to convert index to integer for sorting, fall back to lexical order
+        index_key = int(index_str)
+
         if mpid is None:
             new_key = key.replace(r_mpid, mpid_minus_disp)
-            if mpid_minus_disp not in set_of_forces:
-                set_of_forces[mpid_minus_disp] = {'forces': [], 'key': new_key}
-            set_of_forces[mpid_minus_disp]['forces'].append(forces)
+            if mpid_minus_disp not in raw_sets:
+                raw_sets[mpid_minus_disp] = {'raw': [], 'key': new_key}
+            raw_sets[mpid_minus_disp]['raw'].append((index_key, forces))
         else:
-            set_of_forces.append(forces)
+            raw_list.append((index_key, forces))
 
-    # Return None if no forces found for specific mpid
-    if mpid is not None and not set_of_forces:
-        print(f"No forces found for mpid: {mpid}")
-        return None
+    # Post-process collected raw entries into ordered lists by index
+    if mpid is None:
+        set_of_forces = {}
+        for base, info in raw_sets.items():
+            ordered = sorted(info['raw'], key=lambda x: x[0])
+            forces_ordered = [f for (_, f) in ordered]
+            set_of_forces[base] = {'forces': forces_ordered, 'key': info.get('key')}
+    else:
+        if not raw_list:
+            print(f"No forces found for mpid: {mpid}")
+            return None       
+        ordered = sorted(raw_list, key=lambda x: x[0])
+        set_of_forces = [f for (_, f) in ordered]
     
     return set_of_forces
 
