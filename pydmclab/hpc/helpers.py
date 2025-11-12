@@ -349,6 +349,8 @@ def get_analysis_configs(
     only_xc=None,
     analyze_structure=True,
     analyze_trajectory=False,
+    analyze_forces=False,
+    analyze_stress=False,
     analyze_mag=False,
     analyze_charge=False,
     analyze_dos=False,
@@ -404,6 +406,12 @@ def get_analysis_configs(
 
     if analyze_trajectory:
         includes.append("trajectory")
+
+    if analyze_forces:
+        includes.append("forces")
+
+    if analyze_stress:
+        includes.append("stress")
 
     if analyze_mag:
         includes.append("mag")
