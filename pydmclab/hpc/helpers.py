@@ -28,6 +28,8 @@ def get_vasp_configs(
     compare_static_and_relax_energies=0.1,
     special_functional=False,
     COHPSteps=2000,
+    COHPstartEnergy=-35.0,
+    COHPendEnergy=5.0,
     reciprocal_kpoints_density_for_lobster=100,
     bandstructure_symprec=0.1,
     bandstructure_kpoints_line_density=20,
@@ -80,6 +82,12 @@ def get_vasp_configs(
         COHPSteps (int):
             how many (E, DOS) points do you want in LOBSTER outputs
                 only applies to xc-calc='all-lobster'
+        COHPstartEnergy (float):
+            starting energy relative to Fermi level (0.0 eV)
+                only applies to xc-calc='all-lobster'
+        COHPendEnergy (float):
+            ending energy relative to Fermi level (0.0 eV)
+                only applies to xc-calc='all-lobster'
         reciprocal_kpoints_density_for_lobster (int):
             kppra for LOBSTER calculations (higher is denser grid)
                 only applies to xc-calc='all-lobster'
@@ -108,6 +116,8 @@ def get_vasp_configs(
     vasp_configs["bs_symprec"] = bandstructure_symprec
     vasp_configs["bs_line_density"] = bandstructure_kpoints_line_density
     vasp_configs["COHPSteps"] = COHPSteps
+    vasp_configs["COHPstartEnergy"] = COHPstartEnergy
+    vasp_configs["COHPendEnergy"] = COHPendEnergy
     vasp_configs["reciprocal_kpoints_density_for_lobster"] = (
         reciprocal_kpoints_density_for_lobster
     )
@@ -2162,17 +2172,25 @@ def get_slabs(
 
     if isinstance(min_slab_sizes, int):
         min_slab_sizes = [min_slab_sizes]
-    elif isinstance(min_slab_sizes, (list, tuple)) and all(isinstance(s, int) for s in min_slab_sizes):
+    elif isinstance(min_slab_sizes, (list, tuple)) and all(
+        isinstance(s, int) for s in min_slab_sizes
+    ):
         min_slab_sizes = list(min_slab_sizes)  # Convert tuple to list if needed
     else:
-        raise ValueError("min_slab_sizes must be an integer, list of integers, or tuple of integers.")
+        raise ValueError(
+            "min_slab_sizes must be an integer, list of integers, or tuple of integers."
+        )
 
     if isinstance(vacuum_sizes, int):
         vacuum_sizes = [vacuum_sizes]
-    elif isinstance(vacuum_sizes, (list, tuple)) and all(isinstance(v, int) for v in vacuum_sizes):
+    elif isinstance(vacuum_sizes, (list, tuple)) and all(
+        isinstance(v, int) for v in vacuum_sizes
+    ):
         vacuum_sizes = list(vacuum_sizes)  # Convert tuple to list if needed
     else:
-        raise ValueError("vacuum_sizes must be an integer, list of integers, or tuple of integers.")
+        raise ValueError(
+            "vacuum_sizes must be an integer, list of integers, or tuple of integers."
+        )
 
     slabs = {}
     metadata = {}

@@ -18,12 +18,12 @@ def mus_at_0K():
         return read_json(fjson)
     mus = {}
     mus = read_json(os.path.join(DATA_PATH, "240528_dmc-mus.json"))
-#    for xc in d:
-#        if xc == "gga":
-#            functional = "pbe"
-#        elif xc == "metagga":
-#            functional = "r2scan"
-#        mus[functional] = d[xc]
+    #    for xc in d:
+    #        if xc == "gga":
+    #            functional = "pbe"
+    #        elif xc == "metagga":
+    #            functional = "r2scan"
+    #        mus[functional] = d[xc]
     return write_json(mus, fjson)
 
 
@@ -74,6 +74,44 @@ def mp2020_compatibility_dmus():
     return write_json(data, fjson)
 
 
+def omat2024_compatibility_dmus():
+    """
+    from OMat2024Compatibility (https://huggingface.co/datasets/facebook/OMAT24/tree/main/references)
+    """
+    fjson = os.path.join(DATA_PATH, "omat2024_compatibility_dmus.json")
+    if os.path.exists(fjson):
+        return read_json(fjson)
+    data = {
+        "U": {
+            "V": -1.813,
+            "Cr": -2.037,
+            "Mn": -1.701,
+            "Fe": -2.428,
+            "Co": -2.151,
+            "Ni": -2.58,
+            "W": -4.445,
+            "Mo": -2.972,
+        },
+        "anions": {
+            "O": -0.657,
+            "S": -0.487,
+            "F": -0.436,
+            "Cl": -0.6,
+            "Br": -0.317,
+            "I": -0.194,
+            "N": -0.303,
+            "Se": -0.474,
+            "Si": 0.028,
+            "Sb": -0.194,
+            "Te": -0.418,
+            "H": -0.173,
+        },
+        "peroxide": {"O": -0.433},
+        "superoxide": {"O": -0.152},
+    }
+    return write_json(data, fjson)
+
+
 def mus_from_mp_no_corrections():
     """
     Last collected Dec 2022 from old API
@@ -102,6 +140,7 @@ def mus_from_mp_no_corrections():
         mp_mus[el[:-1]] = mp_mu
 
     return write_json(mp_mus, fjson)
+
 
 def mus_from_omat():
     fjson = os.path.join(DATA_PATH, "mus_from_omat.json")

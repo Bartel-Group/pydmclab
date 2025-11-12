@@ -510,7 +510,7 @@ class StrucTools(object):
         max_normal_search: int | None = None,
         tolerance: float = 0.1,
         ftolerance: float = 0.1,
-        supercell_grid = list | None,
+        supercell_grid: list | None = None,
     ) -> dict[str, dict]:
         """
         Args:
@@ -561,9 +561,9 @@ class StrucTools(object):
                 entry.make_supercell(supercell_grid)
         else:
             slabs = slabs
-        
+
         miller_str = "".join([str(i) for i in miller])
-        
+
         out = {miller_str: {}, "bulk_template": bulk.as_dict()}
         for i, slab in enumerate(slabs):
             out[miller_str][i] = {}
@@ -745,6 +745,7 @@ class SiteTools(object):
                 ox += entry["oxidation_state"] * entry["occu"]
         return ox
 
+
 class SolidSolutionGenerator:
     """Generate quasi-random solid solutions (SQS) between two crystal structures.
 
@@ -789,9 +790,7 @@ class SolidSolutionGenerator:
             ValueError: If endmembers list doesn't contain exactly 2 structures.
         """
         if len(endmembers) != 2:
-            raise ValueError(
-                f"Expected exactly 2 endmembers, got {len(endmembers)}"
-            )
+            raise ValueError(f"Expected exactly 2 endmembers, got {len(endmembers)}")
 
         self.endmembers = endmembers
         self.supercell_dim = supercell_dim or [2, 2, 2]
@@ -874,7 +873,7 @@ class SolidSolutionGenerator:
         struc_B_super = struc_B.copy()
         struc_A_super.make_supercell(self.supercell_dim)
         struc_B_super.make_supercell(self.supercell_dim)
-        
+
         num_differing_sites = 0
         for site_A, site_B in zip(struc_A_super, struc_B_super):
             if str(site_A.specie) != str(site_B.specie):
@@ -882,7 +881,9 @@ class SolidSolutionGenerator:
 
         # Determine number of solutions automatically
         self.num_solns = num_differing_sites
-        print(f"Automatically determined {self.num_solns} intermediate compositions based on differing sites in supercell {self.supercell_dim}.")
+        print(
+            f"Automatically determined {self.num_solns} intermediate compositions based on differing sites in supercell {self.supercell_dim}."
+        )
 
         # Create dummy structures while saving original species and occupancies
         A_species, B_species = [], []
@@ -1102,25 +1103,23 @@ class SolidSolutionGenerator:
                 "lattice": lattice,
                 "coords": coords,
                 "species": species,
-                "supercell": [1, 1, 1]
+                "supercell": [1, 1, 1],
             },
             "iterations": 1000000,
             "sublattice_mode": "split",
-            "shell_weights": {
-                "1": 1.0,
-                "2": 0.5
-            },
-            "composition": [{
-                "sites": [self.element_a, self.element_b],
-                self.element_a: element_a_count,
-                self.element_b: element_b_count
-            }],
-            "max_results_per_objective": 5
+            "shell_weights": {"1": 1.0, "2": 0.5},
+            "composition": [
+                {
+                    "sites": [self.element_a, self.element_b],
+                    self.element_a: element_a_count,
+                    self.element_b: element_b_count,
+                }
+            ],
+            "max_results_per_objective": 5,
         }
-        
+
         with open(output_path, "w", encoding="utf-8") as file:
             json.dump(data, file, indent=4)
-
 
     def generate_sqs(self) -> Tuple[List[Structure], List[Dict[str, Any]]]:
         """Generate special quasirandom structures (SQS) from ordered solutions.
@@ -1150,22 +1149,25 @@ class SolidSolutionGenerator:
         sqs_data = []
 
         # Filter to only process .json files
-        json_files = sorted([f for f in os.listdir(self.dirs["json"]) if f.endswith(".json")])
+        json_files = sorted(
+            [f for f in os.listdir(self.dirs["json"]) if f.endswith(".json")]
+        )
 
         for fname in json_files:
             json_path = os.path.join(self.dirs["json"], fname)
             num_struc = fname.split(".")[0]
-            
+
             # Use absolute paths for clarity
             abs_json_path = os.path.abspath(json_path)
             abs_temp_dir = os.path.abspath(self.dirs["temp"])
-            
+
             # Change to temp directory for sqsgen execution
             original_dir = os.getcwd()
             os.chdir(abs_temp_dir)
 
             try:
                 from sqsgenerator import load_result_pack
+
                 # Run sqsgen
                 print(f"Running SQS optimization for composition {num_struc}...")
                 subprocess.run(
@@ -1187,32 +1189,35 @@ class SolidSolutionGenerator:
                 # Extract SRO parameters (handle different result types)
                 try:
                     sro_full = best_solution.sro()  # Full array
-                    sro_pair = best_solution.sro(self.element_a, self.element_b)  # List for each shell
+                    sro_pair = best_solution.sro(
+                        self.element_a, self.element_b
+                    )  # List for each shell
                 except AttributeError:
                     # For sublattice mode, SRO parameters may not be available or have different interface
                     sro_full = None
                     sro_pair = None
-                
+
                 # Get objective function values
                 objectives = []
                 for obj, solutions in pack:
-                    objectives.append({
-                        "objective": float(obj),
-                        "num_solutions": len(solutions)
-                    })
-                
+                    objectives.append(
+                        {"objective": float(obj), "num_solutions": len(solutions)}
+                    )
+
                 # Store data
                 data_dict = {
                     "composition_index": int(num_struc),
                     "best_objective": float(pack[0][0]),
-                    "all_objectives": objectives
+                    "all_objectives": objectives,
                 }
 
                 # Add SRO parameters if available
                 if sro_full is not None and sro_pair is not None:
                     data_dict["sro_parameters"] = {
                         "full_array": sro_full.tolist(),
-                        f"{self.element_a}_{self.element_b}": [float(x) for x in sro_pair]
+                        f"{self.element_a}_{self.element_b}": [
+                            float(x) for x in sro_pair
+                        ],
                     }
                 else:
                     data_dict["sro_parameters"] = None
@@ -1234,18 +1239,24 @@ class SolidSolutionGenerator:
                 if os.path.exists(default_cif_filename):
                     os.rename(default_cif_filename, target_cif_filename)
                 else:
-                    raise FileNotFoundError(f"Expected CIF file {default_cif_filename} was not created by sqsgen")
+                    raise FileNotFoundError(
+                        f"Expected CIF file {default_cif_filename} was not created by sqsgen"
+                    )
 
                 # Read with pymatgen and save as VASP
                 struc = Structure.from_file(target_cif_filename)
-                output_path = os.path.join(original_dir, self.dirs["sqs"], f"{num_struc}.vasp")
+                output_path = os.path.join(
+                    original_dir, self.dirs["sqs"], f"{num_struc}.vasp"
+                )
                 struc.to(filename=output_path, fmt="poscar")
                 sqs_solns.append(struc)
 
                 # Clean up CIF file
                 os.remove(target_cif_filename)
 
-                print(f"Completed SQS for composition {num_struc}: objective = {data_dict['best_objective']:.6f}")
+                print(
+                    f"Completed SQS for composition {num_struc}: objective = {data_dict['best_objective']:.6f}"
+                )
 
             except subprocess.CalledProcessError as e:
                 print(f"Error running sqsgen for {fname}: {e.stderr}")
@@ -1253,21 +1264,21 @@ class SolidSolutionGenerator:
                 print(f"sqsgenerator package is not installed: {e}")
             except Exception as e:
                 print(f"Error processing {fname}: {e}")
-                
+
             finally:
                 # Return to original directory
                 os.chdir(original_dir)
 
         self.sqs_solns = sqs_solns
         self.sqs_data = sqs_data
-        
+
         # Save summary data
         summary_path = os.path.join(self.dirs["sqs"], "sqs_summary.json")
         with open(output_path, "w", encoding="utf-8") as file:
             json.dump(data, file, indent=4)
-        
+
         print(f"\nSQS generation complete! Results saved to {self.dirs['sqs']}/")
-        
+
         return sqs_solns, sqs_data
 
     def cleanup(self) -> None:
@@ -1304,6 +1315,7 @@ class SolidSolutionGenerator:
             self.cleanup()
 
         return self.disordered_solns, self.ordered_solns, self.sqs_solns, self.sqs_data
+
 
 class SlabTools(object):
     """
