@@ -10,7 +10,7 @@ from pymatgen.io.lobster.outputs import Doscar, Cohpcar, Charge, MadelungEnergie
 
 from pydmclab.core.struc import StrucTools, SiteTools
 from pydmclab.core.comp import CompTools
-from pydmclab.utils.handy import read_json, write_json
+from pydmclab.utils.handy import read_json, write_json, convert_numpy_to_native
 from pydmclab.data.configs import load_base_configs
 
 
@@ -352,7 +352,7 @@ class AnalyzeVASP(object):
         if self.is_converged:
             vr = self.outputs.vasprun
             forces = vr.ionic_steps[-1]["forces"]
-            return forces
+            return convert_numpy_to_native(forces)
         else:
             return None
 
@@ -364,7 +364,7 @@ class AnalyzeVASP(object):
         if self.is_converged:
             vr = self.outputs.vasprun
             stress = vr.ionic_steps[-1]["stress"]
-            return stress
+            return convert_numpy_to_native(stress)
         else:
             return None
 
