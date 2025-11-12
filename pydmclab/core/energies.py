@@ -13,6 +13,8 @@ from pydmclab.data.thermochem import (
     mus_at_T,
     mus_from_mp_no_corrections,
     mus_from_omat,
+    mus_from_matpes_pbe,
+    mus_from_matpes_r2scan,
     #    mus_from_bartel2019_npj,
 )
 from pydmclab.data.features import atomic_masses
@@ -122,7 +124,7 @@ class ChemPots(object):
         standard, functional = self.standard, self.functional
         if T == 0:
             # use DFT data at 0 K
-            if (standard == "dmc") or (functional in ["scan", "r2scan"]):
+            if (standard == "dmc"):
                 # use DMC data
                 all_mus = mus_at_0K()
                 all_mus = all_mus[standard]
@@ -131,6 +133,12 @@ class ChemPots(object):
             elif standard == "omat":
                 # use OMat data
                 mus = mus_from_omat()
+            elif standard == "matpes":
+                # use MatPES data
+                if functional == "pbe":
+                    mus = mus_from_matpes_pbe()
+                elif functional == "r2scan" or functional == "scan":
+                    mus = mus_from_matpes_r2scan()
             else:
                 # use MP data
                 mus = mus_from_mp_no_corrections()
