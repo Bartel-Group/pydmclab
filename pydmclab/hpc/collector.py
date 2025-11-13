@@ -70,6 +70,8 @@ class Collector(object):
         include_calc_setup = configs["include_calc_setup"]
         include_structure = configs["include_structure"]
         include_trajectory = configs["include_trajectory"]
+        include_forces = configs["include_forces"]
+        include_stress = configs["include_stress"]
         include_mag = configs["include_mag"]
         include_tdos = configs["include_tdos"]
         include_pdos = configs["include_pdos"]
@@ -95,6 +97,8 @@ class Collector(object):
             include_calc_setup=include_calc_setup,
             include_structure=include_structure,
             include_trajectory=include_trajectory,
+            include_forces=include_forces,
+            include_stress=include_stress,
             include_mag=include_mag,
             include_tdos=include_tdos,
             include_pdos=include_pdos,
