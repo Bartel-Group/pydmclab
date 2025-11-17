@@ -477,7 +477,7 @@ class AnalyzePhonons(object):
 
     @property
     def plot_phonon_bandstructure(self, qpoints=None, frequencies=None, labels=None, 
-                                ylabel="Frequency (THz)", figsize=(8, 6)):
+                                ylabel="Frequency (eV)", figsize=(8, 6)):
         """
         Plot a phonon band structure from Phonopy-style qpoints and frequencies.
         To do: need to make it so I can use this function to plot band structure by feeding it qpoints and frequencies without having to do a mesh calculation first.
