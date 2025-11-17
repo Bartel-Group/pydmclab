@@ -251,6 +251,13 @@ class AnalyzePhonons(object):
             self._band_structure_paths = bands        
             self._band_structure = self.phonon.get_band_structure_dict()
 
+            h = physical_constants['Planck constant in eV/Hz'][0]
+            # hbar = h / (2 * np.pi)
+            freq_points = self._band_structure['frequencies']
+            #convert frequencies from THz to eV
+            freq_points_ev = freq_points * 1e12 * h #I think it is not necessary to divide by 2pi here because phonopy already gives frequencies in Hz, not angular frequencies
+            self._band_structure['frequencies'] = freq_points_ev
+
         return self._band_structure
 
     @property
@@ -266,12 +273,11 @@ class AnalyzePhonons(object):
             _ = self.phonon.run_total_dos()
             total_dos = self.phonon.get_total_dos_dict()
             E0 = self.E0
-            tdos = total_dos['total_dos']/0.0041356655 # This is to normalize the DOS to 1/eV (phonopy default is 1/THz)
             h = physical_constants['Planck constant in eV/Hz'][0]
-            hbar = h / (2 * np.pi)
+            tdos = total_dos['total_dos']/(h*1e12) # This is to normalize the DOS to 1/eV (phonopy default is 1/THz)
             freq_points = total_dos['frequency_points']
             #convert frequencies from THz to eV
-            freq_points_ev = freq_points * 10e12 * hbar
+            freq_points_ev = freq_points * 1e12 * h 
             self._total_dos = {
                 'E0': E0,
                 'total_dos': [{'E': E, 'total_dos': dos} for E, dos in zip(freq_points_ev, tdos)],
@@ -471,7 +477,7 @@ class AnalyzePhonons(object):
 
     @property
     def plot_phonon_bandstructure(self, qpoints=None, frequencies=None, labels=None, 
-                                ylabel="Frequency (eV)", figsize=(8, 6)):
+                                ylabel="Frequency (THz)", figsize=(8, 6)):
         """
         Plot a phonon band structure from Phonopy-style qpoints and frequencies.
         To do: need to make it so I can use this function to plot band structure by feeding it qpoints and frequencies without having to do a mesh calculation first.
