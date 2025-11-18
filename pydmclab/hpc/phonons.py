@@ -253,7 +253,7 @@ class AnalyzePhonons(object):
 
             h = physical_constants['Planck constant in eV/Hz'][0]
             # hbar = h / (2 * np.pi)
-            freq_points = self._band_structure['frequencies']
+            freq_points = np.array(self._band_structure['frequencies'])
             #convert frequencies from THz to eV
             freq_points_ev = freq_points * 1e12 * h #I think it is not necessary to divide by 2pi here because phonopy already gives frequencies in Hz, not angular frequencies
             self._band_structure['frequencies'] = freq_points_ev
