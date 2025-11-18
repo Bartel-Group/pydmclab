@@ -471,8 +471,8 @@ class AnalyzePhonons(object):
 
     #Plotting functions are just using phonopy's built in plotting functions for the moment, need to updgrade this in the future
     @property
-    def plot_thermal_properties(self):
-        self.thermal_properties() #If thermal properties haven't been calculated, calculations will be done with defaults
+    def plot_thermal_properties_phonopy(self):
+        self.phonopy_thermal_properties() #If thermal properties haven't been calculated, calculations will be done with defaults
         self.phonon.plot_thermal_properties()
 
     @property

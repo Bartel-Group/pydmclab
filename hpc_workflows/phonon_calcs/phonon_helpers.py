@@ -211,7 +211,6 @@ def get_set_of_forces(results,
             arr = np.array(forces)
             print(f"Including forces for {key} with shape {arr.shape}")
  
-        # attempt to convert index to integer for sorting, fall back to lexical order
         index_key = int(index_str)
 
         if mpid is None:
