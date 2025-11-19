@@ -13,7 +13,7 @@ from pydmclab.utils.handy import read_json, write_json, convert_numpy_to_native
 from pydmclab.core.struc import StrucTools
 from pydmclab.core.comp import CompTools
 
-from pymatgen.core.structure import Structure
+from pymatgen.core.composition import Composition
 from pymatgen.io.ase import AseAtomsAdaptor
 from pymatgen.analysis.eos import Murnaghan, Vinet
 from pymatgen.io.phonopy import get_phonopy_structure, get_pmg_structure
@@ -113,6 +113,7 @@ class AnalyzePhonons(object):
                    {...}, ...]}
                 There is a type 2 dataset for multiple displacements in each supercell, but this is not implemented here. Might look into it in the future if needed.
             E0 (float):
+                In eV/atom.
                 Optional static 0 K energy of the supercell. This is added to the phonon free energy to get the total free energy.
                 If E0 is not provided, the Helmholtz free energy will only include the phonon contribution.
         """
@@ -132,6 +133,7 @@ class AnalyzePhonons(object):
             )
 
         pymatgen_struc = StrucTools(unitcell).structure
+        self.natoms = pymatgen_struc.num_sites
 
         unitcell = get_phonopy_structure(pymatgen_struc) #PhonopyAtoms structure object
 
@@ -256,7 +258,7 @@ class AnalyzePhonons(object):
             freq_points = np.array(self._band_structure['frequencies'])
             #convert frequencies from THz to eV
             freq_points_ev = freq_points * 1e12 * h #I think it is not necessary to divide by 2pi here because phonopy already gives frequencies in Hz, not angular frequencies
-            self._band_structure['frequencies'] = freq_points_ev
+            self._band_structure['frequencies'] = convert_numpy_to_native(freq_points_ev)
 
         return self._band_structure
 
@@ -286,22 +288,6 @@ class AnalyzePhonons(object):
 
         return self._total_dos
 
-    @property
-    def formula_units(self):
-        """
-        Returns:
-            int: Number of formula units in the cell.
-        """
-        structure = self.unitcell
-        st = StrucTools(structure)
-        comp = st.structure.composition
-        ct = CompTools(comp)
-        reduced_comp_and_factor = Composition(
-                comp
-                ).get_reduced_composition_and_factor()
-        formula_units = reduced_comp_and_factor[1]
-        return formula_units
-
     def helmholtz(self, temperatures=np.linspace(0, 2000, 100)):
         """
         Helmholtz free energy calculated using ASE's CrystalThermo module.
@@ -310,12 +296,13 @@ class AnalyzePhonons(object):
                 Array of temperatures in Kelvin at which to calculate the Helmholtz free energy.
         Returns:
             A list of dictionaries where each dictionary corresponds to a specific temperature point.
-            e.g. [{'temperature': 300, 'helmholtz_free_energy': float}, ...]
+            [{'temperature': 300, 
+            'helmholtz_free_energy': float}, ...]
+            Units are eV/atom
         """
         phonon_dos = self.total_dos
-        formula_units = self.formula_units
-        helmholtz = Helmholtz(phonon_dos=phonon_dos, temperatures=temperatures, formula_units=formula_units)
-        F = helmholtz.helmholtz
+        helmholtz = Helmholtz(phonon_dos=phonon_dos, temperatures=temperatures, formula_units=self.natoms) #this will normalize to eV/atom not eV/formula unit
+        F = helmholtz.helmholtz()
         return F
 
     def phonopy_thermal_properties(
@@ -476,86 +463,11 @@ class AnalyzePhonons(object):
         self.phonon.plot_thermal_properties()
 
     @property
-    def plot_phonon_bandstructure(self, qpoints=None, frequencies=None, labels=None, 
+    def plot_band_structure(self, qpoints=None, frequencies=None, labels=None, 
                                 ylabel="Frequency (eV)", figsize=(8, 6)):
-        """
-        Plot a phonon band structure from Phonopy-style qpoints and frequencies.
-        To do: need to make it so I can use this function to plot band structure by feeding it qpoints and frequencies without having to do a mesh calculation first.
-
-        Parameters
-        ----------
-        qpoints : ndarray, shape (npaths, npoints, 3)
-            Q-points for each path in reciprocal space
-        frequencies : ndarray, shape (npaths, npoints, nbranches)
-            Phonon frequencies for each q-point and branch
-        labels : list of str or None
-            High symmetry point labels. Must have length = npaths + 1.
-            Example: ["Γ", "X", "K", "Γ", "L"] for 4 paths
-            Note: The middle labels connect paths (end of one = start of next)
-        ylabel : str
-            Label for y-axis
-        figsize : tuple
-            Figure size
-        """
-        if qpoints is None or frequencies is None:
-            band_struct = self.band_structure()
-            qpoints = band_struct['qpoints']
-            frequencies = band_struct['frequencies']
-
-        npaths, npoints, nbranches = frequencies.shape
-
-        def compute_path_distances(qpath):
-            """Given qpath of shape (npoints, 3), return cumulative distance array."""
-            dq = np.diff(qpath, axis=0)
-            dist = np.linalg.norm(dq, axis=1)
-            return np.concatenate(([0], np.cumsum(dist)))
-
-
-        if labels is not None and len(labels) != npaths + 1:
-            raise ValueError(f"labels must have length npaths + 1 ({npaths+1}), got {len(labels)}")
-
-        plt.figure(figsize=figsize)
-
-        # Track cumulative distance and label positions
-        x_offset = 0
-        tick_positions = [0]  # Start with the first point
-
-        for i in range(npaths):
-            qpath = qpoints[i]       # (npoints, 3)
-            freqs = frequencies[i]   # (npoints, nbranches)
-
-            # Compute cumulative distance for this path
-            dist = compute_path_distances(qpath)
-            dist = dist + x_offset   # Shift to continue from previous path
-
-            # Plot each phonon branch
-            for b in range(nbranches):
-                plt.plot(dist, freqs[:, b], linewidth=0.7, color='black')
-
-            # Update offset for next path (end of current path)
-            x_offset = dist[-1]
-            
-            # Add the end position of this path (which is start of next path)
-            tick_positions.append(x_offset)
-
-        # Draw vertical lines at high-symmetry points
-        for pos in tick_positions:
-            plt.axvline(pos, color="gray", linewidth=0.6, alpha=0.5)
-
-        # Apply x-axis labels
-        if labels is not None:
-            plt.xticks(tick_positions, labels)
-        else:
-            plt.xticks([])
-
-        # Labels and formatting
-        plt.ylabel(ylabel)
-        plt.xlabel("Wave Vector")
-        plt.grid(alpha=0.2, axis='y')
-        plt.xlim(0, tick_positions[-1])
-        plt.tight_layout()
-        plt.show()
-
+        if self._band_structure is None:
+            self.band_structure()       
+        self.phonon.plot_band_structure()
 
     @property
     def plot_total_dos(self):
@@ -571,13 +483,7 @@ class AnalyzePhonons(object):
 
 class Helmholtz():
 
-    def __init__(self, phonon_dos, temperatures=np.linspace(0, 2000, 100), formula_units = None):
-
-        self.phonon_dos = phonon_dos
-        self.temperatures = temperatures
-        self.formula_units = formula_units
-        self.E0 = phonon_dos["E0"] if "E0" in phonon_dos else None
-
+    def __init__(self, phonon_dos, temperatures=np.linspace(0, 2000, 100), formula_units = None, move_imaginary: bool = False):
         """
             Args:
                 phonon_dos (Usually obtained from the phonon_dos method of the QHA class, 
@@ -596,19 +502,71 @@ class Helmholtz():
                 formula_units (int)
                     number of formula units in the cell. If None is given, the energy will be in eV/cell. 
                     If a number is given, the energy will be in eV/formula unit.
+                    Could actually give it natoms to get eV/atom as well. Whatever number you give it, it divides the energies by that number.
+                move_imaginary (bool):
+                    If True, moves imaginary frequencies to their absolute values.
+                    If False, removes imaginary frequencies from the DOS.
+                    In order to calculate thermodynamic properties, the phonon DOS must not contain imaginary frequencies, so it will always be cleaned.
         """
-        
+
+
+        self.phonon_dos = phonon_dos
+        self.temperatures = temperatures
+        self.formula_units = formula_units
+        self.E0 = phonon_dos["E0"] if "E0" in phonon_dos else None
+        self.move_imaginary = move_imaginary
+
+
+    def cleanup_dos(self, move_imaginary: bool = False):
+        """
+        Cleans up the phonon DOS by removing or adjusting imaginary frequencies.
+        Args:
+            move_imaginary (bool):
+                If True, moves imaginary frequencies to their absolute values.
+                If False, removes imaginary frequencies from the DOS.
+        """
+        if hasattr(self, 'clean_dos'):
+            return self.clean_dos
+        phonon_dos = self.phonon_dos
+        frequency_points = np.array([phonon_dos['total_dos'][i]['E'] for i in range(len(phonon_dos['total_dos']))])
+        total_dos = np.array([phonon_dos['total_dos'][i]['total_dos'] for i in range(len(phonon_dos['total_dos']))])
+        negative_freqs_with_0_dos = [i for i, freq in enumerate(frequency_points) if freq < 0 and total_dos[i] == 0]
+
+        if move_imaginary:
+            # Move imaginary frequencies to their absolute values, eventually can add functionality so it just moves it to a small positive value instead of absolute value
+            filtered_frequencies = np.abs(frequency_points)
+            filtered_dos = total_dos
+            print(f"Moved {np.sum(frequency_points < 0)} imaginary frequencies to their absolute values.")
+        else:
+            # Remove all DOS values and frequencies where there are imaginary frequencies
+            valid_indices = [
+                i for i, freq in enumerate(frequency_points)
+                if np.real(freq) > 0
+            ]
+            filtered_frequencies = frequency_points[valid_indices]
+            filtered_dos = total_dos[valid_indices]
+            #print how many imaginary frequencies were removed and how many of them had zero DOS
+            print(f"Removed {len(frequency_points) - len(filtered_frequencies)} imaginary frequencies from the DOS. "
+                  f"{len(negative_freqs_with_0_dos)} of them had zero DOS.")
+
+        self.clean_dos = {
+            'E0': phonon_dos['E0'],
+            'total_dos': [{'E': E, 'total_dos': dos} for E, dos in zip(filtered_frequencies, filtered_dos)],
+            'units': phonon_dos['units']
+        }
+        return self.clean_dos
+
 
     def thermo(self):
-        phonon_dos = self.phonon_dos
+        phonon_dos = self.cleanup_dos(move_imaginary=self.move_imaginary)
         E0 = self.E0
         formula_units = self.formula_units
 
         phonon_energies = np.array([
-            phonon_dos["dos"][i]["E"] for i in range(len(phonon_dos["dos"]))
+            phonon_dos["total_dos"][i]["E"] for i in range(len(phonon_dos["total_dos"]))
         ])
         phonon_dos_values = np.array([
-            phonon_dos["dos"][i]["dos"] for i in range(len(phonon_dos["dos"]))
+            phonon_dos["total_dos"][i]["total_dos"] for i in range(len(phonon_dos["total_dos"]))
         ])
         return CrystalThermo(
             phonon_energies=phonon_energies,
@@ -618,14 +576,14 @@ class Helmholtz():
         )
 
     def zero_point_energy(self):
-        phonon_dos = self.phonon_dos
+        phonon_dos = self.cleanup_dos(move_imaginary=self.move_imaginary)
         formula_units = self.formula_units
         E0 = self.E0
         phonon_energies = np.array([
-            phonon_dos["dos"][i]["E"] for i in range(len(phonon_dos["dos"]))
+            phonon_dos["total_dos"][i]["E"] for i in range(len(phonon_dos["total_dos"]))
         ])
         dos_values = np.array([
-            phonon_dos["dos"][i]["dos"] for i in range(len(phonon_dos["dos"]))
+            phonon_dos["total_dos"][i]["total_dos"] for i in range(len(phonon_dos["total_dos"]))
         ])
         zpe_list = phonon_energies / 2.
         zpe = trapezoid(zpe_list * dos_values, phonon_energies)
@@ -634,7 +592,6 @@ class Helmholtz():
         else:
             return (zpe + E0)/formula_units
     
-
     def helmholtz(self):
         """
         Returns:
@@ -643,9 +600,15 @@ class Helmholtz():
         """
         thermo = self.thermo()
         temperatures = self.temperatures
-        S = [thermo.get_entropy(temperature=T) for T in temperatures]
-        Fs = [thermo.get_helmholtz_energy(temperature=T) for T in temperatures]
-        Fs[0] = self.zero_point_energy()
+
+        S = [0.0 if T == 0 
+             else thermo.get_entropy(temperature=T) 
+             for T in temperatures] #Enropy is zero at 0 K
+        
+        Fs = [self.zero_point_energy() if T == 0 
+              else thermo.get_helmholtz_energy(temperature=T) 
+              for T in temperatures] #Helmholtz free energy includes ZPE at 0 K
+
         out = {
             "data": [
                 {"T": temperatures[i], "F": Fs[i], "S": S[i]} for i in range(len(temperatures))
@@ -875,12 +838,9 @@ class QHA(object):
         props = self.parse_results[formula][mpid]
         random_scale = list(props.keys())[0]
         structure = props[random_scale]['structure']
-        st = StrucTools(structure)
-        comp = st.structure.composition
-        ct = CompTools(comp)
-        reduced_comp_and_factor = Composition(
-                comp
-                ).get_reduced_composition_and_factor()
+        formula = StrucTools(structure).formula
+        comp = Composition(formula)
+        reduced_comp_and_factor = comp.get_reduced_composition_and_factor()
         formula_units = reduced_comp_and_factor[1]
         return formula_units
 
