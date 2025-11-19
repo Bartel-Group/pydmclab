@@ -268,22 +268,25 @@ class AnalyzePhonons(object):
         Returns the total density of states for the phonon object in a dictionary.
         The units are converted from phonopy's default THz to eV!!
         Returns:
-            {'frequency_points ': array of frequency points, 'total_dos': array of total density of states}
+            {'E0' : 0 K internal energy (eV/atom),
+            'total_dos' :
+            [{'E' : energy level (eV), 'total_dos': total density of states}, ...],
+            'units': {'frequency': 'eV', 'dos': 'states/eV', 'energy': 'eV/atom'}
+            }
         """
         if not hasattr(self, '_total_dos'):
             print("Calculating total density of states...")
             _ = self.phonon.run_total_dos()
             total_dos = self.phonon.get_total_dos_dict()
-            E0 = self.E0
             h = physical_constants['Planck constant in eV/Hz'][0]
             tdos = total_dos['total_dos']/(h*1e12) # This is to normalize the DOS to 1/eV (phonopy default is 1/THz)
             freq_points = total_dos['frequency_points']
             #convert frequencies from THz to eV
             freq_points_ev = freq_points * 1e12 * h 
             self._total_dos = {
-                'E0': E0,
+                'E0': self.E0,
                 'total_dos': [{'E': E, 'total_dos': dos} for E, dos in zip(freq_points_ev, tdos)],
-                'units': {'frequency': 'eV', 'dos': 'states/eV'}
+                'units': {'frequency': 'eV', 'dos': 'states/eV', 'energy': 'eV/atom'}
             }
 
         return self._total_dos
@@ -301,6 +304,7 @@ class AnalyzePhonons(object):
             Units are eV/atom
         """
         phonon_dos = self.total_dos
+        phonon_dos['E0'] = self.E0*self.natoms #Convert to eV/supercell for CrystalThermo
         helmholtz = Helmholtz(phonon_dos=phonon_dos, temperatures=temperatures, formula_units=self.natoms) #this will normalize to eV/atom not eV/formula unit
         F = helmholtz.helmholtz()
         return F
