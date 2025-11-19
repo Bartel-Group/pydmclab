@@ -305,7 +305,7 @@ class AnalyzePhonons(object):
         """
         phonon_dos = self.total_dos
         phonon_dos['E0'] = self.E0*self.natoms #Convert to eV/supercell for CrystalThermo
-        helmholtz = Helmholtz(phonon_dos=phonon_dos, temperatures=temperatures, formula_units=self.natoms) #this will normalize to eV/atom not eV/formula unit
+        helmholtz = Helmholtz(phonon_dos=phonon_dos, temperatures=temperatures, normalize=self.natoms) #this will normalize to eV/atom not eV/formula unit
         F = helmholtz.helmholtz()
         return F
 
@@ -487,7 +487,7 @@ class AnalyzePhonons(object):
 
 class Helmholtz():
 
-    def __init__(self, phonon_dos, temperatures=np.linspace(0, 2000, 100), formula_units = None, move_imaginary: bool = False):
+    def __init__(self, phonon_dos, temperatures=np.linspace(0, 2000, 100), normalize = None, move_imaginary: bool = False):
         """
             Args:
                 phonon_dos (Usually obtained from the phonon_dos method of the QHA class, 
@@ -499,14 +499,16 @@ class Helmholtz():
                         }
 
                     E0 is optional, but if not given, the energy given is only from phonons, not including the static 0 K energy.
+                    ** Units should be in eV for frequencies energies and eV/cell for E0. 
+                    If E0 is in eV/atom, make sure to multiply by number of atoms in cell before feeding it here, otherwise it will be doubly normalized.**
 
                 temperatures (np.array)
                     list of temperatures (K)
 
-                formula_units (int)
-                    number of formula units in the cell. If None is given, the energy will be in eV/cell. 
-                    If a number is given, the energy will be in eV/formula unit.
-                    Could actually give it natoms to get eV/atom as well. Whatever number you give it, it divides the energies by that number.
+                normalize (int)
+                    What you want to normalize by. If None is given, the energy will be in eV/cell. 
+                    If a number is given, the energy will be divided by that number.
+                    Could give number of formula units to get eV/formula unit, or number of atoms to get eV/atom.
                 move_imaginary (bool):
                     If True, moves imaginary frequencies to their absolute values.
                     If False, removes imaginary frequencies from the DOS.
@@ -516,7 +518,7 @@ class Helmholtz():
 
         self.phonon_dos = phonon_dos
         self.temperatures = temperatures
-        self.formula_units = formula_units
+        self.normalize = normalize
         self.E0 = phonon_dos["E0"] if "E0" in phonon_dos else None
         self.move_imaginary = move_imaginary
 
@@ -564,7 +566,7 @@ class Helmholtz():
     def thermo(self):
         phonon_dos = self.cleanup_dos(move_imaginary=self.move_imaginary)
         E0 = self.E0
-        formula_units = self.formula_units
+        normalize = self.normalize
 
         phonon_energies = np.array([
             phonon_dos["total_dos"][i]["E"] for i in range(len(phonon_dos["total_dos"]))
@@ -576,12 +578,12 @@ class Helmholtz():
             phonon_energies=phonon_energies,
             phonon_DOS=phonon_dos_values,
             potentialenergy=E0,
-            formula_units=formula_units,
+            formula_units=normalize,
         )
 
     def zero_point_energy(self):
         phonon_dos = self.cleanup_dos(move_imaginary=self.move_imaginary)
-        formula_units = self.formula_units
+        normalize = self.normalize
         E0 = self.E0
         phonon_energies = np.array([
             phonon_dos["total_dos"][i]["E"] for i in range(len(phonon_dos["total_dos"]))
@@ -591,10 +593,10 @@ class Helmholtz():
         ])
         zpe_list = phonon_energies / 2.
         zpe = trapezoid(zpe_list * dos_values, phonon_energies)
-        if formula_units is None:
+        if normalize is None:
             return (zpe + E0)
         else:
-            return (zpe + E0)/formula_units
+            return (zpe + E0)/normalize
     
     def helmholtz(self):
         """
@@ -619,14 +621,13 @@ class Helmholtz():
             ]
         }
         return out    
-    
+
 class Gibbs():
-    def __init__(self, phonon_dos_dict, eos="vinet", temperatures=np.linspace(0, 2000, 100), formula_units = None):
+    def __init__(self, phonon_dos_dict, eos="vinet", temperatures=np.linspace(0, 2000, 100), normalize = None):
         self.eos = eos
         self.phonon_dos_dict = phonon_dos_dict
         self.temperatures = temperatures
-        self.formula_units = formula_units
-
+        self.normalize = normalize
         '''
         Args:
             phonon_dos_dict (dict):
@@ -664,12 +665,12 @@ class Gibbs():
         """
         volumes = self.volumes
         dos = self.phonon_dos_dict
-        formula_units = self.formula_units
+        normalize = self.normalize
         return {
             volumes[i]: Helmholtz(
                 phonon_dos=dos[volumes[i]],
                 temperatures=self.temperatures,
-                formula_units=formula_units
+                normalize=normalize
             ).helmholtz()
             for i in range(len(volumes))
         }
@@ -729,6 +730,7 @@ class Gibbs():
 ##To Do: add helmholtz from your own calculations rather than from phonopy. 
 ##but those come in as per formula unit, so make sure the E_electronic in init matches units. Pick either per atom or per formula unit
 ##Add self helmlholtz to summary up in analyze phonons, then don't have to do the ASE calculation here in QHA again.
+##Change normalization from formula units to number of atoms, so that everything is in eV/atom. Then can just feed number of atoms in cell to normalize.
 class QHA(object):
     def __init__(self, results: dict, temperatures = np.linspace(0, 2000, 201), eos: str = "vinet"):
         self.results = results
