@@ -836,6 +836,7 @@ class SolidSolutionGenerator:
     def __init__(
         self,
         endmembers: List[Structure],
+        num_solns: Optional[int] = None,
         supercell_dim: Optional[List[int]] = None,
     ) -> None:
         """Initialize the SolidSolutionGenerator.
@@ -938,10 +939,13 @@ class SolidSolutionGenerator:
                 num_differing_sites += 1
 
         # Determine number of solutions automatically
-        self.num_solns = num_differing_sites
-        print(
-            f"Automatically determined {self.num_solns} intermediate compositions based on differing sites in supercell {self.supercell_dim}."
-        )
+        if not self.num_solns:
+            self.num_solns = num_differing_sites
+            print(
+                f"Automatically determined {self.num_solns} intermediate compositions based on differing sites in supercell {self.supercell_dim}."
+            )
+        else:
+            self.num_solns = self.num_solns
 
         # Create dummy structures while saving original species and occupancies
         A_species, B_species = [], []
@@ -1332,8 +1336,8 @@ class SolidSolutionGenerator:
 
         # Save summary data
         summary_path = os.path.join(self.dirs["sqs"], "sqs_summary.json")
-        with open(output_path, "w", encoding="utf-8") as file:
-            json.dump(data, file, indent=4)
+        with open(summary_path, "w", encoding="utf-8") as file:
+            json.dump(sqs_data, file, indent=4)
 
         print(f"\nSQS generation complete! Results saved to {self.dirs['sqs']}/")
 
