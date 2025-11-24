@@ -803,7 +803,7 @@ class SolidSolutionGenerator:
         self.ordered_solns: Optional[List[Structure]] = None
         self.sqs_solns: Optional[List[Structure]] = None
         self.sqs_data: Optional[List[Dict[str, Any]]] = None
-        self.num_solns: Optional[int] = None
+        self.num_solns = num_solns
 
         # Create necessary directories
         self.dirs: Dict[str, str] = {
