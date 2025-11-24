@@ -14,8 +14,6 @@ from pydmclab.core.mag import MagTools
 from pydmclab.core.energies import ChemPots, FormationEnthalpy, MPFormationEnergy
 from pydmclab.utils.handy import read_json, write_json
 from pydmclab.data.configs import load_partition_configs
-from pydmclab.hpc.phonons import QHA
-
 
 from pymatgen.core.surface import Slab, get_symmetrically_distinct_miller_indices
 from pymatgen.electronic_structure.core import Magmom
