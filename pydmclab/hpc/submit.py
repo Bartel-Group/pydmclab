@@ -311,7 +311,7 @@ class SubmitTools(object):
         configs = self.configs.copy()
         machine = configs["machine"]
         if machine == "msi":
-            return "/home/cbartel/shared/bin"
+            return "/projects/standard/cbartel/shared/bin/"
         elif machine == "bridges2":
             return "/ocean/projects/mat230011p/shared/bin"
         elif machine == "expanse":
