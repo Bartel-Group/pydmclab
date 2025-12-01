@@ -12,7 +12,7 @@ from pydmclab.hpc.submit import SubmitTools
 from pydmclab.hpc.analyze import AnalyzeVASP, AnalyzeBatch
 from pydmclab.core.comp import CompTools
 from pydmclab.core.query import MPQuery, MPLegacyQuery
-from pydmclab.core.struc import StrucTools, InterfaceTools
+from pydmclab.core.struc import StrucTools
 from pydmclab.core.mag import MagTools
 from pydmclab.core.energies import ChemPots, FormationEnthalpy, MPFormationEnergy
 from pydmclab.utils.handy import read_json, write_json
