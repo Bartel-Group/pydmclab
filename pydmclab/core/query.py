@@ -249,8 +249,8 @@ class MPQuery(object):
         # convert returned documents into dictionaries
         d = {}
         for doc in docs:
-            d_doc = doc.dict()
-            mpid = d_doc["material_id"]
+            mpid = str(doc.material_id)
+            d_doc = doc.model_dump()
             # mpid will be the front key in this dict since it's unique
             tmp = {}
             for k, v in d_doc.items():
