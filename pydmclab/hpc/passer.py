@@ -142,7 +142,7 @@ class Passer(object):
             return prev_xc_calc
 
         if curr_xc == "hse06":
-            if curr_calc in "preggastatic":
+            if curr_calc == "preggastatic":
                 # for hse06-preggastatic, inherit from the source structure selected by the user
                 prev_xc_calc = struc_src_for_hse
                 return prev_xc_calc
