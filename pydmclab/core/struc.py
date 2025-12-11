@@ -237,8 +237,9 @@ class StrucTools(object):
         algo: Literal[0, 1, 2] = 0,
         decorate: bool = True,
         n_strucs: int = 1,
-        scaling_factor: int = 1000,
+        scaling_factor: int = 100,
         verbose: bool = True,
+        unique_strucs: bool = True,
     ) -> dict[int, dict]:
         """
         Args:
@@ -283,11 +284,21 @@ class StrucTools(object):
         out = transformer.apply_transformation(
             structure, return_ranked_list=return_ranked_list
         )
+        
+        print("generated %d ordered structures\n" % (len(out) if isinstance(out, list) else 1))
+        
+        if not unique_strucs:
+            # if not getting unique structures, just return the first n_strucs
+            if isinstance(out, list):
+                strucs = {i: out[i]["structure"].as_dict() for i in range(len(out))}
+                return {i: strucs[i] for i in range(n_strucs)}
+            else:
+                return {0: out.as_dict()}
 
         if isinstance(out, list):
             # more than 1 structure, so check for duplicates (symmetrically equivalent structures) and remove them
             if verbose:
-                print("getting unique structures\n")
+                print(f"getting unique structures from {len(out)} candidates \n")
             matcher = StructureMatcher()
             out = [i["structure"] for i in out]
             # find unique groups of structures
@@ -303,9 +314,12 @@ class StrucTools(object):
         self,
         species_mapping: dict[str, dict[str, float]],
         n_strucs: int = 1,
+        algo: int = 0,
+        scaling_factor: int = 100,
         use_ox_states_in_mapping: bool = False,
         use_occ_in_mapping: bool = True,
         verbose: bool = True,
+        unique_strucs: bool = True,
     ) -> dict[int, dict]:
         """
         Args:
@@ -368,7 +382,8 @@ class StrucTools(object):
         else:
             # otherwise, need to order this partially occupied structure
             structools = StrucTools(structure, self.ox_states)
-            return structools.get_ordered_structures(n_strucs=n_strucs, verbose=verbose)
+            return structools.get_ordered_structures(n_strucs=n_strucs, algo=algo, \
+                scaling_factor=scaling_factor,verbose=verbose, unique_strucs=unique_strucs)
 
     @property
     def spacegroup_info(self) -> dict[str, dict[str, int | str]]:
@@ -453,6 +468,49 @@ class StrucTools(object):
         structure.scale_lattice(new_vol)
 
         return structure
+    
+    def get_xrd_pattern(
+        self,
+        wavelength: str | float = "CuKa",
+        symprec: float = 0,
+        debye_waller_factors: dict | None = None,
+        scaled: bool = True,
+        two_theta_range: Tuple[float, float] | None = (0, 90),
+    ) -> dict[str, list]:
+        """
+        Args:
+            wavelength: wavelength of X-ray radiation
+                (see pymatgen.analysis.diffraction.xrd.XRDCalculator for str options)
+            symprec: symmetry precision for structure refinement (no refinement if 0)
+            debye_waller_factors: {element symbol: float} for specifying Debye-Waller factors
+            scaled: whether to scale the intensities to a max of 100 (True) or use absolute values (False)
+            two_theta_range: range of two-theta values to calculate
+        Returns:
+            dict of XRD pattern
+                {'two_thetas' : numpy array of two-theta values in degrees (numpy.float64),
+                 'intensities' : numpy array of intensities (numpy.float64),
+                 'hkl_and_multiplicity' : list of {'hkl': miller indices, 'multiplicity': multiplicity},
+                 'd_spacing' : list of d-spacings (numpy.float64)}
+        """
+        # setup the calculator
+        xrd_calculator = XRDCalculator(
+            wavelength=wavelength,
+            symprec=symprec,
+            debye_waller_factors=debye_waller_factors,
+        )
+        # find the pattern
+        xrd_pattern_of_struc = xrd_calculator.get_pattern(
+            self.structure, scaled=scaled, two_theta_range=two_theta_range
+        )
+        # process the data
+        xrd_hkls = [hkl[0] for hkl in xrd_pattern_of_struc.hkls]
+        return {
+            "two_thetas": xrd_pattern_of_struc.x,
+            "intensities": xrd_pattern_of_struc.y,
+            "hkl_and_multiplicity": xrd_hkls,
+            "d_spacing": xrd_pattern_of_struc.d_hkls,
+        }
+
 
     def get_xrd_pattern(
         self,

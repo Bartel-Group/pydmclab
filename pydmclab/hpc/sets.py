@@ -106,7 +106,7 @@ class GetSet(object):
             # start from MP Scan for metaGGA or metaGGA+U
             return MPScanRelaxSet
         elif xc in ["hse06"]:
-            if calc in ["preggastatic"]:
+            if calc in ["preggastatic", "preggabs"]:
                 # start fom MP HSE for HSE06
                 return MPRelaxSet
             else:
@@ -157,11 +157,16 @@ class GetSet(object):
         if calc == "relax":
             new_settings["NSW"] = 199
 
-        # these three calcs are static --> turn off relaxation things
+        # these calcs are static --> turn off relaxation things
         if calc in [
             "static",
-            #    "prelobster",
+            # "prelobster",
             "lobster",
+            "preggabs",
+            "bs",
+            "wannier",
+            "preg0w0unoccu",
+            "g0w0",
             "parchg",
             "polar",
         ]:
@@ -216,17 +221,19 @@ class GetSet(object):
         # for PARCHG --> set explicit requirements
         if calc == "parchg":
             new_settings["ISTART"] = 1
+            new_settings["KSPACING"] = None
             new_settings["LPARD"] = True
             new_settings["LSEPB"] = False
             new_settings["LSEPK"] = False
             new_settings["LWAVE"] = False
-            new_settings["NBMOD"] = -3
+            new_settings["NBMOD"] = -2
+            print("WARNING: We now set NBMOD = -2 in PARCHG calcs, which is using the absolute energy interval (instead of the eneries relative to the Fermi level) to select contributing bands")
             if "EINT" not in user_passed_settings:
                 print("WARNING: PARCH analysis but no EINT set. Setting to Ef - 2 eV")
                 new_settings["EINT"] = " ".join([str(v) for v in [-2.0, 0]])
 
         # for LOBSTER --> set explicit requirements
-        if calc == "lobster":
+        if calc in ["lobster", "preggabs", "bs",]:
             new_settings["ISTART"] = 0
             new_settings["LAECHG"] = True
             new_settings["ISYM"] = -1
@@ -234,6 +241,31 @@ class GetSet(object):
             new_settings["NSW"] = 0
             new_settings["LWAVE"] = True
             new_settings["ISMEAR"] = -5
+        
+        if calc == "wannier":
+            new_settings["ISTART"] = 1
+            new_settings["KSPACING"] = None
+            new_settings["LWAVE"] = True
+            new_settings["LWANNIER90"] = True
+            new_settings["LWRITE_UNK"] = True
+            new_settings["ISMEAR"] = 0
+            
+        if calc == "preg0w0unoccu":
+            new_settings["ISTART"] = 1
+            new_settings["KSPACING"] = None
+            new_settings["ALGO"] = "Exact"
+            new_settings["NELM"] = 1
+            new_settings["LWAVE"] = True
+            new_settings["ISMEAR"] = 0
+        
+        if calc == "g0w0":
+            new_settings["ISTART"] = 1
+            new_settings["KSPACING"] = None
+            new_settings["ALGO"] = "EVGW0"
+            new_settings["NELMGW"] = 1
+            new_settings["NOMEGA"] = 100
+            new_settings["LWAVE"] = True
+            new_settings["ISMEAR"] = 0
 
         # for computing polarization --> set explicit requirements
         # Note: VASP will only compute the macroscopic polarization if the system is insulating

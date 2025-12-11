@@ -7,12 +7,15 @@ import json
 from shutil import copyfile
 import numpy as np
 import traceback
+from scipy import integrate   ##### parchg #####
 
 from pymatgen.io.vasp.inputs import Incar, Poscar, Kpoints
+from pymatgen.io.vasp.outputs import Vasprun
 from pymatgen.io.vasp.sets import get_structure_from_prev_run
 
 from pydmclab.hpc.analyze import AnalyzeVASP, VASPOutputs
 from pydmclab.core.struc import StrucTools
+from pydmclab.core.comp import CompTools   ##### parchg #####
 
 if TYPE_CHECKING:
     from pymatgen.core.structure import Structure
@@ -138,29 +141,46 @@ class Passer(object):
                 prev_xc_calc = curr_xc_calc.replace(curr_xc, "gga")
             return prev_xc_calc
 
-        if curr_calc == "lobster":
-            # lobster calcs inherit from prelobster
-            prev_xc_calc = curr_xc_calc.replace(curr_calc, "prelobster")
-            return prev_xc_calc
-
         if curr_xc == "hse06":
-            if curr_calc == "preggastatic":
+            if curr_calc in "preggastatic":
                 # for hse06-preggastatic, inherit from the source structure selected by the user
                 prev_xc_calc = struc_src_for_hse
                 return prev_xc_calc
-            if curr_calc not in ["parchg", "lobster"]:
-                # for hse06-parchg, inherit from hse06-static; for other addons in hse06, inherit from preggastatic
+            
+            if curr_calc in ["preg0w0unoccu", "wannier"]:
+                # for hse06-g0w0, hse06-wannier, inherit from hse06-lobster
+                prev_xc_calc = curr_xc_calc.replace(curr_calc, "lobster")
+                return prev_xc_calc
+                
+            if curr_calc not in ["lobster", "parchg", "preggabs", "bs", "preg0w0unoccu", "g0w0", "wannier"]:
+                # for hse06-parchg, inherit from hse06-lobster; for other addons in hse06, inherit from preggastatic
                 prev_xc_calc = curr_xc_calc.replace(curr_calc, "preggastatic")
+                return prev_xc_calc
+                        
+            if curr_calc == "bs":
+                # for hse06-preggabs, inherit from hse06-preggastatic
+                prev_xc_calc = curr_xc_calc.replace(curr_calc, "preggabs")
                 return prev_xc_calc
 
         if curr_calc == "prelobster" and self.xc_calc_src_for_lobster is not None:
             # user can set custom inheritance for non-hse lobster
             # e.g., inheriting from ggau-relax instead of ggau-static
             return self.xc_calc_src_for_lobster
-
+        
+        if curr_calc == "lobster":
+            # lobster calcs inherit from prelobster
+            prev_xc_calc = curr_xc_calc.replace(curr_calc, "prelobster")
+            return prev_xc_calc
+        
+        if curr_calc == "g0w0":
+            # lobster calcs inherit from prelobster
+            prev_xc_calc = curr_xc_calc.replace(curr_calc, "preg0w0unoccu")
+            return prev_xc_calc
+        
         if curr_calc in ["parchg"]:
             # for parchg, inherit from lobster
-            return curr_xc_calc.replace(curr_calc, "lobster")
+            prev_xc_calc = curr_xc_calc.replace(curr_calc, "lobster")
+            return prev_xc_calc
 
         # everything else inherits from static
         return curr_xc_calc.replace(curr_calc, "static")
@@ -236,6 +256,11 @@ class Passer(object):
         if prev_calc == "parchg":
             if os.path.exists(os.path.join(prev_calc_dir, "PARCHG")):
                 return True
+        if prev_calc == "preg0w0unoccu":
+            if os.path.exists(os.path.join(prev_calc_dir, "WAVECAR")) and os.path.exists(
+                os.path.join(prev_calc_dir, "WAVEDAR")
+            ):
+                return True
         return AnalyzeVASP(prev_calc_dir).is_converged
 
     @property
@@ -281,6 +306,9 @@ class Passer(object):
 
     @property
     def update_poscar(self) -> None:
+        # skip copying for band-structure calculation
+        if self.curr_calc in ["preggabs", "bs"]:
+            return
         # copy CONTCAR from curr directory or previous
         if self.is_curr_calc_being_restarted:
             prev_contcar = os.path.join(self.calc_dir, "CONTCAR")
@@ -344,6 +372,7 @@ class Passer(object):
 
         src_dir = self.prev_calc_dir
         dst_dir = self.calc_dir
+        prelobster_dir = dst_dir.replace(curr_calc, "prelobster")
 
         copied = []
 
@@ -352,17 +381,51 @@ class Passer(object):
             copyfile(fsrc_chg, os.path.join(dst_dir, "CHGCAR"))
             copied.append("chgcar")
 
+        fsrc_wavecar = os.path.join(src_dir, "WAVECAR")
+        if os.path.exists(fsrc_wavecar):
+            copyfile(fsrc_wavecar, os.path.join(dst_dir, "WAVECAR"))
+            copied.append("wavecar")
+
         fsrc_kpt = os.path.join(src_dir, "KPOINTS")
         fsrc_ibz = os.path.join(src_dir, "IBZKPT")
+        prelobste_ibz = os.path.join(prelobster_dir, "IBZKPT")
+
         if os.path.exists(fsrc_ibz):
             copyfile(fsrc_ibz, os.path.join(dst_dir, "KPOINTS"))
             copied.append("kpoints")
         elif os.path.exists(fsrc_kpt):
             copyfile(fsrc_kpt, os.path.join(dst_dir, "KPOINTS"))
             copied.append("kpoints")
+        elif os.path.exists(prelobste_ibz):
+            copyfile(prelobste_ibz, os.path.join(dst_dir, "KPOINTS"))
+            copied.append("kpoints")
 
         return "_".join(copied) + " copied" if copied else None
 
+    @property
+    def setup_g0w0(self) -> str | None:
+        """
+        Returns:
+            str if files are copied for g0w0 else None
+
+            copies WAVEDAR from preg0w0unoccu to g0w0
+        """
+        curr_calc = self.curr_calc
+        if "g0e0" not in curr_calc:
+            return None
+
+        src_dir = self.prev_calc_dir
+        dst_dir = self.calc_dir
+
+        copied = []
+
+        fsrc_wavedar = os.path.join(src_dir, "WAVEDAR")
+        if os.path.exists(fsrc_wavedar):
+            copyfile(fsrc_wavedar, os.path.join(dst_dir, "WAVEDAR"))
+            copied.append("wavedar")
+
+        return "_".join(copied) + " copied" if copied else None
+    
     @property
     def errors_encountered_in_curr_calc(self) -> list | None:
         """
@@ -408,7 +471,6 @@ class Passer(object):
         """
         Copies WAVECAR from parent to child
         """
-
         if self.is_curr_calc_being_restarted:
             return None
 
@@ -550,7 +612,7 @@ class Passer(object):
             adjustments["ISMEAR"] = -5
             adjustments["KSPACING"] = 0.22
 
-        return adjustments
+        return bandgap_label, adjustments
 
     @property
     def magmom_based_incar_adjustments(self) -> dict:
@@ -588,12 +650,12 @@ class Passer(object):
 
         return {"MAGMOM": magmom_string}
 
-    @property
-    def nbands_based_incar_adjustments(self) -> dict:
+    def nbands_based_incar_adjustments(self, multiplier: int) -> dict:
         """
         Returns:
             a dictionary of INCAR adjustments based on NBANDS
                 NBANDS = 2 * NBANDS of previous calculation for LOBSTER
+                NBANDS = 5 * NBANDS of previous calculation for G0W0
         """
         prev_calc_dir = self.prev_calc_dir
         if not os.path.exists(prev_calc_dir):
@@ -608,7 +670,7 @@ class Passer(object):
 
         old_nbands = prev_settings["NBANDS"]
         # based on CJB heuristic; note pymatgen io lobster seems to set too few bands by default
-        new_nbands = {"NBANDS": int(2 * old_nbands)}
+        new_nbands = {"NBANDS": int(multiplier * old_nbands)}
         return new_nbands
 
     @property
@@ -666,7 +728,200 @@ class Passer(object):
 
         adjustments = {"KPAR": kpar}
         return adjustments
+    
+    # @property   ##### parchg #####
+    # def electron_interval_for_parchg(self) -> list | None:
+    #     """
+    #     Returns:
+    #         parent's electon interval (list) if parent is ready to pass else None
+    #     """
+        
+    #     electron_interval = self.electron_interval
+    #     charging_family = self.charging_family
+    #     intercalating_ion = self.intercalating_ion
+    #     formula = AnalyzeVASP(self.prev_calc_dir).formula
+        
+    #     for key in charging_family:
+    #         if formula in charging_family[key]:
+    #             dischg_formula = key
+        
+    #     n_intercalating_ion_formula = CompTools(formula).atms[intercalating_ion]
+    #     n_intercalating_ion_dischg_formula = CompTools(dischg_formula).atms[intercalating_ion]
+    #     delta_n_intercalating_ion = n_intercalating_ion_formula - n_intercalating_ion_dischg_formula
+        
+    #     n_interval = n_intercalating_ion_dischg_formula / electron_interval
+    #     electron_interval = []
+    #     # fully discharged state
+    #     if delta_n_intercalating_ion == 0:
+    #         for i in range(n_interval):
+    #             electron_interval.append([i * electron_interval, (i + 1) * electron_interval])
+    #     # fully charged state
+    #     elif n_intercalating_ion_formula == 0:
+    #         for i in range(n_interval):
+    #             electron_interval.append([-i * electron_interval, -(i + 1) * electron_interval])
+    #     # partially charged state
+    #     else:
+    #         for i in range(n_interval):
+    #             electron_interval.append([i * electron_interval + delta_n_intercalating_ion, (i + 1) * electron_interval + delta_n_intercalating_ion])
+    #     return electron_interval
+        
+    # @property   ##### parchg #####
+    # def correct_EF(self) -> float | None:
+    #     """
+    #     Returns:
+    #         the correct Fermi level (float) if parent is ready to pass else None
+    #     """
+        
+    #     tdos = AnalyzeVASP(self.prev_calc_dir).tdos()
+    #     Efermi = 0.0
+        
+    #     n_sites = AnalyzeVASP(self.prev_calc_dir).nsites
+    #     formula = AnalyzeVASP(self.prev_calc_dir).formula
+    #     n_atoms = CompTools(formula).n_atoms
+    #     normalization = n_sites/n_atoms
+        
+    #     energies = tdos["E"]
+    #     populations =  np.array(tdos["total"])/normalization
+    #     occ_energies = []
+    #     occ_populations = []
+        
+    #     for idx, E in enumerate(energies):
+    #         if E == Efermi:
+    #             occ_energies.append(energies[idx])
+    #             occ_populations.append(populations[idx])
+    #         if E < Efermi:
+    #             occ_energies.append(energies[idx])
+    #             occ_populations.append(populations[idx])
+    #     occ_energies = occ_energies[::-1]     
+    #     occ_populations = occ_populations[::-1]
 
+    #     for idx, E in enumerate(occ_populations):
+    #         if occ_populations[idx]:
+    #             new_EF = occ_energies[idx]
+    #             break
+    #     print("new_EF", new_EF, "normalization", normalization)
+    #     return new_EF, normalization
+
+    # @property   ##### parchg #####
+    # def adjust_E_and_normalize_tdos(self) -> dict:
+    #     """
+    #     Returns:
+    #         the correct tdos (dict) if parent is ready to pass else None
+    #     """
+
+    #     # adjust the energies of the tdos to the correct Fermi level 
+    #     tdos = AnalyzeVASP(self.prev_calc_dir).tdos()
+    #     new_EF, normalization = self.correct_EF
+        
+    #     adjust_tdos = {}
+    #     energies = tdos["E"].copy()
+    #     for idx, E in enumerate(energies):
+    #         energies[idx] = E - new_EF
+    #     adjust_tdos["E"] = energies
+    #     for key in tdos:
+    #         if key == "total":
+    #             populations = np.array(tdos[key])
+    #             adjust_tdos[key] = populations/normalization
+
+    #     print("tdos", tdos["E"][0], "adjust_tdos", adjust_tdos["E"][0])
+    #     return adjust_tdos
+        
+    # def energy_interval_for_parchg(self, electron_interval) -> list | None:
+    #     """
+    #     Returns:
+    #         parent's energy interval (list) if parent is ready to pass else None
+    #     """   
+        
+    #     adjust_tdos = self.adjust_E_and_normalize_tdos
+    #     new_EF, normalization = self.correct_EF
+    #     Efermi = 0.0
+        
+    #     # Load the vasprun.xml file
+    #     Efermi_from_vasp = Vasprun(os.path.join(self.prev_calc_dir, "vasprun.xml")).efermi
+    #     print("Efermi_from_vasp", Efermi_from_vasp)
+        
+    #     integrate_to_list = [electron_interval[0], electron_interval[1]]
+    #     print("integrate_to_list", integrate_to_list)
+    #     # for electron_interval_pair in electron_interval:
+    #     # if (electron_interval_pair[0] < 0) or (electron_interval_pair[1] < 0):
+    #     #     integrate_to_list.append(electron_interval_pair[0])
+    #     # else:
+    #     #     integrate_to_list.append(electron_interval_pair[1])
+        
+    #     energies = adjust_tdos["E"]
+    #     populations = adjust_tdos["total"]
+    #     occ_energies = []
+    #     occ_populations = []
+    #     unocc_energies = []
+    #     unocc_populations = []
+
+    #     for idx, E in enumerate(energies):
+    #         if E == Efermi:
+    #             occ_energies.append(energies[idx])
+    #             occ_populations.append(populations[idx])
+    #             unocc_energies.append(energies[idx])
+    #             unocc_populations.append(populations[idx])
+    #         if E < Efermi:
+    #             occ_energies.append(energies[idx])
+    #             occ_populations.append(populations[idx])
+    #         elif E > Efermi:
+    #             unocc_energies.append(energies[idx])
+    #             unocc_populations.append(populations[idx])
+    #     occ_energies = occ_energies[::-1]
+    #     occ_populations = occ_populations[::-1]
+        
+    #     occ_area = integrate.cumulative_trapezoid(occ_populations, occ_energies, initial=0)
+    #     unocc_area = integrate.cumulative_trapezoid(unocc_populations, unocc_energies, initial=0)
+        
+    #     energy_list = []
+    #     for integrate_to in integrate_to_list:
+    #         integrate_to_float = float(integrate_to)
+    #         # occupied states
+    #         if integrate_to_float > 0:
+    #             for i in range(len(occ_area)):
+    #                 if occ_area[i] < -integrate_to_float:
+    #                     energy_list.append(occ_energies[i])
+    #                     break
+    #         # unoccupied states
+    #         elif integrate_to_float < 0:
+    #             for i in range(len(occ_area)):
+    #                 if unocc_area[i] > integrate_to_float:
+    #                     energy_list.append(unocc_energies[i])
+    #                     break
+    #         elif integrate_to_float == 0:
+    #             energy_list.append(0)
+    #     print("energy_list", energy_list)
+    #     print("new_EF", new_EF)
+        
+    #     energy_interval = []
+    #     for idx, E in enumerate(energy_list):
+    #         energy_interval.append(energy_list[idx] + new_EF + Efermi_from_vasp)
+    #         # if E == 0:
+    #         #     energy_interval.append([energies[idx+1] + new_EF])
+    #         # elif energies[idx+1] == 0:
+    #         #     energy_interval.append([E + new_EF])
+    #         # else:
+    #         #     energy_interval.append([E + new_EF, energies[idx+1] + new_EF])
+        
+    #     print("energy_interval", energy_interval)
+    #     return energy_interval
+        
+    # @property   ##### parchg #####
+    # def parchg_based_incar_adjustments(self) -> dict:
+    #     """
+    #     Returns:
+    #         a dictionary of INCAR adjustments based on parchg settings
+    #             EINT
+    #     """    
+        
+    #     # find the electron interval for parchg, assuming that the launch directory is structured as /.../calcs/{formula}/parchg_{initial_electron_interval}_{final_electron_interval}
+    #     launch_dir = self.launch_dir
+    #     id = launch_dir.split('/')[launch_dir.split('/').index("calcs") + 2]
+    #     electron_interval = [id.split("_")[1], id.split("_")[2]]
+        
+    #     energy_interval = self.energy_interval_for_parchg(electron_interval=electron_interval)
+    #     return {"EINT": energy_interval}
+    
     @property
     def nelect_from_neutral_calc_dir(self) -> dict:
         """
@@ -768,8 +1023,8 @@ class Passer(object):
         """
 
         # get bandgap related adjustments if relevant (ISMEAR, SIGMA, KSPACING)
-        bandgap_based_incar_adjustments = self.bandgap_based_incar_adjustments
-
+        bandgap_label, bandgap_based_incar_adjustments = self.bandgap_based_incar_adjustments
+        
         # get new magmom if relevant (MAGMOM)
         magmom_based_incar_adjustments = self.magmom_based_incar_adjustments
 
@@ -784,9 +1039,18 @@ class Passer(object):
             incar_adjustments["ISMEAR"] = -5
 
             # update NBANDS if doing lobster
-            nbands_based_incar_adjustments = self.nbands_based_incar_adjustments
+            nbands_based_incar_adjustments = self.nbands_based_incar_adjustments(multiplier=2)
             incar_adjustments.update(nbands_based_incar_adjustments)
 
+        if curr_calc in ["preg0w0unoccu"]:
+            if bandgap_label != "metal":
+            incar_adjustments["LOPTICS"] = True
+        
+        if curr_calc in ["preg0w0unoccu", "g0w0"]:
+            # update NBANDS if doing lobster
+            nbands_based_incar_adjustments = self.nbands_based_incar_adjustments(multiplier=5)
+            incar_adjustments.update(nbands_based_incar_adjustments)
+        
         if "defect_charged" in curr_xc_calc:
             # update NELECT based on relative charge of defect
             incar_adjustments.update(self.charged_defects_based_incar_adjustments)
@@ -807,6 +1071,8 @@ class Passer(object):
 
         if parchg_out or chgcar_out:
             incar_adjustments["ICHARG"] = 1
+            #parchg_based_incar_adjustments = self.parchg_based_incar_adjustments    ##### parchg #####
+            #incar_adjustments.update(parchg_based_incar_adjustments)    ##### parchg #####
 
         # make sure we don't override user-defined INCAR modifications
         user_incar_mods = self.incar_mods
@@ -889,7 +1155,11 @@ class Passer(object):
             parchg_out=parchg_out,
             chgcar_out=chgcar_out,
         )
-
+         
+        bandgap_label = self.bandgap_based_incar_adjustments[0]
+        if bandgap_label != "metal":
+            g0w0_out = self.setup_g0w0()
+            
         return "completed pass"
 
 

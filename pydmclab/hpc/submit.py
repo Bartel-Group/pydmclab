@@ -217,17 +217,24 @@ class SubmitTools(object):
                 if xc in static_addons:
                     calcs += ["-".join([xc, calc]) for calc in static_addons[xc]]
         if ("hse06" not in relaxation_xcs) and ("hse06" in static_addons):
-            # if we're running hse06 addons but not hse06 relaxations and statics
-            calcs += ["-".join(["hse06", "preggastatic"])]
-            calcs += ["hse06-" + addon for addon in static_addons["hse06"]]
+            if "bs" in static_addons["hse06"]:
+                calcs += ["-".join(["hse06", "preggabs"])]
+            if static_addons["hse06"] != ["bs"]:
+                # if we're running hse06 addons but not hse06 relaxations and statics
+                calcs += ["-".join(["hse06", "preggastatic"])]
+                if ("wannier" in static_addons["hse06"]) or ("g0w0" in static_addons["hse06"]):
+                    calcs += ["-".join(["hse06", "lobster"])]
+                calcs += ["hse06-" + addon for addon in static_addons["hse06"]]
 
         final_calcs = []
         for xc_calc in calcs:
             xc, calc = xc_calc.split("-")
-            if calc in ["lobster", "bs", "parchg"]:
+            if calc in ["lobster", "parchg"]:
                 final_calcs.append("-".join([xc, "prelobster"]))
                 if calc == "parchg":
                     final_calcs.append("-".join([xc, "lobster"]))
+            if calc == "g0w0":
+                final_calcs.append("-".join([xc, "preg0w0unoccu"]))
             final_calcs.append(xc_calc)
 
         ordered_calcs = OrderedDict.fromkeys(final_calcs)
@@ -336,6 +343,8 @@ class SubmitTools(object):
                 return "%s/vasp.5.4.4.pl2" % preamble
             elif version == 6:
                 return "%s/vasp.6.4.1" % preamble
+            elif version == "6_wannier":
+                return "%s/vasp.6.4.1-wannier90" % preamble
             elif version == 7:
                 return "%s/vasp.6.5.1" % preamble
             else:
@@ -421,6 +430,19 @@ class SubmitTools(object):
         chgsum = "%s/bader/chgsum.pl AECCAR0 AECCAR2" % self.bin_dir
         bader = "%s/bader/bader CHGCAR -ref CHGCAR_sum" % self.bin_dir
         return "\n%s\n%s\n" % (chgsum, bader)
+    
+    @property
+    def wannier90_command(self) -> str:
+        """
+        Returns command used to execute wannier90 (str)
+        """
+        configs = self.configs.copy()
+
+        if configs["mpi_command"] == "mpirun":
+            return "\n%s -np %s wannier90.x wannier90\n" % (
+                configs["mpi_command"],
+                str(configs["ntasks"]),
+            )
 
     @property
     def job_name(self) -> str:
@@ -589,6 +611,14 @@ class SubmitTools(object):
                 os.path.join(calc_dir, "PARCHG")
             ):
                 statuses[xc_calc] = "done"
+            if (calc_to_run == "preg0w0unoccu") and os.path.exists(
+                os.path.join(calc_dir, "WAVEDAR")
+            ):
+                statuses[xc_calc] = "done"
+            if (calc_to_run == "wannier") and os.path.exists(
+                os.path.join(calc_dir, "wannier90.wout")
+            ):
+                statuses[xc_calc] = "done"
 
         return statuses
 
@@ -607,6 +637,17 @@ class SubmitTools(object):
             if status in ["done"]:
                 print("  %s is %s\n" % (xc_calc, status))
                 # no work needs to be done for finished or queued calcs
+                
+                ##### 241031
+                xc_to_run, calc_to_run = xc_calc.split("-")	#===== remake lobsterin even if the calc is converged =====#
+                calc_dir = os.path.join(launch_dir, xc_calc)	#===== remake lobsterin even if the calc is converged =====#
+                configs_before_error_handling = configs.copy()  #===== remake lobsterin even if the calc is converged =====#
+                configs_before_error_handling["xc_to_run"] = xc_to_run		#===== remake lobsterin even if the calc is converged =====#
+                configs_before_error_handling["calc_to_run"] = calc_to_run	#===== remake lobsterin even if the calc is converged =====#
+                vsu = VASPSetUp(calc_dir=calc_dir, user_configs=configs_before_error_handling)	#===== remake lobsterin even if the calc is converged =====#
+                vsu.prepare_calc	#===== remake lobsterin even if the calc is converged =====#
+                #####
+                
                 continue
 
             if status in ["queued"]:
@@ -760,6 +801,10 @@ class SubmitTools(object):
                             "impi/intel",
                         ]
                         load = ["mkl/2021/release", "intel/cluster/2021"]
+                        for xc_calc in calc_list:
+                            xc_to_run, calc_to_run = xc_calc.split("-")
+                            if calc_to_run in ["wannier"]:
+                                load.append("wannier/3.1.0")
                         for module in unload:
                             f.write("module unload %s\n" % module)
                         for module in load:
@@ -788,6 +833,10 @@ class SubmitTools(object):
                         if not os.path.exists(os.path.join(calc_dir, "lobsterout")):
                             f.write("\ncd %s\n" % calc_dir)
                             f.write(self.lobster_command)
+                    if calc_to_run in ["static", "lobster"]:                         #===== write Bader commend if ACF.dat not existed =====#
+                        if not os.path.exists(os.path.join(calc_dir, "ACF.dat")):    #===== write Bader commend if ACF.dat not existed =====#
+                            f.write("\ncd %s\n" % calc_dir)                          #===== write Bader commend if ACF.dat not existed =====#
+                            f.write(self.bader_command)                              #===== write Bader commend if ACF.dat not existed =====#      
                     if not self.collection_status(xc_calc):
                         # execute the collector (writes)
                         f.write("\ncd %s\n" % self.scripts_dir)
@@ -839,6 +888,10 @@ class SubmitTools(object):
                 # run bader for all static jobs
                 if calc_to_run in ["static", "lobster"]:
                     f.write(self.bader_command)
+                    
+                # run wannier90 for all wannier jobs
+                if calc_to_run in ["wannier"]:
+                    f.write(self.wannier90_command)
 
                 # execute the collector
                 f.write("\ncd %s\n" % self.scripts_dir)

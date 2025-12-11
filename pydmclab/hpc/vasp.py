@@ -211,7 +211,7 @@ class VASPSetUp(object):
         vaspset.write_input(calc_dir)
 
         # for LOBSTER, use pymatnge io lobseter to get lobsterin
-        if configs["calc_to_run"] in ["lobster", "bs"]:
+        if configs["calc_to_run"] in ["lobster", "preggabs", "bs"]:
 
             poscar = os.path.join(calc_dir, "POSCAR")
             incar = os.path.join(calc_dir, "INCAR")
@@ -227,15 +227,19 @@ class VASPSetUp(object):
                     POTCAR_input=potcar,
                     option="standard",
                 )
-
+                lobsterin_dict = lobsterin.as_dict()
+                
                 # adjust COHPSteps based on how fine of a COHP/DOS user wants
-                # adjust start and end of COHP analysis
-                lobsterin["COHPSteps"] = configs["COHPSteps"]
-                lobsterin["COHPstartEnergy"] = configs["COHPstartEnergy"]
-                lobsterin["COHPendEnergy"] = configs["COHPendEnergy"]
+                lobsterin_dict["COHPSteps"] = configs["COHPSteps"]
+                # lobsterin_dict["COHPstartEnergy"] = configs["COHPstartEnergy"]
+                # lobsterin_dict["COHPendEnergy"] = configs["COHPendEnergy"]
+                for i, basisfunction in enumerate(lobsterin_dict["basisfunctions"]):    #===== change Li basisfunction into 1s 2s =====#
+                    if "Li" in basisfunction:						                    #===== change Li basisfunction into 1s 2s =====#
+                        lobsterin_dict["basisfunctions"][i] = 'Li 1s 2s '
+                lobsterin = Lobsterin.from_dict(lobsterin_dict)
 
             # if getting bandstructure, need Lobsterin to do more work for us
-            elif configs["calc_to_run"] == "bs":
+            elif configs["calc_to_run"] in ["preggabs", "bs"]:
                 lobsterin = Lobsterin
 
                 # get a primitive cell but save the original cell as POSCAR_input
@@ -589,7 +593,7 @@ class VASPSetUp(object):
                 print("electronic relaxation troubles. changing EDIFF")
                 prev_ediff = curr_incar["EDIFF"]
                 incar_changes["EDIFF"] = prev_ediff * 10
-            incar_changes["NELM"] = prev_nelm + 100
+            incar_changes["NELM"] = prev_nelm # + 100
             incar_changes["ALGO"] = "All"
         if "nsw_too_low" in errors:
             # default behavior is to add 100 to NSW
