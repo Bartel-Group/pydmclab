@@ -291,23 +291,38 @@ class AnalyzePhonons(object):
 
         return self._total_dos
 
-    def helmholtz(self, temperatures=np.linspace(0, 2000, 100)):
+    def helmholtz(self, temperatures=np.linspace(0, 2000, 100), 
+                  include_heat_capacity: bool = True, 
+                  move_imaginary: bool = False):
         """
         Helmholtz free energy calculated using ASE's CrystalThermo module.
         Args:
             temperatures (array-like):
                 Array of temperatures in Kelvin at which to calculate the Helmholtz free energy.
+            include_heat_capacity (bool):
+                If True, includes heat capacity in the output.
+            move_imaginary (bool):
+                If True, moves imaginary frequencies to their absolute values.
+                If False, removes imaginary frequencies from the DOS.
+                In order to calculate thermodynamic properties, the phonon DOS must not contain imaginary frequencies, so it will always be cleaned.
         Returns:
             A list of dictionaries where each dictionary corresponds to a specific temperature point.
-            [{'temperature': 300, 
-            'helmholtz_free_energy': float}, ...]
+            [{'T': 300, 
+            'F': float,
+            'S': float,
+            'Cv': float}, ...]
             Units are eV/atom
         """
         phonon_dos = self.total_dos
         phonon_dos['E0'] = self.E0*self.natoms #Convert to eV/supercell for CrystalThermo
-        helmholtz = Helmholtz(phonon_dos=phonon_dos, temperatures=temperatures, normalize=self.natoms) #this will normalize to eV/atom not eV/formula unit
+        helmholtz = Helmholtz(phonon_dos=phonon_dos, temperatures=temperatures, normalize=self.natoms, move_imaginary=move_imaginary) #this will normalize to eV/atom not eV/formula unit
         F = helmholtz.helmholtz()
+        if include_heat_capacity: 
+            Cv = helmholtz.heat_capacity()
+            for i in range(len(F)):
+                F[i]['Cv'] = Cv[i]['Cv']
         return F
+    
 
     def phonopy_thermal_properties(
         self,
@@ -621,6 +636,56 @@ class Helmholtz():
             ]
         }
         return out    
+
+    def heat_capacity(self):
+        """
+        Calculate heat capacity at constant volume from phonon DOS
+        """
+        phonon_dos = self.cleanup_dos(move_imaginary=self.move_imaginary)
+        temperatures = self.temperatures
+        normalize = self.normalize
+        
+        phonon_energies = np.array([
+            phonon_dos["total_dos"][i]["E"] for i in range(len(phonon_dos["total_dos"]))
+        ])
+        dos_values = np.array([
+            phonon_dos["total_dos"][i]["total_dos"] for i in range(len(phonon_dos["total_dos"]))
+        ])
+        
+        kB = physical_constants['Boltzmann constant in eV/K'][0]
+        
+        Cv_list = []
+        for T in temperatures:
+            if T == 0:
+                Cv_list.append(0.0)
+            else:
+                x = phonon_energies / (kB * T)
+                # Avoid overflow for large x
+                x = np.clip(x, -500, 500)
+                exp_x = np.exp(x)
+                
+                # Heat capacity formula: Cv = kB * (x²·exp(x)) / (exp(x)-1)²
+                numerator = x**2 * exp_x
+                denominator = (exp_x - 1)**2
+                
+                # Avoid division by zero
+                mask = denominator > 1e-10
+                integrand = np.zeros_like(x)
+                integrand[mask] = numerator[mask] / denominator[mask]
+                
+                Cv = kB * trapezoid(integrand * dos_values, phonon_energies)
+                
+                if normalize is not None:
+                    Cv = Cv / normalize
+                    
+                Cv_list.append(Cv)
+        
+        return {
+            "data": [
+                {"T": temperatures[i], "Cv": Cv_list[i]} 
+                for i in range(len(temperatures))
+            ]
+        }
 
 class Gibbs():
     def __init__(self, phonon_dos_dict, eos="vinet", temperatures=np.linspace(0, 2000, 100), normalize = None):
