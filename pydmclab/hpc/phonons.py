@@ -319,8 +319,8 @@ class AnalyzePhonons(object):
         F = helmholtz.helmholtz()
         if include_heat_capacity: 
             Cv = helmholtz.heat_capacity()
-            for i in range(len(F)):
-                F[i]['Cv'] = Cv[i]['Cv']
+            for i in range(len(F['data'])):
+                F['data'][i]['Cv'] = Cv['data'][i]['Cv']
         return F
     
 
