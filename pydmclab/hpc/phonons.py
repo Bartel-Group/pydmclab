@@ -404,6 +404,7 @@ class AnalyzePhonons(object):
         include_band_structure = True,
         include_total_dos: bool = True,
         include_helmholtz: bool = True,
+        include_heat_capacity: bool = True,
         phonopy_thermal_properties_kwargs: dict | None = None,
         band_structure_kwargs: dict | None = None
     ):
@@ -464,7 +465,7 @@ class AnalyzePhonons(object):
             data["total_dos"] = total_dos
 
         if include_helmholtz:
-            helmholtz = self.helmholtz()
+            helmholtz = self.helmholtz(include_heat_capacity=include_heat_capacity)
             data["helmholtz"] = helmholtz
 
         data = convert_numpy_to_native(data)  # Convert to JSON serializable format
