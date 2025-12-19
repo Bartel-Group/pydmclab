@@ -207,8 +207,11 @@ class BinaryPD(object):
             savename (_type_, optional): _description_. Defaults to None.
             show (bool, optional): _description_. Defaults to True.
         """
-        stable_params["color"] = color_palette[stable_params["color"]]
-        unstable_params["edgecolor"] = color_palette[unstable_params["edgecolor"]]
+        # Only lookup color names in palette if they're strings
+        if isinstance(stable_params["color"], str):
+            stable_params["color"] = color_palette[stable_params["color"]]
+        if isinstance(unstable_params["edgecolor"], str):
+            unstable_params["edgecolor"] = color_palette[unstable_params["edgecolor"]]
 
         stable_to_plot = self.stable
         unstable_to_plot = self.unstable
@@ -450,8 +453,11 @@ class TernaryPD(object):
         """
         data = self.data
 
-        stable_params["edgecolor"] = color_palette[stable_params["edgecolor"]]
-        unstable_params["edgecolor"] = color_palette[unstable_params["edgecolor"]]
+        # Only lookup color names in palette if they're strings
+        if isinstance(stable_params["edgecolor"], str):
+            stable_params["edgecolor"] = color_palette[stable_params["edgecolor"]]
+        if isinstance(unstable_params["edgecolor"], str):
+            unstable_params["edgecolor"] = color_palette[unstable_params["edgecolor"]]
 
         points_to_plot = self.points_to_plot
         stable_to_plot = [d for d in points_to_plot if d["stability"]]
