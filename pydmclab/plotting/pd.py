@@ -328,6 +328,13 @@ class TernaryPD(object):
             data[formula].update({"a": a, "b": b, "c": c})
             x, y = triangle_to_square((a, b, c))
             data[formula].update({"x": x, "y": y})
+            # derive energy above hull if only decomposition energy is provided
+            if "e_above_hull" not in data[formula]:
+                ed = data[formula].get("Ed")
+                if ed is not None:
+                    data[formula]["e_above_hull"] = max(ed, 0)
+                else:
+                    data[formula]["e_above_hull"] = None
 
         self.data = data
         self.right_end, self.top_end, self.left_end = els_in_end_members
@@ -357,6 +364,11 @@ class TernaryPD(object):
                 }
             )
         return to_plot
+
+    @property
+    def points_lookup(self):
+        """Map formula -> (x, y) for quick annotation."""
+        return {d["formula"]: (d["x"], d["y"]) for d in self.points_to_plot}
 
     @property
     def space(self):
@@ -433,6 +445,11 @@ class TernaryPD(object):
         },
         label_els=True,
         label_compounds=[],
+        formulas_to_label=None,
+        label_kwargs=None,
+        colorbar=True,
+        unstable_cmap=plt.cm.Reds,
+        colorbar_label="Energy Above Hull (eV/atom)",
         legend=True,
         title=None,
         savename=None,
@@ -441,15 +458,20 @@ class TernaryPD(object):
         """_summary_
 
         Args:
-            color_palette (_type_, optional): _description_. Defaults to get_colors("tab10").
-            stable_params (dict, optional): _description_. Defaults to { "color": "white", "edgecolor": "blue", "marker": "o", "s": 50, }.
-            unstable_params (dict, optional): _description_. Defaults to { "color": "white", "edgecolor": "red", "marker": "^", "s": 50, }.
-            label_els (bool, optional): _description_. Defaults to True.
-            label_compounds (list, optional): _description_. Defaults to [].
-            legend (bool, optional): _description_. Defaults to True.
-            title (_type_, optional): _description_. Defaults to None.
-            savename (_type_, optional): _description_. Defaults to None.
-            show (bool, optional): _description_. Defaults to True.
+            color_palette (_type_, optional): Palette lookup. Defaults to get_colors("tab10").
+            stable_params (dict, optional): Scatter kwargs for stable phases. Defaults to {"color": "white", "edgecolor": "blue", "marker": "o", "s": 50}.
+            unstable_params (dict, optional): Scatter kwargs for unstable phases. Defaults to {"color": "white", "edgecolor": "red", "marker": "^", "s": 50}.
+            label_els (bool, optional): Show corner element labels. Defaults to True.
+            label_compounds (list, optional): Deprecated alias for formulas_to_label. Defaults to [].
+            formulas_to_label (list, optional): Formulas to annotate on the diagram. Defaults to None.
+            label_kwargs (dict, optional): Optional text kwargs for annotations. Defaults to None.
+            colorbar (bool, optional): Show colorbar for unstable points if energies available. Defaults to True.
+            unstable_cmap (_type_, optional): Colormap for unstable points. Defaults to plt.cm.Reds.
+            colorbar_label (str, optional): Label for colorbar. Defaults to "Energy Above Hull (eV/atom)".
+            legend (bool, optional): Show legend. Defaults to True.
+            title (_type_, optional): Title. Defaults to None.
+            savename (_type_, optional): Save path. Defaults to None.
+            show (bool, optional): Show figure. Defaults to True.
         """
         data = self.data
 
@@ -471,13 +493,38 @@ class TernaryPD(object):
 
         ax = plt.scatter(x, y, label="stable", **stable_params, zorder=2)
 
-        x, y, labels = [], [], []
+        x, y, labels, e_above = [], [], [], []
         for d in unstable_to_plot:
             x.append(d["x"])
             y.append(d["y"])
             labels.append(d["formula"])
+            # prefer e_above_hull; fallback to decomposition energy
+            e_val = data[d["formula"]].get("e_above_hull")
+            if e_val is None:
+                e_val = max(data[d["formula"]].get("Ed", 0), 0)
+            e_above.append(e_val)
 
-        ax = plt.scatter(x, y, label="unstable", **unstable_params, zorder=1)
+        # If energy-above-hull data exist, use it to color unstable points and add a colorbar
+        if any(v is not None for v in e_above):
+            e_vals = [v if v is not None else 0 for v in e_above]
+            norm = mpl.colors.Normalize(vmin=0, vmax=max(e_vals))
+            ax = plt.scatter(
+                x,
+                y,
+                label="unstable",
+                c=e_vals,
+                cmap=unstable_cmap,
+                norm=norm,
+                **unstable_params,
+                zorder=1,
+            )
+            if colorbar:
+                sm = mpl.cm.ScalarMappable(norm=norm, cmap=unstable_cmap)
+                sm.set_array([])
+                cbar = plt.colorbar(sm, ax=plt.gca(), pad=0.08)
+                cbar.set_label(colorbar_label, rotation=270, labelpad=18)
+        else:
+            ax = plt.scatter(x, y, label="unstable", **unstable_params, zorder=1)
 
         lines_to_plot = self.lines_to_plot
         for l in lines_to_plot:
@@ -516,8 +563,43 @@ class TernaryPD(object):
                 horizontalalignment="right",
             )
 
+        # Optional annotation of specific compounds
+        to_label = formulas_to_label if formulas_to_label is not None else label_compounds
+        if to_label:
+            default_kwargs = {
+                "fontsize": 9,
+                "ha": "center",
+                "va": "bottom",
+                "bbox": {
+                    "boxstyle": "round,pad=0.3",
+                    "facecolor": "white",
+                    "edgecolor": "black",
+                    "alpha": 0.8,
+                },
+                "zorder": 3,
+            }
+            if label_kwargs:
+                default_kwargs.update(label_kwargs)
+
+            points = self.points_lookup
+            for formula in to_label:
+                if formula in points:
+                    x_pt, y_pt = points[formula]
+                    plt.text(x_pt, y_pt, formula, **default_kwargs)
+                else:
+                    print(f"Warning: {formula} not found in phase diagram; skipping label")
+
         if legend:
             ax = plt.legend(loc=legend if isinstance(legend, str) else "best")
+
+        if title:
+            plt.title(title)
+        if savename:
+            plt.savefig(savename, bbox_inches="tight")
+        if show:
+            plt.show()
+
+        return plt.gca()
 
 
 def triangle_to_square(pt):
