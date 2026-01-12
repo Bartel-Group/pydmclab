@@ -352,7 +352,6 @@ class TernaryPD(object):
                     "x": data[formula]["x"],
                     "y": data[formula]["y"],
                     "Ef": data[formula]["Ef"],
-                    "Ed": data[formula]["Ed"],
                     "stability": data[formula]["stability"],
                     "formula": formula,
                 }
@@ -452,7 +451,7 @@ class TernaryPD(object):
             title (_type_, optional): _description_. Defaults to None.
             savename (_type_, optional): _description_. Defaults to None.
             show (bool, optional): _description_. Defaults to True.
-            unstable_colorbar (_type_, optional): Property name to use for colorbar values (e.g., 'e_above_hull'). Defaults to None.
+            unstable_colorbar (_type_, optional): Property name to use for colorbar values (e.g., 'Ed' if want Ed and this is the key provided in stability data dictionary). Defaults to None.
         """
         data = self.data
 
@@ -479,7 +478,8 @@ class TernaryPD(object):
         
         if unstable_colorbar is not None:
             # Extract colorbar values from unstable points
-            c_values = [d.get(unstable_colorbar, 0) for d in unstable_to_plot]
+            formulas = [d["formula"] for d in unstable_to_plot]
+            c_values = [self.data[f][unstable_colorbar] for f in formulas]
             print("Unstable colorbar values:", c_values)
             # Modify unstable_params to use colormap instead of fixed edgecolor
             unstable_params_copy = unstable_params.copy()
