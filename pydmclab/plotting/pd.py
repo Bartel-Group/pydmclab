@@ -1,7 +1,8 @@
 from pydmclab.core.comp import CompTools
 from pydmclab.core.hulls import GetHullInputData, AnalyzeHull, MixingHull
-from pydmclab.plotting.utils import set_rc_params, get_colors
+from pydmclab.plotting.utils import set_rc_params, get_colors, get_label
 from pydmclab.utils.handy import read_json, write_json
+
 
 import os
 import numpy as np
@@ -431,18 +432,8 @@ class TernaryPD(object):
     def ax_pd(
         self,
         color_palette=get_colors("tab10"),
-        stable_params={
-            "color": "white",
-            "edgecolor": "blue",
-            "marker": "o",
-            "s": 50,
-        },
-        unstable_params={
-            "color": "white",
-            "edgecolor": "red",
-            "marker": "^",
-            "s": 50,
-        },
+        stable_params=None,
+        unstable_params=None,
         label_els=True,
         label_compounds=[],
         formulas_to_label=None,
@@ -450,6 +441,9 @@ class TernaryPD(object):
         colorbar=True,
         unstable_cmap=plt.cm.Reds,
         colorbar_label="Energy Above Hull (eV/atom)",
+        colorbar_label_size=12,
+        colorbar_tick_size=10,
+        legend_fontsize=10,
         legend=True,
         title=None,
         savename=None,
@@ -475,10 +469,26 @@ class TernaryPD(object):
         """
         data = self.data
 
+        # Merge user params with defaults
+        stable_defaults = {
+            "color": "white",
+            "edgecolor": "blue",
+            "marker": "o",
+            "s": 90,
+        }
+        unstable_defaults = {
+            "color": "white",
+            "edgecolor": "red",
+            "marker": "^",
+            "s": 110,
+        }
+        stable_params = {**stable_defaults, **(stable_params or {})}
+        unstable_params = {**unstable_defaults, **(unstable_params or {})}
+
         # Only lookup color names in palette if they're strings
-        if isinstance(stable_params["edgecolor"], str):
+        if isinstance(stable_params.get("edgecolor"), str):
             stable_params["edgecolor"] = color_palette[stable_params["edgecolor"]]
-        if isinstance(unstable_params["edgecolor"], str):
+        if isinstance(unstable_params.get("edgecolor"), str):
             unstable_params["edgecolor"] = color_palette[unstable_params["edgecolor"]]
 
         points_to_plot = self.points_to_plot
@@ -508,6 +518,10 @@ class TernaryPD(object):
         if any(v is not None for v in e_above):
             e_vals = [v if v is not None else 0 for v in e_above]
             norm = mpl.colors.Normalize(vmin=0, vmax=max(e_vals))
+            # Avoid passing both 'c' and 'color' which conflicts in matplotlib
+            _unstable_params = dict(unstable_params)
+            if "color" in _unstable_params:
+                _unstable_params.pop("color")
             ax = plt.scatter(
                 x,
                 y,
@@ -515,14 +529,15 @@ class TernaryPD(object):
                 c=e_vals,
                 cmap=unstable_cmap,
                 norm=norm,
-                **unstable_params,
+                **_unstable_params,
                 zorder=1,
             )
             if colorbar:
                 sm = mpl.cm.ScalarMappable(norm=norm, cmap=unstable_cmap)
                 sm.set_array([])
                 cbar = plt.colorbar(sm, ax=plt.gca(), pad=0.08)
-                cbar.set_label(colorbar_label, rotation=270, labelpad=18)
+                cbar.ax.tick_params(labelsize=colorbar_tick_size)
+                cbar.set_label(colorbar_label, rotation=270, labelpad=18, fontsize=colorbar_label_size)
         else:
             ax = plt.scatter(x, y, label="unstable", **unstable_params, zorder=1)
 
@@ -567,7 +582,7 @@ class TernaryPD(object):
         to_label = formulas_to_label if formulas_to_label is not None else label_compounds
         if to_label:
             default_kwargs = {
-                "fontsize": 9,
+                "fontsize": label_fontsize,
                 "ha": "center",
                 "va": "bottom",
                 "bbox": {
@@ -585,12 +600,16 @@ class TernaryPD(object):
             for formula in to_label:
                 if formula in points:
                     x_pt, y_pt = points[formula]
-                    plt.text(x_pt, y_pt, formula, **default_kwargs)
+                    dx, dy = label_offset if label_offset else (0, 0)
+                    plt.text(x_pt + dx, y_pt + dy, get_label(formula), **default_kwargs)
                 else:
                     print(f"Warning: {formula} not found in phase diagram; skipping label")
 
         if legend:
-            ax = plt.legend(loc=legend if isinstance(legend, str) else "best")
+            ax = plt.legend(
+                loc=legend if isinstance(legend, str) else "best",
+                fontsize=legend_fontsize,
+            )
 
         if title:
             plt.title(title)
