@@ -2131,6 +2131,7 @@ def get_slabs(
     min_slab_sizes: list[int] | int = 6,
     vacuum_sizes: list[int] | int = 3,
     force_orthogonal_c: bool = True,
+    ox_states: dict | None = None,
     data_dir: str | os.PathLike = os.getcwd().replace("scripts", "data"),
     savename: str = "slabs.json",
     metadata_savename: str = "slabs_metadata.json",
@@ -2212,7 +2213,7 @@ def get_slabs(
         metadata[cmpd] = {}
         for struc_id in strucs[cmpd]:
             metadata[cmpd][struc_id] = {}
-            st = StrucTools(strucs[cmpd][struc_id])
+            st = StrucTools(strucs[cmpd][struc_id], ox_states=ox_states)
 
             evaluated_miller_indices = set()
 
