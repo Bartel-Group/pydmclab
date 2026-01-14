@@ -773,7 +773,7 @@ def get_qha_strucs(info: dict, dict_type='strucs',
         
         for i in scale:
             scaled_st = st.scale_structure(i)  # Scale the structure
-            new_mpid = f"{mpid}_{i}"
+            new_mpid = f"{mpid}_{np.round(i, 2)}"
             QHA_strucs.setdefault(formula, {})[new_mpid] = scaled_st.as_dict()
 
     # Loop over structures
