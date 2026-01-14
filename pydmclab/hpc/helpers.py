@@ -761,7 +761,7 @@ def get_qha_strucs(info: dict, dict_type='strucs',
     """
 
     fjson = os.path.join(data_dir, savename) if data_dir else None
-    if os.path.exists(fjson) and not remake and fjson:
+    if fjson and os.path.exists(fjson) and not remake:
         return read_json(fjson)
 
     QHA_strucs = {}
