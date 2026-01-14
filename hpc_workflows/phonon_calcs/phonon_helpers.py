@@ -124,7 +124,7 @@ def get_displacements_for_phonons(
     else:
         return out
 
-def estimate_rattle_std(structure: str|dict, fraction: float, include_min_dist_for_mc = True, min_dist_factor = 3.0) -> float:
+def estimate_rattle_std(structure: str|dict, fraction: float, include_min_dist_for_mc = False, min_dist_factor = 3.0) -> float:
     """
     Estimate the rattle standard deviation based on a fraction of the minimum interatomic distance in the structure.
     Note: at the moment just auto detects oxidation states and assigns formal charges. This could be improved in the future.
