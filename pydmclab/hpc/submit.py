@@ -28,9 +28,9 @@ class SubmitTools(object):
         this class will automatically crawl through the VASP output files and figure out
             how to edit that input and submission files to finish the desired calculations
 
-    This class also makes use of pydmclab.hpc.vasp.VASPSetUp to help with the VASP input files 
+    This class also makes use of pydmclab.hpc.vasp.VASPSetUp to help with the VASP input files
 
-    """ 
+    """
 
     def __init__(
         self,
@@ -45,9 +45,9 @@ class SubmitTools(object):
                 directory to launch calculations from (to submit the submission file)
                     assumes initial structure is POSCAR in launch_dir
                         pydmclab.hpc.launch.LaunchTools will put it there
-                within this directory, various VASP calculation directories (calc_dirs) will be created
-                        gga-loose, gga-relax, gga-static, etc
-                            VASP will be run in each of these, but we need to run some sequentially, so we pack them together in one submission script
+                within this directory, various FP and VASP calculation directories (calc_dirs) will be created
+                        fp-relax, gga-relax, gga-static, etc
+                            An FP or VASP will be run in each of these, but we need to run some sequentially, so we pack them together in one submission script
                  eg if <blah blah>/SrZrS3/perovskite/fm is launch_dir
                     then these are calc_dirs <blah blah>/SrZrS3/perovskite/fm/gga-relax, ..../gga-static, ..../metagga-relax, etc
 
@@ -137,6 +137,9 @@ class SubmitTools(object):
         # these are addons to each static calculation (e.g., {'gga': ['lobster', 'bs']})
         self.static_addons = self.configs["static_addons"]
 
+        # True if you want to start all your calcs with a foundation potential (FP) relaxation
+        self.start_with_fp = self.configs["start_with_fp"]
+
         # True if you want to start all your calcs with a loose relaxation
         self.start_with_loose = self.configs["start_with_loose"]
 
@@ -176,26 +179,41 @@ class SubmitTools(object):
 
         calcs = []
 
-        # figure out if we need to run gga before other functionals (in case not explicitly specifeid in relaxation_xcs)
-        if (
-            ("gga" in relaxation_xcs)
-            or ("metagga" in relaxation_xcs)
-            or ("metaggau" in relaxation_xcs)
-            or ("hse06" in relaxation_xcs)
-        ):
-            first_xc = "gga"
-        elif "ggau" in relaxation_xcs:
-            first_xc = "ggau"
-        elif len(relaxation_xcs) == 1:
-            first_xc = relaxation_xcs[0]
+        # figure out if we need to run a fp or gga before other functionals
+        if self.start_with_fp:
+            # start from a gga-trained fp if running gga or ggau
+            # otherwise, start from a metagga-trained fp
+            first_xc = (
+                "fpgga"
+                if any(xc in relaxation_xcs for xc in ["gga", "ggau"])
+                else "fpmetagga"
+            )
+        else:
+            # if not starting from a fp, in most cases, start from gga
+            if any(
+                xc in relaxation_xcs for xc in ["gga", "metagga", "metaggau", "hse06"]
+            ):
+                first_xc = "gga"
+            elif "ggau" in relaxation_xcs:
+                first_xc = "ggau"
+            elif len(relaxation_xcs) == 1:
+                first_xc = relaxation_xcs[0]
 
-        # if starting with a loose, make sure very first calc is loose
-        if self.start_with_loose:
+        # figure out what chain of calcs needs to be run with the first_xc
+        if self.start_with_fp:
+            # if starting with a fp, only run relax calc
+            first_xc_calcs = ["relax"]
+        elif self.start_with_loose:
+            # if starting with a loose, make sure very first calc is loose
             first_xc_calcs = ["loose", "relax", "static"]
         else:
             first_xc_calcs = ["relax", "static"]
 
         calcs += ["-".join([first_xc, calc]) for calc in first_xc_calcs]
+
+        # run gga-static on metagga-trained fp relaxed structure to provide wavecar to pass to metagga DFT calc
+        if first_xc == "fpmetagga":
+            calcs += ["-".join(["gga", "static"])]
 
         # if we preappended some functional to get us started, make sure we don't duplicate
         if first_xc not in relaxation_xcs:
@@ -320,6 +338,25 @@ class SubmitTools(object):
             raise NotImplementedError('dont have bin path for machine "%s"' % machine)
 
     @property
+    def fp_dir(self) -> str:
+        """
+        Returns directory (str) containing foundation potential model files
+        """
+        configs = self.configs.copy()
+        machine = configs["machine"]
+        version = configs["fp_version"]
+        if machine == "msi":
+            preamble = f"{self.bin_dir}/fp"
+            if version == "tnet":
+                return f"{preamble}/TensorNet"
+            elif version == "chgnet":
+                return f"{preamble}/CHGNet"
+            else:
+                raise NotImplementedError(f"FP {version} not supported on MSI")
+        else:
+            raise NotImplementedError(f"don't have FP path for machine {machine}")
+
+    @property
     def vasp_dir(self) -> str:
         """
         Returns directory (str) containing vasp executable
@@ -408,9 +445,6 @@ class SubmitTools(object):
         Returns command used to execute lobster (str)
         """
         lobster_path = self.lobster_dir
-        # lobster_path = os.path.join(
-        #     self.bin_dir, "lobster", "lobster-4.1.0", "lobster-4.1.0"
-        # )
         return "\n%s\n" % lobster_path
 
     @property
@@ -865,9 +899,6 @@ class SubmitTools(object):
             return
 
         configs = self.configs.copy()
-        # shouldn't need to check this since it gets checked in statuses
-        # if self.is_job_in_queue:
-        #     return
 
         scripts_dir = self.scripts_dir
         launch_dir = self.launch_dir
