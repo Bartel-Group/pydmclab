@@ -43,6 +43,33 @@ flexible_convergence_criteria: False # if True, reduce EDIFF or EDIFFG if conver
 relax_static_energy_diff_tol: 0.1 # eV/atom difference between relax and static that will force static to be re-executed
 
 
+###################### FP_CONFIGS ############################
+###### these are settings that pertain to a single FP execution ######
+
+# algorithm for cell position relaxation
+optimizer: "FIRE"
+
+# whether to relax the lattice cell
+relax_cell: True
+
+# conversion factor from GPa to eV/A^3
+stress_weight: 0.00624150912 # 1 / 160.21766208
+
+# force criteria and number of steps to attempt to reach the criteria during relaxation
+fmax: 0.03
+steps: 500
+
+# interval to track and file save name for trajectory
+interval: 1
+traj_file: "traj.pkl"
+
+# ASE cell filter used to control cell relaxation and parameters to pass to it
+cell_filter: "Frechet"
+params_cell_filter: # None,
+
+# kwargs that can be passed to the optimizer
+fp_kwargs: # None, 
+
 ###################### SUB_CONFIGS ############################
 ###### these are settings that pertain to a chain of VASP executions ######
 
@@ -56,6 +83,7 @@ run_static_addons_before_all_relaxes: False # if False, prioritize relaxes finis
 
 # the calc_list gets determined based on relaxation_xcs and static_addons. if you want to do something different than defaults, set custom_calc_list
 custom_calc_list: # eg ['gga-static', 'metagga-static'] would only run those two calcs
+start_with_fp: True # if True, add foundation potential relaxation as very first calc in the list to calculate
 start_with_loose: False # if True, add gga-loose or ggau-loose as your very first calc in the list to calculate
 fresh_restart: # if you want to start certain calcs over set them in a list here. eg ['metaggau-lobster', 'metagga-bs']
 
