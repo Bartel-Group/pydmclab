@@ -1,6 +1,5 @@
 import os
 import numpy as np
-import multiprocessing as multip
 import json
 
 from pymatgen.io.vasp.outputs import Vasprun, Outcar, Eigenval, Oszicar
