@@ -1,22 +1,13 @@
+import sys
 import os
 
 import matgl
-from matgl.ext.ase import Relaxer
 
 from pymatgen.io.vasp import Poscar
 
+from pydmclab.hpc.fp import FPRelaxer
 from pydmclab.core.struc import StrucTools
-from pydmclab.utils.handy import read_json, write_json
-
-# thought for later
-#   could write in such a way that after every interval (e.g., each step if interval is 1)
-#   the structure is written to a CONTCAR and can be copied back to POSCAR if fmax was not reached;
-#   the convergence criteria would need to be checked
-
-# another thought for later
-#   also consider implementing the option to define convergence as reaching fmax
-#   or reaching the max number of steps (in case the FP gets stuck)
-#   along with this, convergence should be reading a message in the output file
+from pydmclab.utils.handy import read_json
 
 
 def main():
@@ -24,12 +15,16 @@ def main():
     # where this calculation, its inputs, and outputs live
     calc_dir = os.path.dirname(os.path.abspath(__file__))
 
-    # NEED TO ADD IN SOME ERROR MESSAGING IF SETTINGS JSON MISSING OR EMPTY
+    # setup output and error file streams
+    sys.stdout = open(os.path.join(calc_dir, "relax.o"), "w", buffering=1)
+    sys.stderr = open(os.path.join(calc_dir, "relax.e"), "w", buffering=1)
+
+    if not os.path.exists(os.path.join(calc_dir, "fp_settings.sjon")):
+        raise FileNotFoundError("fp_settings.json file is missing")
 
     # load in foundation potential (fp) settings
+    print("Loading in fp settings...\n")
     fp_settings = read_json("fp_settings.json")
-
-    # NEED TO ADD IN SOME ERROR MESSAGING IF SETTINGS ARE MESSED UP
 
     # directory where fp files live
     fp_model_dir = fp_settings["fp_model_dir"]
@@ -46,21 +41,26 @@ def main():
     fp_kwargs = fp_settings["fp_kwargs"]
 
     # load fp
+    print("Loading FP model...\n")
     pot = matgl.load_model(fp_model_dir)
 
     # initialize relaxer
-    relaxer = Relaxer(
+    print("Initializing the relaxer...\n")
+    relaxer = FPRelaxer(
         potential=pot,
+        calc_dir=calc_dir,
         optimizer=optimizer,
         relax_cell=relax_cell,
         stress_weight=stress_weight,
     )
 
     # load structure from POSCAR
+    print("Reading the POSCAR...\n")
     fpos = os.path.join(calc_dir, "POSCAR")
     struc = StrucTools(fpos).structure
 
     # relax structure
+    print("Starting relaxation...\n")
     relax_results = relaxer.relax(
         atoms=struc,
         fmax=fmax,
@@ -72,21 +72,25 @@ def main():
         **(fp_kwargs or {}),
     )
 
-    # save trajectory
+    # check for convergence
+    print("Relaxation done...\n")
     obs = relax_results["trajectory"]
-    obs_data = {
-        "energies": obs.energies,
-        "forces": obs.forces,
-        "stresses": obs.stresses,
-        "atom_positions": obs.atom_positions,
-        "cell": obs.cells,
-        "atomic_numbers": obs.atoms.get_atomic_numbers(),
-    }
-    obs_data = write_json(obs_data, "traj.json")
+    final_fmax = obs["fmaxs"][-1]
+    if final_fmax > fmax:
+        print(f"Final fmax = {final_fmax:.5f} eV/Å > target fmax = {fmax:.5f} eV/Å")
+        print("Further relaxation needed")
+        print("\t- Check that the relaxation is making progress towards convergence.")
+        print("\t- Consider increasing the number of relaxation steps.")
+    else:
+        print(f"{len(obs["energies"])} trajectory steps recorded")
+        print(
+            f"{obs["energies"][-1] - obs["energies"][0]:.5f} eV overall change in energy"
+        )
+        print("FP relaxation converged!!!")
 
-    # write CONTCAR
-    final_struc = relax_results["final_structure"]
-    Poscar(final_struc).write_file("CONTCAR")
+    # ensure CONTCAR is the final structure
+    final_structure = relax_results["final_structure"]
+    Poscar(final_structure).write_file(os.path.join(calc_dir, "CONTCAR"))
 
     return
 
