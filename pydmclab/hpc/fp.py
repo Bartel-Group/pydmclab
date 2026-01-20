@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Literal
 import os
 import collections
 import warnings
-from math import sqrt
+import numpy as np
 
 from matgl.ext.ase import Relaxer
 
@@ -157,14 +157,14 @@ class FPRelaxer(Relaxer):
         if params_asecellfilter is None:
             params_asecellfilter = {}
 
-        obs = FPObserver(atoms=atoms, traj_file=traj_file, calc_dir=self.calc_dir)
-
         if self.relax_cell:
             atoms = (
                 FrechetCellFilter(atoms, **params_asecellfilter)
                 if ase_cellfilter == "Frechet"
                 else ExpCellFilter(atoms, **params_asecellfilter)
             )
+
+        obs = FPObserver(atoms=atoms, traj_file=traj_file, calc_dir=self.calc_dir)
 
         optimizer = self.optimizer(atoms, **kwargs)
         optimizer.attach(obs, interval=interval)
@@ -255,15 +255,19 @@ class FPObserver(collections.abc.Sequence):
     def __call__(self) -> None:
         """The logic for saving the properties of an Atoms during the relaxation."""
         atoms = self.atoms
-        self.energies.append(float(self.atoms.get_potential_energy()))
-        self.forces.append(convert_numpy_to_native(self.atoms.get_forces()))
-        self.stresses.append(convert_numpy_to_native(self.atoms.get_stress()))
-        self.fmaxs.append(
-            sqrt((self.atoms.get_forces() ** 2).sum(axis=1).max())
-        )  # this isn't matching the output fmax, NEED TO FIX
+
         if isinstance(atoms, (FrechetCellFilter, ExpCellFilter)):
-            atoms = atoms.atoms
-        st = StrucTools(self.ase_adaptor.get_structure(atoms))
+            underlying_atoms = atoms.atoms
+        else:
+            underlying_atoms = atoms
+
+        self.energies.append(float(underlying_atoms.get_potential_energy()))
+        self.forces.append(convert_numpy_to_native(underlying_atoms.get_forces()))
+        self.stresses.append(convert_numpy_to_native(underlying_atoms.get_stress()))
+        self.fmaxs.append(
+            float(np.linalg.norm(self.atoms.get_forces().reshape(-1, 3), axis=1).max())
+        )
+        st = StrucTools(self.ase_adaptor.get_structure(underlying_atoms))
         self.structures.append(convert_numpy_to_native(st.structure_as_dict))
 
         Poscar(st.structure).write_file(os.path.join(self.calc_dir, "CONTCAR"))
