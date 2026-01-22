@@ -72,6 +72,10 @@ def main():
         **(fp_kwargs or {}),
     )
 
+    # ensure CONTCAR is the final structure
+    final_structure = relax_results["final_structure"]
+    Poscar(final_structure).write_file(os.path.join(calc_dir, "CONTCAR"))
+
     # check for convergence
     print("Relaxation done...\n")
     obs = relax_results["trajectory"]
@@ -87,10 +91,6 @@ def main():
             f"{obs["energies"][-1] - obs["energies"][0]:.5f} eV overall change in energy"
         )
         print("FP relaxation converged!!!")
-
-    # ensure CONTCAR is the final structure
-    final_structure = relax_results["final_structure"]
-    Poscar(final_structure).write_file(os.path.join(calc_dir, "CONTCAR"))
 
     return
 
