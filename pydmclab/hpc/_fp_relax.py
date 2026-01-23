@@ -19,7 +19,7 @@ def main():
     sys.stdout = open(os.path.join(calc_dir, "relax.o"), "w", buffering=1)
     sys.stderr = open(os.path.join(calc_dir, "relax.e"), "w", buffering=1)
 
-    if not os.path.exists(os.path.join(calc_dir, "fp_settings.sjon")):
+    if not os.path.exists(os.path.join(calc_dir, "fp_settings.json")):
         raise FileNotFoundError("fp_settings.json file is missing")
 
     # load in foundation potential (fp) settings
