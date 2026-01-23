@@ -145,7 +145,7 @@ FP_CONFIGS = get_fp_configs(
     fmax=0.03,
     steps=500,
     interval=1,
-    cell_filter="Frechet"
+    cell_filter="Frechet",
     params_cell_filter=None,
 )
 
