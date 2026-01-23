@@ -47,7 +47,7 @@ relax_static_energy_diff_tol: 0.1 # eV/atom difference between relax and static 
 ###### these are settings that pertain to a single FP execution ######
 
 # algorithm for cell position relaxation
-optimizer: "FIRE"
+optimizer: FIRE
 
 # whether to relax the lattice cell
 relax_cell: True
@@ -61,10 +61,10 @@ steps: 500
 
 # interval to track and file save name for trajectory
 interval: 1
-traj_file: "traj.pkl"
+traj_file: traj.pkl
 
 # ASE cell filter used to control cell relaxation and parameters to pass to it
-cell_filter: "Frechet"
+cell_filter: Frechet
 params_cell_filter: # None,
 
 # kwargs that can be passed to the optimizer
@@ -86,6 +86,9 @@ custom_calc_list: # eg ['gga-static', 'metagga-static'] would only run those two
 start_with_fp: True # if True, add foundation potential relaxation as very first calc in the list to calculate
 start_with_loose: False # if True, add gga-loose or ggau-loose as your very first calc in the list to calculate
 fresh_restart: # if you want to start certain calcs over set them in a list here. eg ['metaggau-lobster', 'metagga-bs']
+
+# what FP model to run
+fp_version: tnet
 
 # what kind of VASP to use
 vasp: vasp_std # use vasp_gam for "loose" calcs (havent implemented yet)
