@@ -11,6 +11,7 @@ import traceback
 from pymatgen.io.vasp.inputs import Incar, Poscar, Kpoints
 from pymatgen.io.vasp.sets import get_structure_from_prev_run
 
+from pydmclab.hpc.fp import AnalyzeFP
 from pydmclab.hpc.analyze import AnalyzeVASP, VASPOutputs
 from pydmclab.core.struc import StrucTools
 
@@ -90,28 +91,43 @@ class Passer(object):
         curr_xc_calc = self.xc_calc
         struc_src_for_hse = self.struc_src_for_hse
         curr_xc, curr_calc = curr_xc_calc.split("-")
+
         if curr_calc == "loose":
             # just setting some dummy thing b/c nothing should come before loose
             prev_xc_calc = curr_xc_calc.replace(curr_calc, "pre_loose")
             return prev_xc_calc
 
         if curr_calc == "relax":
-            # for gga/gga+u, inherit from loose if it exists, otherwise don't inherit
+            if curr_xc in ["fpgga", "fpmetagga"]:
+                # just setting some dummy thing b/c nothing should come before fp-relax
+                prev_xc_calc = curr_xc_calc.replace(curr_xc, "pre_fp")
+            # for gga/gga+u, inherit from fpgga-relax if it exists,
+            # otherwise inherit from loose if it exists (otherwise loose is a dummy prev_xc_calc)
             if curr_xc in ["gga", "ggau"]:
-                prev_xc_calc = curr_xc_calc.replace(curr_calc, "loose")
-            # for metagga/hse, inherit from gga
+                if "fpgga-relax" in calc_list:
+                    prev_xc_calc = curr_xc_calc.replace(curr_xc, "fpgga")
+                else:
+                    prev_xc_calc = curr_xc_calc.replace(curr_calc, "loose")
+            # for metagga/hse
             else:
-                prev_xc_calc = curr_xc_calc.replace(curr_xc, "gga")
+                prev_xc_calc = "gga-static"
             return prev_xc_calc
 
         if curr_calc == "static":
-            # static calcs inherit from relax
-
             if curr_xc == "hse06":
                 # for hse06-static, inherit from relax if it exists, otherwise inherit from preggastatic
                 if "hse06-relax" not in calc_list:
                     return curr_xc_calc.replace(curr_calc, "preggastatic")
-            prev_xc_calc = curr_xc_calc.replace(curr_calc, "relax")
+            # gga-static should inherit from fpmetagga-relax if it exists and gga-relax not in calc_list
+            if (
+                curr_xc == "gga"
+                and "fpmetagga-relax" in calc_list
+                and "gga-relax" not in calc_list
+            ):
+                prev_xc_calc = "fpmetagga-relax"
+            # otherwise, static calcs inherit from their same xc-relax
+            else:
+                prev_xc_calc = curr_xc_calc.replace(curr_calc, "relax")
             return prev_xc_calc
 
         if "defect_neutral" in curr_calc:
@@ -236,6 +252,11 @@ class Passer(object):
         if prev_calc == "parchg":
             if os.path.exists(os.path.join(prev_calc_dir, "PARCHG")):
                 return True
+
+        prev_xc = self.prev_xc
+        if prev_xc in ["fpgga", "fpmetagga"]:
+            return AnalyzeFP(prev_calc_dir).is_converged
+
         return AnalyzeVASP(prev_calc_dir).is_converged
 
     @property
@@ -877,18 +898,24 @@ class Passer(object):
         kill_job = self.write_to_job_killer
         if kill_job:
             return "killed job"
-        poscar_out = self.update_poscar
-        prelobster_out = self.setup_prelobster
-        parchg_out = self.setup_parchg
-        wavecar_out = self.copy_wavecar
-        chgcar_out = self.copy_chgcar
-        lobster_kpts_out = self.pass_kpoints_for_lobster
-        incar_out = self.update_incar(
-            wavecar_out=wavecar_out,
-            prelobster_out=prelobster_out,
-            parchg_out=parchg_out,
-            chgcar_out=chgcar_out,
-        )
+        if self.curr_xc in ["fpgga", "fpmetagga"] or self.prev_xc in [
+            "fpgga",
+            "fpmetagga",
+        ]:
+            poscar_out = self.update_poscar
+        else:
+            poscar_out = self.update_poscar
+            prelobster_out = self.setup_prelobster
+            parchg_out = self.setup_parchg
+            wavecar_out = self.copy_wavecar
+            chgcar_out = self.copy_chgcar
+            lobster_kpts_out = self.pass_kpoints_for_lobster
+            incar_out = self.update_incar(
+                wavecar_out=wavecar_out,
+                prelobster_out=prelobster_out,
+                parchg_out=parchg_out,
+                chgcar_out=chgcar_out,
+            )
 
         return "completed pass"
 
