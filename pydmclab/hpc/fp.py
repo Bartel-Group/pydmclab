@@ -2,6 +2,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Literal
 
 import os
+import importlib.resources
+import shutil
 import collections
 import warnings
 import numpy as np
@@ -31,7 +33,9 @@ class FPSetUp(object):
     Use to write inputs for a single FP calculation
     """
 
-    def __init__(self, calc_dir: str, user_configs: dict | None = None) -> None:
+    def __init__(
+        self, calc_dir: str, fp_model_dir: str, user_configs: dict | None = None
+    ) -> None:
         """
         Args:
             calc_dir (str):
@@ -42,34 +46,82 @@ class FPSetUp(object):
                     these will override any default configs
                     see pydmclab.data.data._hpc_configs for defaults that can be changed
         """
-
+        # proper handling for default arg that could be dict
         if user_configs is None:
             user_configs = {}
 
+        # this is where we will run the FP
         self.calc_dir = calc_dir
 
+        # where our FP model lives
+        self.fp_model_dir = fp_model_dir
+
+        # check POSCAR is present, something went wrong if it is not
         fpos = os.path.join(calc_dir, "POSCAR")
         if not os.path.exists(fpos):
             raise FileNotFoundError(f"POSCAR not found in {calc_dir}")
-        else:
-            structure = Structure.from_file(fpos)
-            self.structure = structure
 
-        self.default_configs = load_base_configs()
-
-        self.user_configs = user_configs
-
-    # Don't think need a configs method
-    # Need method to prepare the calc dir
-    # Need method to check if a calc dir is clean
-    # Possibly need some type of error correction?
+        # load in configs
+        _default_configs = load_base_configs()
+        self.configs = {**_default_configs, **user_configs}
 
     @property
     def prepare_calc(self) -> None:
         """
-        Write input files (settings and template...)
+        Write input files (fp_settings.json, fp_relax.py)
         """
-        pass
+        # get our configs dict
+        configs = self.configs.copy()
+
+        # where the FP is going to be run
+        calc_dir = self.calc_dir
+
+        # write fp_settings.json
+        fp_keys = [
+            "optimizer",
+            "relax_cell",
+            "fmax",
+            "steps",
+            "interval",
+            "cell_filter",
+            "params_cell_filter",
+            "fp_kwargs",
+        ]
+        fp_settings = {key: configs[key] for key in fp_keys}
+        fp_settings["fp_model_dir"] = self.fp_model_dir
+        write_json(fp_settings, os.path.join(calc_dir, "fp_settings.json"))
+
+        # copy _fp_relax.py from pydmclab.hpc to fp_relax.py in calc_dir
+        pydmclab_hpc = "pydmclab.hpc"
+        fp_relax_template = "_fp_relax.py"
+        source_file = importlib.resources.files(pydmclab_hpc).joinpath(
+            fp_relax_template
+        )
+        shutil.copy(source_file, os.path.join(calc_dir, "fp_relax.py"))
+
+
+class AnalyzeFP(object):
+    """
+    Analyze the results of one FP calculation
+    """
+
+    def __init__(self, calc_dir):
+        self.calc_dir = calc_dir
+        self.calc = os.path.split(calc_dir)[-1].split("-")[1]
+
+    @property
+    def is_converged(self):
+        """
+        Returns True if the FP calculation is converged, else False
+        """
+        calc_dir = self.calc_dir
+        frelax = os.path.join(calc_dir, "relax.o")
+        if os.path.exists(frelax):
+            with open(frelax, "r", encoding="utf-8") as f:
+                contents = f.read()
+                return "FP relaxation converged!!!" in contents
+        else:
+            return False
 
 
 class FPRelaxer(Relaxer):
