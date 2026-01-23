@@ -156,7 +156,7 @@ def get_fp_configs(
         relax_cell (bool):
             if True, relax the lattice cell (i.e., ISIF = 3)
             if False, don't relax the lattice cell (i.e., ISIF = 2)
-        stress weight (float):
+        stress_weight (float):
             conversion factor from GPa to eV/A^3
         fmax (float):
             force tolerance for relaxation convergence
@@ -165,7 +165,7 @@ def get_fp_configs(
         interval (int):
             step interval for saving the trajectory
         cell_filter (str):
-            options are "Frechet" or "Exp
+            options are "Frechet" or "Exp"
             ASE cell filter used to control cell relaxation
         params_cell_filter (dict or None):
             parameters to pass to cell filter to control cell relaxation
