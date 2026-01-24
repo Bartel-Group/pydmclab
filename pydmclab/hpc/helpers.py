@@ -7,6 +7,7 @@ import subprocess
 from pydmclab.hpc.launch import LaunchTools
 from pydmclab.hpc.submit import SubmitTools
 from pydmclab.hpc.analyze import AnalyzeVASP, AnalyzeBatch
+from pydmclab.hpc.fp import AnalyzeFPBatch
 from pydmclab.core.comp import CompTools
 from pydmclab.core.query import MPQuery, MPLegacyQuery
 from pydmclab.core.struc import StrucTools
@@ -1179,6 +1180,67 @@ def submit_calcs(
         submit_one_calc(curr_submit_args)
 
     return
+
+
+def get_fp_results(
+    launch_dirs,
+    data_dir=os.getcwd().replace("scripts", "data"),
+    savename="fp_results.json",
+    remake=False,
+):
+    """
+    Args:
+        launch_dirs (dict)
+            {launch_dir (str) :
+                {'magmom' : [list of magmoms for the structure in that launch_dir (list)],
+                 'ID_specific_vasp_configs' : {<formula_indicator>_<struc_indicator> : {desired configs for this entry}}}
+        data_dir (str)
+            directory to save fjson
+        savename (str)
+            filename for fjson in data_dir
+        remake (bool)
+            write (True) or just read (False) fjson
+    Returns:
+        {formula--ID--mag--xc-calc (str) :
+            {scraped results from FP calculation}}
+    """
+
+    fjson = os.path.join(data_dir, savename)
+    if os.path.exists(fjson) and not remake:
+        return read_json(fjson)
+
+    analyzer = AnalyzeFPBatch(launch_dirs)
+
+    data = analyzer.results
+
+    write_json(data, fjson)
+    return read_json(fjson)
+
+
+def check_fp_results(fp_results):
+    keys_to_check = list(fp_results.keys())
+
+    converged_fp_gga = 0
+    total_fp_gga = 0
+    converged_fp_metagga = 0
+    total_fp_metagga = 0
+    for key in keys_to_check:
+        _, _, _, xc_calc = key.split("--")
+        xc, _ = xc_calc.split("-")
+        convergence = fp_results[key]["convergence"]
+        if xc == "fpgga":
+            if convergence:
+                converged_fp_gga += 1
+            total_fp_gga += 1
+        elif xc == "fpmetagga":
+            if convergence:
+                converged_fp_metagga += 1
+            total_fp_metagga += 1
+
+    print(f"\n\n SUMMARY: {converged_fp_gga}/{total_fp_gga} fp-gga calcs converged")
+    print(
+        f"\n\n SUMMARY: {converged_fp_metagga}/{total_fp_metagga} fp-metagga calcs converged"
+    )
 
 
 def get_results(
