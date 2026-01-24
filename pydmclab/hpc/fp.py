@@ -191,6 +191,7 @@ class AnalyzeFPBatch(object):
 
         return result
 
+    @property
     def results(self) -> dict:
         """
         Returns:
