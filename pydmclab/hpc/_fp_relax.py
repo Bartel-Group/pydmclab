@@ -86,9 +86,9 @@ def main():
         print("\t- Check that the relaxation is making progress towards convergence.")
         print("\t- Consider increasing the number of relaxation steps.")
     else:
-        print(f"{len(obs["energies"])} trajectory steps recorded")
+        print(f"{len(obs['energies'])} trajectory steps recorded")
         print(
-            f"{obs["energies"][-1] - obs["energies"][0]:.5f} eV overall change in energy"
+            f"{obs['energies'][-1] - obs['energies'][0]:.5f} eV overall change in energy"
         )
         print("FP relaxation converged!!!")
 
