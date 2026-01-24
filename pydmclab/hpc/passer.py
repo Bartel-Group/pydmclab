@@ -101,6 +101,7 @@ class Passer(object):
             if curr_xc in ["fpgga", "fpmetagga"]:
                 # just setting some dummy thing b/c nothing should come before fp-relax
                 prev_xc_calc = curr_xc_calc.replace(curr_xc, "pre_fp")
+                return prev_xc_calc
             # for gga/gga+u, inherit from fpgga-relax if it exists,
             # otherwise inherit from loose if it exists (otherwise loose is a dummy prev_xc_calc)
             if curr_xc in ["gga", "ggau"]:
