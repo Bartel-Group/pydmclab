@@ -387,7 +387,7 @@ class GetSet(object):
             new_settings[k] = v
 
         # delete KSPACING b/c pymatgen wants to check this at some point when writing INCAR and None causes problems
-        if new_settings["KSPACING"] is None:
+        if "KSPACING" in new_settings and new_settings["KSPACING"] is None:
             del new_settings["KSPACING"]
 
         return new_settings.copy()
