@@ -12,6 +12,8 @@ from pydmclab.hpc.helpers import (
     get_launch_dirs,
     check_launch_dirs,
     submit_calcs,
+    get_fp_results,
+    check_fp_results,
     get_results,
     check_results,
     get_gs,
@@ -261,7 +263,11 @@ def main():
     remake_subs = True
     ready_to_launch = True
 
-    # remake compiled results? print results summary?
+    # remake compiled FP results? print FP results summary?
+    remake_fp_results = True
+    print_fp_results_check = True
+
+    # remake compiled VASP results? print VASP results summary?
     remake_results = True
     print_results_check = True
 
@@ -359,7 +365,15 @@ def main():
             n_procs=CONFIGS["n_procs_for_submission"],
         )
 
-    # analyze calculations
+    # analyze FP calculations
+    #  collect results of completed FP calcs (from traj.json files in each calc_dir)
+    fp_results = get_fp_results(
+        launch_dirs=launch_dirs, data_dir=DATA_DIR, remake=remake_fp_results
+    )
+    if print_fp_results_check:
+        check_fp_results(fp_results)
+
+    # analyze VASP calculations
     #  see if they're done
     #  compile their results
     #  note: a lot of the analysis happens within each submission script, so this should be fast
