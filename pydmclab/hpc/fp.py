@@ -80,6 +80,7 @@ class FPSetUp(object):
         fp_keys = [
             "optimizer",
             "relax_cell",
+            "stress_weight",
             "fmax",
             "steps",
             "interval",
