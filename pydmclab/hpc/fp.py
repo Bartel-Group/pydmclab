@@ -124,6 +124,92 @@ class AnalyzeFP(object):
             return False
 
 
+class AnalyzeFPBatch(object):
+    def __init__(self, launch_dirs: dict) -> None:
+        """
+        Args:
+            launch_dirs (dict):
+                {launch directory: {'magmom': ..., 'ID_specific_vasp_configs': ...}}
+        """
+        self.launch_dirs = launch_dirs
+
+    @property
+    def calc_dirs(self) -> list[str]:
+        """
+        Returns:
+            a list of all calculation directories to crawl through and collect FP output info
+        """
+        launch_dirs = self.launch_dirs
+        all_calc_dirs = []
+        for launch_dir in launch_dirs:
+            stuff_in_launch_dir = os.listdir(launch_dir)
+            relevant_stuff = [
+                c
+                for c in stuff_in_launch_dir
+                if "-" in c
+                if any(fp_xc in c for fp_xc in ["fpgga", "fpmetagga"])
+            ]
+            calc_dirs = [os.path.join(launch_dir, c) for c in relevant_stuff]
+            calc_dirs = [
+                c for c in calc_dirs if os.path.exists(os.path.join(c, "POSCAR"))
+            ]
+            all_calc_dirs += calc_dirs
+        return sorted(list(set(all_calc_dirs)))
+
+    def _key_for_calc_dir(self, calc_dir: str) -> str:
+        """
+        Args:
+            calc_dir (str): path to a calculation directory where a FP was executed
+
+        Returns:
+            a string that can be used as a key for a dictionary
+        """
+        return "--".join(calc_dir.split("/")[-4:])
+
+    def _results_for_calc_dir(self, calc_dir: str) -> dict:
+        """
+        Args:
+            calc_dir (str): path to a calculation directory where a FP was executed
+
+        Returns:
+            a dictionary of results for that calculation directory
+                - current format defaults to the "traj.json" format from FPObserver
+        """
+        # only collect results for converged FP calculations
+        is_converged = AnalyzeFP(calc_dir).is_converged
+        if not is_converged:
+            return {"convergence": False, "metadata": None, "trajectory": None}
+
+        # if the calculation completed, "fp_settings.json" and "traj.json" files should exist
+        meta = read_json(os.path.join(calc_dir, "fp_settings.json"))
+        traj = read_json(os.path.join(calc_dir, "traj.json"))
+
+        # compile results
+        fp_model = "-".join(meta["fp_model_dir"].split("/")[-2:])
+        meta["fp_model"] = fp_model
+        result = {"convergence": True, "metadata": meta, "trajectory": traj}
+
+        return result
+
+    def results(self) -> dict:
+        """
+        Returns:
+            {calc_dir key: results for that calc_dir}
+        """
+
+        # get the FP calc dirs
+        calc_dirs = self.calc_dirs
+
+        # collect the data
+        out = {}
+        for calc_dir in calc_dirs:
+            calc_key = self._key_for_calc_dir(calc_dir)
+            calc_results = self._results_for_calc_dir(calc_dir)
+            out[calc_key] = calc_results
+
+        return out
+
+
 class FPRelaxer(Relaxer):
     """
     Custom relaxer building on top of matgl relaxer
