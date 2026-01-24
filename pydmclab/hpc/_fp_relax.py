@@ -66,7 +66,7 @@ def main():
         fmax=fmax,
         steps=steps,
         interval=interval,
-        traj_file=None,
+        traj_file="traj.json",
         ase_cellfilter=cell_filter,
         params_asecellfilter=params_cell_filter,
         **(fp_kwargs or {}),
