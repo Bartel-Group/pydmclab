@@ -179,7 +179,7 @@ class AnalyzeFPBatch(object):
         # only collect results for converged FP calculations
         is_converged = AnalyzeFP(calc_dir).is_converged
         if not is_converged:
-            return {"convergence": False, "metadata": None, "trajectory": None}
+            return {"convergence": False, "meta": None, "trajectory": None}
 
         # if the calculation completed, "fp_settings.json" and "traj.json" files should exist
         meta = read_json(os.path.join(calc_dir, "fp_settings.json"))
@@ -188,7 +188,7 @@ class AnalyzeFPBatch(object):
         # compile results
         fp_model = "-".join(meta["fp_model_dir"].split("/")[-2:])
         meta["fp_model"] = fp_model
-        result = {"convergence": True, "metadata": meta, "trajectory": traj}
+        result = {"convergence": True, "meta": meta, "trajectory": traj}
 
         return result
 
