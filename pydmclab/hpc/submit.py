@@ -338,22 +338,20 @@ class SubmitTools(object):
         else:
             raise NotImplementedError('dont have bin path for machine "%s"' % machine)
 
-    @property
-    def fp_dir(self) -> str:
+    def fp_dir(self, xc_calc: str) -> str:
         """
         Returns directory (str) containing foundation potential model files
         """
         configs = self.configs.copy()
         machine = configs["machine"]
         version = configs["fp_version"]
-        calc_list = self.calc_list
-        if "fpgga-relax" in calc_list:
+        if xc_calc == "fpgga-relax":
             pbe_or_r2scan = "pbe"
-        elif "fpmetagga-relax" in calc_list:
+        elif xc_calc == "fpmetagga-relax":
             pbe_or_r2scan = "r2scan"
         else:
             raise RuntimeError(
-                "something went wrong, fp_dir was asked for but no recognized fp calc in calc list"
+                "something went wrong, fp_dir was asked for but the fp xc_calc was not recognized"
             )
         if machine == "msi":
             preamble = f"{self.bin_dir}/fp"
@@ -664,7 +662,7 @@ class SubmitTools(object):
 
             # handle setting up FP directories
             if xc_to_run in ["fpgga", "fpmetagga"]:
-                fp_model_dir = self.fp_dir
+                fp_model_dir = self.fp_dir(xc_calc)
                 fsu = FPSetUp(
                     calc_dir=calc_dir,
                     fp_model_dir=fp_model_dir,
