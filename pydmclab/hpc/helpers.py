@@ -1237,10 +1237,12 @@ def check_fp_results(fp_results):
                 converged_fp_metagga += 1
             total_fp_metagga += 1
 
-    print(f"\n\n SUMMARY: {converged_fp_gga}/{total_fp_gga} fp-gga calcs converged")
+    print("\n\n-------- FP calcs --------")
+    print(f"\n SUMMARY: {converged_fp_gga}/{total_fp_gga} fp-gga calcs converged")
     print(
-        f"\n\n SUMMARY: {converged_fp_metagga}/{total_fp_metagga} fp-metagga calcs converged"
+        f"\n SUMMARY: {converged_fp_metagga}/{total_fp_metagga} fp-metagga calcs converged\n"
     )
+    print("\n--------------------------\n\n")
 
 
 def get_results(
