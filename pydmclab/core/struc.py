@@ -2174,19 +2174,133 @@ class HomoInterfaceBuilder:
 
         return slabs
 
+    def _substitute_elements_by_atom_number(
+        self,
+        structure: Structure,
+        target_element: str,
+        target_atom_count: int,
+    ) -> Structure:
+        """
+        Substitute elements to achieve a specific number of film atoms.
+        
+        Determines the c-coordinate threshold needed to get the desired number
+        of film atoms, then substitutes atoms above that threshold.
+        
+        Args:
+            structure: Structure to modify
+            target_element: Film element to count (e.g., 'La' for LaAlO3)
+            target_atom_count: Number of film atoms desired
+            
+        Returns:
+            Structure with substituted elements
+            
+        Raises:
+            ValueError: If target_element is not in film composition
+            ValueError: If target_atom_count exceeds available substrate atoms
+        """
+        element_mapping = self.film_to_sub_element_mapping
+        
+        # Get the substrate element that maps to the target film element
+        substrate_element = None
+        for sub_el, film_el in element_mapping.items():
+            if film_el == target_element:
+                substrate_element = sub_el
+                break
+        
+        if substrate_element is None:
+            raise ValueError(
+                f"Target element '{target_element}' not found in film composition. "
+                f"Available film elements: {list(element_mapping.values())}"
+            )
+        
+        # Get all sites of the substrate element, sorted by c-coordinate (descending)
+        substrate_sites = []
+        for i, site in enumerate(structure):
+            if site.specie.symbol == substrate_element:
+                substrate_sites.append((i, site.frac_coords[2]))
+        
+        substrate_sites.sort(key=lambda x: x[1], reverse=True)
+        
+        # Validate target_atom_count
+        total_substrate_atoms = len(substrate_sites)
+        if target_atom_count > total_substrate_atoms:
+            raise ValueError(
+                f"Target atom count ({target_atom_count}) exceeds total number of "
+                f"'{substrate_element}' atoms in supercell ({total_substrate_atoms})"
+            )
+        
+        if target_atom_count <= 0:
+            raise ValueError(
+                f"Target atom count must be positive, got {target_atom_count}"
+            )
+        
+        # Find the c-coordinate threshold
+        # We want to replace the top target_atom_count atoms
+        # The threshold is just below the c-coordinate of the target_atom_count-th atom
+        if target_atom_count == total_substrate_atoms:
+            # Replace all atoms
+            threshold = 0.0
+        else:
+            # Get the c-coordinate of the atom at position target_atom_count (0-indexed)
+            threshold = substrate_sites[target_atom_count - 1][1]
+        
+        # Now substitute all atoms with c >= threshold
+        return self._substitute_elements_by_fraction(structure, threshold)
+
     def build_bulklike_interface_by_atom_number(
             self, 
-            non_gaseous_atom_count: int,
+            target_element: str,
+            target_atom_count: int,
             layers: int,
             orthogonalize: bool = True,
     ) -> Structure:
-
+        """
+        Build a bulklike interface by specifying the number of film atoms.
         
+        Instead of specifying a fractional threshold, this method allows you to specify
+        exactly how many atoms of a particular film element you want in the interface.
+        The method determines the appropriate c-coordinate threshold to achieve this count.
+        
+        Example:
+            For SrTiO3/LaAlO3 interface with Sr->La mapping:
+            - Specify target_element='La' and target_atom_count=10
+            - The method will find where to cut the supercell to get exactly 10 La atoms
+            - All atoms above that threshold will be replaced with film atoms
+        
+        Args:
+            target_element: Film element to count (e.g., 'La' for LaAlO3)
+            target_atom_count: Number of film atoms desired for the target element
+            layers: Number of layers in the interface
+            orthogonalize: Whether to orthogonalize the c-axis
+            
+        Returns:
+            Interface structure with elements substituted
+            
+        Raises:
+            ValueError: If vacuum is set to True
+            ValueError: If compositions are incompatible
+            ValueError: If target_element is not in film composition
+            ValueError: If target_atom_count exceeds available atoms or is non-positive
+        """
+        if self.vacuum:
+            raise ValueError("Vacuum must be set False to build bulklike interface")
+        
+        # Validate that compositions are compatible
+        self._validate_composition_compatibility()
+        
+        # Create supercell in c-direction
+        interface_template = self._create_supercell(layers)
 
-
-
-
-        return 
+        # Orthogonalize if requested
+        if orthogonalize:
+            interface_template = self._orthogonalize_lattice(interface_template)
+    
+        # Build the interface by replacing atoms to achieve target atom count
+        return self._substitute_elements_by_atom_number(
+            interface_template, 
+            target_element, 
+            target_atom_count
+        ) 
 
 
 
@@ -2529,6 +2643,18 @@ class HomoInterfaceTools:
     ) -> Structure:
         """Build a bulklike interface. See HomoInterfaceBuilder for details."""
         return self.builder.build_bulklike_interface_by_fraction(layers, sub_fraction, orthogonalize)
+    
+    def build_bulklike_interface_by_atom_number(
+            self,
+            target_element: str,
+            target_atom_count: int,
+            layers: int,
+            orthogonalize: bool = True,
+    ) -> Structure:
+        """Build a bulklike interface by atom count. See HomoInterfaceBuilder for details."""
+        return self.builder.build_bulklike_interface_by_atom_number(
+            target_element, target_atom_count, layers, orthogonalize
+        )
     
     def build_slablike_interface_by_fraction(
             self,
