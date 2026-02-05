@@ -18,6 +18,18 @@ class IsoAlloy:
     A class to model and analyze binary isomorphic alloy systems using the regular
     solution model (Ideal entropy of mixing + enthalpic interaction parameter).
 
+    For consistency, all energies must be normalized per mixing site
+
+    Example:
+        For Sn_{x}Ti_{1-x}O_2 (mixing only on the cation sublattice):
+            - There is only 1 mixing site per formula unit
+            - Mixing energies should then be passed in eV/f.u. (i.e., per mixing site in the SQS structure)
+        
+        For some (A_{x}B_{1-x})_2O_3 compound:
+            - Each formula unit has 2 mixing sites (2 cation sites per formula unit)
+            - Mixing energies should be passed in eV/f.u. AND set n_mixing_sites = 2 when initializing the IsoAlloy object
+
+
     Attributes:
         energies (Dict[float, float]): Dictionary of mixing energies (in eV) for different compositions.
         kB (float): Boltzmann constant in eV/K.
@@ -27,7 +39,7 @@ class IsoAlloy:
         omega (float): Interaction parameter (in eV) calculated from the mixing energies.
     """
 
-    def __init__(self, energies: Dict[float, float], kB: float = 8.6173e-5, 
+    def __init__(self, energies: Dict[float, float], kB: float = 8.6173e-5, n_mixing_sites: int = 1,
                  xs: np.ndarray = np.linspace(0.00001, 0.99999, 10000), 
                  Ts: np.ndarray = np.linspace(100, 3000, 1000)):
         """
@@ -43,6 +55,7 @@ class IsoAlloy:
         self.kB = kB
         self.xs = xs
         self.Ts = Ts
+        self.n_mixing_sites = n_mixing_sites
         self.discrete_x = sorted(list(energies.keys()))
         self.omega = self._calculate_omega()
 
@@ -62,6 +75,19 @@ class IsoAlloy:
         popt, _ = curve_fit(free_energy_model, x, y)
         return popt[0]
 
+    def _entropy_mix(self, x: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
+        """
+        Calculate the ideal mixing entropy per formula unit
+
+        Args:
+            x (Union[float, np.ndarray]): Composition or array of compositions.
+
+        Returns:
+            Union[float, np.ndarray]: Ideal mixing entropy in eV/K per formula unit.
+        """
+
+        return -self.n_mixing_sites * self.kB * (x * np.log(x) + (1 - x) * np.log(1 - x))
+
     def deltaG_mix(self, x: Union[float, np.ndarray], T: float) -> Union[float, np.ndarray]:
         """
         Calculate the Gibbs free energy of mixing.
@@ -73,7 +99,10 @@ class IsoAlloy:
         Returns:
             Union[float, np.ndarray]: Gibbs free energy of mixing.
         """
-        return self.kB * T * (x * np.log(x) + (1 - x) * np.log(1 - x)) + self.omega * x * (1 - x)
+
+        H_mix = self.omega * x * (1 - x)
+        S_mix = self._entropy_mix(x)
+        return H_mix - T * S_mix
 
     def find_tangent_touch_points(self, x: np.ndarray, y: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """
