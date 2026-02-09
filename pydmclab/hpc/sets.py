@@ -442,13 +442,13 @@ class GetSet(object):
             )
         elif "line_density" in new_settings:
             return Kpoints.automatic_density_by_lengths(
-                structure=self.structure, length_densities=new_settings["line_density"], force_gamma=new_settings["force_gamma"] if "force_gamma" in new_settings
+                structure=self.structure, length_densities=new_settings["line_density"], force_gamma=new_settings["force_gamma"] if "force_gamma" in new_settings else False
                 )
         elif "slab_line_density" in new_settings:
             line_densities = new_settings["slab_line_density"]
             line_densities = [line_densities[0], line_densities[1], self.structure.lattice.c] # set k-point density along c direction to 1 for slabs (computed as N/c = 1 --> N = c)
             return Kpoints.automatic_density_by_lengths(
-                structure=self.structure, length_densities=line_densities, force_gamma=new_settings["force_gamma"] if "force_gamma" in new_settings
+                structure=self.structure, length_densities=line_densities, force_gamma=new_settings["force_gamma"] if "force_gamma" in new_settings else False
             )
 
     @property
