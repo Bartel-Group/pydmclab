@@ -66,7 +66,6 @@ def main():
 
             struc_results = "placeholder"
 
-            struc_results["final_structure"] = struc_results["final_structure"].as_dict()
             struc_results["trajectory"] = struc_results["trajectory"].as_dict()
             struc_results = convert_numpy_to_native(struc_results)
             current_relax_results.update({name: struc_results})
