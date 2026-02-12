@@ -68,6 +68,7 @@ class AnalyzePhonons(object):
                  force_data: np.ndarray|list = None, 
                  supercell_matrix: list = None,
                  primitive_matrix: list = None,
+                 symprec=1e-5,
                  mesh: int|list|float=[30, 30, 30],
                  dataset: dict = None,
                  E0: float = 0
@@ -122,6 +123,7 @@ class AnalyzePhonons(object):
         self.supercell_matrix = supercell_matrix
         self.primitive_matrix = primitive_matrix
         self.dataset = dataset
+        self.symprec = symprec
         self.E0 = E0
 
         self._band_structure = None
@@ -132,12 +134,12 @@ class AnalyzePhonons(object):
                 "Mesh should be a list of three integers or an int."
             )
 
-        pymatgen_struc = StrucTools(unitcell).structure
+        self.pymatgen_struc = StrucTools(unitcell).structure
         self.natoms = pymatgen_struc.num_sites
 
         unitcell = get_phonopy_structure(pymatgen_struc) #PhonopyAtoms structure object
 
-        phonon = Phonopy(unitcell, supercell_matrix, primitive_matrix) #And also need to make sure I have this for finite displacement the way it was originally done when generating the displacements
+        phonon = Phonopy(unitcell, supercell_matrix, primitive_matrix, symprec=symprec) #And also need to make sure I have this for finite displacement the way it was originally done when generating the displacements
         self.unitcell = unitcell
 
         phonon.dataset = dataset
@@ -213,26 +215,47 @@ class AnalyzePhonons(object):
             parsed_data.append(data_point)
 
         return parsed_data
+    
+    @property
+    def find_high_symmetry_path(self):
+        import seekpath
+        structure = self.pymatgen_struc
+        structure_tuple = (
+            structure.lattice.matrix,
+            structure.frac_coords,
+            structure.atomic_numbers
+        )
+        path_data = seekpath.get_path(structure_tuple)
+        path = path_data['path']
+        gamma_indices = [i for i, segment in enumerate(path) if 'GAMMA' in segment]
+        gamma_to_gamma = path[gamma_indices[0]:gamma_indices[1]+1]
+        out = {p: [path_data['point_coords'][p[0]], path_data['point_coords'][p[1]]] for p in gamma_to_gamma}
+        return out
 
     def band_structure(
         self,
-        paths: list =[
-            [[0.0, 0.0, 0.0], [0.5, 0.5, 0.0]],  # Γ to X
-            [[0.5, 0.5, 1.0], [0, 0, 0]],  # X to K to Γ
-            [[0.0, 0.0, 0.0], [0.5, 0.5, 0.5]],  # Γ to L
-        ],
+        paths: list|None = None,
         Nq: int = 100
     ):
         """
         Returns the band structure for the phonon object in a dictionary
         Args:
             paths (list):
-                List of paths in reciprocal space. e.g. [[[0.0, 0.0, 0.0], [0.5, 0.0, 0.0]], [[0.5, 0.0, 0.0], [0.5, 0.5, 0.5]], ...]
+                List of paths in reciprocal space. e.g.: 
+                            [
+                                [[0.0, 0.0, 0.0], [0.5, 0.5, 0.0]],  # Γ to X 
+                                [[0.5, 0.5, 1.0], [0, 0, 0]],  # X to K to Γ
+                                [[0.0, 0.0, 0.0], [0.5, 0.5, 0.5]],  # Γ to L
+                            ] (these coordinates/high symmetry points vary structure to structure)
 
         Returns:
             {'qpoints': arrays of q points, 'distances': arrays of distances, 'frequencies': arrays of frequencies, 'eigenvectors': arrays of eigenvectors, group_velocities': arrays of group velocities}
         """
-        # FCC q-point paths
+
+        if paths==None:
+            path_data = self.find_high_symmetry_path
+            paths = [path_data[key] for key in path_data]
+        
         def get_band(q_start, q_stop, N):
             """ Return path between q_start and q_stop """
             return np.array([q_start + (q_stop-q_start)*i/(N-1) for i in range(N)])
@@ -252,6 +275,8 @@ class AnalyzePhonons(object):
             _ = self.phonon.run_band_structure(bands)
             self._band_structure_paths = bands        
             self._band_structure = self.phonon.get_band_structure_dict()
+            if path_data:
+                self._band_structure['high_symm_points'] = list(path_data.keys())
 
             h = physical_constants['Planck constant in eV/Hz'][0]
             # hbar = h / (2 * np.pi)
