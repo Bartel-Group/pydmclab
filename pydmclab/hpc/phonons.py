@@ -66,9 +66,9 @@ class AnalyzePhonons(object):
                     - Or the supercell matrix and unitcell match the ones used to generate the dataset.
                     I almost think this should be removed as an argument to avoid confusion, and just require the user to provide the supercell as the unitcell if they are using a dataset.
             primitive_matrix (list):
-                Transformation matrix from the unitcell to the primitive cell. e.g. [[0.5, 0.5, 0], [0, 0.5, 0.5], [0.5, 0, 0.5]] for a 2x2x2 supercell.
+                Transformation matrix from the unitcell to the primitive cell. e.g. [[0.5, 0, 0], [0, 0.5, 0], [0, 0, 1]] for a 2x2x1 supercell.
                 Probably don't feed both supercell_matrix and primitive_matrix if you are using a supercell as the unitcell, just use primitive_matrix.
-                It's nice to feed primitive matrix so that the band structure can be plotted in the primitive cell Brillouin zone. Check and make sure whether thermal properties are given as per unit cell or per primitive cell if you are using a primitive matrix.
+                It's nice to feed primitive matrix so that the band structure can be plotted in the primitive cell Brillouin zone. Phonopy DOS and band structure are given for primitive cell if you are using a primitive matrix.
             mesh (array-like or float):
                 Mesh numbers along a, b, c axes when array_like object is given, shape=(3,).
                 When float value is given, uniform mesh is generated following VASP convention by N = max(1, nint(l * |a|^*)) where 'nint' is the function to return the nearest integer. In this case, it is forced to set is_gamma_center=True.
@@ -109,21 +109,21 @@ class AnalyzePhonons(object):
 
         self.pymatgen_struc = StrucTools(unitcell).structure
         pymatgen_struc = self.pymatgen_struc
-        self.natoms = pymatgen_struc.num_sites
+        self.natoms = pymatgen_struc.num_sites 
+        natoms_unitcell = self.natoms 
 
         unitcell = get_phonopy_structure(pymatgen_struc) #PhonopyAtoms structure object
 
         phonon = Phonopy(unitcell, supercell_matrix, primitive_matrix, symprec=symprec) #And also need to make sure I have this for finite displacement the way it was originally done when generating the displacements
         self.unitcell = unitcell
-
+        if primitive_matrix is not None:
+            self.natoms = len(phonon.primitive) #natoms in primitive cell. results reported from phonopy are corresponding to number of atoms in the primitive if you give a primitive transformation matrix
+            self.natoms_unitcell = natoms_unitcell #natoms in unitcell provided (probably a supercell)
         phonon.dataset = dataset
-
 
         if force_data is not None:
             arr = np.array(force_data)
-            natoms = pymatgen_struc.num_sites
-
-            if arr.ndim == 3 and arr.shape[1:] == (natoms, 3):
+            if arr.ndim == 3 and arr.shape[1:] == (natoms_unitcell, 3):
                 # Looks like forces from displacements
                 print(f"Detected forces from {arr.shape[0]} displacement calculations")
                 self.forces = arr
@@ -133,7 +133,7 @@ class AnalyzePhonons(object):
                 phonon.produce_force_constants()
                 self.force_constants = phonon.force_constants
 
-            elif arr.shape == (natoms, natoms, 3, 3):
+            elif arr.shape == (natoms_unitcell, natoms_unitcell, 3, 3):
                 # Looks like force constants
                 print(f"Detected force constants in full form")
                 phonon.force_constants = arr
@@ -142,9 +142,9 @@ class AnalyzePhonons(object):
                 raise ValueError(
                     f"Unrecognized force_data shape: {arr.shape}\n"
                     f"Expected one of:\n"
-                    f"  - Forces: (N_displacements, {natoms}, 3)\n"
-                    f"  - Force constants: ({natoms}, {natoms}, 3, 3)\n"
-                    f"\nBased on supercell with {natoms} atoms"
+                    f"  - Forces: (N_displacements, {natoms_unitcell}, 3)\n"
+                    f"  - Force constants: ({natoms_unitcell}, {natoms_unitcell}, 3, 3)\n"
+                    f"\nBased on supercell with {natoms_unitcell} atoms"
                 )
 
             self.dynamical_matrix = phonon.dynamical_matrix # This is just a phonopy.dynamical_matrix.DynamicalMatrix object. Need it to run mesh.
@@ -159,36 +159,6 @@ class AnalyzePhonons(object):
         """
         mesh_dict = self.phonon.get_mesh_dict()
         return mesh_dict
-
-    def parse_thermal_properties(self, phonopy_data: dict):
-        """
-        Parses the thermal properties data from the phonopy object into a list of dictionaries
-        Args:
-            phonopy_data (dict):
-                Thermal properties data obtained from the phonopy object self.phonon.get_thermal_properties_dict()
-
-        Returns:
-            A list of dictionaries where each dictionary corresponds to a specific temperature point.
-            e.g. [{'temperature': 300, 'free_energy': float, 'entropy': float, 'heat_capacity': float},
-                {'temperature': 310, 'free_energy': float, 'entropy': float, 'heat_capacity': float}, ...]
-        """
-        parsed_data = []
-
-        temperatures = phonopy_data["temperatures"]
-        free_energies = phonopy_data["free_energy"]
-        entropies = phonopy_data["entropy"]
-        heat_capacities = phonopy_data["heat_capacity"]
-
-        for i, T in enumerate(temperatures):
-            data_point = {
-                "temperature": T,
-                "free_energy": free_energies[i],
-                "entropy": entropies[i],
-                "heat_capacity": heat_capacities[i],
-            }
-            parsed_data.append(data_point)
-
-        return parsed_data
     
     @property
     def find_high_symmetry_path(self):
@@ -325,14 +295,44 @@ class AnalyzePhonons(object):
         """
         phonon_dos = self.total_dos
         phonon_dos['E0'] = self.E0*self.natoms #Convert to eV/supercell for CrystalThermo
-        helmholtz = Helmholtz(phonon_dos=phonon_dos, temperatures=temperatures, normalize=self.natoms, move_imaginary=move_imaginary) #this will normalize to eV/atom not eV/formula unit
+        normalize=self.natoms
+        helmholtz = Helmholtz(phonon_dos=phonon_dos, temperatures=temperatures, normalize=normalize, move_imaginary=move_imaginary) #this will normalize to eV/atom not eV/formula unit
         F = helmholtz.helmholtz()
         if include_heat_capacity: 
             Cv = helmholtz.heat_capacity()
             for i in range(len(F['data'])):
                 F['data'][i]['Cv'] = Cv['data'][i]['Cv']
         return F
-    
+
+    def parse_thermal_properties(self, phonopy_data: dict):
+        """
+        Parses the thermal properties data from the phonopy object into a list of dictionaries
+        Args:
+            phonopy_data (dict):
+                Thermal properties data obtained from the phonopy object self.phonon.get_thermal_properties_dict()
+
+        Returns:
+            A list of dictionaries where each dictionary corresponds to a specific temperature point.
+            e.g. [{'temperature': 300, 'free_energy': float, 'entropy': float, 'heat_capacity': float},
+                {'temperature': 310, 'free_energy': float, 'entropy': float, 'heat_capacity': float}, ...]
+        """
+        parsed_data = []
+
+        temperatures = phonopy_data["temperatures"]
+        free_energies = phonopy_data["free_energy"]
+        entropies = phonopy_data["entropy"]
+        heat_capacities = phonopy_data["heat_capacity"]
+
+        for i, T in enumerate(temperatures):
+            data_point = {
+                "temperature": T,
+                "free_energy": free_energies[i],
+                "entropy": entropies[i],
+                "heat_capacity": heat_capacities[i],
+            }
+            parsed_data.append(data_point)
+
+        return parsed_data
 
     def phonopy_thermal_properties(
         self,
