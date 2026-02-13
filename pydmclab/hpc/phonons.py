@@ -135,6 +135,7 @@ class AnalyzePhonons(object):
             )
 
         self.pymatgen_struc = StrucTools(unitcell).structure
+        pymatgen_struc = self.pymatgen_struc
         self.natoms = pymatgen_struc.num_sites
 
         unitcell = get_phonopy_structure(pymatgen_struc) #PhonopyAtoms structure object
@@ -218,6 +219,14 @@ class AnalyzePhonons(object):
     
     @property
     def find_high_symmetry_path(self):
+        '''
+        Find the high symmetry qpoints and corresponding coordinates for the given structure using seekpath.
+        Returns:
+                {
+                ('Γ', 'X'): [[0.0, 0.0, 0.0], [0.5, 0.0, 0.0]],
+                ('X', 'S'): [[0.5, 0.0, 0.0], [0.5, 0.5, 0.0]], ...
+                }
+        '''
         import seekpath
         structure = self.pymatgen_struc
         structure_tuple = (
@@ -229,7 +238,9 @@ class AnalyzePhonons(object):
         path = path_data['path']
         gamma_indices = [i for i, segment in enumerate(path) if 'GAMMA' in segment]
         gamma_to_gamma = path[gamma_indices[0]:gamma_indices[1]+1]
-        out = {p: [path_data['point_coords'][p[0]], path_data['point_coords'][p[1]]] for p in gamma_to_gamma}
+        out = {tuple(point.replace('GAMMA', 'Γ') for point in p): 
+            [path_data['point_coords'][p[0]], path_data['point_coords'][p[1]]] 
+            for p in gamma_to_gamma}
         return out
 
     def band_structure(
@@ -276,7 +287,7 @@ class AnalyzePhonons(object):
             self._band_structure_paths = bands        
             self._band_structure = self.phonon.get_band_structure_dict()
             if path_data:
-                self._band_structure['high_symm_points'] = list(path_data.keys())
+                self._band_structure['path'] = list(path_data.keys())
 
             h = physical_constants['Planck constant in eV/Hz'][0]
             # hbar = h / (2 * np.pi)
