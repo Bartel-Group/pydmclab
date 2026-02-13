@@ -628,3 +628,30 @@ def get_fcp_uncertainty(ideal_supercell, rattled_structures, force_sets,
         }
 
     return final_fcp, cs, out
+
+def get_force_constants_dfpt(calc_dir: str, savename: str = "force_constants.json", remake: bool = False):
+    '''
+    workflow for getting force constants from a dfpt calculation
+    '''
+    fjson = os.path.join(calc_dir, savename)
+    if os.path.exists(fjson) and not remake:
+        return read_json(fjson)
+    
+    force_constants_path = os.path.join(calc_dir, "vasprun.xml")
+    if not os.path.exists(force_constants_path):
+        print(f"Warning: vasprun.xml file not found in {calc_dir}. Returning None.")
+        return None
+    
+    force_constants_dict = parse_force_constants(force_constants_path)
+    if not force_constants_dict:
+        print("Warning: Failed to parse force constants. Returning None.")
+        return None
+    
+    force_constants = force_constants_dict[0]
+    atoms = force_constants_dict[1]
+    out = {"force_constants": force_constants, "calc_method": "dfpt", "atoms": atoms}
+
+    out = convert_numpy_to_native(out)  # Make sure the output is JSON serializable
+    write_json(out, fjson)
+
+    return read_json(fjson)

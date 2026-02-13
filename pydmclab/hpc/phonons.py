@@ -35,33 +35,6 @@ from ase.thermochemistry import CrystalThermo
 set_rc_params()
 COLORS = get_colors(palette="tab10")
 
-def get_force_constants_dfpt(calc_dir: str, savename: str = "force_constants.json", remake: bool = False):
-    '''
-    workflow for getting force constants from a dfpt calculation
-    '''
-    fjson = os.path.join(calc_dir, savename)
-    if os.path.exists(fjson) and not remake:
-        return read_json(fjson)
-    
-    force_constants_path = os.path.join(calc_dir, "vasprun.xml")
-    if not os.path.exists(force_constants_path):
-        print(f"Warning: vasprun.xml file not found in {calc_dir}. Returning None.")
-        return None
-    
-    force_constants_dict = parse_force_constants(force_constants_path)
-    if not force_constants_dict:
-        print("Warning: Failed to parse force constants. Returning None.")
-        return None
-    
-    force_constants = force_constants_dict[0]
-    atoms = force_constants_dict[1]
-    out = {"force_constants": force_constants, "calc_method": "dfpt", "atoms": atoms}
-
-    out = convert_numpy_to_native(out)  # Make sure the output is JSON serializable
-    write_json(out, fjson)
-
-    return read_json(fjson)
-
 
 class AnalyzePhonons(object):
     def __init__(self, unitcell: str|dict,
@@ -251,7 +224,8 @@ class AnalyzePhonons(object):
         """
         Returns the band structure for the phonon object in a dictionary
         Args:
-            paths (list):
+            paths (list or None):
+                If None is provided, a path will automatically be found using seekpath
                 List of paths in reciprocal space. e.g.: 
                             [
                                 [[0.0, 0.0, 0.0], [0.5, 0.5, 0.0]],  # Γ to X 
@@ -457,6 +431,7 @@ class AnalyzePhonons(object):
                 Include thermal properties in the output. Default is True.
             include_band_structure (bool, optional):
                 Include band structure in the output. Default is True.
+                Remember, if want to set a custom path - need to give band_structure_kwargs
             include_total_dos (bool, optional):         
                 Include total density of states in the output. Default is True.
             thermal_properties_kwargs (dict, optional): 
