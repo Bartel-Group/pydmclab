@@ -133,8 +133,11 @@ class Passer(object):
 
         if "defect_neutral" in curr_calc:
             if curr_xc in ["gga", "ggau"]:
-                # setting dummy reference b/c nothing should come before gga-defect_neutral
-                prev_xc_calc = curr_xc_calc.replace(curr_calc, "pre_defect_neutral")
+                if "fpgga-relax" in calc_list:
+                    prev_xc_calc = "fpgga-relax"
+                else:
+                    # setting dummy reference b/c nothing should come before gga-defect_neutral
+                    prev_xc_calc = curr_xc_calc.replace(curr_calc, "pre_defect_neutral")
             else:
                 # for metagga or otherwise, inherit from neutral gga
                 prev_xc_calc = curr_xc_calc.replace(curr_xc, "gga")
