@@ -138,6 +138,12 @@ class Passer(object):
                 else:
                     # setting dummy reference b/c nothing should come before gga-defect_neutral
                     prev_xc_calc = curr_xc_calc.replace(curr_calc, "pre_defect_neutral")
+            elif (
+                curr_xc == "hse06"
+                and curr_xc_calc.replace(curr_xc, "metagga") in calc_list
+            ):
+                # for hse06, inherit from metagga if it exists
+                prev_xc_calc = curr_xc_calc.replace(curr_xc, "metagga")
             else:
                 # for metagga or otherwise, inherit from neutral gga
                 prev_xc_calc = curr_xc_calc.replace(curr_xc, "gga")
@@ -153,6 +159,12 @@ class Passer(object):
                 else:
                     # for gga/gga+u, inherit from neutral gga/gga+u
                     prev_xc_calc = curr_xc_calc.replace(curr_calc, "defect_neutral")
+            elif (
+                curr_xc == "hse06"
+                and curr_xc_calc.replace(curr_xc, "metagga") in calc_list
+            ):
+                # for hse06, inherit from metagga if it exists
+                prev_xc_calc = curr_xc_calc.replace(curr_xc, "metagga")
             else:
                 # for metagga or otherwise, inherit from charged gga calculation
                 prev_xc_calc = curr_xc_calc.replace(curr_xc, "gga")
