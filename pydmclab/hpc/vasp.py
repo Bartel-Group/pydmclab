@@ -339,7 +339,10 @@ class VASPSetUp(object):
                 "internal error in subroutine POSMAP",
             ],
             "point_group": ["Error: point group operation missing"],
-            "ibzkpt": ["internal error in subroutine IBZKPT"],
+            "ibzkpt": [
+                "internal error in subroutine IBZKPT",
+                "IBZKPT: unable to construct a generating k-lattice",
+                ],
             "bad_sym": [
                 "ERROR: while reading WAVECAR, plane wave coefficients changed"
             ],
