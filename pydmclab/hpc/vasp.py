@@ -302,7 +302,7 @@ class VASPSetUp(object):
                 "Fatal error detecting k-mesh",
                 "Fatal error: unable to match k-point",
                 "Routine TETIRR needs special values",
-                "Tetrahedron method fails (number of k-points < 4)",
+                "fails (number of k-points < 4)",
             ],
             "inv_rot_mat": [
                 "inverse of rotation matrix was not found (increase " "SYMPREC)"
