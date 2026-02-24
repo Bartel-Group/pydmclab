@@ -179,11 +179,27 @@ class AnalyzePhonons(object):
         )
         path_data = seekpath.get_path(structure_tuple)
         path = path_data['path']
+        
         gamma_indices = [i for i, segment in enumerate(path) if 'GAMMA' in segment]
-        gamma_to_gamma = path[gamma_indices[0]:gamma_indices[1]+1]
+        
+        if len(gamma_indices) < 2:
+            start_idx = 0
+            end_idx = len(path)
+        else:
+            start_idx = gamma_indices[0]
+            end_idx = gamma_indices[1]
+            if end_idx < len(path):
+                next_point = path[end_idx+1][1]
+                for i in range(end_idx+2, len(path)):
+                    if path[i][1] == next_point:
+                        end_idx = i+1
+                        break
+        
+        selected_path = path[start_idx:end_idx]
         out = {tuple(point.replace('GAMMA', 'Γ') for point in p): 
             [path_data['point_coords'][p[0]], path_data['point_coords'][p[1]]] 
-            for p in gamma_to_gamma}
+            for p in selected_path}
+        
         return out
 
     def band_structure(
