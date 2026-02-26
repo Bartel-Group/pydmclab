@@ -28,8 +28,8 @@ class IsoAlloy:
     Finally, to obtain the entropy on a per-formula unit basis, we multiply by the number of mixing sites per formula unit, n_{sites/fu}:
         ∆S_{mix_fu} = -k_B * n_{sites/fu} * [x * ln(x) + (1 - x) * ln(1 - x)]
     
-    In this class, the user can specify the units they prefer their output to be in
-
+    In this class, the output will be in eV/f.u. Therefore, the user must pass mixing energies in units of eV/f.u.
+    
     1) 'eV/fu' : outputs are per formula unit, using n_sites_per_fu to scale the entropy
         Example:
             For (A_{x}B_{1-x})_2O_3 (mixing on 2 cation sites per formula unit):
@@ -40,34 +40,20 @@ class IsoAlloy:
                 - 1 mixing site per formula unit
                 - Pass energies (mixing energies) as eV/fu
                 - set n_sites_per_fu = 1
-    2) 'eV/site' : outputs are per mixing site
-        Example:
-            For (A_{x}B_{1-x})_2O_3 (mixing on 2 cation sites per formula unit):
-                - Pass energies (mixing energies) as eV/mix_sites
-                - n_sites_per_fu is ignored
-    3) 'eV' : outputs are total energies, using N_sites to scale the entropy
-        Example:
-            For a supercell with 100 mixing sites:
-                - Pass energies (mixing energies) as total eV
-                - set N_sites = 100
-                - n_sites_per_fu is ignored
-
 
     Attributes:
-        energies (Dict[float, float]): Dictionary of mixing energies (in eV) for different compositions.
+        energies (Dict[float, float]): Dictionary of mixing energies (in eV/f.u.) for different compositions.
         kB (float): Boltzmann constant in eV/K.
         xs (np.ndarray): Array of composition values.
         Ts (np.ndarray): Array of temperature values.
         discrete_x (List[float]): Sorted list of compositions from the energies dictionary.
         omega (float): Interaction parameter (in eV) calculated from the mixing energies.
         n_sites_per_fu (int): Number of mixing sites per formula unit.
-        N_sites (int): Total number of mixing sites in the alloy.
-        units (str): Units for output ('eV/fu' or 'eV/site' or 'eV').
     """
 
     def __init__(self, energies: Dict[float, float], kB: float = 8.6173e-5, 
                  xs: np.ndarray = np.linspace(0.00001, 0.99999, 10000), 
-                 Ts: np.ndarray = np.linspace(100, 3000, 1000), n_sites_per_fu: int = 1, N_sites = None ,units: str = 'eV/fu'):
+                 Ts: np.ndarray = np.linspace(100, 3000, 1000), n_sites_per_fu: int = 1,):
         """
         Initialize the IsoAlloy object.
 
@@ -85,12 +71,8 @@ class IsoAlloy:
         self.xs = xs
         self.Ts = Ts
         self.n_sites_per_fu = n_sites_per_fu
-        self.N_sites = N_sites
         self.discrete_x = sorted(list(energies.keys()))
         self.omega = self._calculate_omega()
-        if units not in ['eV/fu', 'eV/site', 'eV']:
-            raise ValueError("units must be 'eV/fu', 'eV/site', or 'eV'")
-        self.units = units
     def _calculate_omega(self) -> float:
         """
         Calculate the interaction parameter omega using curve fitting.
@@ -109,16 +91,9 @@ class IsoAlloy:
 
     def _mixing_entropy(self, x: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
 
-        if self.units == 'eV/fu':
-            if self.n_sites_per_fu is None:
-                raise ValueError("n_sites_per_fu must be specified when units are 'eV/fu'")
-            return -self.kB * self.n_sites_per_fu * (x * np.log(x) + (1 - x) * np.log(1 - x))
-        elif self.units == 'eV/site':
-            return -self.kB * (x * np.log(x) + (1 - x) * np.log(1 - x))
-        else:  # self.units == 'eV'
-            if self.N_sites is None:
-                raise ValueError("N_sites must be specified when units are 'eV'")
-            return -self.kB * self.N_sites * (x * np.log(x) + (1 - x) * np.log(1 - x))
+        if self.n_sites_per_fu is None:
+            raise ValueError("n_sites_per_fu must be specified")
+        return -self.kB * self.n_sites_per_fu * (x * np.log(x) + (1 - x) * np.log(1 - x))
 
     def deltaG_mix(self, x: Union[float, np.ndarray], T: float) -> Union[float, np.ndarray]:
         """
