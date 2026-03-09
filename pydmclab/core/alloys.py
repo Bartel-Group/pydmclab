@@ -237,6 +237,7 @@ class IsoAlloyPlotter:
         temp_unit: str = "C",
         xlim: Tuple[float, float] = (0, 1),
         ylim: Tuple[float, float] = None,
+        title: str = "Phase Diagram"
     ):
         """
         Initialize the IsoAlloyPlotter object.
@@ -248,6 +249,9 @@ class IsoAlloyPlotter:
             A_label (str, optional): Label for component A. Defaults to "A".
             B_label (str, optional): Label for component B. Defaults to "B".
             temp_unit (str, optional): Temperature unit ('C' or 'K'). Defaults to "C".
+            xlim (Tuple[float, float], optional): X-axis limits. Defaults to (0, 1).
+            ylim (Tuple[float, float], optional): Y-axis limits. Defaults to None. Must be in the same units as temp_unit.
+            title (str, optional): Title for the phase diagram. Defaults to "Phase Diagram".
         """
         self.alloy_dict = alloy_dict
         self.main_color = main_color
@@ -257,6 +261,7 @@ class IsoAlloyPlotter:
         self.temp_unit = temp_unit
         self.xlim = xlim
         self.ylim = ylim
+        self.title = title
 
     def plot_mixing_enthalpies(self) -> None:
         """
@@ -309,7 +314,7 @@ class IsoAlloyPlotter:
 
         plt.xlabel(r"$%s_{1-x}%s_{x}$" % (A, B))
         plt.ylabel("Temperature (°C)" if self.temp_unit == "C" else "Temperature (K)")
-        plt.title("Phase Diagram")
+        plt.title(self.title)
         plt.legend()
         plt.grid(True, linestyle=':', alpha=0.7)
         plt.xlim(self.xlim)
