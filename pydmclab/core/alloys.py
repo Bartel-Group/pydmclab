@@ -235,6 +235,8 @@ class IsoAlloyPlotter:
         A_label: str = "A",
         B_label: str = "B",
         temp_unit: str = "C",
+        xlim: Tuple[float, float] = (0, 1),
+        ylim: Tuple[float, float] = None,
     ):
         """
         Initialize the IsoAlloyPlotter object.
@@ -253,6 +255,8 @@ class IsoAlloyPlotter:
         self.A_label = A_label
         self.B_label = B_label
         self.temp_unit = temp_unit
+        self.xlim = xlim
+        self.ylim = ylim
 
     def plot_mixing_enthalpies(self) -> None:
         """
@@ -308,8 +312,8 @@ class IsoAlloyPlotter:
         plt.title("Phase Diagram")
         plt.legend()
         plt.grid(True, linestyle=':', alpha=0.7)
-        plt.xlim(0, 1)
-        plt.ylim(bottom=0)
+        plt.xlim(self.xlim)
+        plt.ylim(self.ylim if self.ylim else plt.ylim())
         plt.tight_layout()
         plt.show()
 
