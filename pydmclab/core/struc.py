@@ -1794,7 +1794,7 @@ class HomoInterfaceBuilder:
         spg_film = SpacegroupAnalyzer(film_bulk).get_space_group_number()
 
         if spg_bulk != spg_film:
-            raise Warning(
+            warnings.warn(
                 f"Substrate and film must have the same space group to build a homointerface. "
                 f"Got substrate: {spg_bulk}, film: {spg_film}"
             )
