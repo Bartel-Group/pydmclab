@@ -1,7 +1,12 @@
 import multiprocessing as multip
 import os
+import re
 import warnings
 import subprocess
+
+from pymatgen.io.vasp.sets import MPRelaxSet
+from pymatgen.core.surface import Slab, get_symmetrically_distinct_miller_indices
+from pymatgen.electronic_structure.core import Magmom
 
 from pydmclab.hpc.launch import LaunchTools
 from pydmclab.hpc.submit import SubmitTools
@@ -13,9 +18,6 @@ from pydmclab.core.mag import MagTools
 from pydmclab.core.energies import ChemPots, FormationEnthalpy, MPFormationEnergy
 from pydmclab.utils.handy import read_json, write_json
 from pydmclab.data.configs import load_partition_configs
-
-from pymatgen.core.surface import Slab, get_symmetrically_distinct_miller_indices
-from pymatgen.electronic_structure.core import Magmom
 
 
 def get_vasp_configs(
@@ -2323,6 +2325,117 @@ def set_magmoms_from_template(
 
     write_json(magmoms_dict, fjson)
     return read_json(fjson)
+
+
+def get_id_specific_vasp_configs_for_defects(
+    addn_incar_mods: dict | None = None,
+    addn_kpoint_mods: dict | None = None,
+    addn_potcar_mods: dict | None = None,
+    id_specific_mods: dict[str, dict[str, dict]] | None = None,
+    potcar_functional: str = "PBE_54",
+    strucs: str | os.PathLike | dict[str, dict] = os.path.join(
+        os.getcwd().replace("scripts", "data"), "strucs.json"
+    ),
+) -> dict[str, dict[str, dict]]:
+    """
+    this function should be passed to `get_launch_configs` in the launcher when running defect calcs
+
+    handles incar, kpoint, and potcar mods (for example, changing NELECT for charged defects)
+
+    strucs.json is expected to have format {host_formula: {defect_id_chg: Structure.as_dict()}},
+        where chg is the relative charge of the defect
+
+    note: correct counting for NELECT depends upon MPRelaxSet, MPScanRelaxSet, and MPHSERelaxSet all using the same
+        POTCAR files names (they only differ for W and Yb which we correct for in pydmclab.hpc.sets and here)
+
+    Args:
+        addn_incar_mods (dict):
+            additional incar modifications applied across all defect calcs
+        addn_kpoint_mods (dict):
+            additional kpoint modificaitions applied across all defect calcs
+        addn_potcar_mods (dict):
+            additional potcar modifications applied across all defect calcs
+        id_specific_mods (dict[str, dict[str, dict]]):
+            passing id specific modifications to individual subsets of calcs
+                e.g, {<formula_indicator>_<struc_indicator> : {'incar_mods' : {<INCAR tag> : <value>},
+                    {'kpoints_mods' : <kpoints value>}, {'potcar_mods' : <potcar value>}}}
+        potcar_functional (str):
+            what pseudopotentials to use to determine NELECT
+                setting this correctly is vital, the dmc standard is 'PBE_54'
+        strucs (str | os.PathLike | dict):
+            path to where the corresponding strucs.json file for the launcher script exists
+            or the strucs dict itself (i.e., if generated in the launcher script)
+
+    Returns:
+        dict of id specific vasp configs for defect calculations
+            in the format of {<formula_indicator>_<struc_indicator> : {'incar_mods' : {<INCAR tag> : <value>},
+                    {'kpoints_mods' : <kpoints value>}, {'potcar_mods' : <potcar value>}}}
+    """
+
+    # handle falsy values
+    addn_incar_mods = addn_incar_mods or {}
+    addn_kpoint_mods = addn_kpoint_mods or {}
+    addn_potcar_mods = addn_potcar_mods or {}
+    id_specific_mods = id_specific_mods or {}
+
+    # check that we can access strucs and that it has the expected formatting
+    if not isinstance(strucs, dict):
+        if not os.path.isfile(strucs):
+            raise FileNotFoundError(
+                f"File path provided, but could not find strucs.json at: {strucs}"
+            )
+        strucs = read_json(strucs)
+
+    chg_pattern = re.compile(r"_[+-]\d+$")
+    for formula_id, struc_ids in strucs.items():
+        for struc_id in struc_ids:
+            if not chg_pattern.search(struc_id):
+                raise ValueError(
+                    f"Invalid charge state format in struc_id '{struc_id}'. "
+                    "Expected suffix to end with '-#', '+0', or '+#' (e.g., v_O_+2)"
+                )
+
+    # iterate through and determine modifications to vasp configs
+    id_specific_vasp_configs = {}
+    for formula_id, struc_ids in strucs.items():
+        for struc_id, struc_as_dict in struc_ids.items():
+
+            formula_struc_id = formula_id + "_" + struc_id
+            struc = StrucTools(struc_as_dict).structure
+
+            chg_state = int(struc_id.split("_")[-1])
+
+            if potcar_functional in ["PBE_54", "PBE_64"]:
+                vaspset = MPRelaxSet(
+                    structure=struc,
+                    user_potcar_settings={
+                        "W": "W_sv",
+                        "Yb": "Yb_3",
+                    },  # this needs to be consistent with (pydmclab.hpc.sets)
+                    user_potcar_functional=potcar_functional,
+                )
+                neutral_nelect = vaspset.nelect
+            else:
+                raise ValueError(
+                    "Using a set of POTCAR functionals other than 'PBE_54' or 'PBE_64' is not currently implemented. "
+                    "Check that NELECT will be consistently determined across various levels of theory before implementing."
+                )
+
+            charged_nelect = neutral_nelect - chg_state
+
+            # calculated NELECT takes precedent in the INCAR settings
+            # for all other settings, the id specific configs take precedent
+            specific_mods = id_specific_mods.get(formula_struc_id, {})
+            id_specific_vasp_configs[formula_struc_id] = {
+                "incar_mods": addn_incar_mods
+                | specific_mods.get("incar_mods", {})
+                | {"NELECT": charged_nelect},
+                "kpoints_mods": addn_kpoint_mods
+                | specific_mods.get("kpoints_mods", {}),
+                "potcar_mods": addn_potcar_mods | specific_mods.get("potcar_mods", {}),
+            }
+
+    return id_specific_vasp_configs
 
 
 def main():
