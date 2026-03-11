@@ -442,13 +442,29 @@ class GetSet(object):
             )
         elif "line_density" in new_settings:
             return Kpoints.automatic_density_by_lengths(
-                structure=self.structure, length_densities=new_settings["line_density"], force_gamma=new_settings["force_gamma"] if "force_gamma" in new_settings else False
-                )
+                structure=self.structure,
+                length_densities=new_settings["line_density"],
+                force_gamma=(
+                    new_settings["force_gamma"]
+                    if "force_gamma" in new_settings
+                    else False
+                ),
+            )
         elif "slab_line_density" in new_settings:
             line_densities = new_settings["slab_line_density"]
-            line_densities = [line_densities[0], line_densities[1], self.structure.lattice.c] # set k-point density along c direction to 1 for slabs (computed as N/c = 1 --> N = c)
+            line_densities = [
+                line_densities[0],
+                line_densities[1],
+                self.structure.lattice.c,
+            ]  # set k-point density along c direction to 1 for slabs (computed as N/c = 1 --> N = c)
             return Kpoints.automatic_density_by_lengths(
-                structure=self.structure, length_densities=line_densities, force_gamma=new_settings["force_gamma"] if "force_gamma" in new_settings else False
+                structure=self.structure,
+                length_densities=line_densities,
+                force_gamma=(
+                    new_settings["force_gamma"]
+                    if "force_gamma" in new_settings
+                    else False
+                ),
             )
 
     @property
@@ -463,8 +479,13 @@ class GetSet(object):
 
         new_settings = {}
         if standard == "dmc":
+            # setting "W" and "Yb" ensures consistency across the different relax sets
             # default MPRelaxSet potcar gives unavailable W POTCAR in PBE_54
-            new_settings["W"] = "W"
+            # was new_settings["W"] = "W", but MPScanRelaxSet use "W_sv", so changing for consistency
+            # note: STILL NEED TO TEST!
+            new_settings["W"] = "W_sv"
+            # Yb_2 yields incorrect energies, switching to Yb_3 (https://github.com/materialsproject/pymatgen/issues/2968)
+            new_settings["Yb"] = "Yb_3"
 
         for setting, value in user_passed_settings.items():
             new_settings[setting] = value
