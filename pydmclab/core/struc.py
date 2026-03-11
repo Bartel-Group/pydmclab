@@ -25,7 +25,7 @@ from pymatgen.transformations.standard_transformations import (
     OxidationStateDecorationTransformation,
 )
 from pymatgen.analysis import structure_matcher
-from pymatgen.analysis.structure_matcher import StructureMatcher
+from pymatgen.analysis.structure_matcher import StructureMatcher, SpeciesComparator
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from pymatgen.analysis.diffraction.xrd import XRDCalculator
 
@@ -238,6 +238,7 @@ class StrucTools(object):
         decorate: bool = True,
         n_strucs: int = 1,
         scaling_factor: int = 1000,
+        el_mapping_for_matching: dict | None = None,
         verbose: bool = True,
     ) -> dict[int, dict]:
         """
@@ -247,17 +248,20 @@ class StrucTools(object):
                     0 = fast, 1 = complete, 2 = best first
                         see pymatgen.transformations.standard_transformations.OrderDisorderedStructureTransformation
                         0 usually OK
-
             decorate (bool)
                 whether to decorate with oxidation states
                     if False, self.structure must already have them
-
             n_strucs (int)
                 number of ordered structures to return
-
             scaling_factor (int)
-                (n_strucs x scaling_factor) structures are initially generated
-                to ensure sufficient sampling of ordered strucs
+                (n_strucs x scaling_factor) structures are initially generated to ensure sufficient
+                sampling of ordered strucs
+            el_mapping_for_matching (dict):
+                element-based mapping for species to be treated equivalently when evaluating unique structures
+                    oxidation states are ignored during mapping (i.e., only elements are considered)
+                    unspecified elements are self-mapped
+                    e.g., if Co3+, Co4+, Mn3+, and Mn4+ are present and el_mapping_for_matching={'Co': 'Mn'}
+                        all four species will be treated as Mn during structure matching
 
         Returns:
             dict of ordered structures
@@ -268,7 +272,7 @@ class StrucTools(object):
         # initialize ordering engine
         transformer = OrderDisorderedStructureTransformation(algo=algo)
 
-        # decorat with oxidation states or not
+        # decorate with oxidation states or not
         if decorate:
             structure = self.decorate_with_ox_states
         else:
@@ -288,15 +292,50 @@ class StrucTools(object):
             # more than 1 structure, so check for duplicates (symmetrically equivalent structures) and remove them
             if verbose:
                 print("getting unique structures\n")
-            matcher = StructureMatcher()
+
+            # handle element mapping for elements to treat equivalently when determining unique structures
+            el_map = {}
+            if el_mapping_for_matching is not None:
+                structure_els = self.els
+                for el, alias in el_mapping_for_matching.items():
+                    if el == alias:
+                        continue
+                    if el not in structure_els:
+                        warnings.warn(
+                            f"{el} in el_mapping_for_matching not found in the structure "
+                            f"(current els: {structure_els}); this is likely a typo",
+                            UserWarning,
+                        )
+                    el_map[el] = alias
+                if verbose and el_map:
+                    print(f"\tusing species mapping for matching: {el_map}")
+
+            class _MappedComparator(SpeciesComparator):
+                """
+                Modified SpeciesComparator that re-maps species/elements via el_map before comparison
+                """
+
+                def _remap(self, sp) -> str:
+                    el_str = str(sp.element) if hasattr(sp, "element") else str(sp)
+                    return el_map.get(el_str, el_str)
+
+                def are_equal(self, sp1, sp2):
+                    return self._remap(sp1) == self._remap(sp2)
+
+                def get_hash(self, sp):
+                    return hash(self._remap(sp))
+
+            comparator = _MappedComparator() if el_map else SpeciesComparator()
+
+            # find unique ordered structures
+            matcher = StructureMatcher(comparator=comparator)
             out = [i["structure"] for i in out]
-            # find unique groups of structures
             groups = matcher.group_structures(out)
             out = [groups[i][0] for i in range(len(groups))]
             strucs = {i: out[i].as_dict() for i in range(len(out))}
             return {i: strucs[i] for i in range(n_strucs) if i in strucs}
         else:
-            # if only one structure is made, return in same formation (dict)
+            # if only one structure is made, return in same format (dict)
             return {0: out.as_dict()}
 
     def replace_species(
