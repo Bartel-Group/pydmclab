@@ -479,7 +479,7 @@ class AnalyzeVASP(object):
         else:
             return None
 
-    def pdos(self, fjson=None, remake=False):
+    def pdos(self, fdoscar="DOSCAR.lobster", fjson=None, remake=False):
         """
         @TODO: add demo/test
 
@@ -520,8 +520,9 @@ class AnalyzeVASP(object):
             except json.decoder.JSONDecodeError:
                 pass
 
-        doscar = self.outputs.doscar()
+        doscar = self.outputs.doscar(fdoscar=fdoscar)
         if not doscar:
+            print("warning: ", fdoscar, "not existed.") 
             return None
 
         complete_dos = doscar.completedos
