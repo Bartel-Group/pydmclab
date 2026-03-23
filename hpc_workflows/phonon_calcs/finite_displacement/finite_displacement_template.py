@@ -31,13 +31,13 @@ def compute_all_phonon_properties(results,
                                   query=None,
                                   xc_wanted="metagga",
                                   init_kwargs={},
-                                  thermal_properties_kwargs=None,
                                   band_structure_kwargs=None,
                                   savename='phonons.json',
                                   data_dir=DATA_DIR,
                                   remake=False,
                                   plot_band_structure=True,
-                                  plot_thermal_properties=True):
+                                  plot_thermal_properties=True,
+                                  phonopy_thermal_properties_kwargs=None,):
 
     """
     Compute all phonon properties from VASP results and displacements dictionary.
@@ -130,7 +130,7 @@ def compute_all_phonon_properties(results,
             E0=E_per_at
         )
 
-        summary = analyzer.summary(thermal_properties_kwargs=thermal_properties_kwargs,
+        summary = analyzer.summary(phonopy_thermal_properties_kwargs=phonopy_thermal_properties_kwargs,
                                     band_structure_kwargs=band_structure_kwargs)
     
 
@@ -166,14 +166,15 @@ def main():
                                   displacements=displacements,
                                   xc_wanted=xc_wanted,
                                   init_kwargs=init_kwargs,
-                                  phonopy_thermal_properties_kwargs=thermal_properties_kwargs,
                                   band_structure_kwargs=band_structure_kwargs,
                                   query=query,
                                   savename='phonons.json',
                                   data_dir=DATA_DIR,
                                   remake=remake_phonons,
                                   plot_band_structure=plot_band_structure,
-                                  plot_thermal_properties=plot_thermal_properties)
+                                  plot_thermal_properties=plot_thermal_properties,
+                                  phonopy_thermal_properties_kwargs=thermal_properties_kwargs,
+)
     
     #If running qha run this line
     #dos_dict = parse_qha_results(results)
