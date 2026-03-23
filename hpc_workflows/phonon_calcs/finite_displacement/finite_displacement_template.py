@@ -19,6 +19,7 @@ if PHONON_HELPERS_DIR not in sys.path:
 
 from phonon_helpers import (
     get_set_of_forces,
+    parse_qha_results
 )
 
 
@@ -27,11 +28,11 @@ DATA_DIR = SCRIPT_DIR.replace('scripts', 'data')
 
 def compute_all_phonon_properties(results,
                                   displacements,
+                                  query=None,
                                   xc_wanted="metagga",
                                   init_kwargs={},
                                   thermal_properties_kwargs=None,
                                   band_structure_kwargs=None,
-                                  query=None,
                                   savename='phonons.json',
                                   data_dir=DATA_DIR,
                                   remake=False,
@@ -60,7 +61,7 @@ def compute_all_phonon_properties(results,
             Arguments for band structure calculation. See pydmclab.hpc.phonons.AnalyzePhonons.band_structure() for more details.
         query (dict): 
             Query dictionary used for DFT calculations (usually from your get_query() function). 
-            If None is given, information will not be retrieved for static calculations.
+            If None is given, information will not be retrieved for static calculations (pre-displacements).
             This is to retrieve data from the static calculations (pre-displacements) that might be necessary in the case of running a QHA calculation.
             In QHA calculations need energy of original cell + phonon information.
             This dictionary should have the same mpids as the results dictionary but without the displacement suffixes.
@@ -77,7 +78,7 @@ def compute_all_phonon_properties(results,
             Whether to plot the thermal properties.
 
     Returns:
-        dict: A dictionary containing the computed phonon properties. e.g.:
+        dict, e.g.:
         {
         'SrZrS3--SrZrS3_needle--nm--metagga-finite_displacement': {
             'phonons': {
@@ -90,6 +91,8 @@ def compute_all_phonon_properties(results,
             'results': {'E_per_at': ...,},
             'structure': ...,
         }
+
+        Note if query is provided, phonon energy values are returned as total energy (internal + phonon)
 
     """
 
@@ -109,18 +112,6 @@ def compute_all_phonon_properties(results,
         dataset = displacements[mpid]['dataset']
         calc_method = displacements[mpid]['calc_method']
 
-        phonon_key = static_key.replace("static", calc_method)
-
-        analyzer = AnalyzePhonons(
-            unitcell=supercell,
-            force_data=forces,
-            dataset=dataset,
-            **init_kwargs
-        )
-
-        summary = analyzer.summary(thermal_properties_kwargs=thermal_properties_kwargs,
-                                    band_structure_kwargs=band_structure_kwargs)
-        
         if query:
             E_per_at = query[mpid]['E_per_at']
             struc = query[mpid]['structure']
@@ -128,6 +119,20 @@ def compute_all_phonon_properties(results,
             out[static_key] = {'results': 
                                {'E_per_at': E_per_at}, 
                                'structure': struc}
+
+        phonon_key = static_key.replace("static", calc_method)
+
+        analyzer = AnalyzePhonons(
+            unitcell=supercell,
+            force_data=forces,
+            dataset=dataset,
+            **init_kwargs,
+            E0=E_per_at
+        )
+
+        summary = analyzer.summary(thermal_properties_kwargs=thermal_properties_kwargs,
+                                    band_structure_kwargs=band_structure_kwargs)
+    
 
         if plot_band_structure:
             analyzer.plot_band_structure
@@ -141,9 +146,8 @@ def compute_all_phonon_properties(results,
     return read_json(fjson)
 
 
-
 def main():
-    remake_phonons = True
+    remake_phonons = False
 
     xc_wanted = "metagga"
 
@@ -158,7 +162,7 @@ def main():
     plot_band_structure = True
     plot_thermal_properties = True
 
-    compute_all_phonon_properties(results=results,
+    results = compute_all_phonon_properties(results=results,
                                   displacements=displacements,
                                   xc_wanted=xc_wanted,
                                   init_kwargs=init_kwargs,
@@ -170,6 +174,12 @@ def main():
                                   remake=remake_phonons,
                                   plot_band_structure=plot_band_structure,
                                   plot_thermal_properties=plot_thermal_properties)
+    
+    #If running qha run this line
+    #dos_dict = parse_qha_results(results)
+    #qha = QHA(dos_dict)
+    #qha.plot_stuff (see pydmclab.hpc.phonons.QHA)
+
     
 if __name__ == "__main__":
     main()
