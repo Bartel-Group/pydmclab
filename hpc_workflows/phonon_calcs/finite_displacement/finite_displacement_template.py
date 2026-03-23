@@ -166,7 +166,7 @@ def main():
                                   displacements=displacements,
                                   xc_wanted=xc_wanted,
                                   init_kwargs=init_kwargs,
-                                  thermal_properties_kwargs=thermal_properties_kwargs,
+                                  phonopy_thermal_properties_kwargs=thermal_properties_kwargs,
                                   band_structure_kwargs=band_structure_kwargs,
                                   query=query,
                                   savename='phonons.json',
