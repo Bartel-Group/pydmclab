@@ -10,9 +10,9 @@ from pydmclab.hpc.phonons import AnalyzePhonons
 # from pydmclab.hpc.helpers import get_query
 # from pymatgen.io.ase import AseAtomsAdaptor
 
-HOME_PATH = os.environ["HOME"]
-PHONON_HELPERS_DIR = "%s/bin/pydmclab/hpc_workflows/phonon_calcs" % HOME_PATH
-# PHONON_HELPERS_DIR = "/Users/carr0770/mydrive/bartel-group/pydmclab/hpc_workflows/phonon_calcs"
+# HOME_PATH = os.environ["HOME"]
+# PHONON_HELPERS_DIR = "%s/bin/pydmclab/hpc_workflows/phonon_calcs" % HOME_PATH
+PHONON_HELPERS_DIR = "/Users/carr0770/mydrive/bartel-group/pydmclab/hpc_workflows/phonon_calcs"
 
 if PHONON_HELPERS_DIR not in sys.path:
     sys.path.append(PHONON_HELPERS_DIR)
@@ -23,21 +23,21 @@ from phonon_helpers import (
 )
 
 
-SCRIPT_DIR = os.getcwd()
-DATA_DIR = SCRIPT_DIR.replace('scripts', 'data')
+# SCRIPT_DIR = os.getcwd()
+DATA_DIR = '/Users/carr0770/mydrive/bartel-group/ABS3-synthesis/dev/data/aic/phonons/QHA/finite_displacement/260113'
 
 def compute_all_phonon_properties(results,
                                   displacements,
                                   query=None,
                                   xc_wanted="metagga",
                                   init_kwargs={},
+                                  temperatures=np.linspace(0, 2000, 100),
                                   band_structure_kwargs=None,
                                   savename='phonons.json',
                                   data_dir=DATA_DIR,
                                   remake=False,
                                   plot_band_structure=True,
-                                  plot_thermal_properties=True,
-                                  phonopy_thermal_properties_kwargs=None,):
+                                  plot_thermal_properties_phonopy=True):
 
     """
     Compute all phonon properties from VASP results and displacements dictionary.
@@ -130,20 +130,21 @@ def compute_all_phonon_properties(results,
             E0=E_per_at
         )
 
-        summary = analyzer.summary(phonopy_thermal_properties_kwargs=phonopy_thermal_properties_kwargs,
-                                    band_structure_kwargs=band_structure_kwargs)
+        summary = analyzer.summary(temperatures=temperatures,
+                                   band_structure_kwargs=band_structure_kwargs,)
     
 
         if plot_band_structure:
             analyzer.plot_band_structure
 
-        if plot_thermal_properties:
-            analyzer.plot_thermal_properties
+        if plot_thermal_properties_phonopy:
+            analyzer.plot_thermal_properties_phonopy
 
         out[phonon_key] = {'phonons': summary}
 
     write_json(out, fjson)
     return read_json(fjson)
+
 
 
 def main():
@@ -156,24 +157,24 @@ def main():
     query = read_json(os.path.join(DATA_DIR, "query.json"))
 
     init_kwargs = {}
-    thermal_properties_kwargs = None
     band_structure_kwargs = None
-    
+    temperatures=np.linspace(0, 2000, 100)
+
     plot_band_structure = True
-    plot_thermal_properties = True
+    plot_thermal_properties_phonopy = True
 
     results = compute_all_phonon_properties(results=results,
                                   displacements=displacements,
+                                  query=query,
                                   xc_wanted=xc_wanted,
                                   init_kwargs=init_kwargs,
+                                  temperatures=temperatures,
                                   band_structure_kwargs=band_structure_kwargs,
-                                  query=query,
                                   savename='phonons.json',
                                   data_dir=DATA_DIR,
                                   remake=remake_phonons,
                                   plot_band_structure=plot_band_structure,
-                                  plot_thermal_properties=plot_thermal_properties,
-                                  phonopy_thermal_properties_kwargs=thermal_properties_kwargs,
+                                  plot_thermal_properties_phonopy=plot_thermal_properties_phonopy,
 )
     
     #If running qha run this line
