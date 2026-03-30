@@ -723,7 +723,7 @@ def check_strucs(strucs):
             struc = strucs[formula][ID]
             print("\tstructure formula: %s" % StrucTools(struc).formula)
 
-def get_qha_strucs(info: dict, dict_type='strucs',
+def get_qha_strucs(info: dict, dict_type='query',
                    scale=np.linspace(0.96, 1.04, 5),
                    data_dir: str|None = os.getcwd().replace("scripts", "data"),
                    savename="QHA_strucs.json",
