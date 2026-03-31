@@ -422,7 +422,7 @@ class AnalyzePhonons(object):
         savename: str = "phonons.json",
         remake: bool = False,
         include_force_constants: bool= True,
-        include_mesh: bool = True,
+        include_mesh: bool = False, #Mesh data can be quite large, so not including by default, but can be included if needed for post-processing
         include_band_structure = True,
         include_total_dos: bool = True,
         include_helmholtz: bool = True,
