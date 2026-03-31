@@ -220,6 +220,7 @@ class AnalyzePhonons(object):
             {'qpoints': arrays of q points, 'distances': arrays of distances, 'frequencies': arrays of frequencies, 'eigenvectors': arrays of eigenvectors, group_velocities': arrays of group velocities}
         """
 
+        path_data = None
         if paths==None:
             path_data = self.find_high_symmetry_path
             paths = [path_data[key] for key in path_data]
@@ -243,7 +244,7 @@ class AnalyzePhonons(object):
             _ = self.phonon.run_band_structure(bands)
             self._band_structure_paths = bands        
             self._band_structure = self.phonon.get_band_structure_dict()
-            if path_data:
+            if path_data is not None:
                 self._band_structure['path'] = list(path_data.keys())
 
             h = physical_constants['Planck constant in eV/Hz'][0]
