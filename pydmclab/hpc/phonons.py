@@ -42,9 +42,10 @@ class AnalyzePhonons(object):
                  supercell_matrix: list = None,
                  primitive_matrix: list = None,
                  symprec=1e-5,
+                 symmetrize_force_constants: bool = True,
                  mesh: int|list|float=[30, 30, 30],
                  dataset: dict = None,
-                 E0: float = 0
+                 E0: float = 0,
 ):
         """
         Class to analyze phonon data from a VASP calculation using Phonopy, Can return force constants, dynamical matrix, mesh data, thermal properties, band structure, and total density of states.
@@ -128,13 +129,17 @@ class AnalyzePhonons(object):
                 if phonon.dataset is None:
                     raise ValueError("Unable to set dataset for phonon calculation. Please provide a valid dataset or force constants.")
                 phonon.produce_force_constants()
+                if symmetrize_force_constants:
+                    phonon.symmetrize_force_constants()
                 self.force_constants = phonon.force_constants
 
             elif arr.shape == (natoms_unitcell, natoms_unitcell, 3, 3):
                 # Looks like force constants
                 print(f"Detected force constants in full form")
                 phonon.force_constants = arr
-                self.force_constants = arr
+                if symmetrize_force_constants:
+                    phonon.symmetrize_force_constants()
+                self.force_constants = phonon.force_constants
             else:
                 raise ValueError(
                     f"Unrecognized force_data shape: {arr.shape}\n"
