@@ -130,6 +130,7 @@ class AnalyzePhonons(object):
                     raise ValueError("Unable to set dataset for phonon calculation. Please provide a valid dataset or force constants.")
                 phonon.produce_force_constants()
                 if symmetrize_force_constants:
+                    print("Symmetrizing force constants...")
                     phonon.symmetrize_force_constants()
                 self.force_constants = phonon.force_constants
 
