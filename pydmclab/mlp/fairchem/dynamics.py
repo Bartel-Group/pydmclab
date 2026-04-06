@@ -81,6 +81,7 @@ class FAIRChemCalculator(Calculator):
         inference_settings: InferenceSettings | str = "default",
         overrides: dict | None = None,
         device: Literal["cuda", "cpu"] | None = None,
+        seed: int = 42,
     ):
         """
         UMA ASE Calculator
@@ -108,6 +109,7 @@ class FAIRChemCalculator(Calculator):
                 inference_settings=inference_settings,
                 overrides=overrides,
                 device=device,
+                seed=seed,
             )
         elif os.path.isfile(name_or_path):
             predict_unit = pretrained_mlip.load_predict_unit(
@@ -115,6 +117,7 @@ class FAIRChemCalculator(Calculator):
                 inference_settings=inference_settings,
                 overrides=overrides,
                 device=device,
+                seed=seed,
             )
         else:
             raise ValueError(
@@ -424,6 +427,7 @@ class FAIRChemRelaxer:
         inference_settings: InferenceSettings | str = "default",
         overrides: dict | None = None,
         device: Literal["cuda", "cpu"] | None = None,
+        seed: int = 42,
         optimizer: ASEOptimizer | str = "FIRE",
     ) -> None:
 
@@ -444,6 +448,7 @@ class FAIRChemRelaxer:
                 inference_settings=inference_settings,
                 overrides=overrides,
                 device=device,
+                seed=seed,
             )
 
     def predict_structure(
