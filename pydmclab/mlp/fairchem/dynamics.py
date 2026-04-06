@@ -109,7 +109,6 @@ class FAIRChemCalculator(Calculator):
                 inference_settings=inference_settings,
                 overrides=overrides,
                 device=device,
-                seed=seed,
             )
         elif os.path.isfile(name_or_path):
             predict_unit = pretrained_mlip.load_predict_unit(
@@ -117,7 +116,6 @@ class FAIRChemCalculator(Calculator):
                 inference_settings=inference_settings,
                 overrides=overrides,
                 device=device,
-                seed=seed,
             )
         else:
             raise ValueError(
