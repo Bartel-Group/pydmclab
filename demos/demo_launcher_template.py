@@ -368,7 +368,10 @@ def main():
     # analyze FP calculations
     #  collect results of completed FP calcs (from traj.json files in each calc_dir)
     fp_results = get_fp_results(
-        launch_dirs=launch_dirs, data_dir=DATA_DIR, remake=remake_fp_results
+        launch_dirs=launch_dirs,
+        include_full_trajs=False,
+        data_dir=DATA_DIR,
+        remake=remake_fp_results,
     )
     if print_fp_results_check:
         check_fp_results(fp_results)
