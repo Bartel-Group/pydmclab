@@ -225,7 +225,11 @@ def get_custom_data(savename="custom.json", remake=False):
     return read_json(fjson)
     
 
-def get_strucs(query, supercell = [2,2,2], data_dir = DATA_DIR, savename = "strucs.json", savename_displacements = "displacements.json", remake=False):
+def get_strucs(query, 
+               supercell = [2,2,2], 
+               data_dir = DATA_DIR, savename = "strucs.json", 
+               savename_displacements = "displacements.json", 
+               remake=False):
     fjson = os.path.join(data_dir, savename)
     fjson_displacements = os.path.join(data_dir, savename_displacements)
     if os.path.exists(fjson) and os.path.exists(fjson_displacements) and not remake:

@@ -836,6 +836,18 @@ class QHA(object):
                  temperatures = np.linspace(0, 2000, 201), 
                  eos: str = "vinet"):
         
+        '''
+        Args:
+            dos_dict (dict):
+                {volume (float) :
+                    {'structure' : structure dictionary,
+                    'E0' : 0 K internal energy (eV/cell),
+                    'total_dos' :
+                        [{'E' : energy level (eV),
+                        'dos' : phonon DOS at E (float) (normalized to 1/eV)]}
+                    }
+        '''
+        
         self.dos_dict = dos_dict
         self.temperatures = temperatures
         self.eos = eos
