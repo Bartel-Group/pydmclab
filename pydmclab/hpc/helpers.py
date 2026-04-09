@@ -1184,6 +1184,7 @@ def submit_calcs(
 
 def get_fp_results(
     launch_dirs,
+    include_full_trajs=False,
     data_dir=os.getcwd().replace("scripts", "data"),
     savename="fp_results.json",
     remake=False,
@@ -1194,6 +1195,8 @@ def get_fp_results(
             {launch_dir (str) :
                 {'magmom' : [list of magmoms for the structure in that launch_dir (list)],
                  'ID_specific_vasp_configs' : {<formula_indicator>_<struc_indicator> : {desired configs for this entry}}}
+        include_full_trajs (bool):
+            if True, include full trajectories in collected results (can lead to large file size)
         data_dir (str)
             directory to save fjson
         savename (str)
@@ -1209,7 +1212,7 @@ def get_fp_results(
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
 
-    analyzer = AnalyzeFPBatch(launch_dirs)
+    analyzer = AnalyzeFPBatch(launch_dirs, include_full_trajs)
 
     data = analyzer.results
 
