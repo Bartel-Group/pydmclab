@@ -126,13 +126,16 @@ class AnalyzeFP(object):
 
 
 class AnalyzeFPBatch(object):
-    def __init__(self, launch_dirs: dict) -> None:
+    def __init__(self, launch_dirs: dict, include_full_trajs: bool) -> None:
         """
         Args:
             launch_dirs (dict):
                 {launch directory: {'magmom': ..., 'ID_specific_vasp_configs': ...}}
+            include_full_trajs (bool):
+                if True, include full trajectories in collected results (can lead to large file size)
         """
         self.launch_dirs = launch_dirs
+        self.include_full_trajs = include_full_trajs
 
     @property
     def calc_dirs(self) -> list[str]:
@@ -179,16 +182,35 @@ class AnalyzeFPBatch(object):
         # only collect results for converged FP calculations
         is_converged = AnalyzeFP(calc_dir).is_converged
         if not is_converged:
-            return {"convergence": False, "meta": None, "trajectory": None}
+            converged_results = {
+                "convergence": False,
+                "E_per_at": None,
+                "forces": None,
+                "stresses": None,
+                "fmax": None,
+                "structure": None,
+            }
+            return {"meta": None, "results": converged_results, "trajectory": None}
 
         # if the calculation completed, "fp_settings.json" and "traj.json" files should exist
         meta = read_json(os.path.join(calc_dir, "fp_settings.json"))
         traj = read_json(os.path.join(calc_dir, "traj.json"))
 
         # compile results
-        fp_model = "-".join(meta["fp_model_dir"].split("/")[-2:])
-        meta["fp_model"] = fp_model
-        result = {"convergence": True, "meta": meta, "trajectory": traj}
+        meta["fp_model"] = "-".join(meta["fp_model_dir"].split("/")[-2:])
+        converged_data = {
+            "convergence": True,
+            "E_per_at": traj["energies"][-1] / len(traj["structures"][-1]["sites"]),
+            "forces": traj["forces"][-1],
+            "stresses": traj["stresses"][-1],
+            "fmax": traj["fmaxs"][-1],
+            "structure": traj["structures"][-1],
+        }
+        result = {
+            "meta": meta,
+            "results": converged_data,
+            "trajectory": traj if self.include_full_trajs else None,
+        }
 
         return result
 
