@@ -1230,7 +1230,7 @@ def check_fp_results(fp_results):
     for key in keys_to_check:
         _, _, _, xc_calc = key.split("--")
         xc, _ = xc_calc.split("-")
-        convergence = fp_results[key]["convergence"]
+        convergence = fp_results[key]["results"]["convergence"]
         if xc == "fpgga":
             if convergence:
                 converged_fp_gga += 1
