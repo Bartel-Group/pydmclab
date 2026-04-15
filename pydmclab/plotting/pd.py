@@ -475,21 +475,49 @@ class TernaryPD(object):
             x.append(d["x"])
             y.append(d["y"])
             labels.append(d["formula"])
-        
+
         if unstable_colorbar is not None:
             # Extract colorbar values from unstable points
             formulas = [d["formula"] for d in unstable_to_plot]
-            c_values = [self.data[f][unstable_colorbar] for f in formulas]
+            c_values = np.asarray([self.data[f][unstable_colorbar] for f in formulas], dtype=float)
+            c_values = np.atleast_1d(c_values)
             print("Unstable colorbar values:", c_values)
             # Modify unstable_params to use colormap instead of fixed edgecolor
             unstable_params_copy = unstable_params.copy()
             unstable_params_copy.pop("edgecolor", None)
             unstable_params_copy.pop("color", None)
-            scatter = plt.scatter(x, y, c=c_values, label="unstable", 
-                                cmap="Reds", vmin=0,**unstable_params_copy, zorder=1)
+            scatter = plt.scatter(
+                np.asarray(x),
+                np.asarray(y),
+                c=c_values,
+                label="unstable",
+                cmap="Reds",
+                vmin=0,
+                **unstable_params_copy,
+                zorder=1,
+            )
             plt.colorbar(scatter, label=unstable_colorbar)
         else:
             ax = plt.scatter(x, y, label="unstable", **unstable_params, zorder=1)
+
+        if label_compounds:
+            for cmpd in label_compounds:
+                if cmpd in self.data:
+                    label_x, label_y = triangle_to_square(
+                        (data[cmpd]["a"], data[cmpd]["b"], data[cmpd]["c"])
+                    )
+                    plt.annotate(
+                        get_label(cmpd),
+                        xy=(label_x, label_y),
+                        xytext=(5, 5),
+                        textcoords="offset points",
+                        fontsize=15,
+                        ha="left",
+                        va="bottom",
+                        bbox={"facecolor": "white", "alpha": 0.75, "edgecolor": None, "pad": 0.5},
+                    )
+                else:
+                    print(f"Warning: compound {cmpd} not found in ternary data")
 
         lines_to_plot = self.lines_to_plot
         for l in lines_to_plot:
