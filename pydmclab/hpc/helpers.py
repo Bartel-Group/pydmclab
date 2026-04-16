@@ -8,7 +8,7 @@ from pydmclab.hpc.submit import SubmitTools
 from pydmclab.hpc.analyze import AnalyzeVASP, AnalyzeBatch
 from pydmclab.core.comp import CompTools
 from pydmclab.core.query import MPQuery, MPLegacyQuery
-from pydmclab.core.struc import StrucTools
+from pydmclab.core.struc import StrucTools, SolidSolutionGenerator
 from pydmclab.core.mag import MagTools
 from pydmclab.core.energies import ChemPots, FormationEnthalpy, MPFormationEnergy
 from pydmclab.utils.handy import read_json, write_json
@@ -2324,6 +2324,71 @@ def set_magmoms_from_template(
     write_json(magmoms_dict, fjson)
     return read_json(fjson)
 
+def get_sqs_strucs(
+        oriented_end_member_A_path: str | os.PathLike | list[str | os.PathLike],
+        oriented_end_member_B_path: str | os.PathLike | list[str | os.PathLike],
+        supercell: list[int],
+        miller_str: str = None,
+        substrate_path: str | os.PathLike | list[None | str | os.PathLike] = None,
+        save_dir: str | os.PathLike = os.getcwd().replace("scripts", "data"),
+        strain: bool = False,
+)-> dict[str, dict[str, dict]]:
+    
+    if strain and substrate_path is None:
+        raise ValueError("If strain is True, substrate_path must be provided.")
+    
+    if strain and miller_str is None:
+        raise ValueError("If strain is True, miller_str must be provided to specify the strain orientation")
+    
+    or_em_A = StrucTools(oriented_end_member_A_path).structure
+    or_em_B = StrucTools(oriented_end_member_B_path).structure
+
+    if strain:
+        substrate = StrucTools(substrate_path).structure
+        strained_or_em_A = StrucTools(or_em_A).strain_structure_to_substrate(substrate)
+        strained_or_em_B = StrucTools(or_em_B).strain_structure_to_substrate(substrate)
+        or_em_A = strained_or_em_A
+        or_em_B = strained_or_em_B
+
+    else:
+        or_em_A = or_em_A
+        or_em_B = or_em_B
+
+    endmembers = [or_em_A, or_em_B]
+
+    generator = SolidSolutionGenerator(
+        endmembers=endmembers,
+        num_solns=None,
+        supercell_dim=supercell,
+    )
+
+    element_A = generator.element_a
+    element_B = generator.element_b
+
+    disordered, ordered, sqs, data = generator.run(cleanup=True)
+    
+    s = {}
+    alloy_id = f'{or_em_A.reduced_formula}_{or_em_B.reduced_formula}'
+    s[alloy_id] = {}
+
+    for struc in sqs:
+        el_A_count = sum(1 for site in struc.sites if site.specie.symbol == element_A)
+        el_B_count = sum(1 for site in struc.sites if site.specie.symbol == element_B)
+
+        el_A_frac = el_A_count / (el_A_count + el_B_count)
+        el_B_frac = 1 - el_A_frac
+
+        if strain:
+            struc_id = f'{element_A}_{el_A_frac: .2f}-{element_B}_{el_B_frac: .2f}_{miller_str}'
+        else:
+            struc_id = f'{element_A}_{el_A_frac: .2f}-{element_B}_{el_B_frac: .2f}'
+
+        s[alloy_id][struc_id] = struc.as_dict()
+
+    fjson = os.path.join(save_dir, 'strucs.json')
+
+    write_json(s, fjson)
+    return read_json(fjson)        
 
 def main():
     return

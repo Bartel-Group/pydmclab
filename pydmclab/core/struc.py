@@ -17,7 +17,7 @@ import numpy as np
 from math import lcm
 from pathlib import Path
 
-from pymatgen.core import Structure, PeriodicSite, Composition
+from pymatgen.core import Structure, PeriodicSite, Composition, Lattice
 from pymatgen.core.surface import SlabGenerator, Slab
 from pymatgen.transformations.standard_transformations import (
     OrderDisorderedStructureTransformation,
@@ -580,6 +580,33 @@ class StrucTools(object):
 
         return out
 
+    def strain_structure_to_substrate(
+            self,
+            substrate: Structure,
+    ):
+        self_sg = self.sg()
+        substrate_sg = self.__class__(substrate).sg()
+
+        if self_sg != substrate_sg:
+            raise ValueError(f"Cannot strain structure to substrate with different space group")
+        
+        # Get substrate lattice parameters
+        a_sub, b_sub, c_sub = substrate.lattice.abc
+        
+        # Create new lattice for the strained film
+        new_lattice = Lattice.from_parameters(a=a_sub, b=b_sub, c=c_sub,
+                                            alpha=substrate.lattice.alpha,
+                                            beta=substrate.lattice.beta,
+                                            gamma=substrate.lattice.gamma)
+        
+        # Apply strain to the film structure
+        strained_struc = Structure(lattice=new_lattice,
+                                species=self.structure.species_and_occu,
+                                coords=self.structure.frac_coords,
+                                coords_are_cartesian=False)
+        
+        return strained_struc
+
     def structure_to_cif(self, filename: str, data_dir: str = None) -> None:
         """
         Coverts a structure to a cif file and saves it to a directory, useful for VESTA viewing
@@ -796,9 +823,9 @@ class SolidSolutionGenerator:
         self.endmembers = endmembers
         self.supercell_dim = supercell_dim or [2, 2, 2]
 
+        self.element_a, self.element_b = self._get_differing_elements(*endmembers)
+
         # Initialize attributes that will be set during processing
-        self.element_a: Optional[str] = None
-        self.element_b: Optional[str] = None
         self.disordered_solns: Optional[List[Structure]] = None
         self.ordered_solns: Optional[List[Structure]] = None
         self.sqs_solns: Optional[List[Structure]] = None
@@ -818,6 +845,24 @@ class SolidSolutionGenerator:
         """Create necessary working directories."""
         for dir_path in self.dirs.values():
             Path(dir_path).mkdir(exist_ok=True)
+
+    def _get_differing_elements(
+        self, struc_A: Structure, struc_B: Structure
+    ) -> Tuple[str, str]:
+        """Return the two elements that differ between the endmembers."""
+        elements_A = {str(el) for el in struc_A.composition.elements}
+        elements_B = {str(el) for el in struc_B.composition.elements}
+        differing_elements = elements_A.symmetric_difference(elements_B)
+
+        if len(differing_elements) != 2:
+            raise ValueError(
+                "The code currently supports systems where only one element differs between the endmembers."
+            )
+
+        return (
+            differing_elements.intersection(elements_A).pop(),
+            differing_elements.intersection(elements_B).pop(),
+        )
 
     def generate_solid_solutions(self) -> List[Structure]:
         """
@@ -856,18 +901,7 @@ class SolidSolutionGenerator:
         struc_B.remove_oxidation_states()
 
         # Determine which elements differ between the two endmembers
-        elements_A = set([str(el) for el in struc_A.composition.elements])
-        elements_B = set([str(el) for el in struc_B.composition.elements])
-        differing_elements = elements_A.symmetric_difference(elements_B)
-
-        if len(differing_elements) != 2:
-            raise ValueError(
-                "The code currently supports systems where only one element differs between the endmembers."
-            )
-
-        # Map differing elements to variables
-        self.element_a = differing_elements.intersection(elements_A).pop()
-        self.element_b = differing_elements.intersection(elements_B).pop()
+        self.element_a, self.element_b = self._get_differing_elements(struc_A, struc_B)
 
         # Count the number of differing sites in the supercell
         struc_A_super = struc_A.copy()
