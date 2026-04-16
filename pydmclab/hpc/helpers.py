@@ -2332,7 +2332,12 @@ def get_sqs_strucs(
         substrate_path: str | os.PathLike | list[None | str | os.PathLike] = None,
         save_dir: str | os.PathLike = os.getcwd().replace("scripts", "data"),
         strain: bool = False,
+        remake: bool = False,
 )-> dict[str, dict[str, dict]]:
+    
+    fjson = os.path.join(save_dir, 'strucs.json')
+    if os.path.exists(fjson) and not remake:
+        return read_json(fjson)
     
     if strain and substrate_path is None:
         raise ValueError("If strain is True, substrate_path must be provided.")
