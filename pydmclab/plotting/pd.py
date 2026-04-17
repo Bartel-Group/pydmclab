@@ -476,29 +476,34 @@ class TernaryPD(object):
             y.append(d["y"])
             labels.append(d["formula"])
 
+        unstable_kwargs = unstable_params.copy()
         if unstable_colorbar is not None:
             # Extract colorbar values from unstable points
             formulas = [d["formula"] for d in unstable_to_plot]
             c_values = np.asarray([self.data[f][unstable_colorbar] for f in formulas], dtype=float)
             c_values = np.atleast_1d(c_values)
             print("Unstable colorbar values:", c_values)
-            # Modify unstable_params to use colormap instead of fixed edgecolor
-            unstable_params_copy = unstable_params.copy()
-            unstable_params_copy.pop("edgecolor", None)
-            unstable_params_copy.pop("color", None)
-            scatter = plt.scatter(
-                np.asarray(x),
-                np.asarray(y),
-                c=c_values,
-                label="unstable",
-                cmap="Reds",
-                vmin=0,
-                **unstable_params_copy,
-                zorder=1,
-            )
-            plt.colorbar(scatter, label=unstable_colorbar)
-        else:
-            ax = plt.scatter(x, y, label="unstable", **unstable_params, zorder=1)
+            # Modify unstable_kwargs to use colormap instead of fixed edgecolor
+            unstable_kwargs.pop("edgecolor", None)
+            unstable_kwargs.pop("color", None)
+            unstable_kwargs.update({
+                "c": c_values,
+                "cmap": "Reds",
+                "vmin": 0,
+                "vmax": 0.12,
+            })
+
+        scatter = plt.scatter(x, y, label="unstable", **unstable_kwargs, zorder=1)
+
+        if unstable_colorbar is not None:
+            if unstable_colorbar == 'Ed':
+                unstable_colorbar_label = r"\mathit{E}_{d}"
+            else:
+                unstable_colorbar_label = f"{unstable_colorbar}"
+
+            cbar = plt.colorbar(scatter, label=f"${unstable_colorbar_label} \\,(eV/atom)$")
+            cbar.ax.yaxis.label.set_size(20)
+            cbar.ax.tick_params(labelsize=18)
 
         if label_compounds:
             for cmpd in label_compounds:
@@ -506,12 +511,13 @@ class TernaryPD(object):
                     label_x, label_y = triangle_to_square(
                         (data[cmpd]["a"], data[cmpd]["b"], data[cmpd]["c"])
                     )
+                    els_order_for_label = [self.left_end, self.right_end, self.top_end]
                     plt.annotate(
-                        get_label(cmpd),
+                        get_label(cmpd, els_order_for_label),
                         xy=(label_x, label_y),
                         xytext=(5, 5),
                         textcoords="offset points",
-                        fontsize=15,
+                        fontsize=20,
                         ha="left",
                         va="bottom",
                         bbox={"facecolor": "white", "alpha": 0.75, "edgecolor": None, "pad": 0.5},
@@ -530,7 +536,7 @@ class TernaryPD(object):
         ax = plt.gca().tick_params(bottom=False, top=False, left=False, right=False)
 
         if label_els:
-            el_label_size = 18
+            el_label_size = 30
             left_el_pos = (-0.02, -0.05)
             right_el_pos = (1.02, -0.05)
             top_el_pos = (0.5, 0.89)
@@ -557,7 +563,7 @@ class TernaryPD(object):
             )
 
         if legend:
-            ax = plt.legend(loc=legend if isinstance(legend, str) else "best")
+            ax = plt.legend(loc=legend if isinstance(legend, str) else "best", fontsize=20)
 
 
 def triangle_to_square(pt):
