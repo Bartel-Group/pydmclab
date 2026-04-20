@@ -890,7 +890,16 @@ class SubmitTools(object):
 
         # if we made it this far, launch it
         os.chdir(launch_dir)
-        subprocess.call(["sbatch", "sub.sh"])
+        # If running within a SLURM job, use env -i to clear environment before sbatch
+        # This prevents MPI variable inheritance that causes bootstrap errors
+        if 'SLURM_JOB_ID' in os.environ:
+            # Use env -i to start with clean environment, then set minimal required variables
+            cmd = f"env -i HOME={os.environ['HOME']} USER={os.environ['USER']} PATH={os.environ['PATH']} sbatch sub.sh"
+            subprocess.call(cmd, shell=True)
+        else:
+            print("No active SLURM job detected, submitting normally.")
+            subprocess.call(["sbatch", "sub.sh"])
+
         os.chdir(scripts_dir)
 
         print("submitted %s\n" % fsub)
