@@ -823,9 +823,9 @@ class SolidSolutionGenerator:
         self.endmembers = endmembers
         self.supercell_dim = supercell_dim or [2, 2, 2]
 
-        self.element_a, self.element_b = self._get_differing_elements(*endmembers)
-
         # Initialize attributes that will be set during processing
+        self.element_a: Optional[str] = None
+        self.element_b: Optional[str] = None
         self.disordered_solns: Optional[List[Structure]] = None
         self.ordered_solns: Optional[List[Structure]] = None
         self.sqs_solns: Optional[List[Structure]] = None
@@ -845,24 +845,6 @@ class SolidSolutionGenerator:
         """Create necessary working directories."""
         for dir_path in self.dirs.values():
             Path(dir_path).mkdir(exist_ok=True)
-
-    def _get_differing_elements(
-        self, struc_A: Structure, struc_B: Structure
-    ) -> Tuple[str, str]:
-        """Return the two elements that differ between the endmembers."""
-        elements_A = {str(el) for el in struc_A.composition.elements}
-        elements_B = {str(el) for el in struc_B.composition.elements}
-        differing_elements = elements_A.symmetric_difference(elements_B)
-
-        if len(differing_elements) != 2:
-            raise ValueError(
-                "The code currently supports systems where only one element differs between the endmembers."
-            )
-
-        return (
-            differing_elements.intersection(elements_A).pop(),
-            differing_elements.intersection(elements_B).pop(),
-        )
 
     def generate_solid_solutions(self) -> List[Structure]:
         """
@@ -901,7 +883,18 @@ class SolidSolutionGenerator:
         struc_B.remove_oxidation_states()
 
         # Determine which elements differ between the two endmembers
-        self.element_a, self.element_b = self._get_differing_elements(struc_A, struc_B)
+        elements_A = set([str(el) for el in struc_A.composition.elements])
+        elements_B = set([str(el) for el in struc_B.composition.elements])
+        differing_elements = elements_A.symmetric_difference(elements_B)
+
+        if len(differing_elements) != 2:
+            raise ValueError(
+                "The code currently supports systems where only one element differs between the endmembers."
+            )
+
+        # Map differing elements to variables
+        self.element_a = differing_elements.intersection(elements_A).pop()
+        self.element_b = differing_elements.intersection(elements_B).pop()
 
         # Count the number of differing sites in the supercell
         struc_A_super = struc_A.copy()
