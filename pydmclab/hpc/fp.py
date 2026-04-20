@@ -60,6 +60,7 @@ class FPSetUp(object):
         fpos = os.path.join(calc_dir, "POSCAR")
         if not os.path.exists(fpos):
             raise FileNotFoundError(f"POSCAR not found in {calc_dir}")
+        self.fpos = fpos
 
         # load in configs
         _default_configs = load_base_configs()
@@ -75,6 +76,11 @@ class FPSetUp(object):
 
         # where the FP is going to be run
         calc_dir = self.calc_dir
+
+        # sort structure to obtain clean POSCAR that is consistent with the VASP calcs
+        struc = StrucTools(self.fpos).structure
+        sorted_struc = struc.get_sorted_structure()
+        sorted_struc.to(fmt="poscar", filename=self.fpos)
 
         # write fp_settings.json
         fp_keys = [
