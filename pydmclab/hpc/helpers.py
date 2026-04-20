@@ -2359,6 +2359,10 @@ def get_sqs_strucs(
         or_em_A = or_em_A
         or_em_B = or_em_B
 
+    s = {}
+    alloy_id = f'{or_em_A.reduced_formula}_{or_em_B.reduced_formula}'
+    s[alloy_id] = {}
+
     endmembers = [or_em_A, or_em_B]
 
     generator = SolidSolutionGenerator(
@@ -2367,15 +2371,11 @@ def get_sqs_strucs(
         supercell_dim=supercell,
     )
 
+    disordered, ordered, sqs, data = generator.run(cleanup=True)
+
     element_A = generator.element_a
     element_B = generator.element_b
-
-    disordered, ordered, sqs, data = generator.run(cleanup=True)
     
-    s = {}
-    alloy_id = f'{or_em_A.reduced_formula}_{or_em_B.reduced_formula}'
-    s[alloy_id] = {}
-
     for struc in sqs:
         el_A_count = sum(1 for site in struc.sites if site.specie.symbol == element_A)
         el_B_count = sum(1 for site in struc.sites if site.specie.symbol == element_B)
@@ -2384,9 +2384,9 @@ def get_sqs_strucs(
         el_B_frac = 1 - el_A_frac
 
         if strain:
-            struc_id = f'{element_A}_{el_A_frac: .2f}-{element_B}_{el_B_frac: .2f}_{miller_str}'
+            struc_id = f'{element_A}_{el_A_frac:.2f}-{element_B}_{el_B_frac:.2f}_{miller_str}'
         else:
-            struc_id = f'{element_A}_{el_A_frac: .2f}-{element_B}_{el_B_frac: .2f}'
+            struc_id = f'{element_A}_{el_A_frac:.2f}-{element_B}_{el_B_frac:.2f}'
 
         s[alloy_id][struc_id] = struc.as_dict()
 
