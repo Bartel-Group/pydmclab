@@ -832,7 +832,7 @@ class Gibbs():
 ### create plotting capability in pydmclab.plotting for phonon stuff
 class QHA(object):
     def __init__(self, 
-                 dos_dict: dict, 
+                 dos_dict: dict, #this should just take a dictionary of force data and structures to feed into AnalyzePhonons
                  temperatures = np.linspace(0, 2000, 201), 
                  eos: str = "vinet"):
         
