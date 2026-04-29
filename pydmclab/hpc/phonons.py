@@ -290,7 +290,7 @@ class AnalyzePhonons(object):
 
         return self._total_dos
 
-    def helmholtz(self, temperatures=np.linspace(0, 2000, 100), 
+    def helmholtz(self, temperatures=np.linspace(0, 2000, 101), 
                   include_heat_capacity: bool = True, 
                   move_imaginary: bool = False):
         """
@@ -433,7 +433,7 @@ class AnalyzePhonons(object):
         include_total_dos: bool = True,
         include_helmholtz: bool = True,
         include_heat_capacity: bool = True,
-        temperatures = np.linspace(0, 2000, 100),
+        temperatures = np.linspace(0, 2000, 101),
         band_structure_kwargs: dict | None = None,
         include_phonopy_thermal_properties: bool = False,
         phonopy_thermal_properties_kwargs: dict | None = None,
@@ -534,7 +534,7 @@ class AnalyzePhonons(object):
 
 class Helmholtz():
 
-    def __init__(self, phonon_dos, temperatures=np.linspace(0, 2000, 100), normalize = None, move_imaginary: bool = False):
+    def __init__(self, phonon_dos, temperatures=np.linspace(0, 2000, 101), normalize = None, move_imaginary: bool = False):
         """
             Args:
                 phonon_dos (Usually obtained from the phonon_dos method of the QHA class, 
@@ -719,7 +719,7 @@ class Helmholtz():
         }
 
 class Gibbs():
-    def __init__(self, phonon_dos_dict, eos="vinet", temperatures=np.linspace(0, 2000, 100), normalize = None):
+    def __init__(self, phonon_dos_dict, eos="vinet", temperatures=np.linspace(0, 2000, 101), normalize = None):
         self.eos = eos
         self.phonon_dos_dict = phonon_dos_dict
         self.temperatures = temperatures
@@ -833,7 +833,7 @@ class Gibbs():
 class QHA(object):
     def __init__(self, 
                  dos_dict: dict, #this should just take a dictionary of force data and structures to feed into AnalyzePhonons
-                 temperatures = np.linspace(0, 2000, 201), 
+                 temperatures = np.linspace(0, 2000, 101), 
                  eos: str = "vinet"):
         
         '''
