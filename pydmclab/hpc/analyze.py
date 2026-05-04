@@ -479,7 +479,7 @@ class AnalyzeVASP(object):
         else:
             return None
 
-    def pdos(self, fjson=None, remake=False):
+    def pdos(self, fdoscar="DOSCAR.lobster", fjson=None, remake=False):
         """
         @TODO: add demo/test
 
@@ -520,8 +520,9 @@ class AnalyzeVASP(object):
             except json.decoder.JSONDecodeError:
                 pass
 
-        doscar = self.outputs.doscar()
+        doscar = self.outputs.doscar(fdoscar=fdoscar)
         if not doscar:
+            print("warning: ", fdoscar, "not existed.") 
             return None
 
         complete_dos = doscar.completedos
@@ -713,38 +714,36 @@ class AnalyzeVASP(object):
             bond_length = cohp[bond_idx]["length"]
             if el_tag not in out:
                 out[el_tag] = {}
-            out[el_tag][site_tag] = {
-                "cohp": {
-                    "1": list(np.zeros(len(energies))),
-                    "-1": list(np.zeros(len(energies))),
-                },
-                "icohp": {
-                    "-1": list(np.zeros(len(energies))),
-                    "1": list(np.zeros(len(energies))),
-                },
-                "length": bond_length,
-            }
-            out[el_tag][site_tag]["cohp"]["total"] = np.zeros(len(energies))
-            out[el_tag][site_tag]["icohp"]["total"] = np.zeros(len(energies))
+            if site_tag not in out[el_tag]:
+                out[el_tag][site_tag] = {
+                    "cohp": {
+                        "1": list(np.zeros(len(energies))),
+                        "-1": list(np.zeros(len(energies))),
+                    },
+                    "icohp": {
+                        "-1": list(np.zeros(len(energies))),
+                        "1": list(np.zeros(len(energies))),
+                    },
+                    "length": bond_length,
+                }
+                out[el_tag][site_tag]["cohp"]["total"] = np.zeros(len(energies))
+                out[el_tag][site_tag]["icohp"]["total"] = np.zeros(len(energies))
             for spin in cohp[bond_idx]["COHP"]:
                 if spin.name == "up":
                     spin_tag = "1"
                 else:
                     spin_tag = "-1"
-                out[el_tag][site_tag]["cohp"][spin_tag] = list(
-                    cohp[bond_idx]["COHP"][spin]
-                )
-                out[el_tag][site_tag]["icohp"][spin_tag] = list(
-                    cohp[bond_idx]["ICOHP"][spin]
-                )
+                out[el_tag][site_tag]["cohp"][spin_tag] += cohp[bond_idx]["COHP"][spin]
+                out[el_tag][site_tag]["icohp"][spin_tag] += cohp[bond_idx]["ICOHP"][spin]
                 out[el_tag][site_tag]["cohp"]["total"] += cohp[bond_idx]["COHP"][spin]
                 out[el_tag][site_tag]["icohp"]["total"] += cohp[bond_idx]["ICOHP"][spin]
 
         for el_tag in out:
             for site_tag in out[el_tag]:
                 for key in ["cohp", "icohp"]:
-                    tmp = out[el_tag][site_tag][key]["total"]
-                    out[el_tag][site_tag][key]["total"] = list(tmp)
+                    for spin_tag in ["1", "-1", "total"]:
+                        tmp = out[el_tag][site_tag][key][spin_tag]
+                        out[el_tag][site_tag][key][spin_tag] = list(tmp)
 
         out["E"] = list(energies)
 

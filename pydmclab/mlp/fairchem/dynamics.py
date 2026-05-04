@@ -81,6 +81,7 @@ class FAIRChemCalculator(Calculator):
         inference_settings: InferenceSettings | str = "default",
         overrides: dict | None = None,
         device: Literal["cuda", "cpu"] | None = None,
+        seed: int = 42,
     ):
         """
         UMA ASE Calculator
@@ -424,6 +425,7 @@ class FAIRChemRelaxer:
         inference_settings: InferenceSettings | str = "default",
         overrides: dict | None = None,
         device: Literal["cuda", "cpu"] | None = None,
+        seed: int = 42,
         optimizer: ASEOptimizer | str = "FIRE",
     ) -> None:
 
@@ -444,6 +446,7 @@ class FAIRChemRelaxer:
                 inference_settings=inference_settings,
                 overrides=overrides,
                 device=device,
+                seed=seed,
             )
 
     def predict_structure(

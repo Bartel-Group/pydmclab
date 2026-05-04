@@ -26,7 +26,7 @@ def write_json(d, fjson):
         written dictionary
     """
     with open(fjson, "w") as f:
-        json.dump(d, f)
+        json.dump(d, f, indent=2)
     return d
 
 
