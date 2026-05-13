@@ -302,7 +302,7 @@ class VASPSetUp(object):
                 "Fatal error detecting k-mesh",
                 "Fatal error: unable to match k-point",
                 "Routine TETIRR needs special values",
-                "Tetrahedron method fails (number of k-points < 4)",
+                "fails (number of k-points < 4)",
             ],
             "inv_rot_mat": [
                 "inverse of rotation matrix was not found (increase " "SYMPREC)"
@@ -339,7 +339,10 @@ class VASPSetUp(object):
                 "internal error in subroutine POSMAP",
             ],
             "point_group": ["Error: point group operation missing"],
-            "ibzkpt": ["internal error in subroutine IBZKPT"],
+            "ibzkpt": [
+                "internal error in subroutine IBZKPT",
+                "IBZKPT: unable to construct a generating k-lattice",
+                ],
             "bad_sym": [
                 "ERROR: while reading WAVECAR, plane wave coefficients changed"
             ],

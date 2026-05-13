@@ -65,6 +65,7 @@ class GetSet(object):
                 user specified KPOINTS settings
                     {kpoints setting (str) : value for that setting (float, int, list)}
                         'reciprocal_density' = N --> # kpts * volume = N
+                        'line_density' = [M, N, P] --> [M/a, N/b, P/c] kpts along reciprocal lattice vectors
                         'density' = N --> # kpts * atoms = N
                         'auto' = N --> Auto N
                         'grid' = [N, N, N] --> N x N x N grid
@@ -387,7 +388,7 @@ class GetSet(object):
             new_settings[k] = v
 
         # delete KSPACING b/c pymatgen wants to check this at some point when writing INCAR and None causes problems
-        if new_settings["KSPACING"] is None:
+        if "KSPACING" in new_settings and new_settings["KSPACING"] is None:
             del new_settings["KSPACING"]
 
         return new_settings.copy()
@@ -398,6 +399,8 @@ class GetSet(object):
         Returns KPOINTS object based on user passed settings
 
             'reciprocal_density' = N --> # kpts * volume = N
+            'line_density' = [M, N, P] --> [M/a, N/b, P/c] kpts along reciprocal lattice vectors
+            'slab_line_density' = [M, N] --> [M/a, N/b, 1] kpts along reciprocal lattice vectors for slabs
             'density' = N --> # kpts * atoms = N
             'auto' = N --> Auto N
             'grid' = [N, N, N] --> N x N x N grid
@@ -436,6 +439,16 @@ class GetSet(object):
         elif "reciprocal_density" in new_settings:
             return Kpoints.automatic_density_by_vol(
                 structure=self.structure, kppvol=new_settings["reciprocal_density"]
+            )
+        elif "line_density" in new_settings:
+            return Kpoints.automatic_density_by_lengths(
+                structure=self.structure, length_densities=new_settings["line_density"], force_gamma=new_settings["force_gamma"] if "force_gamma" in new_settings else False
+                )
+        elif "slab_line_density" in new_settings:
+            line_densities = new_settings["slab_line_density"]
+            line_densities = [line_densities[0], line_densities[1], self.structure.lattice.c] # set k-point density along c direction to 1 for slabs (computed as N/c = 1 --> N = c)
+            return Kpoints.automatic_density_by_lengths(
+                structure=self.structure, length_densities=line_densities, force_gamma=new_settings["force_gamma"] if "force_gamma" in new_settings else False
             )
 
     @property

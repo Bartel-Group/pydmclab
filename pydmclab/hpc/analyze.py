@@ -10,7 +10,7 @@ from pymatgen.io.lobster.outputs import Doscar, Cohpcar, Charge, MadelungEnergie
 
 from pydmclab.core.struc import StrucTools, SiteTools
 from pydmclab.core.comp import CompTools
-from pydmclab.utils.handy import read_json, write_json
+from pydmclab.utils.handy import read_json, write_json, convert_numpy_to_native
 from pydmclab.data.configs import load_base_configs
 
 
@@ -345,6 +345,30 @@ class AnalyzeVASP(object):
             return None
 
     @property
+    def forces(self):
+        """
+        Returns final forces (eV/Å) from vasprun.xml or None if calc is not converged
+        """
+        if self.is_converged:
+            vr = self.outputs.vasprun
+            forces = vr.ionic_steps[-1]["forces"]
+            return convert_numpy_to_native(forces)
+        else:
+            return None
+
+    @property
+    def stress(self):
+        """
+        Returns final stress (kBar) from vasprun.xml or None if calc is not converged
+        """
+        if self.is_converged:
+            vr = self.outputs.vasprun
+            stress = vr.ionic_steps[-1]["stress"]
+            return convert_numpy_to_native(stress)
+        else:
+            return None
+
+    @property
     def nbands(self):
         """
         Returns number of bands from EIGENVAL
@@ -455,7 +479,7 @@ class AnalyzeVASP(object):
         else:
             return None
 
-    def pdos(self, fjson=None, remake=False):
+    def pdos(self, fdoscar="DOSCAR.lobster", fjson=None, remake=False):
         """
         @TODO: add demo/test
 
@@ -496,8 +520,9 @@ class AnalyzeVASP(object):
             except json.decoder.JSONDecodeError:
                 pass
 
-        doscar = self.outputs.doscar()
+        doscar = self.outputs.doscar(fdoscar=fdoscar)
         if not doscar:
+            print("warning: ", fdoscar, "not existed.") 
             return None
 
         complete_dos = doscar.completedos
@@ -689,38 +714,36 @@ class AnalyzeVASP(object):
             bond_length = cohp[bond_idx]["length"]
             if el_tag not in out:
                 out[el_tag] = {}
-            out[el_tag][site_tag] = {
-                "cohp": {
-                    "1": list(np.zeros(len(energies))),
-                    "-1": list(np.zeros(len(energies))),
-                },
-                "icohp": {
-                    "-1": list(np.zeros(len(energies))),
-                    "1": list(np.zeros(len(energies))),
-                },
-                "length": bond_length,
-            }
-            out[el_tag][site_tag]["cohp"]["total"] = np.zeros(len(energies))
-            out[el_tag][site_tag]["icohp"]["total"] = np.zeros(len(energies))
+            if site_tag not in out[el_tag]:
+                out[el_tag][site_tag] = {
+                    "cohp": {
+                        "1": list(np.zeros(len(energies))),
+                        "-1": list(np.zeros(len(energies))),
+                    },
+                    "icohp": {
+                        "-1": list(np.zeros(len(energies))),
+                        "1": list(np.zeros(len(energies))),
+                    },
+                    "length": bond_length,
+                }
+                out[el_tag][site_tag]["cohp"]["total"] = np.zeros(len(energies))
+                out[el_tag][site_tag]["icohp"]["total"] = np.zeros(len(energies))
             for spin in cohp[bond_idx]["COHP"]:
                 if spin.name == "up":
                     spin_tag = "1"
                 else:
                     spin_tag = "-1"
-                out[el_tag][site_tag]["cohp"][spin_tag] = list(
-                    cohp[bond_idx]["COHP"][spin]
-                )
-                out[el_tag][site_tag]["icohp"][spin_tag] = list(
-                    cohp[bond_idx]["ICOHP"][spin]
-                )
+                out[el_tag][site_tag]["cohp"][spin_tag] += cohp[bond_idx]["COHP"][spin]
+                out[el_tag][site_tag]["icohp"][spin_tag] += cohp[bond_idx]["ICOHP"][spin]
                 out[el_tag][site_tag]["cohp"]["total"] += cohp[bond_idx]["COHP"][spin]
                 out[el_tag][site_tag]["icohp"]["total"] += cohp[bond_idx]["ICOHP"][spin]
 
         for el_tag in out:
             for site_tag in out[el_tag]:
                 for key in ["cohp", "icohp"]:
-                    tmp = out[el_tag][site_tag][key]["total"]
-                    out[el_tag][site_tag][key]["total"] = list(tmp)
+                    for spin_tag in ["1", "-1", "total"]:
+                        tmp = out[el_tag][site_tag][key][spin_tag]
+                        out[el_tag][site_tag][key][spin_tag] = list(tmp)
 
         out["E"] = list(energies)
 
@@ -1214,6 +1237,8 @@ class AnalyzeVASP(object):
         include_calc_setup=False,
         include_structure=False,
         include_trajectory=False,
+        include_forces=False,
+        include_stress=False,
         include_mag=False,
         include_tdos=False,
         include_pdos=False,
@@ -1271,6 +1296,16 @@ class AnalyzeVASP(object):
                 data["trajectory"] = self.compact_trajectory
             else:
                 data["trajectory"] = None
+        if include_forces:
+            if convergence:
+                data["forces"] = self.forces
+            else:
+                data["forces"] = None
+        if include_stress:
+            if convergence:
+                data["stress"] = self.stress
+            else:
+                data["stress"] = None
         if include_mag:
             if convergence:
                 data["magnetization"] = self.magnetization
@@ -1528,6 +1563,8 @@ def _results_for_calc_dir(calc_dir, configs):
     include_calc_setup = configs["include_calc_setup"]
     include_structure = configs["include_structure"]
     include_trajectory = configs["include_trajectory"]
+    include_forces = configs["include_forces"]
+    include_stress = configs["include_stress"]
     include_mag = configs["include_mag"]
     include_tdos = configs["include_tdos"]
     include_pdos = configs["include_pdos"]
@@ -1554,6 +1591,8 @@ def _results_for_calc_dir(calc_dir, configs):
         include_calc_setup=include_calc_setup,
         include_structure=include_structure,
         include_trajectory=include_trajectory,
+        include_forces=include_forces,
+        include_stress=include_stress,
         include_mag=include_mag,
         include_tdos=include_tdos,
         include_pdos=include_pdos,

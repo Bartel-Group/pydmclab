@@ -778,6 +778,7 @@ class SolidSolutionGenerator:
     def __init__(
         self,
         endmembers: List[Structure],
+        num_solns: Optional[int] = None,
         supercell_dim: Optional[List[int]] = None,
         data_dir: str = os.getcwd()
     ) -> None:
@@ -805,7 +806,7 @@ class SolidSolutionGenerator:
         self.ordered_solns: Optional[List[Structure]] = None
         self.sqs_solns: Optional[List[Structure]] = None
         self.sqs_data: Optional[List[Dict[str, Any]]] = None
-        self.num_solns: Optional[int] = None
+        self.num_solns = num_solns
 
         # Create necessary directories
         self.dirs: Dict[str, Path] = {
@@ -886,10 +887,13 @@ class SolidSolutionGenerator:
                 num_differing_sites += 1
 
         # Determine number of solutions automatically
-        self.num_solns = num_differing_sites
-        print(
-            f"Automatically determined {self.num_solns} intermediate compositions based on differing sites in supercell {self.supercell_dim}."
-        )
+        if not self.num_solns:
+            self.num_solns = num_differing_sites
+            print(
+                f"Automatically determined {self.num_solns} intermediate compositions based on differing sites in supercell {self.supercell_dim}."
+            )
+        else:
+            self.num_solns = self.num_solns
 
         # Create dummy structures while saving original species and occupancies
         A_species, B_species = [], []
@@ -1280,9 +1284,9 @@ class SolidSolutionGenerator:
 
         # Save summary data
         summary_path = os.path.join(self.dirs["sqs"], "sqs_summary.json")
-        with open(summary_path, "w", encoding="utf-8") as f:
-            json.dump(sqs_data, f, indent=4)
-        
+        with open(summary_path, "w", encoding="utf-8") as file:
+            json.dump(sqs_data, file, indent=4)
+
         print(f"\nSQS generation complete! Results saved to {self.dirs['sqs']}/")
 
         return sqs_solns, sqs_data
@@ -1516,6 +1520,74 @@ class SlabTools(object):
         surface_area = np.linalg.norm(np.cross(lattice_mattrix[0], lattice_mattrix[1]))
 
         return surface_area
+
+    def cleavage_energy(
+        self,
+        *,
+        vacuum_axis: Literal["a", "b", "c", "auto"] = "auto",
+        variable_element: str = None,
+        verbose: bool = True,
+    ) -> float:
+        """
+        Calculates the cleavage energy, the simple structural energy difference between the slab and the bulk per unit area,
+        excluding any chemical potential term. Mathematically: (E_slab - N * E_bulk) / (2 * A)
+        """
+        if not self.bulk_e_per_at:
+            raise ValueError(
+                "Bulk energy per atom must be provided to calculate cleavage energy."
+            )
+
+        surface_area = self.surface_area(vacuum_axis=vacuum_axis, verbose=verbose)
+
+        if not self.is_stoich:
+            slab_e_tot = self.slab_e_per_at * len(self.slab_structure)
+
+            if self.unreduced_bulk_composition:
+                bulk_e_tot = (
+                    self.bulk_e_per_at * self.unreduced_bulk_composition.num_atoms
+                )
+            else:
+                possible_scenarios = self.possible_off_stoichiometries
+
+                if not possible_scenarios:
+                    raise ValueError(
+                        f"No possible off-stoichiometries found with deviation less than {sum(self.reduced_bulk_composition.get_el_amt_dict()).values()} total atoms."
+                    )
+
+                if variable_element:
+                    for scenario in possible_scenarios:
+                        excess_or_deficient_amts = scenario["excess_or_deficient_amts"]
+                        total_atoms = sum(
+                            abs(amt) for amt in excess_or_deficient_amts.values()
+                        )
+                        variable_element_count = abs(
+                            excess_or_deficient_amts.get(variable_element, 0)
+                        )
+                        scenario["variable_element_percentage"] = (
+                            (variable_element_count / total_atoms) * 100
+                            if total_atoms > 0
+                            else 0
+                        )
+
+                    possible_scenarios.sort(
+                        key=lambda x: x["variable_element_percentage"], reverse=True
+                    )
+
+                bulk_e_tot = (
+                    self.bulk_e_per_at
+                    * Composition.from_dict(
+                        possible_scenarios[0]["scaled_bulk_composition"]
+                    ).num_atoms
+                )
+
+            return (slab_e_tot - bulk_e_tot) / (2 * surface_area)
+
+        scale = (
+            self.slab_structure.composition.get_reduced_composition_and_factor()[1]
+            * self.slab_structure.composition.reduced_composition.num_atoms
+        )
+
+        return ((self.slab_e_per_at - self.bulk_e_per_at) * scale) / (2 * surface_area)
 
     def surface_energy(
         self,

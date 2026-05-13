@@ -81,7 +81,7 @@ class FAIRChemCalculator(Calculator):
         inference_settings: InferenceSettings | str = "default",
         overrides: dict | None = None,
         device: Literal["cuda", "cpu"] | None = None,
-        seed: int|None = None,
+        seed: int = 42,
     ):
         """
         UMA ASE Calculator
@@ -97,7 +97,6 @@ class FAIRChemCalculator(Calculator):
                 (optimized for speed but requires fixed atomic composition).
             overrides: Optional dictionary of settings to override default inference settings.
             device: Optional torch device to load the model onto. If None, uses the default device.
-            seed (int, optional): Random seed for reproducibility.
         """
 
         super().__init__()
@@ -123,30 +122,20 @@ class FAIRChemCalculator(Calculator):
                 f"{name_or_path=} is not a valid model name or checkpoint path, pretrained models include {available_models}"
             )
 
-        if predict_unit.inference_mode.external_graph_gen is not False:
-            raise RuntimeError(
-                "FAIRChemCalculator can only be used with external_graph_gen True inference settings."
-            )
-
-        if predict_unit.model.module.backbone.direct_forces:
-            logging.warning(
-                "This is a direct-force model. Direct force predictions may lead to discontinuities in the potential "
-                "energy surface and energy conservation errors."
-            )
-
         if isinstance(task_name, UMATask):
             task_name = task_name.value
 
+        valid_datasets = list(predict_unit.dataset_to_tasks.keys())
         if task_name is not None:
             assert (
-                task_name in list(predict_unit.dataset_to_tasks.keys())
-            ), f"Given: {task_name}, Valid options are {list(predict_unit.dataset_to_tasks.keys())}"
-            self._task_name = task_name
-        elif len(list(predict_unit.dataset_to_tasks.keys())) == 1:
-            self._task_name = list(predict_unit.dataset_to_tasks.keys())[0]
+                task_name in valid_datasets
+            ), f"Given: {task_name}, Valid options are {valid_datasets}"
+            self._task = UMATask(task_name)
+        elif len(valid_datasets) == 1:
+            self._task = UMATask(valid_datasets[0])
         else:
             raise RuntimeError(
-                f"A task name must be provided. Valid options are {list(predict_unit.dataset_to_tasks.keys())}"
+                f"A task name must be provided. Valid options are {valid_datasets}"
             )
 
         self.implemented_properties = [
@@ -155,23 +144,34 @@ class FAIRChemCalculator(Calculator):
         if "energy" in self.implemented_properties:
             self.implemented_properties.append(
                 "free_energy"
-            )  # free_energy is a copy of energy, see calculate method docstring
+            )  # Free energy is a copy of energy, see docstring above
 
         self.predictor = predict_unit
-        # self.predictor.seed(seed)
+
+        if predict_unit.inference_settings.external_graph_gen is True:
+            r_edges = True
+            max_neigh = 300
+            radius = 6.0  # Default radius for edge generation
+            logging.warning(
+                "External graph generation is enabled, limiting neighbors to 300."
+            )
+        else:
+            r_edges = False
+            max_neigh = None
+            radius = 6.0  # Still need radius even for internal graph gen
 
         self.a2g = partial(
             AtomicData.from_ase,
-            max_neigh=self.predictor.model.module.backbone.max_neighbors,
-            radius=self.predictor.model.module.backbone.cutoff,
             task_name=self.task_name,
-            r_edges=False,
+            r_edges=r_edges,
             r_data_keys=["spin", "charge"],
+            max_neigh=max_neigh,
+            radius=radius,
         )
 
     @property
     def task_name(self) -> str:
-        return self._task_name
+        return self._task.value
 
     def check_state(self, atoms: Atoms, tol: float = 1e-15) -> list:
         """
@@ -531,9 +531,9 @@ class FAIRChemRelaxer:
 
             native_obs = convert_numpy_to_native(obs.as_dict())
             obs = FAIRChemObserver.from_dict(native_obs)
-            
-         # Ensure structure is JSON serializable by converting to dict
-        serializable_structure = struc.as_dict() if hasattr(struc, 'as_dict') else struc
+
+        # Ensure structure is JSON serializable by converting to dict
+        serializable_structure = struc.as_dict() if hasattr(struc, "as_dict") else struc
 
         return {
             "final_structure": serializable_structure,
@@ -554,7 +554,6 @@ class EquationOfState:
         inference_settings: InferenceSettings | str = "default",
         overrides: dict | None = None,
         device: Literal["cuda", "cpu"] | None = None,
-        seed: int = 42,
         optimizer: ASEOptimizer | str = "FIRE",
     ) -> None:
         """Initialize a structure optimizer object for calculation of bulk modulus.
@@ -569,7 +568,6 @@ class EquationOfState:
                 (optimized for speed but requires fixed atomic composition).
             overrides (dict | None): Optional dictionary of settings to override default inference settings.
             device (Literal["cuda", "cpu"] | None): Optional torch device to load the model onto. If None, uses the default device.
-            seed (int, optional): Random seed for reproducibility.
             optimizer (ASEOptimizer | str): The ASE optimizer to use for relaxation.
         """
 
@@ -585,7 +583,6 @@ class EquationOfState:
                 inference_settings=inference_settings,
                 overrides=overrides,
                 device=device,
-                seed=seed,
                 optimizer=optimizer,
             )
 
@@ -717,7 +714,6 @@ class FAIRChemMD:
         inference_settings: InferenceSettings | str = "default",
         overrides: dict | None = None,
         device: Literal["cuda", "cpu"] | None = None,
-        seed: int = 42,
     ) -> None:
 
         self.ensemble = ensemble
@@ -745,7 +741,6 @@ class FAIRChemMD:
                 inference_settings=inference_settings,
                 overrides=overrides,
                 device=device,
-                seed=seed,
             )
 
         if taut is None:
