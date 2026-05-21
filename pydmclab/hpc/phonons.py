@@ -207,13 +207,13 @@ class AnalyzePhonons(object):
 
     def band_structure(
         self,
-        paths: list|None = None,
+        paths: list|dict|None = None,
         Nq: int = 100
     ):
         """
         Returns the band structure for the phonon object in a dictionary
         Args:
-            paths (list or None):
+            paths (list or dict or None):
                 If None is provided, a path will automatically be found using seekpath
                 List of paths in reciprocal space. e.g.: 
                             [
@@ -221,16 +221,23 @@ class AnalyzePhonons(object):
                                 [[0.5, 0.5, 1.0], [0, 0, 0]],  # X to K to Γ
                                 [[0.0, 0.0, 0.0], [0.5, 0.5, 0.5]],  # Γ to L
                             ] (these coordinates/high symmetry points vary structure to structure)
+                Or dictionary of paths with labels. e.g.:
+                            {'Γ-X': [[0.0, 0.0, 0.0], [0.5, 0.5, 0.0]],
+                            'X-Γ': [[0.5, 0.5, 1.0], [0, 0, 0]],...}
+                            This will save the labels in the band structure dictionary for ease of plotting.
 
         Returns:
-            {'qpoints': arrays of q points, 'distances': arrays of distances, 'frequencies': arrays of frequencies, 'eigenvectors': arrays of eigenvectors, group_velocities': arrays of group velocities}
+            {'qpoints': arrays of q points, 'distances': arrays of distances, 'frequencies': arrays of frequencies, 'eigenvectors': arrays of eigenvectors, group_velocities': arrays of group velocities, 'paths': list of path labels if provided or automatically found}
         """
 
         path_data = None
         if paths==None:
             path_data = self.find_high_symmetry_path
             paths = [path_data[key] for key in path_data]
-        
+        elif isinstance(paths, dict):
+            path_data = paths
+            paths = list(paths.values())
+
         def get_band(q_start, q_stop, N):
             """ Return path between q_start and q_stop """
             return np.array([q_start + (q_stop-q_start)*i/(N-1) for i in range(N)])

@@ -19,8 +19,12 @@ EV_TO_KJ_PER_MOL = EV_TO_J_PER_MOL / 1000.0
 
 #This code needs a lot of cleanup and refactoring, but I want to get some quick plotting in before I spend time on that. So apologies for the messiness here.
 
-def plot_phonon_bandstructure(qpoints, frequencies, labels=None, 
-                              ylabel="Energy (eV)", title="", figsize=(8, 6)):
+def plot_phonon_bandstructure(qpoints, 
+                              frequencies, 
+                              labels=None, 
+                              ylabel="Energy (eV)", 
+                              title="", 
+                              figsize=(8, 6)):
     """
     Plot a phonon band structure from Phonopy-style qpoints and frequencies.
 
