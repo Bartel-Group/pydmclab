@@ -1,6 +1,5 @@
 import os
 import numpy as np
-import multiprocessing as multip
 import json
 
 from pymatgen.io.vasp.outputs import Vasprun, Outcar, Eigenval, Oszicar
@@ -1403,6 +1402,7 @@ class AnalyzeBatch(object):
                 if "-" in c
                 if any(xc in c for xc in ["gga", "metagga", "hse"])
                 if "prelobster" not in c
+                if not any(fp_xc in c for fp_xc in ["fpgga", "fpmetagga"])
             ]
             calc_dirs = [os.path.join(launch_dir, c) for c in relevant_stuff]
             calc_dirs = [

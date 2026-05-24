@@ -1,11 +1,13 @@
 import multiprocessing as multip
 import os
+import math
 import warnings
 import subprocess
 
 from pydmclab.hpc.launch import LaunchTools
 from pydmclab.hpc.submit import SubmitTools
 from pydmclab.hpc.analyze import AnalyzeVASP, AnalyzeBatch
+from pydmclab.hpc.fp import AnalyzeFPBatch
 from pydmclab.core.comp import CompTools
 from pydmclab.core.query import MPQuery, MPLegacyQuery
 from pydmclab.core.struc import StrucTools
@@ -135,6 +137,66 @@ def get_vasp_configs(
     return vasp_configs
 
 
+def get_fp_configs(
+    optimizer="FIRE",
+    relax_cell=True,
+    stress_weight=1 / 160.21766208,
+    fmax=0.03,
+    steps=500,
+    interval=1,
+    cell_filter="Frechet",
+    params_cell_filter=None,
+    **kwargs,
+):
+    """
+    configs related to foundation potential (FP) calculations
+    Args:
+        optimizer (str):
+            options include "FIRE", "BFGS", "LBFGS", ...
+            (see https://github.com/materialyzeai/matgl/blob/v1.3.0/src/matgl/ext/ase.py for complete list)
+        relax_cell (bool):
+            if True, relax the lattice cell (i.e., ISIF = 3)
+            if False, don't relax the lattice cell (i.e., ISIF = 2)
+        stress_weight (float):
+            conversion factor from GPa to eV/A^3
+        fmax (float):
+            force tolerance for relaxation convergence
+        steps (int):
+            maximum number of steps to attempt for relaxation
+        interval (int):
+            step interval for saving the trajectory
+        cell_filter (str):
+            options are "Frechet" or "Exp"
+            ASE cell filter used to control cell relaxation
+        params_cell_filter (dict or None):
+            parameters to pass to cell filter to control cell relaxation
+            e.g., {"mask":[False,False,True,False,False,False]} to relax in only the z-direction
+        **kwargs:
+            kwargs to pass to optimizer
+
+    """
+    if not math.isclose(stress_weight, 1 / 160.21766208, rel_tol=0.0, abs_tol=1e-8):
+        warnings.warn(
+            "The default stress weight is intended to convert from GPa to eV/A^3. "
+            "Please make sure you understand what you are doing.",
+            UserWarning,
+            stacklevel=2,
+        )
+
+    fp_configs = {}
+    fp_configs["optimizer"] = optimizer
+    fp_configs["relax_cell"] = relax_cell
+    fp_configs["stress_weight"] = stress_weight
+    fp_configs["fmax"] = fmax
+    fp_configs["steps"] = steps
+    fp_configs["interval"] = interval
+    fp_configs["cell_filter"] = cell_filter
+    fp_configs["params_cell_filter"] = params_cell_filter
+    fp_configs["fp_kwargs"] = kwargs
+
+    return fp_configs
+
+
 def get_slurm_configs(
     total_nodes=1,
     cores_per_node=8,
@@ -216,12 +278,14 @@ def get_sub_configs(
     relaxation_xcs=["gga"],
     static_addons={"gga": ["lobster"]},
     prioritize_relaxes=True,
+    start_with_fp=True,
     start_with_loose=False,
     custom_calc_list=None,
     restart_these_calcs=None,
     submit_calculations_in_parallel=False,
     machine="msi",
     mpi_command="mpirun",
+    fp_version="tnet",
     vasp_version=6,
     lobster_version=4,
     struc_src_for_hse="metagga-relax",
@@ -247,6 +311,9 @@ def get_sub_configs(
                     calc_list = ['gga-relax', 'gga-static', 'metagga-relax', 'metagga-static', 'gga-lobster', 'metagga-bs']
                 if prioritize_relaxes = False,
                     calc_list = ['gga-relax', 'gga-static', 'gga-lobster', 'metagga-relax', 'metagga-static', 'metagga-lobster']
+        start_with_fp (bool):
+            if True, your first relaxation_xc will start with a foundation potential before the DFT relax --> static
+            if False, no foundational potential calculations will be performed
         start_with_loose (bool):
             if True, your first relaxation_xc will start with a loose calc before relax --> static
             if False, no loose calculations will be performed
@@ -265,6 +332,8 @@ def get_sub_configs(
             name of supercomputer
         mpi_command (str):
             the command to use for mpi (eg mpirun, srun, etc)
+        fp_version (str):
+            "tnet" for TensorNet MatPes model, "chgnet" for CHGNet MatPes model
         vasp_version (int):
             5 for 5.4.4, 6 for 6.4.1, or 7 for 6.5.1
         lobster_version (int):
@@ -273,6 +342,16 @@ def get_sub_configs(
         {config_name : config_value}
     """
     sub_configs = {}
+
+    # fp takes precedence over loose (i.e., don't run loose if FP is being run)
+    if start_with_fp and start_with_loose:
+        warnings.warn(
+            "Both start_with_fp and start_with_loose were set to True. "
+            "start_with_loose will be ignored since start_with_fp takes precedence",
+            UserWarning,
+            stacklevel=2,
+        )
+        start_with_loose = False
 
     if restart_these_calcs is None:
         restart_these_calcs = []
@@ -292,10 +371,12 @@ def get_sub_configs(
         sub_configs["custom_calc_list"] = custom_calc_list
 
     sub_configs["fresh_restart"] = restart_these_calcs
+    sub_configs["start_with_fp"] = start_with_fp
     sub_configs["start_with_loose"] = start_with_loose
     sub_configs["relaxation_xcs"] = relaxation_xcs
     sub_configs["static_addons"] = static_addons
     sub_configs["machine"] = machine
+    sub_configs["fp_version"] = fp_version
     sub_configs["vasp_version"] = vasp_version
     sub_configs["lobster_version"] = lobster_version
     sub_configs["struc_src_for_hse"] = struc_src_for_hse
@@ -1009,7 +1090,7 @@ def submit_calcs(
                     which vasp do you want to use
                         use vasp_gam for "loose" calcs (havent implemented yet)
                 vasp_version: default is 6
-                    version of VASP (can be 5 for 5.4.4 or 6 for 6.4.1)
+                    version of VASP (can be 5 for 5.4.4 or 6 for 6.4.1 or 7 for 6.5.1)
                 mpi_command: default is mpirun
                     how to launch on multicore/multinode (may be mpirun depending on compilation)
                 manager: default is '#SBATCH'
@@ -1099,6 +1180,72 @@ def submit_calcs(
         submit_one_calc(curr_submit_args)
 
     return
+
+
+def get_fp_results(
+    launch_dirs,
+    include_full_trajs=False,
+    data_dir=os.getcwd().replace("scripts", "data"),
+    savename="fp_results.json",
+    remake=False,
+):
+    """
+    Args:
+        launch_dirs (dict)
+            {launch_dir (str) :
+                {'magmom' : [list of magmoms for the structure in that launch_dir (list)],
+                 'ID_specific_vasp_configs' : {<formula_indicator>_<struc_indicator> : {desired configs for this entry}}}
+        include_full_trajs (bool):
+            if True, include full trajectories in collected results (can lead to large file size)
+        data_dir (str)
+            directory to save fjson
+        savename (str)
+            filename for fjson in data_dir
+        remake (bool)
+            write (True) or just read (False) fjson
+    Returns:
+        {formula--ID--mag--xc-calc (str) :
+            {scraped results from FP calculation}}
+    """
+
+    fjson = os.path.join(data_dir, savename)
+    if os.path.exists(fjson) and not remake:
+        return read_json(fjson)
+
+    analyzer = AnalyzeFPBatch(launch_dirs, include_full_trajs)
+
+    data = analyzer.results
+
+    write_json(data, fjson)
+    return read_json(fjson)
+
+
+def check_fp_results(fp_results):
+    keys_to_check = list(fp_results.keys())
+
+    converged_fp_gga = 0
+    total_fp_gga = 0
+    converged_fp_metagga = 0
+    total_fp_metagga = 0
+    for key in keys_to_check:
+        _, _, _, xc_calc = key.split("--")
+        xc, _ = xc_calc.split("-")
+        convergence = fp_results[key]["results"]["convergence"]
+        if xc == "fpgga":
+            if convergence:
+                converged_fp_gga += 1
+            total_fp_gga += 1
+        elif xc == "fpmetagga":
+            if convergence:
+                converged_fp_metagga += 1
+            total_fp_metagga += 1
+
+    print("\n\n-------- FP calcs --------")
+    print(f"\n SUMMARY: {converged_fp_gga}/{total_fp_gga} fp-gga calcs converged")
+    print(
+        f"\n SUMMARY: {converged_fp_metagga}/{total_fp_metagga} fp-metagga calcs converged"
+    )
+    print("\n--------------------------\n\n")
 
 
 def get_results(
