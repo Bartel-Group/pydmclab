@@ -247,125 +247,177 @@ def plot_thermal_properties(thermal_props, plot_props=["F", "S"], title="", figs
     plt.show()
 
 
-def plot_relative_prop(thermal_props_dict, 
-                       prop="F", align_Fs=False, 
-                       figsize=(6,4), 
-                       ylims=None, 
-                       xlims=None, plot_in_j_mol=False, 
-                       atoms_per_formula_units=None,
-                       thermal_props_dict2=None, 
-                       data_set_labels=["DFT", "TensorNet"]):
+def plot_relative_prop(
+    thermal_props_dict,
+    prop="F",
+    align_at_0K=False,
+    figsize=(6, 4),
+    ylims=None,
+    xlims=None,
+    plot_in_j_mol=False,
+    atoms_per_formula_units=None,
+    colors=["green", "blue", "orange", "purple", "red"],
+):
     """
-    Plot relative property between two structures. The property is plotted as the difference (structure 2 - structure 1) vs temperature.
-    If second set of thermal properties is provided, it will be plotted on the same graph for comparison. (e.g., comparing DFT vs TensorNet for both needle and dist_perovskite structures)
+    Plot the difference in a thermal property between two structures, for one or
+    more datasets (e.g. DFT vs matcalc).
+
+    The difference is always (second structure − first structure) within each dataset.
 
     Parameters
     ----------
-    thermal_props_dict : dict
-        Dictionary containing thermal properties for both structures
-        {"label1": [{'T': float, 'F': float, 'S': float, ...}, ...],
-         "label2": [{'T': float, 'F': float, 'S': float, ...}, ...]}
-    thermal_props_dict2 : dict or None
-        Dictionary containing thermal properties for a second set of structures (optional)
-        Must be the same size array over the same temperatures as thermal_props_dict
+    thermal_props_dict :
+        Outer keys  → dataset label (shown in legend if more than one, e.g. "DFT", "matcalc").
+        Inner keys  → structure label (e.g. "needle", "perovskite").
+        Each leaf   → list of dicts with keys 'T', 'F', 'S', 'Cv', …
+
+        Example:
+            {
+                'DFT':     {'needle': [...], 'perovskite': [...]},
+                'matcalc': {'needle': [...], 'perovskite': [...]},
+            }
+
+        if only one dataset is provided, outer keys don't matter and will be ignored in the legend (e.g. just "ΔF: perovskite - needle" instead of "ΔF: perovskite - needle [DFT]").
+        Can say:
+            {'data': {'needle': [...], 'perovskite': [...]},
+            
+        Exactly two inner keys are required per dataset (the difference is
+        computed as second_structure - first_structure).
+
     prop : str
-        Property to plot
+        Property to take the difference of ('F', 'S', 'Cv', …).
+    align_at_0K : bool
+        If True, shift every curve so that its 0 K value matches the lowest
+        0 K value across all datasets. Useful for comparing relative changes
+        with temperature without an absolute offset.
     figsize : tuple
-        Figure size
+        Figure size.
+    ylims : tuple or None
+        y-axis limits.
+    xlims : tuple or None
+        x-axis limits.
     plot_in_j_mol : bool
-        If True, plot in kJ/mol; if False, plot in eV/atom
+        If True, convert F → kJ/mol and S/Cv → J/K/mol.
     atoms_per_formula_units : int or None
-        Number of atoms per formula unit. If provided, scales per-atom to per-formula-unit.
+        If provided, scales per-atom values to per-formula-unit.
+    colors : list[str]
+        One color per dataset (cycles if needed).
     """
-    # Ensure numpy arrays for numeric operations
-    label1, label2 = list(thermal_props_dict.keys())
-    thermal_props1 = thermal_props_dict[label1]
-    thermal_props2 = thermal_props_dict[label2]
-    temps = np.array([point['T'] for point in thermal_props1])
-    prop_struc1_vals = np.array([point[prop] for point in thermal_props1])
-    prop_struc2_vals = np.array([point[prop] for point in thermal_props2])
-    delta_prop = prop_struc2_vals - prop_struc1_vals
+    if not thermal_props_dict:
+        raise ValueError("thermal_props_dict is empty.")
 
-    if thermal_props_dict2 is not None:
-        label3, label4 = list(thermal_props_dict2.keys())
-        thermal_props3 = thermal_props_dict2[label3]
-        thermal_props4 = thermal_props_dict2[label4]
-        prop_struc3_vals = np.array([point[prop] for point in thermal_props3])
-        prop_struc4_vals = np.array([point[prop] for point in thermal_props4])
-        delta_prop2 = prop_struc4_vals - prop_struc3_vals
-        if align_Fs:
-            # Align the F values of the two datasets by substacting the difference at 0K (or lowest T) from the entire curve. This way we can compare relative changes with temperature without an absolute offset.
-            data_set1_0K_val = delta_prop[0]
-            data_set2_0K_val = delta_prop2[0]
-            lower_0K = min(data_set1_0K_val, data_set2_0K_val)
-            #shift the one that has a larger value at 0K down to match the lower one
-            if data_set1_0K_val > data_set2_0K_val:
-                delta_prop = delta_prop - (data_set1_0K_val - lower_0K)
-            elif data_set2_0K_val > data_set1_0K_val:
-                delta_prop2 = delta_prop2 - (data_set2_0K_val - lower_0K)
+    linestyles = ["-", "--", "-.", ":"]  # first dataset solid, rest dashed
 
+    # ── Parse & compute Δprop for every dataset ──────────────────────────────
+    deltas   = {}   # label → np.ndarray of Δprop (raw eV/atom)
+    temps_by = {}   # label → np.ndarray of temperatures
+
+    for ds_label, structures in thermal_props_dict.items():
+        struct_labels = list(structures.keys())
+        if len(struct_labels) != 2:
+            raise ValueError(
+                f"Dataset '{ds_label}' has {len(struct_labels)} structure(s); "
+                "exactly 2 are required to compute a difference."
+            )
+        lbl_a, lbl_b = struct_labels
+        data_a, data_b = structures[lbl_a], structures[lbl_b]
+
+        for d, lbl in [(data_a, lbl_a), (data_b, lbl_b)]:
+            if prop not in d[0]:
+                raise ValueError(
+                    f"Property '{prop}' not found in dataset '{ds_label}' / "
+                    f"structure '{lbl}'. Available: {list(d[0].keys())}"
+                )
+
+        temps   = np.array([pt["T"]    for pt in data_a])
+        vals_a  = np.array([pt[prop]   for pt in data_a])
+        vals_b  = np.array([pt[prop]   for pt in data_b])
+        delta   = vals_b - vals_a          # second − first
+
+        deltas[ds_label]   = delta
+        temps_by[ds_label] = temps
+
+    # ── Optional 0 K alignment ───────────────────────────────────────────────
+    if align_at_0K:
+        lowest_0K = min(d[0] for d in deltas.values())
+        for ds_label in deltas:
+            offset = deltas[ds_label][0] - lowest_0K
+            deltas[ds_label] = deltas[ds_label] - offset
+
+    # ── Unit scaling ─────────────────────────────────────────────────────────
     if atoms_per_formula_units is not None:
-        delta_prop = delta_prop * atoms_per_formula_units
+        for ds_label in deltas:
+            deltas[ds_label] = deltas[ds_label] * atoms_per_formula_units
 
     if plot_in_j_mol:
-        delta_prop_plot = delta_prop * EV_TO_KJ_PER_MOL if prop == "F" else delta_prop * EV_TO_J_PER_MOL
-        ylabel = f"Δ{prop} (kJ/mol{'-fu' if atoms_per_formula_units else ''})"
+        factor = EV_TO_KJ_PER_MOL if prop == "F" else EV_TO_J_PER_MOL
+        for ds_label in deltas:
+            deltas[ds_label] = deltas[ds_label] * factor
+        unit   = "kJ/mol" if prop == "F" else "J/K/mol"
     else:
-        delta_prop_plot = delta_prop
-        ylabel = f"Δ{prop} (eV/{'fu' if atoms_per_formula_units else 'atom'})"
+        unit   = "eV/fu" if atoms_per_formula_units else "eV/atom"
 
+    ylabel = f"Δ{prop} ({unit}{'-fu' if (atoms_per_formula_units and plot_in_j_mol) else ''})"
+
+    # ── Plot ─────────────────────────────────────────────────────────────────
     plt.figure(figsize=figsize)
-    plt.plot(temps, delta_prop_plot, color='green', linewidth=1.5, label=f"Δ{prop}: {label2} - {label1} - {data_set_labels[0]}")
-    if thermal_props_dict2 is not None:
-        plt.plot(temps, delta_prop2, color='green', linewidth=1.5, linestyle='--', label=f"Δ{prop}: {label4} - {label3} - {data_set_labels[1]}")
-    plt.axhline(0, color='black', linestyle='--', linewidth=0.8)
 
-    # Detect first zero-crossing (sign change) and mark it
+    for i, (ds_label, structures) in enumerate(thermal_props_dict.items()):
+        struct_labels  = list(structures.keys())
+        lbl_a, lbl_b   = struct_labels
+        legend_label = (
+                        f"Δ{prop}: {lbl_b} - {lbl_a}"
+                        if len(thermal_props_dict) == 1
+                        else f"Δ{prop}: {lbl_b} - {lbl_a}  [{ds_label}]"
+                    )
+        color          = colors[i % len(colors)]
+        ls             = linestyles[i % len(linestyles)]
+
+        plt.plot(
+            temps_by[ds_label],
+            deltas[ds_label],
+            color=color,
+            linewidth=1.5,
+            linestyle=ls,
+            label=legend_label,
+        )
+
+    plt.axhline(0, color="black", linestyle="--", linewidth=0.8)
+
+    # ── Transition temperature: detect for the FIRST dataset only ────────────
+    first_label = next(iter(thermal_props_dict))
+    delta_ref   = deltas[first_label]
+    temps_ref   = temps_by[first_label]
+
     trans_T = None
-    # Look for sign changes between adjacent points
-    signs = np.sign(delta_prop)
-    # Consider small values as zero for robustness
-    zero_idxs = np.where(np.isclose(delta_prop, 0.0, atol=1e-12))[0]
+    zero_idxs = np.where(np.isclose(delta_ref, 0.0, atol=1e-12))[0]
     if zero_idxs.size > 0:
-        # exact zero exists — take first occurrence
-        trans_T = float(temps[zero_idxs[0]])
+        trans_T = float(temps_ref[zero_idxs[0]])
     else:
+        signs      = np.sign(delta_ref)
         cross_idxs = np.where(np.diff(signs) != 0)[0]
         if cross_idxs.size > 0:
-            i = cross_idxs[0]
-            # linear interpolation between (temps[i], delta_prop[i]) and (temps[i+1], delta_prop[i+1])
-            t1, t2 = float(temps[i]), float(temps[i+1])
-            f1, f2 = float(delta_prop[i]), float(delta_prop[i+1])
-            if (f2 - f1) != 0:
-                trans_T = t1 - f1 * (t2 - t1) / (f2 - f1)
-            else:
-                trans_T = float((t1 + t2) / 2.0)
+            i       = cross_idxs[0]
+            t1, t2  = float(temps_ref[i]), float(temps_ref[i + 1])
+            f1, f2  = float(delta_ref[i]), float(delta_ref[i + 1])
+            trans_T = t1 - f1 * (t2 - t1) / (f2 - f1) if (f2 - f1) != 0 else (t1 + t2) / 2
 
     if trans_T is not None:
         ax = plt.gca()
         ymin, ymax = ax.get_ylim()
         xmin, xmax = ax.get_xlim()
-        # draw vertical red dotted line at transition temperature
-        plt.axvline(trans_T, color='red', linestyle=':', linewidth=1.2)
-        # label the transition temperature to the side of the line
-        label_text = f"T_trans = {trans_T:.1f} K"
-        # horizontal offset as fraction of axis width
-        x_off = 0.03 * (xmax - xmin)
-        # prefer placing label to the right; if too close to right edge, place to left
+        plt.axvline(trans_T, color="red", linestyle=":", linewidth=1.2)
+        x_off   = 0.03 * (xmax - xmin)
         label_x = trans_T + x_off if (trans_T + x_off) < xmax else trans_T - x_off
-        # vertical position: scooch label down (about 25% above bottom)
-        label_y = ymin + 0.25 * (ymax - ymin)
-        # clamp so label isn't too close to the axis bottom
-        min_y = ymin + 0.05 * (ymax - ymin)
-        if label_y < min_y:
-            label_y = min_y
-        ha = 'left' if label_x > trans_T else 'right'
-        plt.text(label_x, label_y, label_text, color='red', ha=ha, va='center', fontsize=9, backgroundcolor='white')
+        label_y = max(ymin + 0.05 * (ymax - ymin), ymin + 0.25 * (ymax - ymin))
+        ha      = "left" if label_x > trans_T else "right"
+        plt.text(
+            label_x, label_y, f"T_trans = {trans_T:.1f} K",
+            color="red", ha=ha, va="center", fontsize=9, backgroundcolor="white",
+        )
 
     plt.xlabel("Temperature (K)")
     plt.ylabel(ylabel)
-    # plt.title("Relative Helmholtz Free Energy")
-    # plt.grid(alpha=0.3)
     if ylims is not None:
         plt.ylim(ylims)
     if xlims is not None:
@@ -374,88 +426,134 @@ def plot_relative_prop(thermal_props_dict,
     plt.tight_layout()
     plt.show()
 
-def plot_phonon_dos_comparison(frequencies, dos, frequencies2=None, dos2=None, label1="Dataset 1", label2="Dataset 2",
-                   plot_in_thz=False, title="", figsize=(6,4), ylims=None, fill_between=False):
+def plot_phonon_dos_comparison(
+    dos_dict,
+    plot_in_thz=False,
+    title="",
+    figsize=(6, 4),
+    ylims=None,
+    fill_between=False,
+    normalize=True,
+):
     """
-    Plot phonon density of states. If dos2 is provided, both are normalized to unit area and plotted together for comparison. (Like if you want to compare the DOS from two different calculation methods)
-    Parameters    
+    Plot phonon density of states for one or more datasets.
+
+    Parameters
     ----------
-    frequencies : ndarray, shape (npoints,)
-        Frequency values for dos in eV
-    dos : ndarray, shape (npoints,)
-        Density of states values for dos in states/eV
-    frequencies2 : ndarray or None
-        Frequency values for dos2 in eV. Must be the same length as dos2 if dos2 is provided.
-    dos2 : ndarray or None
-        Density of states values for dos2 in states/eV. Must be the same length as frequencies2 if provided.
-    label1, label2 : str
-        Labels for the two datasets (used when dos2 is provided)
+    dos_dict : dict
+        Keys are dataset labels (str), values are lists of dicts with keys 'E' and 'total_dos'.
+        Example:
+            {
+                'DFT':     [{'E': -0.004, 'total_dos': 0.0}, ...],
+                'matcalc': [{'E': -0.004, 'total_dos': 0.0}, ...],
+            }
     plot_in_thz : bool
-        If True, convert frequencies from eV to THz and adjust DOS units accordingly
+        If True, convert frequencies from eV to THz and adjust DOS units accordingly.
     title : str
-        Plot title
+        Plot title.
     figsize : tuple
-        Figure size
+        Figure size.
     ylims : tuple or None
-        y-axis limits
+        y-axis limits.
     fill_between : bool
-        If True and dos2 is provided, fill the area between the two DOS curves to visually highlight differences.
+        If True and more than one dataset is provided, fill the area between each
+        dataset and the first dataset to visually highlight differences.
+    normalize : bool
+        If True and more than one dataset is provided, normalize each DOS to unit area
+        before plotting.
     """
+    if not dos_dict:
+        raise ValueError("dos_dict is empty.")
+
+    h = physical_constants['Planck constant in eV/Hz'][0]
+    THz_factor = h * 1e12  # eV → THz conversion factor
+
+    colors = ['blue', 'red', 'green', 'orange', 'purple', 'brown']
+    linestyles = ['-', '--', '--', '--', '--', '--']  # first solid, rest dashed
+
+    multi = len(dos_dict) > 1
 
     if plot_in_thz:
-        h = physical_constants['Planck constant in eV/Hz'][0]
-        frequencies = frequencies / (h * 1e12)
-        dos = dos * (h * 1e12)
-        if dos2 is not None:
-            frequencies2 = frequencies2 / (h * 1e12)
-            dos2 = dos2 * (h * 1e12)
-        ylabel = "DOS (states/THz)"
+        ylabel = "DOS (states/THz)" if not (multi and normalize) else "Normalized DOS (arb. units)"
         xlabel = "Frequency (THz)"
     else:
-        ylabel = "DOS (states/eV)"
+        ylabel = "DOS (states/eV)" if not (multi and normalize) else "Normalized DOS (arb. units)"
         xlabel = "Energy (eV)"
+
+    # Parse all datasets up front
+    parsed = {}
+    for label, records in dos_dict.items():
+        freqs = np.array([r['E'] for r in records])
+        dos   = np.array([r['total_dos'] for r in records])
+        if plot_in_thz:
+            freqs = freqs / THz_factor
+            dos   = dos   * THz_factor
+        parsed[label] = (freqs, dos)
 
     plt.figure(figsize=figsize)
 
-    if dos2 is not None and frequencies2 is not None:
-        # Normalize both to unit area on their own grids
-        norm1 = trapezoid(dos, frequencies)
-        norm2 = trapezoid(dos2, frequencies2)
-        dos1_norm = dos / norm1
-        dos2_norm = dos2 / norm2
+    # Reference dataset (first key) for fill_between and shape metrics
+    ref_label = next(iter(parsed))
+    ref_freqs, ref_dos = parsed[ref_label]
+    ref_norm = trapezoid(ref_dos, ref_freqs) if multi and normalize else 1.0
+    ref_dos_plot = ref_dos / ref_norm
 
-        # Build a common grid spanning both frequency ranges
-        common_freq = np.linspace(
-            max(frequencies[0], frequencies2[0]),
-            min(frequencies[-1], frequencies2[-1]),
-            max(len(frequencies), len(frequencies2))
-        )
+    shape_metrics = {}
 
-        # Interpolate both onto the common grid for fill_between
-        interp1 = interp1d(frequencies, dos1_norm, bounds_error=False, fill_value=0.0)
-        interp2 = interp1d(frequencies2, dos2_norm, bounds_error=False, fill_value=0.0)
-        dos1_common = interp1(common_freq)
-        dos2_common = interp2(common_freq)
+    for i, (label, (freqs, dos)) in enumerate(parsed.items()):
+        color = colors[i % len(colors)]
+        ls    = linestyles[min(i, len(linestyles) - 1)]
 
-        # Plot each on its own original grid
-        plt.plot(frequencies, dos1_norm, color='blue', linewidth=1.2, label=label1)
-        plt.plot(frequencies2, dos2_norm, color='red', linewidth=1.2, linestyle='--', label=label2)
+        if multi and normalize:
+            norm = trapezoid(dos, freqs)
+            dos_plot = dos / norm
+            ylabel = "Normalized DOS (arb. units)"
+        else:
+            dos_plot = dos
 
-        if fill_between:
-            # Fill on the common grid
-            plt.fill_between(common_freq, dos1_common, dos2_common, alpha=0.2, color='gray', label='difference')
+        plt.plot(freqs, dos_plot, color=color, linewidth=1.2, linestyle=ls, label=label)
+
+        # Fill between this dataset and the reference (skip the reference itself)
+        if fill_between and multi and i > 0:
+            common_freq = np.linspace(
+                max(ref_freqs[0], freqs[0]),
+                min(ref_freqs[-1], freqs[-1]),
+                max(len(ref_freqs), len(freqs)),
+            )
+            interp_ref  = interp1d(ref_freqs, ref_dos_plot, bounds_error=False, fill_value=0.0)
+            interp_this = interp1d(freqs, dos_plot,         bounds_error=False, fill_value=0.0)
+            dos_ref_c   = interp_ref(common_freq)
+            dos_this_c  = interp_this(common_freq)
+            plt.fill_between(common_freq, dos_ref_c, dos_this_c,
+                             alpha=0.15, color=color, label=f'{ref_label}↔{label} diff')
+
+        # Shape metrics vs reference
+        if multi and i > 0:
+            common_freq = np.linspace(
+                max(ref_freqs[0], freqs[0]),
+                min(ref_freqs[-1], freqs[-1]),
+                max(len(ref_freqs), len(freqs)),
+            )
+            interp_ref  = interp1d(ref_freqs, ref_dos_plot, bounds_error=False, fill_value=0.0)
+            interp_this = interp1d(freqs, dos_plot,         bounds_error=False, fill_value=0.0)
+            dos_ref_c   = interp_ref(common_freq)
+            dos_this_c  = interp_this(common_freq)
+            shape_metrics[label] = {
+                'shape_diff': trapezoid(np.abs(dos_ref_c - dos_this_c), common_freq),
+                'cosine_sim': 1 - cosine(dos_ref_c, dos_this_c),
+            }
+
+    # Single-dataset shading
+    if not multi:
+        _, (freqs, dos) = next(iter(parsed.items())), (ref_freqs, ref_dos)
+        plt.fill_between(ref_freqs, ref_dos, color='lightblue', alpha=0.5)
+
+    if multi:
         plt.legend()
-        ylabel = "Normalized DOS (arb. units)"
-
-        # Shape metrics on common grid
-        shape_diff = trapezoid(np.abs(dos1_common - dos2_common), common_freq)
-        cos_sim = 1 - cosine(dos1_common, dos2_common)
-        print(f"Shape difference (integral of |ΔDOS|): {shape_diff:.4f}")
-        print(f"Cosine similarity: {cos_sim:.4f}")
-
-    else:
-        plt.plot(frequencies, dos, color='blue', linewidth=1.2)
-        plt.fill_between(frequencies, dos, color='lightblue', alpha=0.5)
+        for label, metrics in shape_metrics.items():
+            print(f"[{ref_label} vs {label}]  "
+                  f"Shape diff (∫|ΔDOS|): {metrics['shape_diff']:.4f}  |  "
+                  f"Cosine similarity: {metrics['cosine_sim']:.4f}")
 
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
@@ -466,132 +564,144 @@ def plot_phonon_dos_comparison(frequencies, dos, frequencies2=None, dos2=None, l
     plt.tight_layout()
     plt.show()
 
-def compare_thermal_properties(thermal_props1, 
-                               thermal_props2, 
-                               plot_props=["F", "S"], 
-                               title="", figsize=(8,4), 
-                               plot_in_j_mol=False, 
-                               atoms_per_formula_units=None, 
-                               colors=['blue', 'red', 'green', 'orange', 'purple']):
+def compare_thermal_properties(
+    thermal_props_dict,
+    plot_props=["F", "S"],
+    title="",
+    figsize=(8, 4),
+    plot_in_j_mol=False,
+    atoms_per_formula_units=None,
+    colors=["blue", "red", "green", "orange", "purple"],
+):
     """
-    Plot thermal properties (Helmholtz free energy, entropy, heat capacity).
+    Plot thermal properties for one or more datasets.
 
-    Properties with the same units share the same axis.
-    Properties with different units get separate axes (e.g., F on left, S/Cv on right).
-
-    Args:
-        thermal_props1 (dict):
-            OJO: Right now this is hard coded to assume dataset 1 is DFT and dataset 2 is Foundation potential.
-            {'data': 
-                [{'temperature': float, 
-                'helmholtz_free_energy': float, 
-                'entropy': float}, ...]}
-        thermal_props2 (dict):
-            {'data': 
-                [{'temperature': float, 
-                'helmholtz_free_energy': float, 
-                'entropy': float}, ...]}
-        plot_props (list or str):
-            Which properties to plot. Options: "F" for Helmholtz free energy, "S" for entropy, "Cv" for heat capacity. Default is ["F", "S"] to plot both.
-        title (str):
-            Title for the plot.
-        figsize : tuple
-            Figure size
-        formula_units : int or None
-            Number of atoms per formula unit. If provided, scales per-atom to per-formula-unit.
+    Parameters
+    ----------
+    thermal_props_dict : dict
+        Keys are dataset labels (str); values are lists of dicts with keys
+        'T', 'F', 'S', and/or 'Cv'.
+        Example:
+            {
+                'DFT':     [{'T': 0, 'F': -1.2, 'S': 0.0}, ...],
+                'matcalc': [{'T': 0, 'F': -1.1, 'S': 0.0}, ...],
+            }
+    plot_props : list[str] or str
+        Which properties to plot. Options: "F", "S", "Cv". Default ["F", "S"].
+    title : str
+        Plot title.
+    figsize : tuple
+        Figure size.
+    plot_in_j_mol : bool
+        If True, convert F → kJ/mol and S/Cv → J/K/mol.
+    atoms_per_formula_units : int or None
+        If provided, scales all values from per-atom to per-formula-unit.
+    colors : list[str]
+        One color per dataset (cycles if more datasets than colors).
     """
     if isinstance(plot_props, str):
         plot_props = [plot_props]
+    if not thermal_props_dict:
+        raise ValueError("thermal_props_dict is empty.")
 
-    # Define unit groups: which properties share units
-    # "F" is in eV/atom or kJ/mol, "S" and "Cv" are in J/K/mol
-    prop_to_group = {
-        "F": "energy",
-        "S": "thermal",
-        "Cv": "thermal"
+    # Unit-group logic: properties that share axes
+    prop_to_group = {"F": "energy", "S": "thermal", "Cv": "thermal"}
+
+    labels   = list(thermal_props_dict.keys())
+    datasets = list(thermal_props_dict.values())
+    linestyles = ["-"] + ["--"] * (len(labels) - 1)   # first solid, rest dashed
+
+    # Validate that requested props exist in every dataset
+    for prop in plot_props:
+        for label, data in thermal_props_dict.items():
+            if prop not in data[0]:
+                raise ValueError(
+                    f"Property '{prop}' not found in dataset '{label}'. "
+                    f"Available: {list(data[0].keys())}"
+                )
+
+    # Use temperatures from the first dataset for x-axis
+    temperatures = [point["T"] for point in datasets[0]]
+
+    # Build per-dataset, per-property value arrays (scaled + converted)
+    def prepare(values, prop):
+        vals = list(values)
+        if atoms_per_formula_units is not None:
+            vals = [v * atoms_per_formula_units for v in vals]
+        if plot_in_j_mol:
+            factor = EV_TO_KJ_PER_MOL if prop == "F" else EV_TO_J_PER_MOL
+            vals = [v * factor for v in vals]
+        return vals
+
+    parsed = {
+        label: {
+            prop: prepare([pt[prop] for pt in data], prop)
+            for prop in plot_props
+        }
+        for label, data in thermal_props_dict.items()
     }
 
-    # Collect data
-    temperatures = [point['T'] for point in thermal_props1]
-    props1 = {prop: [point[prop] for point in thermal_props1] for prop in plot_props}
-    props2 = {prop: [point[prop] for point in thermal_props2] for prop in plot_props}
-
-    # Create figure and axes
+    # Axis creation
     fig, ax1 = plt.subplots(figsize=figsize)
     axes = [ax1]
-    ax = ax1
-    current_side = "left"
 
-    # Plot each property, creating new axes for different unit groups
-    color_idx = 0
-
-    # Check which groups are needed
     needed_groups = []
-
     for prop in plot_props:
-        if prop not in thermal_props1[0] or prop not in thermal_props2[0]:
-            raise ValueError(f"Property '{prop}' not found in one or both thermal_props. Available properties: {list(thermal_props1[0].keys())}")
         group = prop_to_group.get(prop)
         if group and group not in needed_groups:
             needed_groups.append(group)
 
-        # Scale by formula_units if provided
+    # Create twin axes for additional unit groups
+    for _ in needed_groups[1:]:
+        axes.append(ax1.twinx())
+
+    def ylabel_for(prop):
+        if plot_in_j_mol:
+            unit = "kJ/mol" if prop == "F" else "J/K/mol"
+        else:
+            unit = "eV/atom" if prop == "F" else "eV/atom/K"
         if atoms_per_formula_units is not None:
-                props1[prop] = [val * atoms_per_formula_units for val in props1[prop]]
-                props2[prop] = [val * atoms_per_formula_units for val in props2[prop]]
+            unit = unit.replace("atom", "fu")
+        return rf"$\mathit{{{prop}}}$ ({unit})"
 
-        # Convert units if requested
-        if plot_in_j_mol:
-                if prop == "F":
-                    props1[prop] = [val * EV_TO_KJ_PER_MOL for val in props1[prop]]
-                    props2[prop] = [val * EV_TO_KJ_PER_MOL for val in props2[prop]]
-                elif prop == "S" or prop == "Cv":
-                    props1[prop] = [val * EV_TO_J_PER_MOL for val in props1[prop]]
-                    props2[prop] = [val * EV_TO_J_PER_MOL for val in props2[prop]]
+    # Plot
+    prop_color_idx = 0   # one color per property across all datasets
 
-        # Determine which axis to use
+    for prop in plot_props:
+        group     = prop_to_group.get(prop, "energy")
         group_idx = needed_groups.index(group) if group in needed_groups else 0
-        if group_idx == 0:
-            ax = axes[0]  # Use left axis for first group
-        else:
-            # Create twin axis for additional unit groups
-            if len(axes) <= group_idx:
-                ax = ax1.twinx()
-                axes.append(ax)
-                current_side = "right" if current_side == "left" else "left"
-            else:
-                ax = axes[group_idx]
+        ax        = axes[group_idx]
+        ax.set_ylabel(ylabel_for(prop), fontsize=15)
+        ax.tick_params(axis="y", labelsize=15)
 
-        if plot_in_j_mol:
-            ylabel = f"{prop} ({'kJ/mol' if prop == 'F' else 'J/K/mol'}{'-fu' if atoms_per_formula_units else ''})"
-        else:
-            ylabel = f"{prop} (eV/atom)" if prop == "F" else f"{prop} (eV/atom/K)"
-            if atoms_per_formula_units is not None:
-                ylabel = ylabel.replace("atom", "fu")
+        prop_color = colors[prop_color_idx % len(colors)]
+        prop_color_idx += 1
 
-        ax.set_ylabel(ylabel, fontsize=15)
-        ax.tick_params(axis='y', labelsize=15)
-        ax.plot(temperatures, props1[prop], color=colors[color_idx], linewidth=1.5, label=rf'$\mathit{{{prop}}}$ (DFT)') 
-        ax.plot(temperatures, props2[prop], color=colors[color_idx], linewidth=1.5, linestyle='--', label=rf'$\mathit{{{prop}}}$ (TensorNet)')
-        color_idx += 1
+        for i, label in enumerate(labels):
+            ls = linestyles[i]
+            ax.plot(
+                temperatures,
+                parsed[label][prop],
+                color=prop_color,
+                linewidth=1.5,
+                linestyle=ls,
+                label=rf"$\mathit{{{prop}}}$ ({label})",
+            )
 
-    handles_labels = []
+    # Combined legend on primary axis
+    all_handles, all_labels = [], []
     for ax in axes:
-        handles, labels = ax.get_legend_handles_labels()
-        for h, l in zip(handles, labels):
-            handles_labels.append((h, l))
+        h, l = ax.get_legend_handles_labels()
+        all_handles.extend(h)
+        all_labels.extend(l)
+    if all_handles:
+        ax1.legend(all_handles, all_labels, loc="best", fontsize=12)
 
-    if handles_labels:
-        handles, labels = zip(*handles_labels)
-        ax1.legend(handles, labels, loc='best', fontsize=12)
-
-    # Set x-axis on the primary axis
     ax1.set_xlabel("Temperature (K)", fontsize=15)
-    ax1.tick_params(axis='x', labelsize=15)
+    ax1.tick_params(axis="x", labelsize=15)
     plt.title(title)
     plt.tight_layout()
     plt.show()
-
 
 def main():
     plot_in_j_mol = False
