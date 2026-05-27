@@ -19,8 +19,7 @@ EV_TO_KJ_PER_MOL = EV_TO_J_PER_MOL / 1000.0
 
 #This code needs a lot of cleanup and refactoring, but I want to get some quick plotting in before I spend time on that. So apologies for the messiness here.
 
-def plot_phonon_bandstructure(qpoints, 
-                              frequencies, 
+def plot_phonon_bandstructure(bs_dict, 
                               labels=None, 
                               ylabel="Energy (eV)", 
                               title="", 
@@ -30,10 +29,11 @@ def plot_phonon_bandstructure(qpoints,
 
     Parameters
     ----------
-    qpoints : ndarray, shape (npaths, npoints, 3)
-        Q-points for each path in reciprocal space
-    frequencies : ndarray, shape (npaths, npoints, nbranches)
-        Phonon frequencies for each q-point and branch
+    bs_dict : dict
+        {
+        'qpoints': list of np.ndarray (npaths, npoints, 3),
+        'frequencies': list of np.ndarray (npaths, npoints, nbranches)
+         }
     labels : list of str or None
         High symmetry point labels. Must have length = npaths + 1.
         Example: ["Γ", "X", "K", "Γ", "L"] for 4 paths
@@ -43,6 +43,9 @@ def plot_phonon_bandstructure(qpoints,
     figsize : tuple
         Figure size
     """
+    qpoints = bs_dict['qpoints']
+    frequencies = bs_dict['frequencies']
+
     npaths, npoints, nbranches = frequencies.shape
 
     if labels is not None and len(labels) != npaths + 1:
