@@ -43,8 +43,8 @@ def plot_phonon_bandstructure(bs_dict,
     figsize : tuple
         Figure size
     """
-    qpoints = bs_dict['qpoints']
-    frequencies = bs_dict['frequencies']
+    qpoints = np.array(bs_dict['qpoints'])
+    frequencies = np.array(bs_dict['frequencies'])
 
     npaths, npoints, nbranches = frequencies.shape
 

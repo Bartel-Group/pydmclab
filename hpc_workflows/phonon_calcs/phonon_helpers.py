@@ -153,8 +153,8 @@ def get_set_of_forces(results,
                       mpid=None,
                       xc: str = "metagga"):
     '''
-    Get the set of calculated forces from multiple structures with displacements for a specific MPID and return as a list of arrays.
-    This is for the finite displacement method, where forces will be stored in the results.json under 'results'.
+    Get the set of calculated forces (from DFT) from multiple structures with displacements for a specific MPID and return as a list of arrays.
+    This is for the finite displacement method, where forces will be stored in the results.json under 'results' for a DFT calculation.
     Args:
         results (dict):
             Dictionary containing results from multiple calculations, usually generated with get_results().
