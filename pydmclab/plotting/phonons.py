@@ -230,7 +230,7 @@ def plot_thermal_properties(thermal_props, plot_props=["F", "S"], title="", figs
             ylabel = f"{prop} ({'kJ/mol' if prop == 'F' else 'J/K/mol'}{'-fu' if formula_units else ''})"
         else:
             ylabel = f"{prop} (eV/atom)" if prop == "F" else f"{prop} (eV/atom/K)"
-            if formula_units is not None:
+            if atoms_per_formula_units is not None:
                 ylabel = ylabel.replace("atom", "fu")
 
         ax.set_ylabel(ylabel, fontsize=15)
@@ -772,7 +772,7 @@ def main():
         # # plot_phonon_dos(np.array(energies), np.array(tdos), plot_in_thz=True, title=mpid, ylims=ylims)
         #Need to fix plot phonon_dos
         F = phonons[key]['thermal_properties']
-        # plot_thermal_properties(F, plot_props=["F", "S"], title=mpid, plot_in_j_mol=plot_in_j_mol, formula_units=formula_units)
+        # plot_thermal_properties(F, plot_props=["F", "S"], title=mpid, plot_in_j_mol=plot_in_j_mol, atoms_per_formula_units=atoms_per_formula_units)
         tprops[mpid] = F
 
     key_order = ['S3Sr1Zr1_needle', 'S3Sr1Zr1_dist_perovskite']
@@ -787,7 +787,7 @@ def main():
                         prop=prop, 
                         align_Fs=True,
                         plot_in_j_mol=plot_in_j_mol, 
-                        formula_units=formula_units, 
+                        atoms_per_formula_units=atoms_per_formula_units, 
                         xlims=xlims)
         
     # dft_phonons = read_json(os.path.join(DATA_DIR, '../251124/phonons.json'))
@@ -807,7 +807,7 @@ def main():
     #                     label1=rf'$\mathit{{{prop}}}_\mathrm{{needle}}$' + ' (DFT)', 
     #                     label2=rf'$\mathit{{{prop}}}_\mathrm{{needle}}$' + ' (TensorNet)', 
     #                     plot_in_j_mol=plot_in_j_mol, 
-    #                     formula_units=formula_units, 
+    #                     atoms_per_formula_units=atoms_per_formula_units, 
     #                     xlims=xlims)
         
     #     plot_relative_prop(dft_tprops['S3Sr1Zr1_dist_perovskite'], 
@@ -816,7 +816,7 @@ def main():
     #                     label1=rf'$\mathit{{{prop}}}_\mathrm{{perovskite}}$' + ' (DFT)', 
     #                     label2=rf'$\mathit{{{prop}}}_\mathrm{{perovskite}}$' + ' (TensorNet)', 
     #                     plot_in_j_mol=plot_in_j_mol, 
-    #                     formula_units=formula_units, 
+    #                     atoms_per_formula_units=atoms_per_formula_units, 
     #                     xlims=xlims)
 
     # for prop in ['F', 'S']:
@@ -825,7 +825,7 @@ def main():
     #                             plot_props=prop, 
     #                             title='Needle', 
     #                             plot_in_j_mol=plot_in_j_mol, 
-    #                             formula_units=formula_units,
+    #                             atoms_per_formula_units=atoms_per_formula_units,
     #                             figsize=(6,4),
     #                             colors=['blue'] if prop == 'F' else ['red'])
         
@@ -834,6 +834,6 @@ def main():
     #                             plot_props=prop, 
     #                             title='Perovskite', 
     #                             plot_in_j_mol=plot_in_j_mol, 
-    #                             formula_units=formula_units,
+    #                             atoms_per_formula_units=atoms_per_formula_units,
     #                             figsize=(6,4),
     #                             colors=['blue'] if prop == 'F' else ['red'])
