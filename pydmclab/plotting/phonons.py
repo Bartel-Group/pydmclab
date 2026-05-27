@@ -97,21 +97,28 @@ def plot_phonon_bandstructure(qpoints,
     plt.tight_layout()
     plt.show()
 
-def plot_phonon_dos(frequencies, dos, plot_in_thz=False, title="", figsize=(6,4), ylims=None):
+def plot_phonon_dos(dos_dict, plot_in_thz=False, title="", figsize=(6,4), ylims=None):
     """
     Plot phonon density of states.
 
     Parameters
     ----------
-    frequencies : ndarray, shape (npoints,)
-        Frequency values in eV
-    dos : ndarray, shape (npoints,)
-        Density of states values in states/eV
+    dos_dict : dict
+            {
+                'total_dos': [
+                    {'E': -0.004, 'total_dos': 0.0},
+                    {'E': 0.0, 'total_dos': 1.2},
+                    ...
+                ]
+            }
     ylabel : str
         Label for y-axis
     figsize : tuple
         Figure size
     """
+    frequencies = np.array([r['E'] for r in dos_dict['total_dos']])
+    dos = np.array([r['total_dos'] for r in dos_dict['total_dos']])
+
     if plot_in_thz:
         h = physical_constants['Planck constant in eV/Hz'][0]
         frequencies = frequencies / (h * 1e12)  # Convert eV to THz
