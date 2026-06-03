@@ -582,46 +582,28 @@ def compare_thermal_properties(
     plot_in_j_mol=False,
     atoms_per_formula_units=None,
     colors=["blue", "red", "green", "orange", "purple"],
+    align_F_to_reference=False,
 ):
     """
-    Plot thermal properties for one or more datasets.
-
-    Parameters
-    ----------
-    thermal_props_dict : dict
-        Keys are dataset labels (str); values are lists of dicts with keys
-        'T', 'F', 'S', and/or 'Cv'.
-        Example:
-            {
-                'DFT':     [{'T': 0, 'F': -1.2, 'S': 0.0}, ...],
-                'matcalc': [{'T': 0, 'F': -1.1, 'S': 0.0}, ...],
-            }
-    plot_props : list[str] or str
-        Which properties to plot. Options: "F", "S", "Cv". Default ["F", "S"].
-    title : str
-        Plot title.
-    figsize : tuple
-        Figure size.
-    plot_in_j_mol : bool
-        If True, convert F → kJ/mol and S/Cv → J/K/mol.
-    atoms_per_formula_units : int or None
-        If provided, scales all values from per-atom to per-formula-unit.
-    colors : list[str]
-        One color per dataset (cycles if more datasets than colors).
+    ...
+    align_F_to_reference : bool
+        If True, shift F for every non-reference dataset so that its value at
+        the first temperature matches the reference (first) dataset. This lets
+        you compare how F evolves with temperature across methods without the
+        absolute offset between them obscuring the comparison.
+    ...
     """
     if isinstance(plot_props, str):
         plot_props = [plot_props]
     if not thermal_props_dict:
         raise ValueError("thermal_props_dict is empty.")
 
-    # Unit-group logic: properties that share axes
-    prop_to_group = {"F": "energy", "S": "thermal", "Cv": "thermal"}
+    prop_to_group    = {"F": "energy", "S": "thermal", "Cv": "thermal"}
+    prop_linestyles  = ["-", "--", "-.", ":"]
+    labels           = list(thermal_props_dict.keys())
+    datasets         = list(thermal_props_dict.values())
+    multi            = len(labels) > 1
 
-    labels   = list(thermal_props_dict.keys())
-    datasets = list(thermal_props_dict.values())
-    linestyles = ["-"] + ["--"] * (len(labels) - 1)   # first solid, rest dashed
-
-    # Validate that requested props exist in every dataset
     for prop in plot_props:
         for label, data in thermal_props_dict.items():
             if prop not in data[0]:
@@ -630,10 +612,8 @@ def compare_thermal_properties(
                     f"Available: {list(data[0].keys())}"
                 )
 
-    # Use temperatures from the first dataset for x-axis
     temperatures = [point["T"] for point in datasets[0]]
 
-    # Build per-dataset, per-property value arrays (scaled + converted)
     def prepare(values, prop):
         vals = list(values)
         if atoms_per_formula_units is not None:
@@ -651,7 +631,15 @@ def compare_thermal_properties(
         for label, data in thermal_props_dict.items()
     }
 
-    # Axis creation
+    # ── Align F to reference dataset's starting point ─────────────────────────
+    if align_F_to_reference and "F" in plot_props:
+        ref_label   = labels[0]
+        ref_F_start = parsed[ref_label]["F"][0]
+        for label in labels[1:]:
+            offset = parsed[label]["F"][0] - ref_F_start
+            parsed[label]["F"] = [v - offset for v in parsed[label]["F"]]
+
+    # Axis setup
     fig, ax1 = plt.subplots(figsize=figsize)
     axes = [ax1]
 
@@ -660,45 +648,52 @@ def compare_thermal_properties(
         group = prop_to_group.get(prop)
         if group and group not in needed_groups:
             needed_groups.append(group)
-
-    # Create twin axes for additional unit groups
     for _ in needed_groups[1:]:
         axes.append(ax1.twinx())
 
-    def ylabel_for(prop):
+    def ylabel_for(prop, aligned=False):
         if plot_in_j_mol:
             unit = "kJ/mol" if prop == "F" else "J/K/mol"
         else:
             unit = "eV/atom" if prop == "F" else "eV/atom/K"
         if atoms_per_formula_units is not None:
             unit = unit.replace("atom", "fu")
-        return rf"$\mathit{{{prop}}}$ ({unit})"
-
-    # Plot
-    prop_color_idx = 0   # one color per property across all datasets
+        suffix = " [aligned]" if (aligned and prop == "F") else ""
+        return rf"$\mathit{{{prop}}}$ ({unit}){suffix}"
 
     for prop in plot_props:
         group     = prop_to_group.get(prop, "energy")
         group_idx = needed_groups.index(group) if group in needed_groups else 0
         ax        = axes[group_idx]
-        ax.set_ylabel(ylabel_for(prop), fontsize=15)
+        props_on_axis = [p for p in plot_props if prop_to_group.get(p) == group]
+        combined_ylabel = " / ".join(
+            ylabel_for(p, aligned=align_F_to_reference) for p in props_on_axis
+        )
+        ax.set_ylabel(combined_ylabel, fontsize=15)
         ax.tick_params(axis="y", labelsize=15)
 
-        prop_color = colors[prop_color_idx % len(colors)]
-        prop_color_idx += 1
+    # Plot
+    for prop_idx, prop in enumerate(plot_props):
+        group     = prop_to_group.get(prop, "energy")
+        group_idx = needed_groups.index(group) if group in needed_groups else 0
+        ax        = axes[group_idx]
+        ls        = prop_linestyles[prop_idx % len(prop_linestyles)]
 
-        for i, label in enumerate(labels):
-            ls = linestyles[i]
+        for ds_idx, label in enumerate(labels):
+            color        = colors[ds_idx % len(colors)]
+            legend_label = (
+                rf"$\mathit{{{prop}}}$ ({label})" if multi
+                else rf"$\mathit{{{prop}}}$"
+            )
             ax.plot(
                 temperatures,
                 parsed[label][prop],
-                color=prop_color,
+                color=color,
                 linewidth=1.5,
                 linestyle=ls,
-                label=rf"$\mathit{{{prop}}}$ ({label})",
+                label=legend_label,
             )
 
-    # Combined legend on primary axis
     all_handles, all_labels = [], []
     for ax in axes:
         h, l = ax.get_legend_handles_labels()
@@ -712,7 +707,7 @@ def compare_thermal_properties(
     plt.title(title)
     plt.tight_layout()
     plt.show()
-
+    
 def main():
     plot_in_j_mol = False
     # atoms_per_formula_units = 5 # number of atoms per formula unit
@@ -781,14 +776,13 @@ def main():
 
     props_to_plot = ['F', 'S', 'Cv']
     for prop in props_to_plot:
-        plot_relative_prop(dft_tprops,
-                           tprops,
-                        data_set_labels=["DFT", "TensorNet"],
-                        prop=prop, 
-                        align_Fs=True,
-                        plot_in_j_mol=plot_in_j_mol, 
-                        atoms_per_formula_units=atoms_per_formula_units, 
-                        xlims=xlims)
+        plot_relative_prop(tprops, 
+                           prop=prop, 
+                           align_at_0K=True, 
+                           figsize=(6,4), 
+                           xlims=xlims, 
+                           plot_in_j_mol=plot_in_j_mol, 
+                           atoms_per_formula_units=atoms_per_formula_units)
         
     # dft_phonons = read_json(os.path.join(DATA_DIR, '../251124/phonons.json'))
     # dft_tprops = {}
