@@ -83,7 +83,6 @@ class Collector(object):
         include_pcobi = configs["include_pcobi"]
         include_entry = configs["include_entry"]
         include_phonons_dfpt = configs["include_phonons_dfpt"]
-        include_forces = configs["include_forces"]
         check_relax = configs["check_relax_energy"]
         create_cif = configs["create_cif"]
 
@@ -111,7 +110,6 @@ class Collector(object):
             include_pcobi=include_pcobi,
             include_entry=include_entry,
             include_phonons_dfpt=include_phonons_dfpt,
-            include_forces=include_forces,
         )
 
         # store the relax energy if we asked to
