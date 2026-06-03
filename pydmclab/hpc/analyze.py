@@ -1253,7 +1253,6 @@ class AnalyzeVASP(object):
         include_pcobi=False,
         include_entry=False,
         include_phonons_dfpt=False,
-        include_forces=False,
     ):
         """
         Returns all desired data for post-processing DFT calculations
