@@ -357,7 +357,6 @@ def get_analysis_configs(
     analyze_dos=False,
     analyze_bonding=False,
     analyze_phonons_dfpt=False,
-    analyze_forces=False,
     exclude=None,
     remake_results=False,
     verbose=False,
