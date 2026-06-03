@@ -1381,11 +1381,6 @@ class AnalyzeVASP(object):
                 data["phonons_dfpt"] = self.summarize_phonons_dfpt(supercell_matrix=None, mesh=100)
             else:
                 data["phonons_dfpt"] = None
-        if include_forces:
-            if convergence:
-                data["forces"] = self.forces
-            else:
-                data["forces"] = None
 
         return data
 
@@ -1575,7 +1570,6 @@ def _results_for_calc_dir(calc_dir, configs):
     include_pcobi = configs["include_pcobi"]
     include_entry = configs["include_entry"]
     include_phonons_dfpt = configs["include_phonons_dfpt"]
-    include_forces = configs["include_forces"]
     check_relax = configs["check_relax_energy"]
     create_cif = configs["create_cif"]
 
@@ -1603,7 +1597,6 @@ def _results_for_calc_dir(calc_dir, configs):
         include_pcobi=include_pcobi,
         include_entry=include_entry,
         include_phonons_dfpt=include_phonons_dfpt,
-        include_forces=include_forces,
     )
 
     # store the relax energy if we asked to
