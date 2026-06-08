@@ -144,7 +144,11 @@ def plot_phonon_dos(dos_dict, plot_in_thz=False, title="", figsize=(6,4), ylims=
     plt.show()
 
 
-def plot_thermal_properties(thermal_props, plot_props=["F", "S"], title="", figsize=(8,4), plot_in_j_mol=False, atoms_per_formula_units=None):
+def plot_thermal_properties(thermal_props, 
+                            plot_props=["F", "S"], 
+                            title="", figsize=(8,4), 
+                            plot_in_j_mol=False, 
+                            atoms_per_formula_units=None):
     """
     Plot thermal properties (Helmholtz free energy, entropy, heat capacity).
 
@@ -154,15 +158,18 @@ def plot_thermal_properties(thermal_props, plot_props=["F", "S"], title="", figs
     Args:
         thermal_props (dict):
             {'data': 
-                [{'T': float, 
-                'F': float, 
-                'S': float}, ...]}
+                [{'T': float (K), 
+                'F': float (eV/atom), 
+                'S': float (eV/atom/K), 
+                'Cv': float (eV/atom/K)}, ...]}
         plot_props (list or str):
             Which properties to plot. Options: "F" for Helmholtz free energy, "S" for entropy, "Cv" for heat capacity. Default is ["F", "S"] to plot both.
         title (str):
             Title for the plot.
         figsize : tuple
             Figure size
+        plot_in_j_mol (bool):
+            If True, convert F → kJ/mol and S/Cv → J/K/mol.
         atoms_per_formula_units : int or None
             Number of atoms per formula unit. If provided, scales per-atom to per-formula-unit.
     """
@@ -268,6 +275,7 @@ def plot_relative_prop(
     atoms_per_formula_units=None,
     colors=["green", "blue", "orange", "purple", "red"],
 ):
+    
     """
     Plot the difference in a thermal property between two structures, for one or
     more datasets (e.g. DFT vs matcalc).
@@ -313,14 +321,19 @@ def plot_relative_prop(
     colors : list[str]
         One color per dataset (cycles if needed).
     """
-    if not thermal_props_dict:
-        raise ValueError("thermal_props_dict is empty.")
 
-    linestyles = ["-", "--", "-.", ":"]  # first dataset solid, rest dashed
+    DS_MARKERS = ["o", "^", "D", "s", "v", "P", "X", "h"]
+    MARKEVERY  = 10
+    MARKERSIZE = 5
 
-    # ── Parse & compute Δprop for every dataset ──────────────────────────────
-    deltas   = {}   # label → np.ndarray of Δprop (raw eV/atom)
-    temps_by = {}   # label → np.ndarray of temperatures
+    def ds_style(ds_idx):
+        if ds_idx == 0:
+            return "-", "None", None
+        marker = DS_MARKERS[(ds_idx - 1) % len(DS_MARKERS)]
+        return "--", marker, MARKEVERY
+
+    deltas   = {}
+    temps_by = {}
 
     for ds_label, structures in thermal_props_dict.items():
         struct_labels = list(structures.keys())
@@ -339,22 +352,20 @@ def plot_relative_prop(
                     f"structure '{lbl}'. Available: {list(d[0].keys())}"
                 )
 
-        temps   = np.array([pt["T"]    for pt in data_a])
-        vals_a  = np.array([pt[prop]   for pt in data_a])
-        vals_b  = np.array([pt[prop]   for pt in data_b])
-        delta   = vals_b - vals_a          # second − first
+        temps  = np.array([pt["T"]  for pt in data_a])
+        vals_a = np.array([pt[prop] for pt in data_a])
+        vals_b = np.array([pt[prop] for pt in data_b])
+        delta  = vals_b - vals_a
 
         deltas[ds_label]   = delta
         temps_by[ds_label] = temps
 
-    # ── Optional 0 K alignment ───────────────────────────────────────────────
     if align_at_0K:
         lowest_0K = min(d[0] for d in deltas.values())
         for ds_label in deltas:
             offset = deltas[ds_label][0] - lowest_0K
             deltas[ds_label] = deltas[ds_label] - offset
 
-    # ── Unit scaling ─────────────────────────────────────────────────────────
     if atoms_per_formula_units is not None:
         for ds_label in deltas:
             deltas[ds_label] = deltas[ds_label] * atoms_per_formula_units
@@ -363,25 +374,24 @@ def plot_relative_prop(
         factor = EV_TO_KJ_PER_MOL if prop == "F" else EV_TO_J_PER_MOL
         for ds_label in deltas:
             deltas[ds_label] = deltas[ds_label] * factor
-        unit   = "kJ/mol" if prop == "F" else "J/K/mol"
+        unit = "kJ/mol" if prop == "F" else "J/K/mol"
     else:
-        unit   = "eV/fu" if atoms_per_formula_units else "eV/atom"
+        unit = "eV/fu" if atoms_per_formula_units else "eV/atom"
 
     ylabel = f"Δ{prop} ({unit}{'-fu' if (atoms_per_formula_units and plot_in_j_mol) else ''})"
 
-    # ── Plot ─────────────────────────────────────────────────────────────────
     plt.figure(figsize=figsize)
 
     for i, (ds_label, structures) in enumerate(thermal_props_dict.items()):
-        struct_labels  = list(structures.keys())
-        lbl_a, lbl_b   = struct_labels
-        legend_label = (
-                        f"Δ{prop}: {lbl_b} - {lbl_a}"
-                        if len(thermal_props_dict) == 1
-                        else f"Δ{prop}: {lbl_b} - {lbl_a}  [{ds_label}]"
-                    )
-        color          = colors[i % len(colors)]
-        ls             = linestyles[i % len(linestyles)]
+        struct_labels = list(structures.keys())
+        lbl_a, lbl_b  = struct_labels
+        legend_label  = (
+            f"Δ{prop}: {lbl_b} - {lbl_a}"
+            if len(thermal_props_dict) == 1
+            else f"Δ{prop}: {lbl_b} - {lbl_a}  [{ds_label}]"
+        )
+        color             = colors[i % len(colors)]
+        ls, marker, markevery = ds_style(i)
 
         plt.plot(
             temps_by[ds_label],
@@ -389,12 +399,14 @@ def plot_relative_prop(
             color=color,
             linewidth=1.5,
             linestyle=ls,
+            marker=marker,
+            markevery=markevery,
+            markersize=MARKERSIZE,
             label=legend_label,
         )
 
     plt.axhline(0, color="black", linestyle="--", linewidth=0.8)
 
-    # ── Transition temperature: detect for the FIRST dataset only ────────────
     first_label = next(iter(thermal_props_dict))
     delta_ref   = deltas[first_label]
     temps_ref   = temps_by[first_label]
@@ -407,9 +419,9 @@ def plot_relative_prop(
         signs      = np.sign(delta_ref)
         cross_idxs = np.where(np.diff(signs) != 0)[0]
         if cross_idxs.size > 0:
-            i       = cross_idxs[0]
-            t1, t2  = float(temps_ref[i]), float(temps_ref[i + 1])
-            f1, f2  = float(delta_ref[i]), float(delta_ref[i + 1])
+            i      = cross_idxs[0]
+            t1, t2 = float(temps_ref[i]), float(temps_ref[i + 1])
+            f1, f2 = float(delta_ref[i]), float(delta_ref[i + 1])
             trans_T = t1 - f1 * (t2 - t1) / (f2 - f1) if (f2 - f1) != 0 else (t1 + t2) / 2
 
     if trans_T is not None:
@@ -574,7 +586,161 @@ def plot_phonon_dos_comparison(
     plt.tight_layout()
     plt.show()
 
-def compare_thermal_properties(
+def plot_thermal_properties_comparison(
+    thermal_props_dict,
+    plot_props=["F", "S"],
+    title="",
+    figsize=(8, 4),
+    plot_in_j_mol=False,
+    atoms_per_formula_units=None,
+    colors=["blue", "red", "green", "orange", "purple"],
+    align_F_to_reference=False,
+):
+    if isinstance(plot_props, str):
+        plot_props = [plot_props]
+    if not thermal_props_dict:
+        raise ValueError("thermal_props_dict is empty.")
+
+    prop_to_group   = {"F": "energy", "S": "thermal", "Cv": "thermal"}
+    labels          = list(thermal_props_dict.keys())
+    datasets        = list(thermal_props_dict.values())
+    multi           = len(labels) > 1
+    multi_prop      = len(plot_props) > 1
+
+    # Dataset styles: first is solid/no-marker, rest get dashed + unique markers
+    # markevery thins out markers so lines stay readable
+    DS_MARKERS  = ["o", "^", "D", "s", "v", "P", "X", "h"]  # circle, triangle, diamond, square…
+    MARKEVERY   = 10   # place a marker every N points (tune to taste)
+    MARKERSIZE  = 5
+
+    def ds_style(ds_idx):
+        """Return (linestyle, marker, markevery) for dataset index."""
+        if ds_idx == 0:
+            return "-", "None", None
+        marker = DS_MARKERS[(ds_idx - 1) % len(DS_MARKERS)]
+        return "--", marker, MARKEVERY
+
+    for prop in plot_props:
+        for label, data in thermal_props_dict.items():
+            if prop not in data[0]:
+                raise ValueError(
+                    f"Property '{prop}' not found in dataset '{label}'. "
+                    f"Available: {list(data[0].keys())}"
+                )
+
+    temperatures = [point["T"] for point in datasets[0]]
+
+    def prepare(values, prop):
+        vals = list(values)
+        if atoms_per_formula_units is not None:
+            vals = [v * atoms_per_formula_units for v in vals]
+        if plot_in_j_mol:
+            factor = EV_TO_KJ_PER_MOL if prop == "F" else EV_TO_J_PER_MOL
+            vals = [v * factor for v in vals]
+        return vals
+
+    parsed = {
+        label: {
+            prop: prepare([pt[prop] for pt in data], prop)
+            for prop in plot_props
+        }
+        for label, data in thermal_props_dict.items()
+    }
+
+    if align_F_to_reference and "F" in plot_props:
+        ref_label   = labels[0]
+        ref_F_start = parsed[ref_label]["F"][0]
+        for label in labels[1:]:
+            offset = parsed[label]["F"][0] - ref_F_start
+            parsed[label]["F"] = [v - offset for v in parsed[label]["F"]]
+
+    # Axis setup
+    fig, ax1 = plt.subplots(figsize=figsize)
+    axes = [ax1]
+
+    needed_groups = []
+    for prop in plot_props:
+        group = prop_to_group.get(prop)
+        if group and group not in needed_groups:
+            needed_groups.append(group)
+    for _ in needed_groups[1:]:
+        axes.append(ax1.twinx())
+
+    def ylabel_for(prop, aligned=False):
+        if plot_in_j_mol:
+            unit = "kJ/mol" if prop == "F" else "J/K/mol"
+        else:
+            unit = "eV/atom" if prop == "F" else "eV/atom/K"
+        if atoms_per_formula_units is not None:
+            unit = unit.replace("atom", "fu")
+        suffix = " [aligned]" if (aligned and prop == "F") else ""
+        return rf"$\mathit{{{prop}}}$ ({unit}){suffix}"
+
+    for prop in plot_props:
+        group     = prop_to_group.get(prop, "energy")
+        group_idx = needed_groups.index(group) if group in needed_groups else 0
+        ax        = axes[group_idx]
+        props_on_axis = [p for p in plot_props if prop_to_group.get(p) == group]
+        combined_ylabel = " / ".join(
+            ylabel_for(p, aligned=align_F_to_reference) for p in props_on_axis
+        )
+        ax.set_ylabel(combined_ylabel, fontsize=15)
+        ax.tick_params(axis="y", labelsize=15)
+
+    # ── Color assignment ───────────────────────────────────────────────────────
+    # Single property  → each dataset gets its own color
+    # Multiple props   → each *property* gets a color; datasets share it
+    def line_color(prop_idx, ds_idx):
+        if multi_prop:
+            return colors[prop_idx % len(colors)]
+        else:
+            return colors[ds_idx % len(colors)]
+
+    # ── Plot ───────────────────────────────────────────────────────────────────
+    for prop_idx, prop in enumerate(plot_props):
+        group     = prop_to_group.get(prop, "energy")
+        group_idx = needed_groups.index(group) if group in needed_groups else 0
+        ax        = axes[group_idx]
+
+        for ds_idx, label in enumerate(labels):
+            ls, marker, markevery = ds_style(ds_idx)
+            color = line_color(prop_idx, ds_idx)
+
+            if multi_prop:
+                # Legend entry identifies both property and dataset
+                legend_label = rf"$\mathit{{{prop}}}$ ({label})" if multi else rf"$\mathit{{{prop}}}$"
+            else:
+                # Single property: legend entry is just the dataset label
+                legend_label = label if multi else rf"$\mathit{{{prop}}}$"
+
+            ax.plot(
+                temperatures,
+                parsed[label][prop],
+                color=color,
+                linewidth=1.5,
+                linestyle=ls,
+                marker=marker,
+                markevery=markevery,
+                markersize=MARKERSIZE,
+                label=legend_label,
+            )
+
+    all_handles, all_labels = [], []
+    for ax in axes:
+        h, l = ax.get_legend_handles_labels()
+        all_handles.extend(h)
+        all_labels.extend(l)
+    if all_handles:
+        ax1.legend(all_handles, all_labels, loc="best", fontsize=12)
+
+    ax1.set_xlabel("Temperature (K)", fontsize=15)
+    ax1.tick_params(axis="x", labelsize=15)
+    plt.title(title)
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_thermal_properties_comparison(
     thermal_props_dict,
     plot_props=["F", "S"],
     title="",
@@ -585,13 +751,29 @@ def compare_thermal_properties(
     align_F_to_reference=False,
 ):
     """
-    ...
+    thermal_props_dict : dict
+        Outer keys  → dataset label (shown in legend if more than one, e.g. "DFT", "matcalc").
+        Inner keys  → list of dicts with keys 'T', 'F', 'S', 'Cv', …
+        Example:
+            {
+                'DFT':     [{'T': 0, 'F': -1.2, 'S': 0.0, 'Cv': 0.0}, ...],
+                'matcalc': [{'T': 0, 'F': -1.0, 'S': 0.0, 'Cv': 0.0}, ...],
+            }
+    plot_props : list or str
+        Which properties to plot. Options: "F" for Helmholtz free energy, "S" for entropy, "Cv" for heat capacity. Default is ["F", "S"].
+    title : str
+        Title for the plot.
+    figsize : tuple
+        Figure size.
+    plot_in_j_mol : bool
+        If True, convert F → kJ/mol and S/Cv → J/K/mol.
+    atoms_per_formula_units : int or None
+        Number of atoms per formula unit. If provided, scales per-atom to per-formula-unit.
+    colors : list[str]
+        One color per dataset (cycles if needed).
     align_F_to_reference : bool
         If True, shift F for every non-reference dataset so that its value at
-        the first temperature matches the reference (first) dataset. This lets
-        you compare how F evolves with temperature across methods without the
-        absolute offset between them obscuring the comparison.
-    ...
+        the first temperature matches the reference (first) dataset. 
     """
     if isinstance(plot_props, str):
         plot_props = [plot_props]
@@ -708,126 +890,3 @@ def compare_thermal_properties(
     plt.tight_layout()
     plt.show()
     
-def main():
-    plot_in_j_mol = False
-    # atoms_per_formula_units = 5 # number of atoms per formula unit
-    atoms_per_formula_units = None
-    xlims = (0, 2200)
-
-    r =read_json(os.path.join(DATA_DIR, 'relaxation_results.json'))
-    phonons = read_json(os.path.join(DATA_DIR, 'phonons.json'))
-
-    high_symm_points = [['Γ', 'X'],
-                        ['X', 'S'],
-                        ['S', 'Y'],
-                        ['Y', 'Γ'],
-                        ['Γ', 'Z'],
-                        ['Z', 'U'],
-                        ['U', 'R'],
-                        ['R', 'T'],
-                        ['T', 'Z']]
-
-    dft_phonons = read_json(os.path.join(DATA_DIR, '../251124/phonons.json'))
-    dft_dos = {}
-    dft_tprops = {}
-    for key in dft_phonons:
-        calc_type = key.split('--')[-1]
-        if calc_type == 'metagga-static':
-            continue
-
-        mpid = key.split('--')[1]
-        dos_data = dft_phonons[key]['phonons']['total_dos']['total_dos']
-        energies = [point['E'] for point in dos_data]
-        dft_dos[mpid] = {'dos': np.array([point['total_dos'] for point in dos_data]), 'energies': np.array(energies)}
-        dft_tprops[mpid] = dft_phonons[key]['phonons']['helmholtz']['data']
-
-    tprops = {}
-    for key in phonons:
-        mpid = key
-        # bs_qpoints = phonons[key]['band_structure']['qpoints']
-        # bs_frequencies = phonons[key]['band_structure']['frequencies']
-        # # high_symm_points = phonons[key]['band_structure']['path']
-        # labels = [i[0] for i in high_symm_points] + [high_symm_points[-1][-1]]
-        # plot_phonon_bandstructure(np.array(bs_qpoints), np.array(bs_frequencies), labels=labels, title=mpid)
-        # # forces = phonons[key]['forces']
-        # # plot_forces_distribution(forces, mpid)
-        # dos_data = phonons[key]['total_dos']['total_dos']
-        # natoms = len(r[key]['final_structure']['sites'])
-        # print(f"Plotting DOS for {mpid} with {natoms} atoms in the cell")
-        # tdos = np.array([point['total_dos'] for point in dos_data])
-        # energies = [point['E'] for point in dos_data]
-        # ylims = (0, 50000) if 'needle' in mpid else (0, 50000)
-        # mpid = mpid.replace('dist_perovskite', 'perovskite')
-        # plot_phonon_dos(np.array(energies), np.array(tdos), title=mpid, ylims=ylims)
-        # ylims = (0, 80) if 'needle' in mpid else (0, 80)
-        # dos2 = dft_dos[key]['dos']
-        # energies2 = dft_dos[key]['energies']
-        # plot_phonon_dos_comparison(np.array(energies), np.array(tdos), frequencies2=np.array(energies2), dos2=np.array(dos2), label1="TensorNet", label2="DFT", title=mpid, ylims=ylims)
-        # # ylims = (0, 300) if 'needle' in mpid else (0, 90)
-        # # plot_phonon_dos(np.array(energies), np.array(tdos), plot_in_thz=True, title=mpid, ylims=ylims)
-        #Need to fix plot phonon_dos
-        F = phonons[key]['thermal_properties']
-        # plot_thermal_properties(F, plot_props=["F", "S"], title=mpid, plot_in_j_mol=plot_in_j_mol, atoms_per_formula_units=atoms_per_formula_units)
-        tprops[mpid] = F
-
-    key_order = ['S3Sr1Zr1_needle', 'S3Sr1Zr1_dist_perovskite']
-    tprops = {k: tprops[k] for k in key_order}
-    dft_tprops = {k: dft_tprops[k] for k in key_order}
-
-    props_to_plot = ['F', 'S', 'Cv']
-    for prop in props_to_plot:
-        plot_relative_prop(tprops, 
-                           prop=prop, 
-                           align_at_0K=True, 
-                           figsize=(6,4), 
-                           xlims=xlims, 
-                           plot_in_j_mol=plot_in_j_mol, 
-                           atoms_per_formula_units=atoms_per_formula_units)
-        
-    # dft_phonons = read_json(os.path.join(DATA_DIR, '../251124/phonons.json'))
-    # dft_tprops = {}
-    # for key in dft_phonons:
-    #     calc_type = key.split('--')[-1]
-    #     if calc_type == 'metagga-static':
-    #         continue
-    #     mpid = key.split('--')[1]
-    #     F = dft_phonons[key]['phonons']['helmholtz']['data']
-    #     dft_tprops[mpid] = F
-
-    # for prop in props_to_plot:
-    #     plot_relative_prop(dft_tprops['S3Sr1Zr1_needle'], 
-    #                     prop_needle, 
-    #                     prop=prop, 
-    #                     label1=rf'$\mathit{{{prop}}}_\mathrm{{needle}}$' + ' (DFT)', 
-    #                     label2=rf'$\mathit{{{prop}}}_\mathrm{{needle}}$' + ' (TensorNet)', 
-    #                     plot_in_j_mol=plot_in_j_mol, 
-    #                     atoms_per_formula_units=atoms_per_formula_units, 
-    #                     xlims=xlims)
-        
-    #     plot_relative_prop(dft_tprops['S3Sr1Zr1_dist_perovskite'], 
-    #                     prop_perovskite, 
-    #                     prop=prop, 
-    #                     label1=rf'$\mathit{{{prop}}}_\mathrm{{perovskite}}$' + ' (DFT)', 
-    #                     label2=rf'$\mathit{{{prop}}}_\mathrm{{perovskite}}$' + ' (TensorNet)', 
-    #                     plot_in_j_mol=plot_in_j_mol, 
-    #                     atoms_per_formula_units=atoms_per_formula_units, 
-    #                     xlims=xlims)
-
-    # for prop in ['F', 'S']:
-    #     compare_thermal_properties(dft_tprops['S3Sr1Zr1_needle'], 
-    #                             prop_needle, 
-    #                             plot_props=prop, 
-    #                             title='Needle', 
-    #                             plot_in_j_mol=plot_in_j_mol, 
-    #                             atoms_per_formula_units=atoms_per_formula_units,
-    #                             figsize=(6,4),
-    #                             colors=['blue'] if prop == 'F' else ['red'])
-        
-    #     compare_thermal_properties(dft_tprops['S3Sr1Zr1_dist_perovskite'], 
-    #                             prop_perovskite, 
-    #                             plot_props=prop, 
-    #                             title='Perovskite', 
-    #                             plot_in_j_mol=plot_in_j_mol, 
-    #                             atoms_per_formula_units=atoms_per_formula_units,
-    #                             figsize=(6,4),
-    #                             colors=['blue'] if prop == 'F' else ['red'])

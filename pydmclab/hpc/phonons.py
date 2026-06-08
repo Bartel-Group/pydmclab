@@ -297,7 +297,7 @@ class AnalyzePhonons(object):
 
         return self._total_dos
 
-    def helmholtz(self, temperatures=np.linspace(0, 2000, 101), 
+    def thermal_properties(self, temperatures=np.linspace(0, 2000, 101), 
                   include_heat_capacity: bool = True, 
                   move_imaginary: bool = False):
         """
@@ -330,7 +330,7 @@ class AnalyzePhonons(object):
                 F['data'][i]['Cv'] = Cv['data'][i]['Cv']
         return F
 
-    def parse_thermal_properties(self, phonopy_data: dict):
+    def parse_phonopy_thermal_properties(self, phonopy_data: dict):
         """
         Parses the thermal properties data from the phonopy object into a list of dictionaries
         Args:
@@ -422,7 +422,7 @@ class AnalyzePhonons(object):
             
             tp = self.phonon.get_thermal_properties_dict()
             if tp is not None:
-                self._thermal_properties = self.parse_thermal_properties(tp)
+                self._thermal_properties = self.parse_phonopy_thermal_properties(tp)
             else:
                 print("Thermal properties could not be calculated.")
                 return None
@@ -438,7 +438,7 @@ class AnalyzePhonons(object):
         include_mesh: bool = False, #Mesh data can be quite large, so not including by default, but can be included if needed for post-processing
         include_band_structure = True,
         include_total_dos: bool = True,
-        include_helmholtz: bool = True,
+        include_thermal_properties: bool = True,
         include_heat_capacity: bool = True,
         temperatures = np.linspace(0, 2000, 101),
         band_structure_kwargs: dict | None = None,
@@ -455,7 +455,7 @@ class AnalyzePhonons(object):
             include_mesh (bool, optional):  
                 Include mesh data in the output. Default is True.
             include_thermal_properties (bool, optional):
-                Include thermal properties in the output. Default is True.
+                Include thermal properties (F, S, Cv) in the output. Default is True.
             include_band_structure (bool, optional):
                 Include band structure in the output. Default is True.
                 Remember, if want to set a custom path - need to give band_structure_kwargs
@@ -467,6 +467,11 @@ class AnalyzePhonons(object):
             band_structure_kwargs (dict, optional): 
                Additional arguments for band structure calculation. See
                `self.band_structure` for details.
+            include_phonopy_thermal_properties (bool, optional):
+                If True, includes the thermal properties calculated using phonopy's built in functions in the output. Default is False.
+                Note that these are in Phonopy's default units (usually THz for frequencies and eV/*primitive* cell for energies)
+                Additional arguments for phonopy thermal properties calculation. See
+                `self.phonopy_thermal_properties` for details.
 
         Returns:
             Dictionary with the specified information
@@ -480,7 +485,6 @@ class AnalyzePhonons(object):
         
         data = {}
     
-
         if include_force_constants:
             fc = self.force_constants
             data["force_constants"] = fc
@@ -488,11 +492,6 @@ class AnalyzePhonons(object):
         if include_mesh:
             mesh_array = self.mesh_dict
             data["mesh"] = mesh_array
-
-        if include_phonopy_thermal_properties:
-            force_rerun = True if phonopy_thermal_properties_kwargs else False
-            tp = self.phonopy_thermal_properties(**(phonopy_thermal_properties_kwargs or {}), force_rerun=force_rerun)
-            data["thermal_properties"] = tp
 
         if include_band_structure:
             band_struc = self.band_structure(**(band_structure_kwargs or {}))
@@ -502,9 +501,15 @@ class AnalyzePhonons(object):
             total_dos = self.total_dos
             data["total_dos"] = total_dos
 
-        if include_helmholtz:
+        if include_thermal_properties:
             helmholtz = self.helmholtz(temperatures=temperatures,include_heat_capacity=include_heat_capacity)
-            data["helmholtz"] = helmholtz
+            data["thermal_properties"] = helmholtz
+
+        if include_phonopy_thermal_properties:
+            force_rerun = True if phonopy_thermal_properties_kwargs else False
+            tp = self.phonopy_thermal_properties(**(phonopy_thermal_properties_kwargs or {}), force_rerun=force_rerun)
+            data["phonopy_thermal_properties"] = tp
+
 
         data = convert_numpy_to_native(data)  # Convert to JSON serializable format
 
