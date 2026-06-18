@@ -312,7 +312,6 @@ class AnalyzePhonons(object):
                 If False, removes imaginary frequencies from the DOS.
                 In order to calculate thermodynamic properties, the phonon DOS must not contain imaginary frequencies, so it will always be cleaned.
         Returns:
-            A list of dictionaries where each dictionary corresponds to a specific temperature point.
             [{'T': 300, 
             'F': float,
             'S': float,
@@ -338,7 +337,6 @@ class AnalyzePhonons(object):
                 Thermal properties data obtained from the phonopy object self.phonon.get_thermal_properties_dict()
 
         Returns:
-            A list of dictionaries where each dictionary corresponds to a specific temperature point.
             e.g. [{'temperature': 300, 'free_energy': float, 'entropy': float, 'heat_capacity': float},
                 {'temperature': 310, 'free_energy': float, 'entropy': float, 'heat_capacity': float}, ...]
         """
@@ -362,63 +360,25 @@ class AnalyzePhonons(object):
 
     def phonopy_thermal_properties(
         self,
-        t_min: int|float =0,
-        t_max: int|float = 2000,
-        t_step: int =20,
-        temperatures: list|int|float|np.ndarray = None,
-        cutoff_frequency: int|float = None,
-        pretend_real: bool = False,
-        band_indices: list = None,
-        is_projection: bool = False,
+        phonopy_tprops_kwargs=None,
         force_rerun: bool = False,
     ):
         """
         returns the thermal properties for the phonon object in a dictionary
         Args:
-            t_min, t_max, t_step (float, optional)
-                Minimum and maximum temperatures and the interval in this
-                temperature range. Default values are 0, 1000, and 10.
-            temperatures (array_like, optional)
-                Temperature points where thermal properties are calculated.
-                When this is set, t_min, t_max, and t_step are ignored.
-            cutoff_frequency (float, optional)
-                Ignore phonon modes whose frequencies are smaller than this value.
-                Default is None, which gives cutoff frequency as zero.
-            pretend_real (bool, optional)
-                Use absolute value of phonon frequency when True. Default is False.
-            band_indices (array_like, optional)
-                Band indices starting with 0. Normally the numbers correspond to
-                phonon bands in ascending order of phonon frequencies. Thermal
-                properties are calculated only including specified bands.
-                Note that use of this results in unphysical values, and it is not
-                recommended to use this feature. Default is None.
-            is_projection (bool, optional)
-                When True, fractions of squeared eigenvector elements are
-                multiplied to mode thermal property quantities at respective phonon
-                modes. Note that use of this results in unphysical values, and it
-                is not recommended to use this feature. Default is False.
+            phonopy_tprops_kwargs (dict, optional)
+                see Phonopy.run_thermal_properties() for possible kwargs and defaults
             force_rerun (bool, optional)
                 If you already ran thermal properties but now want to change some of the arguments
-                and want it to recalculate the thermal properties, set this to True. 
-                Default is False.
+                and want it to recalculate the thermal properties, set this to True. Default is False.
 
-        Returns parsed thermal properties in the following format:
-        A list of dictionaries where each dictionary corresponds to a specific temperature point.
+        Returns parsed thermal properties:
         e.g. [{'temperature': 300, 'free_energy': float, 'entropy': float, 'heat_capacity': float},
                 {'temperature': 310, 'free_energy': float, 'entropy': float, 'heat_capacity': float}, ...]
         """
         if force_rerun or not hasattr(self, '_thermal_properties'):
             print("Calculating thermal properties...")
-            self.phonon.run_thermal_properties(
-                t_min=t_min,
-                t_max=t_max,
-                t_step=t_step,
-                temperatures=temperatures,
-                cutoff_frequency=cutoff_frequency,
-                pretend_real=pretend_real,
-                band_indices=band_indices,
-                is_projection=is_projection,
-            )
+            self.phonon.run_thermal_properties(**(phonopy_tprops_kwargs or {}))
             
             tp = self.phonon.get_thermal_properties_dict()
             if tp is not None:
@@ -443,7 +403,7 @@ class AnalyzePhonons(object):
         temperatures = np.linspace(0, 2000, 101),
         band_structure_kwargs: dict | None = None,
         include_phonopy_thermal_properties: bool = False,
-        phonopy_thermal_properties_kwargs: dict | None = None,
+        phonopy_tprops_kwargs: dict | None = None,
     ):
         """
         Returns all desired data for post-processing DFT calculations
@@ -506,10 +466,9 @@ class AnalyzePhonons(object):
             data["thermal_properties"] = helmholtz
 
         if include_phonopy_thermal_properties:
-            force_rerun = True if phonopy_thermal_properties_kwargs else False
-            tp = self.phonopy_thermal_properties(**(phonopy_thermal_properties_kwargs or {}), force_rerun=force_rerun)
+            force_rerun = True if phonopy_tprops_kwargs else False
+            tp = self.phonopy_thermal_properties(phonopy_tprops_kwargs, force_rerun=force_rerun)
             data["phonopy_thermal_properties"] = tp
-
 
         data = convert_numpy_to_native(data)  # Convert to JSON serializable format
 
@@ -519,7 +478,7 @@ class AnalyzePhonons(object):
         else:
             return data
 
-    #Plotting functions are just using phonopy's built in plotting functions for the moment, need to updgrade this in the future
+    #Plotting functions are just using phonopy's built in plotting functions for the moment, use plotting functions in pydmclab.plotting.phonons for more customizable functions
     @property
     def plot_thermal_properties_phonopy(self):
         self.phonopy_thermal_properties() #If thermal properties haven't been calculated, calculations will be done with defaults
