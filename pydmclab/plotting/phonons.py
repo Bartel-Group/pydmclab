@@ -100,7 +100,11 @@ def plot_phonon_bandstructure(bs_dict,
     plt.tight_layout()
     plt.show()
 
-def plot_phonon_dos(dos_dict, plot_in_thz=False, title="", figsize=(6,4), ylims=None):
+def plot_phonon_dos(dos_dict, 
+                    plot_in_thz=False, 
+                    title="", 
+                    figsize=(6,4), 
+                    ylims=None):
     """
     Plot phonon density of states.
 
@@ -274,6 +278,9 @@ def plot_relative_prop(
     plot_in_j_mol=False,
     atoms_per_formula_units=None,
     colors=["green", "blue", "orange", "purple", "red"],
+    xlabel_kwargs=None,
+    ylabel_kwargs=None,
+    legend_kwargs=None,
 ):
     
     """
@@ -388,7 +395,7 @@ def plot_relative_prop(
         legend_label  = (
             f"Δ{prop}: {lbl_b} - {lbl_a}"
             if len(thermal_props_dict) == 1
-            else f"Δ{prop}: {lbl_b} - {lbl_a}  [{ds_label}]"
+            else f"{ds_label}"
         )
         color             = colors[i % len(colors)]
         ls, marker, markevery = ds_style(i)
@@ -412,17 +419,18 @@ def plot_relative_prop(
     temps_ref   = temps_by[first_label]
 
     trans_T = None
-    zero_idxs = np.where(np.isclose(delta_ref, 0.0, atol=1e-12))[0]
-    if zero_idxs.size > 0:
-        trans_T = float(temps_ref[zero_idxs[0]])
-    else:
-        signs      = np.sign(delta_ref)
-        cross_idxs = np.where(np.diff(signs) != 0)[0]
-        if cross_idxs.size > 0:
-            i      = cross_idxs[0]
-            t1, t2 = float(temps_ref[i]), float(temps_ref[i + 1])
-            f1, f2 = float(delta_ref[i]), float(delta_ref[i + 1])
-            trans_T = t1 - f1 * (t2 - t1) / (f2 - f1) if (f2 - f1) != 0 else (t1 + t2) / 2
+    if prop == "F":
+        zero_idxs = np.where(np.isclose(delta_ref, 0.0, atol=1e-12))[0]
+        if zero_idxs.size > 0:
+            trans_T = float(temps_ref[zero_idxs[0]])
+        else:
+            signs      = np.sign(delta_ref)
+            cross_idxs = np.where(np.diff(signs) != 0)[0]
+            if cross_idxs.size > 0:
+                i      = cross_idxs[0]
+                t1, t2 = float(temps_ref[i]), float(temps_ref[i + 1])
+                f1, f2 = float(delta_ref[i]), float(delta_ref[i + 1])
+                trans_T = t1 - f1 * (t2 - t1) / (f2 - f1) if (f2 - f1) != 0 else (t1 + t2) / 2
 
     if trans_T is not None:
         ax = plt.gca()
@@ -435,7 +443,7 @@ def plot_relative_prop(
         ha      = "left" if label_x > trans_T else "right"
         plt.text(
             label_x, label_y, f"T_trans = {trans_T:.1f} K",
-            color="red", ha=ha, va="center", fontsize=9, backgroundcolor="white",
+            color="red", ha=ha, va="center", fontsize=14, backgroundcolor="white",
         )
 
     plt.xlabel("Temperature (K)")
@@ -444,7 +452,7 @@ def plot_relative_prop(
         plt.ylim(ylims)
     if xlims is not None:
         plt.xlim(xlims)
-    plt.legend()
+    plt.legend(**(legend_kwargs or {'loc': 'best', 'fontsize': 12}))
     plt.tight_layout()
     plt.show()
 
@@ -453,6 +461,9 @@ def plot_phonon_dos_comparison(
     plot_in_thz=False,
     title="",
     figsize=(6, 4),
+    ylabel_kwargs=None,
+    xlabel_kwargs=None,
+    legend_kwargs=None,
     ylims=None,
     fill_between=False,
     normalize=True,
@@ -571,174 +582,20 @@ def plot_phonon_dos_comparison(
         plt.fill_between(ref_freqs, ref_dos, color='lightblue', alpha=0.5)
 
     if multi:
-        plt.legend()
+        plt.legend(**(legend_kwargs or {}))
         for label, metrics in shape_metrics.items():
             print(f"[{ref_label} vs {label}]  "
                   f"Shape diff (∫|ΔDOS|): {metrics['shape_diff']:.4f}  |  "
                   f"Cosine similarity: {metrics['cosine_sim']:.4f}")
 
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
+    plt.xlabel(xlabel, **(xlabel_kwargs or {}))
+    plt.ylabel(ylabel, **(ylabel_kwargs or {}))
     if ylims is not None:
         plt.ylim(ylims)
     plt.title(title)
-    plt.grid(alpha=0.3)
+    # plt.grid(alpha=0.3)
     plt.tight_layout()
     plt.show()
-
-def plot_thermal_properties_comparison(
-    thermal_props_dict,
-    plot_props=["F", "S"],
-    title="",
-    figsize=(8, 4),
-    plot_in_j_mol=False,
-    atoms_per_formula_units=None,
-    colors=["blue", "red", "green", "orange", "purple"],
-    align_F_to_reference=False,
-):
-    if isinstance(plot_props, str):
-        plot_props = [plot_props]
-    if not thermal_props_dict:
-        raise ValueError("thermal_props_dict is empty.")
-
-    prop_to_group   = {"F": "energy", "S": "thermal", "Cv": "thermal"}
-    labels          = list(thermal_props_dict.keys())
-    datasets        = list(thermal_props_dict.values())
-    multi           = len(labels) > 1
-    multi_prop      = len(plot_props) > 1
-
-    # Dataset styles: first is solid/no-marker, rest get dashed + unique markers
-    # markevery thins out markers so lines stay readable
-    DS_MARKERS  = ["o", "^", "D", "s", "v", "P", "X", "h"]  # circle, triangle, diamond, square…
-    MARKEVERY   = 10   # place a marker every N points (tune to taste)
-    MARKERSIZE  = 5
-
-    def ds_style(ds_idx):
-        """Return (linestyle, marker, markevery) for dataset index."""
-        if ds_idx == 0:
-            return "-", "None", None
-        marker = DS_MARKERS[(ds_idx - 1) % len(DS_MARKERS)]
-        return "--", marker, MARKEVERY
-
-    for prop in plot_props:
-        for label, data in thermal_props_dict.items():
-            if prop not in data[0]:
-                raise ValueError(
-                    f"Property '{prop}' not found in dataset '{label}'. "
-                    f"Available: {list(data[0].keys())}"
-                )
-
-    temperatures = [point["T"] for point in datasets[0]]
-
-    def prepare(values, prop):
-        vals = list(values)
-        if atoms_per_formula_units is not None:
-            vals = [v * atoms_per_formula_units for v in vals]
-        if plot_in_j_mol:
-            factor = EV_TO_KJ_PER_MOL if prop == "F" else EV_TO_J_PER_MOL
-            vals = [v * factor for v in vals]
-        return vals
-
-    parsed = {
-        label: {
-            prop: prepare([pt[prop] for pt in data], prop)
-            for prop in plot_props
-        }
-        for label, data in thermal_props_dict.items()
-    }
-
-    if align_F_to_reference and "F" in plot_props:
-        ref_label   = labels[0]
-        ref_F_start = parsed[ref_label]["F"][0]
-        for label in labels[1:]:
-            offset = parsed[label]["F"][0] - ref_F_start
-            parsed[label]["F"] = [v - offset for v in parsed[label]["F"]]
-
-    # Axis setup
-    fig, ax1 = plt.subplots(figsize=figsize)
-    axes = [ax1]
-
-    needed_groups = []
-    for prop in plot_props:
-        group = prop_to_group.get(prop)
-        if group and group not in needed_groups:
-            needed_groups.append(group)
-    for _ in needed_groups[1:]:
-        axes.append(ax1.twinx())
-
-    def ylabel_for(prop, aligned=False):
-        if plot_in_j_mol:
-            unit = "kJ/mol" if prop == "F" else "J/K/mol"
-        else:
-            unit = "eV/atom" if prop == "F" else "eV/atom/K"
-        if atoms_per_formula_units is not None:
-            unit = unit.replace("atom", "fu")
-        suffix = " [aligned]" if (aligned and prop == "F") else ""
-        return rf"$\mathit{{{prop}}}$ ({unit}){suffix}"
-
-    for prop in plot_props:
-        group     = prop_to_group.get(prop, "energy")
-        group_idx = needed_groups.index(group) if group in needed_groups else 0
-        ax        = axes[group_idx]
-        props_on_axis = [p for p in plot_props if prop_to_group.get(p) == group]
-        combined_ylabel = " / ".join(
-            ylabel_for(p, aligned=align_F_to_reference) for p in props_on_axis
-        )
-        ax.set_ylabel(combined_ylabel, fontsize=15)
-        ax.tick_params(axis="y", labelsize=15)
-
-    # ── Color assignment ───────────────────────────────────────────────────────
-    # Single property  → each dataset gets its own color
-    # Multiple props   → each *property* gets a color; datasets share it
-    def line_color(prop_idx, ds_idx):
-        if multi_prop:
-            return colors[prop_idx % len(colors)]
-        else:
-            return colors[ds_idx % len(colors)]
-
-    # ── Plot ───────────────────────────────────────────────────────────────────
-    for prop_idx, prop in enumerate(plot_props):
-        group     = prop_to_group.get(prop, "energy")
-        group_idx = needed_groups.index(group) if group in needed_groups else 0
-        ax        = axes[group_idx]
-
-        for ds_idx, label in enumerate(labels):
-            ls, marker, markevery = ds_style(ds_idx)
-            color = line_color(prop_idx, ds_idx)
-
-            if multi_prop:
-                # Legend entry identifies both property and dataset
-                legend_label = rf"$\mathit{{{prop}}}$ ({label})" if multi else rf"$\mathit{{{prop}}}$"
-            else:
-                # Single property: legend entry is just the dataset label
-                legend_label = label if multi else rf"$\mathit{{{prop}}}$"
-
-            ax.plot(
-                temperatures,
-                parsed[label][prop],
-                color=color,
-                linewidth=1.5,
-                linestyle=ls,
-                marker=marker,
-                markevery=markevery,
-                markersize=MARKERSIZE,
-                label=legend_label,
-            )
-
-    all_handles, all_labels = [], []
-    for ax in axes:
-        h, l = ax.get_legend_handles_labels()
-        all_handles.extend(h)
-        all_labels.extend(l)
-    if all_handles:
-        ax1.legend(all_handles, all_labels, loc="best", fontsize=12)
-
-    ax1.set_xlabel("Temperature (K)", fontsize=15)
-    ax1.tick_params(axis="x", labelsize=15)
-    plt.title(title)
-    plt.tight_layout()
-    plt.show()
-
 
 def plot_thermal_properties_comparison(
     thermal_props_dict,
@@ -854,12 +711,25 @@ def plot_thermal_properties_comparison(
         ax.set_ylabel(combined_ylabel, fontsize=15)
         ax.tick_params(axis="y", labelsize=15)
 
+    DS_MARKERS = ["o", "^", "D", "s", "v", "P", "X", "h"]
+    MARKEVERY  = 10
+    MARKERSIZE = 5
+
+    def ds_style(ds_idx, single_prop):
+        """Return (linestyle, marker, markevery) for a dataset index."""
+        if not single_prop or ds_idx == 0:
+            return "-", "None", None
+        marker = DS_MARKERS[(ds_idx - 1) % len(DS_MARKERS)]
+        return "--", marker, MARKEVERY
+
+    single_prop = len(plot_props) == 1
+
     # Plot
     for prop_idx, prop in enumerate(plot_props):
         group     = prop_to_group.get(prop, "energy")
         group_idx = needed_groups.index(group) if group in needed_groups else 0
         ax        = axes[group_idx]
-        ls        = prop_linestyles[prop_idx % len(prop_linestyles)]
+        ls_prop   = prop_linestyles[prop_idx % len(prop_linestyles)]
 
         for ds_idx, label in enumerate(labels):
             color        = colors[ds_idx % len(colors)]
@@ -867,12 +737,21 @@ def plot_thermal_properties_comparison(
                 rf"$\mathit{{{prop}}}$ ({label})" if multi
                 else rf"$\mathit{{{prop}}}$"
             )
+
+            ls, marker, markevery = ds_style(ds_idx, single_prop)
+            # When multiple props, fall back to prop-based linestyle
+            if not single_prop:
+                ls = ls_prop
+
             ax.plot(
                 temperatures,
                 parsed[label][prop],
                 color=color,
                 linewidth=1.5,
                 linestyle=ls,
+                marker=marker,
+                markevery=markevery,
+                markersize=MARKERSIZE,
                 label=legend_label,
             )
 

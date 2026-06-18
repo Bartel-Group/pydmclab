@@ -74,6 +74,7 @@ class AnalyzePhonons(object):
             dataset (dict):
                 Only for Finite Displacement. Dictionary containing displacement information, can optionally include forces and supercell energy. But these can also be provided separately in force_data, this easier because you can just feed it as a list of arrays.
                 Usually generated using phonopy's phonopy.displacements and then extract dataset using phonopy.dataset
+                Helper function get_displacements_for_phonons() in hpc_worflows/phonon_calcs generates this for you as well.
                 WARNING: See warning for force_data argument.
                 Type 1. One atomic displacement in each supercell:
                 {'natom': number of atoms in supercell,
