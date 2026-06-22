@@ -463,7 +463,7 @@ class AnalyzePhonons(object):
             data["total_dos"] = total_dos
 
         if include_thermal_properties:
-            helmholtz = self.helmholtz(temperatures=temperatures,include_heat_capacity=include_heat_capacity)
+            helmholtz = self.thermal_properties(temperatures=temperatures,include_heat_capacity=include_heat_capacity)
             data["thermal_properties"] = helmholtz
 
         if include_phonopy_thermal_properties:
