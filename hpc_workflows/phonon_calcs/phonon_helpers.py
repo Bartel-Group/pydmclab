@@ -10,8 +10,6 @@ from pymatgen.io.ase import AseAtomsAdaptor
 from pymatgen.io.phonopy import get_phonopy_structure, get_pmg_structure
 from pymatgen.analysis.local_env import CrystalNN
 
-from hiphive.structure_generation import generate_mc_rattled_structures, generate_rattled_structures
-
 from phonopy import Phonopy
 
 def get_displacements_for_phonons(
@@ -97,6 +95,7 @@ def get_displacements_for_phonons(
         out["dataset"] = dataset
 
     if method == "hiphive":
+        from hiphive.structure_generation import generate_mc_rattled_structures, generate_rattled_structures
         #turn unitcell to AseAtoms
         atoms = AseAtomsAdaptor.get_atoms(pymatgen_struc)
         if mc:
