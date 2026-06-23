@@ -769,3 +769,216 @@ def plot_thermal_properties_comparison(
     plt.tight_layout()
     plt.show()
     
+
+
+    # def plot_phonon_dos(self, volume=None, remove_imaginary=False):
+    #     """
+    #     Plot phonon density of states for a specific volume.
+    #     Args:
+    #         formula (str): Chemical formula of the material.
+    #         mpid (str): Materials Project ID.
+    #         volume (float): Volume of the structure. If none, will plot phonon dos for all the volumes.
+    #         remove_imaginary (bool): Whether to remove imaginary frequencies. Default is False.
+    #     """
+    #     phonon_dos_dict = self.phonon_dos(remove_imaginary=remove_imaginary)
+        
+    #     if not volume:
+    #         plt.figure(figsize=(10, 6))
+    #         for volume in phonon_dos_dict:
+    #             phonon_dos = phonon_dos_dict[str(volume)]
+
+    #             frequency_points = np.array([d['E'] for d in phonon_dos['dos']])
+    #             total_dos = np.array([d['dos'] for d in phonon_dos['dos']])
+    #             label = f"{float(volume):.2f} A^3"
+    #             plt.plot(frequency_points, total_dos, label=label)
+
+    #         plt.title(f"Phonon Density of States for {mpid}", fontsize=14)
+    #         plt.legend(title="Volumes", loc="best", fontsize=10)
+
+    #     else:
+    #         phonon_dos = phonon_dos_dict[str(volume)]
+
+    #         frequency_points = np.array([d['E'] for d in phonon_dos['dos']])
+    #         total_dos = np.array([d['dos'] for d in phonon_dos['dos']])
+
+    #         plt.figure(figsize=(10, 6))
+    #         plt.plot(frequency_points, total_dos, label=f"{volume:.2f} A^3")
+    #         plt.title(f"Phonon Density of States for {volume:.2f} A^3", fontsize=14)
+            
+    #     plt.xlabel("Energy (eV)", fontsize=12)
+    #     plt.ylabel("Phonon DOS (1/eV)", fontsize=12)
+
+    
+   
+    # def plot_helmholtz_free_energy(self, temp_cutoff=None):
+    #     """
+    #     Plot Temperature vs Helmholtz Free Energy at Different Volumes.
+
+    #     Args:
+    #         F (dict): Dictionary containing Helmholtz free energy data for different volumes.
+    #         temp_cutoff (tuple): Optional temperature range (min_temp, max_temp) for filtering.
+    #     """
+
+    #     F = self.helmholtz()
+
+    #     plt.figure(figsize=(10, 6))  
+
+    #     volumes = list(F.keys())  
+
+    #     for vol in volumes:
+    #         # Extract Helmholtz free energies and temperatures
+    #         data = F[vol]['data']
+    #         if temp_cutoff:
+    #             data = [d for d in data if temp_cutoff[0] <= d['T'] <= temp_cutoff[1]]
+
+    #         Fs = [i['F'] for i in data]
+    #         Ts = [i['T'] for i in data]
+
+    #         plt.plot(Ts, Fs, label=f"{float(vol):.2f}")  # Format volume label to 2 decimals
+
+    #     # Add title and axis labels
+    #     # plt.title("Temperature vs Helmholtz Free Energy at Different Volumes", fontsize=14)
+    #     plt.xlabel("Temperature (K)")
+    #     plt.ylabel("Helmholtz Free Energy (eV/atom)" if self.natoms else "Helmholtz Free Energy (eV/cell)")
+
+    #     # Add legend and grid
+    #     plt.legend(title="Volumes", loc="best", fontsize=10)
+
+
+    #     # Display the plot
+    #     plt.show()
+
+    # def plot_gibbs_free_energy(self, temp_cutoff=None):
+    #     """
+    #     Plot Temperature vs Gibbs Free Energy at Different Volumes.
+
+    #     Args:
+    #         G (dict): Dictionary containing Gibbs free energy data.
+    #         volumes (list): List of volume values.
+    #         temp_cutoff (tuple): Optional temperature range (min_temp, max_temp) for filtering.
+    #     """
+    #     G = self.gibbs()
+
+    #     plt.figure(figsize=(10, 6))  # Create a new figure with a specified size
+
+    #     data = G['data']
+    #     if temp_cutoff:
+    #         data = [d for d in data if temp_cutoff[0] <= d['T'] <= temp_cutoff[1]]
+
+    #     Gs = [i['G'] for i in data]
+    #     Ts = [i['T'] for i in data]
+
+    #     plt.plot(Ts, Gs) 
+
+    #     # Add title and axis labels
+    #     # plt.title("Temperature vs Gibbs Free Energy at Different Volumes", fontsize=14)
+    #     plt.xlabel("Temperature (K)")
+    #     plt.ylabel("Gibbs Free Energy (eV/atom)" if self.natoms else "Gibbs Free Energy (eV/cell)")
+
+    #     # Add legend and grid
+    #     # plt.legend(title="Volumes", loc="best", fontsize=10)
+    #     # plt.grid(True)
+
+    #     # Display the plot
+    #     plt.show()
+    
+    # def plot_volumes_vs_helmholtz(self, skip=1, temp_cutoff=None, normalize_298K=False):
+    #     """
+    #     Plot Helmholtz Free Energy vs Volume at different temperatures.
+    #     Optionally subtract the energy at 298K for normalization.
+    #     """
+    #     F = self.helmholtz()
+    #     G = self.gibbs()
+
+    #     # Extract all temperature points (assuming consistent across volumes)
+    #     temperatures = [entry['T'] for entry in next(iter(F.values()))['data']]
+    #     if temp_cutoff:
+    #         temperatures = [T for T in temperatures if temp_cutoff[0] <= T <= temp_cutoff[1]]
+
+    #     plt.figure(figsize=(3, 6))  # Prepare the figure
+
+    #     equil_vols = []  # List to store equilibrium volumes
+    #     equil_F_values = []  # List to store F value (Gibbs) at equilibrium volume
+
+    #     # Loop over temperatures with the specified skip step
+    #     for i, T in enumerate(temperatures[1::skip]): 
+    #         vols = []  # List to store volumes
+    #         Fs = []  # List to store free energy values
+    #         equil_vol = next(item['V'] for item in G['data'] if item['T'] == T)  # Get the equilibrium volume
+    #         equil_vol_F = next(item['G'] for item in G['data'] if item['T'] == T)  # Get the Gibbs free energy at the equilibrium volume
+
+    #         equil_vols.append(equil_vol)  # Add equilibrium volumes
+    #         equil_F_values.append(equil_vol_F)  # Add equilibrium Gibbs free energies
+
+    #         for vol, data in F.items():
+    #             for entry in data['data']:
+    #                 if entry['T'] == T:
+    #                     F_value = entry['F']
+    #                     if normalize_298K:
+    #                         G_at_T300 = next(item['G'] for item in G['data'] if item['T'] == 300)
+    #                         F_value -= G_at_T300
+    #                     vols.append(float(vol))
+    #                     Fs.append(F_value)
+    #                     break
+
+    #         # Plot Helmholtz Free Energy vs Volume for the current temperature
+    #         plt.scatter(vols, Fs, marker='o', color='black')
+    #                 # Plot the smooth fitted line for this temperature
+    #         if T in G['fitted_F_values']:
+    #             plt.plot(G['volumes_for_fitting'], G['fitted_F_values'][T], color='black')
+
+
+    #     print("Equilibrium Volumes: ", equil_vols)
+    #     print("Equilibrium Free Energy Values: ", equil_F_values)
+
+    #     # Now plot the equilibrium volumes and Gibbs free energies at each temperature
+    #     plt.plot(equil_vols, equil_F_values, color='red', marker='x', label="Equilibrium Volume")
+
+    #     # # Add legend for first and last temperature
+    #     # plt.text(484, -30.8, f"T = {temperatures[1::skip][0]} K", fontsize=14,
+    #     #          color='black', ha='center', va='center')
+    #     # plt.text(448, -37.8, f"T = {temperatures[1::skip][-1]} K", fontsize=14,
+    #     #          color='black', ha='center', va='center')
+
+    #     plt.xlabel("Volume ($\mathrm{Å}^3$)", fontsize=18)
+    #     plt.ylabel("F (eV/f.u.)", fontsize=18)
+    #     plt.yticks(fontsize=14)
+    #     plt.xticks(fontsize=14)
+    #     # plt.title(
+    #     #     "Helmholtz Free Energy vs Volume at Different Temperatures" +
+    #     #     (" (Normalized to 298K)" if normalize_298K else ""),
+    #     #     fontsize=14
+    #     # )
+
+    #     # Show the plot
+    #     plt.show()
+
+
+    # def plot_equilibrium_volume_vs_temperature(self, temp_cutoff=None):
+    #     """
+    #     Plot Equilibrium Volume vs Temperature.
+
+    #     Args:
+    #         G (dict): Dictionary containing Gibbs free energy data.
+    #         volumes (list): List of volume values.
+    #         temp_cutoff (tuple): Optional temperature range (min_temp, max_temp) for filtering.
+    #     """
+    #     G = self.gibbs() 
+
+    #     plt.figure(figsize=(2, 6))
+
+    #     data = G['data']
+    #     if temp_cutoff:
+    #         data = [d for d in data if temp_cutoff[0] <= d['T'] <= temp_cutoff[1]]
+        
+    #     Ts = [i['T'] for i in data]
+    #     Vs = [i['V'] for i in data]
+
+    #     plt.plot(Ts, Vs, label=mpid)
+    #     # plt.title("Equilibrium Volume vs Temperature", fontsize=14)
+    #     plt.xlabel("Temperature (K)", fontsize=12)
+    #     plt.ylabel("Equilibrium Volume ($\mathrm{Å}^3$)", fontsize=12)
+    #     plt.xticks(fontsize=12)
+    #     plt.yticks(fontsize=12)
+    #     # plt.legend(loc="best", fontsize=10)
+
