@@ -9,20 +9,21 @@ from scipy.constants import physical_constants
 import pandas as pd
 # from sumo.plotting.phonon_bs_plotter import SPhononBSPlotter
 
-EV_TO_J = physical_constants['electron volt-joule relationship'][0]
-AVOGADRO = physical_constants['Avogadro constant'][0]
-EV_TO_J_PER_MOL = EV_TO_J * AVOGADRO
-EV_TO_KJ_PER_MOL = EV_TO_J_PER_MOL / 1000.0
-
 # from pydmclab.core.struc import StrucTools
 # from pymatgen.core import Structure
 # from pydmclab.hpc.helpers import get_query
 # from pymatgen.io.ase import AseAtomsAdaptor
 
-SCRIPTS_DIR = os.getcwd()
-DATA_DIR = SCRIPTS_DIR.replace('scripts', 'data')
+# set up some paths that will point to where your data/calculations will live
+#  these are just defaults, you can change the `_DIR` variables to point to wherever you want
+#
+# The home directory path is used to point to your local copy of the pydmclab repo
+#   pydmclab is assumed to be in /users/{number}/{username}/bin/pydmclab
+#   and $HOME points to /users/{number}/{username}
+HOME_PATH = os.environ["HOME"]
 
-PHONON_HELPERS_DIR = "~/bin/pydmclab/hpc_workflows/phonon_calcs"
+#importing phonon helpers
+PHONON_HELPERS_DIR = "%s/bin/pydmclab/hpc_workflows/phonon_calcs" % HOME_PATH
 
 if PHONON_HELPERS_DIR not in sys.path:
     sys.path.append(PHONON_HELPERS_DIR)
@@ -30,6 +31,17 @@ if PHONON_HELPERS_DIR not in sys.path:
 from phonon_helpers import (
     get_set_of_forces,
 )
+
+# where is this file
+SCRIPTS_DIR = os.getcwd()
+
+# where is my data going to live
+DATA_DIR = SCRIPTS_DIR.replace("scripts", "data")
+
+EV_TO_J = physical_constants['electron volt-joule relationship'][0]
+AVOGADRO = physical_constants['Avogadro constant'][0]
+EV_TO_J_PER_MOL = EV_TO_J * AVOGADRO
+EV_TO_KJ_PER_MOL = EV_TO_J_PER_MOL / 1000.0
 
 def compute_all_phonon_properties(results,
                                   displacements,
@@ -120,9 +132,9 @@ def compute_all_phonon_properties(results,
 
         phonon_key = static_key.replace("static", calc_method)
 
-        E_per_at = None
+        E_per_at = 0
         if query:
-            E_per_at = query[mpid]['E_per_at']
+            E_per_at = query[mpid]['E_per_at'] #assuming *base* mpids match between query and results.json
             struc = query[mpid]['structure']
 
             out[static_key] = {'results': 
@@ -152,18 +164,15 @@ def compute_all_phonon_properties(results,
 def main():
     remake_phonons = False
 
-    results = read_json(os.path.join(INPUT_DATA_DIR, "results.json"))
-    displacements = read_json(os.path.join(INPUT_DATA_DIR, "displacements.json"))
-    query = read_json(os.path.join(INPUT_DATA_DIR, "query.json"))
+    results = read_json(os.path.join(DATA_DIR, "results.json"))
+    displacements = read_json(os.path.join(DATA_DIR, "displacements.json"))
+    query = read_json(os.path.join(DATA_DIR, "query.json"))
 
     xc_wanted = "metagga"
 
     temperatures = np.linspace(0, 2000, 101)
     init_kwargs = {}
     band_structure_kwargs = None
-
-    plot_band_structure = True
-    plot_thermal_properties = True
 
     phonons = compute_all_phonon_properties(results=results,
                                             displacements=displacements,
@@ -174,9 +183,7 @@ def main():
                                             query=query,
                                             savename='phonons_test.json',
                                             data_dir=DATA_DIR,
-                                            remake=remake_phonons,
-                                            plot_band_structure=plot_band_structure,
-                                            plot_thermal_properties=plot_thermal_properties)
+                                            remake=remake_phonons,)
 
     #See pydmclab.plotting.phonons for plotting functions
 

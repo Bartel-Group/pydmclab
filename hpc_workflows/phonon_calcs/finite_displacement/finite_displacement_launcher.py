@@ -52,7 +52,7 @@ if PHONON_HELPERS_DIR not in sys.path:
     sys.path.append(PHONON_HELPERS_DIR)
 
 from phonon_helpers import (
-    get_displacements_for_phonons,
+    get_finite_displacement_strucs,
 )
 
 _, _, _, USER_NAME = HOME_PATH.split("/")
@@ -225,45 +225,6 @@ def get_custom_data(savename="custom.json", remake=False):
     return read_json(fjson)
     
 
-def get_strucs(query, 
-               supercell = [2,2,2], 
-               data_dir = DATA_DIR, savename = "strucs.json", 
-               savename_displacements = "displacements.json", 
-               remake=False):
-    fjson = os.path.join(data_dir, savename)
-    fjson_displacements = os.path.join(data_dir, savename_displacements)
-    if os.path.exists(fjson) and os.path.exists(fjson_displacements) and not remake:
-        return read_json(fjson)
-
-    strucs = {}
-    displacements_data = {}
-    for mpid in query:
-        struc = query[mpid]['structure']
-        st = StrucTools(struc)
-        formula = st.compact_formula
-        st.make_supercell(supercell)
-        supercell = st.structure_as_dict
-        
-        if formula not in strucs:
-            strucs[formula] = {}
-
-        data = get_displacements_for_phonons(unitcell = supercell,
-                                             method = "finite_displacement",
-                                             data_dir = None)
-
-        # new_mpid = f"{formula}" #If wanted to have a different mpid than what is in the query.
-
-        displaced_supercells = data['displaced_structures']
-        for i,disp in enumerate(displaced_supercells):
-            new_mpid_i = f'{mpid}_{i}'
-            strucs[formula][new_mpid_i] = disp
-
-        displacements_data[mpid] = data
-
-    write_json(displacements_data, fjson_displacements)
-    write_json(strucs, fjson)
-    return read_json(fjson)
-
 def main():
     # make a submission script so you can execute launcher.py on the cluster
     remake_sub_for_launcher = False
@@ -332,13 +293,14 @@ def main():
     #  replace with your own function for making structures
     #  if you don't want to just use the structures as is from the query
     #  eg make substitutions, create defects, make supercells, etc
-    strucs = get_strucs(
-        query=query,
-        supercell = [2,2,2],
-        data_dir=DATA_DIR,
-        savename="strucs.json",
-        remake=remake_strucs,
-    )
+    strucs = get_finite_displacement_strucs(query,
+                                            distance='auto',
+                                            supercell_matrix = None,
+                                            data_dir = DATA_DIR, 
+                                            savename = "strucs.json", 
+                                            savename_displacements = "displacements.json", 
+                                            remake=False
+                                        )
     if print_strucs_check:
         check_strucs(strucs)
 

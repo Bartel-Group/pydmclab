@@ -12,41 +12,96 @@ from pymatgen.analysis.local_env import CrystalNN
 
 from phonopy import Phonopy
 
+def get_finite_displacement_strucs(query, 
+                                   distance='auto',
+                                   supercell_matrix = None,
+                                   data_dir = DATA_DIR, 
+                                   savename = "strucs.json", 
+                                   savename_displacements = "displacements.json", 
+                                   remake=False):
+    '''
+    distance (float or None):
+        Distance for finite displacement. If auto will calculate as 1% of minimum interatomic distance in structure.
+    supercell_matrix (list or None):
+        Supercell matrix to use if want to generate supercells. Usually don't use this when doing DFT as structure used to create displacements is usually already supercelled and relaxed.
+    data_dir (str):
+        Path to directory where displacement data will be saved. If None, data will not be saved.
+    savename (str or None):
+        Name of the file to save strucs to.
+    savename_displacements ('str'):
+        Name of the file to save displacement data. Will need this for post process calculation of phonon properties.
+    remake (bool or None):
+        If True, will remake the displacement data even if it exists.
+    '''
+    
+    fjson = os.path.join(data_dir, savename)
+    fjson_displacements = os.path.join(data_dir, savename_displacements)
+    if os.path.exists(fjson) and os.path.exists(fjson_displacements) and not remake:
+        return read_json(fjson)
+
+    strucs = {}
+    displacements_data = {}
+    for mpid in query:
+        struc = query[mpid]['structure']
+        st = StrucTools(struc)
+
+        formula = st.compact_formula
+
+        if formula not in strucs:
+            strucs[formula] = {}
+
+        data = get_displacements_for_phonons(unitcell = struc,
+                                             method = "finite_displacement",
+                                             distance=distance,
+                                             supercell_matrix=supercell_matrix,
+                                             data_dir = None)
+
+        displaced_supercells = data['displaced_structures']
+        for i,disp in enumerate(displaced_supercells):
+            new_mpid_i = f'{mpid}_{i}'
+            strucs[formula][new_mpid_i] = disp
+
+        displacements_data[mpid] = data
+
+    write_json(displacements_data, fjson_displacements)
+    write_json(strucs, fjson)
+    return read_json(fjson)
+
 def get_displacements_for_phonons(
                     unitcell: str|dict,
                     method: str,
                     data_dir: str|None,
                     savename: str|None = 'displacements.json',
                     remake: bool|None = False,
-                    supercell_matrix: list|None = None,
                     distance: float|str = 'auto',
+                    supercell_matrix: list|None = None,
                     mc: bool = True,
                     n_structures: int|None = None,
                     rattle_std: float|None = None,
                     minimum_distance: float|None = None,
                     ):
-    """    Get the displacements for a given unitcell and method.
+    """    
+    Get the displacements data and structures for a given unitcell and method.
     Args:
         unitcell (str or dict):
             Path to the unitcell structure file (e.g., POSCAR) or a dictionary containing the structure data.
-            If a dictionary is provided, it should contain 'lattice', 'species', and 'coords' keys.
         method (str):
             Method to use for displacements. Options are 'finite_displacement' or 'hiphive'.
             REMINDER: finite_displacement creates many unitcells with one displacement each, while hiphive creates many unitcells with multiple random displacements.
         data_dir (str or None):
-            Path to directory where displacement data will be saved. If None, data will not be saved to disk.
+            Path to directory where displacement data will be saved. If None, data will not be saved.
         savename (str or None):
             Name of the file to save displacement data.
         remake (bool or None):
             If True, will remake the displacement data even if it exists.
-        supercell_matrix (list or None):
-            Supercell matrix to use for generating supercells. Highly recommend not using as to not cause confusion. Feed a structure that has already been supercelled.
         distance (float or None):
             Distance for finite displacement only. If auto will calculate as 1% of minimum interatomic distance in structure.
+        supercell_matrix (list or None):
+            Supercell matrix to use if want to generate supercells. Usually don't use this when doing DFT as structure used to create displacements is usually already supercelled and relaxed.
         mc (bool):
             If True, will use Monte Carlo method for generating displacements. For hiphive only.
         rattle_std (float or None):
-            Standard deviation for random rattling displacements.
+            Standard deviation for random rattling displacements. For hiphive only.
         minimum_distance (float or None):
             Minimum distance for hiphive displacement generation only if doing Monte Carlo. See hiphive.structure_generation.rattle.generate_mc_rattled_structures() for more details.
 
@@ -56,12 +111,12 @@ def get_displacements_for_phonons(
                 "unitcell": The original supercell structure pre-displacements (as dict),
                 "displaced_structures": The list of displaced structures (as dict),
                 "dataset": Only for finite displacement. The dataset containing displacement information obtained from phonopy,
-                            this is needed to feed to AnalyzePhonons if want to obtain thermal properties from finite displacement, 
-                            could optionally contain forces if calculating with mlp, but this would be in a separate function.
+                            this is needed to feed to AnalyzePhonons if want to obtain thermal properties from finite displacement.
                 "calc_method": method used for calculating displacements: finite_displacement or hiphive
             }
 
-    When creating MPIDs for the displaced structures (this would be once you are creating your get_strucs() or something), the original MPID should be used as a base, with an index appended for each displacement, always set at the end. 
+    When creating MPIDs for the displaced structures (this would be once you are creating your get_strucs() or something), 
+    the original MPID should be used as a base, with an index appended for each displacement always set at the end (see get_finite_displacement_strucs() helper). 
     For example, if the base MPID is 'S3Sr1Zr1_needle', the displaced structures could be named 'S3Sr1Zr1_needle_01', 'S3Sr1Zr1_needle_02', etc.
     Or for QHA, where there is also a suffix for the scaling of the different volumes: 'S3Sr1Zr1_needle_1.2_01', 'S3Sr1Zr1_needle_1.2_02', etc.
     Then the helper get_set_of_forces() can be used to extract the forces within each mpid using the "raw" mpid as a key by checking against mpid minus the last underscore and everything after it.
@@ -84,7 +139,7 @@ def get_displacements_for_phonons(
         phonon = Phonopy(unitcell=unitcell, supercell_matrix=supercell_matrix)
 
         if distance == 'auto':
-            distance = estimate_rattle_std(st.structure_as_dict(),
+            distance = estimate_displacement_distance(st.structure_as_dict,
                                            fraction= 0.01)
 
         displacement_data = phonon.generate_displacements(distance=distance)
@@ -118,12 +173,12 @@ def get_displacements_for_phonons(
     else:
         return out
 
-def estimate_rattle_std(structure: str|dict, 
-                        fraction: float, 
-                        include_min_dist_for_mc = False, 
-                        min_dist_factor = 3.0) -> float:
+def estimate_displacement_distance(structure: str|dict, 
+                                    fraction: float, 
+                                    include_min_dist_for_mc = False, 
+                                    min_dist_factor = 3.0) -> float:
     """
-    Estimate the rattle standard deviation based on a fraction of the minimum interatomic distance in the structure.
+    Estimate the finite displacement distance or hiphive rattle standard deviation based on a fraction of the minimum interatomic distance in the structure.
     Note: at the moment just auto detects oxidation states and assigns formal charges. This could be improved in the future.
     """
     nn = CrystalNN()
@@ -262,7 +317,7 @@ def get_force_constants_dfpt(calc_dir: str, savename: str = "force_constants.jso
 
 def parse_qha_results(qha_results: dict, include_structures: bool = True):
     """
-    Parse the results from a results.json file for a QHA calculation.
+    Parse the results from a results.json file for a QHA calculation. Needs work. 
     Args:
         qha_results (dict): Usually generated with pydmclab phonon template which grabs QHA raw results, passes them through AnalyzePhonons and produces a results.json file.
         The keys in qha_results should follow the same format as pydmclab.hpc.helper.get_results() 
