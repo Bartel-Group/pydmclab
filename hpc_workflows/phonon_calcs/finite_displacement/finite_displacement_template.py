@@ -74,7 +74,7 @@ def compute_all_phonon_properties(results,
             Arguments for band structure calculation. See pydmclab.hpc.phonons.AnalyzePhonons.band_structure() for more details.
         query (dict): 
             Query dictionary used for DFT calculations (usually from your get_query() function). This is to retrieve data from the static calculations (pre-displacements)
-            If None is given, information will not be retrieved for static calculations, so the returned phonon results will be phonon contribution to the energy only (without E0)..
+            If None is given, the returned phonon results will be phonon contribution to the energy only (without E0)
             Note: In QHA calculations need energy of original cell + phonon information.
             This dictionary should have the same mpids as the results dictionary but without the displacement suffixes.
             e.g. SrZrS3_needle, SrZrS3_perovskite for query keys and SrZrS3_needle_01, SrZrS3_perovskite_01 for mpid in results dictionary keys.
