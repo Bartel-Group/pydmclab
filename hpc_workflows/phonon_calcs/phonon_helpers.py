@@ -20,6 +20,7 @@ def get_finite_displacement_strucs(query,
                                    savename_displacements = "displacements.json", 
                                    remake=False):
     '''
+    Args:
     distance (float or None):
         Distance for finite displacement. If auto will calculate as 1% of minimum interatomic distance in structure.
     supercell_matrix (list or None):
@@ -32,6 +33,18 @@ def get_finite_displacement_strucs(query,
         Name of the file to save displacement data. Will need this for post process calculation of phonon properties.
     remake (bool or None):
         If True, will remake the displacement data even if it exists.
+    Returns:
+        {formula_indicator (str) :
+            {struc_indicator (str) with displacement index as suffix:
+                Pymatgen Structure object as dict}}
+        e.g.: 
+        {S3Sr1Zr1:
+            {S3Sr1Zr1_needle_01:
+                Pymatgen Structure object as dict,
+            S3Sr1Zr1_needle_02:
+                Pymatgen Structure object as dict,
+                },...}
+    
     '''
     
     fjson = os.path.join(data_dir, savename)
