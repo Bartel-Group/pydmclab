@@ -315,6 +315,58 @@ def get_force_constants_dfpt(calc_dir: str, savename: str = "force_constants.jso
 
     return read_json(fjson)
 
+def get_qha_strucs(query: dict,
+                   scale=np.linspace(0.99, 1.01, 5),
+                   data_dir: str = os.getcwd().replace("scripts", "data"),
+                   savename="strucs.json",
+                   remake=False):
+    """
+    Scales the structures' volumes for Quasi-Harmonic Approximation (QHA) and returns a strained structures dictionary.
+    Can write the strained structures to a json file if needed.
+
+    Args:
+        query (dict)
+            {ID (str) : {'structure' : Pymatgen Structure as dict,
+                        '<other property>' : whatever you queried for}}
+        scale (list): 
+            List of scale factors to apply to the structure volume. For QHA, you need at least 5 volume points.
+        data_dir (str): 
+            Directory to save the JSON file.
+        savename (str): 
+            filename for fjson in DATA_DIR  
+        remake (bool): 
+            write (True) or just read (False) fjson  
+
+    Returns:
+        {formula_indicator (str) :
+            {struc_indicator (str) with scale factor as suffix:
+                Pymatgen Structure object as dict}}
+        e.g., if you got some MP data, this might return something like:
+            {'Cl3Cs1Pb1' : {'mp-1234_1.02' : Structure.as_dict}, {'mp-1234_1.04' : Structure.as_dict}, ...} 
+    """
+
+    fjson = os.path.join(data_dir, savename) if data_dir else None
+    if fjson and os.path.exists(fjson) and not remake:
+        return read_json(fjson)
+
+    QHA_strucs = {}
+  
+    def scale_and_update(mpid, s):
+        st = StrucTools(s)
+        formula = st.compact_formula
+        
+        for i in scale:
+            scaled_st = st.scale_structure(i)
+            new_mpid = f"{mpid}_{np.round(i, 3)}"
+            QHA_strucs.setdefault(formula, {})[new_mpid] = scaled_st.as_dict()
+
+    for mpid in query:
+        scale_and_update(mpid, query[mpid]['structure'])
+    
+    write_json(QHA_strucs, fjson)
+    return read_json(fjson)
+
+
 def parse_qha_results(qha_results: dict, include_structures: bool = True):
     """
     Parse the results from a results.json file for a QHA calculation. Needs work. 

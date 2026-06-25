@@ -730,30 +730,23 @@ def check_strucs(strucs):
             struc = strucs[formula][ID]
             print("\tstructure formula: %s" % StrucTools(struc).formula)
 
-def get_qha_strucs(info: dict, dict_type='query',
-                   scale=np.linspace(0.96, 1.04, 5),
-                   data_dir: str|None = os.getcwd().replace("scripts", "data"),
-                   savename="QHA_strucs.json",
+def get_qha_strucs(query: dict,
+                   scale=np.linspace(0.99, 1.01, 5),
+                   data_dir: str = os.getcwd().replace("scripts", "data"),
+                   savename="strucs.json",
                    remake=False):
     """
     Scales the structures' volumes for Quasi-Harmonic Approximation (QHA) and returns a strained structures dictionary.
     Can write the strained structures to a json file if needed.
 
     Args:
-        info (dict): Structures or query info containing Pymatgen structures as dict.
-                    strucs (dict)
-                        {<formula indicator> (e.g., Cl3Cs1Pb1) :
-                            <unique structure indicator> (e.g., MP ID) :
-                                {'structure' : Pymatgen Structure as dict,
-                or  query (dict)
-                        {ID (str) : {'structure' : Pymatgen Structure as dict,
-                                    '<other property>' : whatever you queried for}}
-        dict_type (str): 
-            Type of dictionary ('strucs' or 'query') you are feeding for info.
+        query (dict)
+            {ID (str) : {'structure' : Pymatgen Structure as dict,
+                        '<other property>' : whatever you queried for}}
         scale (list): 
             List of scale factors to apply to the structure volume. For QHA, you need at least 5 volume points.
         data_dir (str): 
-            Directory to save the JSON file. If None is provided, it will not save the file.
+            Directory to save the JSON file.
         savename (str): 
             filename for fjson in DATA_DIR  
         remake (bool): 
@@ -772,32 +765,21 @@ def get_qha_strucs(info: dict, dict_type='query',
         return read_json(fjson)
 
     QHA_strucs = {}
-    
-    # Helper function to scale structures and update the dictionary
+  
     def scale_and_update(mpid, s):
         st = StrucTools(s)
         formula = st.compact_formula
         
         for i in scale:
-            scaled_st = st.scale_structure(i)  # Scale the structure
-            new_mpid = f"{mpid}_{np.round(i, 2)}"
+            scaled_st = st.scale_structure(i)
+            new_mpid = f"{mpid}_{np.round(i, 3)}"
             QHA_strucs.setdefault(formula, {})[new_mpid] = scaled_st.as_dict()
 
-    # Loop over structures
-    if dict_type == 'strucs':
-        for cmpd in info:
-            for mpid in info[cmpd]:
-                scale_and_update(mpid, info[cmpd][mpid])
-    elif dict_type == 'query':
-        for mpid in info:
-            scale_and_update(mpid, info[mpid]['structure'])
-
-    # Write to JSON if needed
-    if fjson:
-        write_json(QHA_strucs, fjson)
-        return read_json(fjson)
+    for mpid in query:
+        scale_and_update(mpid, query[mpid]['structure'])
     
-    return QHA_strucs
+    write_json(QHA_strucs, fjson)
+    return read_json(fjson)
 
 
 def get_magmoms(
