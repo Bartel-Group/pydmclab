@@ -160,12 +160,11 @@ def plot_thermal_properties(thermal_props,
     Properties with different units get separate axes (e.g., F on left, S/Cv on right).
 
     Args:
-        thermal_props (dict):
-            {'data': 
-                [{'T': float (K), 
-                'F': float (eV/atom), 
-                'S': float (eV/atom/K), 
-                'Cv': float (eV/atom/K)}, ...]}
+        thermal_props (list[dict]):
+           [{'T': float (K), 
+            'F': float (eV/atom), 
+            'S': float (eV/atom/K), 
+            'Cv': float (eV/atom/K)}, ...]}
         plot_props (list or str):
             Which properties to plot. Options: "F" for Helmholtz free energy, "S" for entropy, "Cv" for heat capacity. Default is ["F", "S"] to plot both.
         title (str):
