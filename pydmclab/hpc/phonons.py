@@ -121,7 +121,7 @@ class AnalyzePhonons(object):
                 )
 
             # self.dynamical_matrix = phonon.dynamical_matrix # This is just a phonopy.dynamical_matrix.DynamicalMatrix object. Need it to run mesh.
-            _mesh_out = phonon.run_mesh(mesh) #Need to run this in order to get mesh data, thermal properties, band structure, and total density of states
+            _mesh_out = phonon.run_mesh(mesh) #Need to run this in order to run everything else downstream
 
             self.phonon = phonon
 
