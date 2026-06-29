@@ -56,20 +56,6 @@ def get_mlp_calculator(framework='tensornet', calculator_kwargs=None):
         raise ValueError(f"Unsupported calculator: {framework}")
     return mlp_calculator
 
-def get_dE_gs(relaxation_results):
-    for mpid in relaxation_results:
-        if "needle" in mpid:
-            needle_E = relaxation_results[mpid]['energy']
-            needle_struc = relaxation_results[mpid]['final_structure']
-            natoms = len(needle_struc['sites'])
-            needle_E_per_at = needle_E/natoms
-        else:
-            perov_E = relaxation_results[mpid]['energy']
-            perov_struc = relaxation_results[mpid]['final_structure']
-            natoms = len(perov_struc['sites'])
-            perov_E_per_at = perov_E/natoms
-    return perov_E_per_at-needle_E_per_at
-
 def parse_phonon_results(phonon_results,
                          band_structure_paths=None):
 
