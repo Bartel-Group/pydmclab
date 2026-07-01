@@ -32,6 +32,8 @@ bs_line_density: 20 # kpoint line density for bs calculation
 
 # related to LOBSTER calculations (calc = 'lobster')
 COHPSteps: 2000 # how fine of a LOBSTER DOS do you want (more = more detailed)
+COHPstartEnergy: -35.0 # starting energy relative to Fermi level (0.0 eV)
+COHPendEnergy: 5.0 # ending energy relative to Fermi level (0.0 eV)
 reciprocal_kpoints_density_for_lobster: 100 # KPOINTS density for LOBSTER
 
 # related to error handling
@@ -116,6 +118,8 @@ include_metadata: True # include metadata like INCAR, KPOINTS, POTCAR settings
 include_calc_setup: True # include things related to the calculation setup -- mag, xc, etc
 include_structure: True # include the relaxed crystal structure as a dict
 include_trajectory: False # include the compact trajectory from the vasprun.xml
+include_forces: False # include the final forces from the vasprun.xml
+include_stress: False # include the final stress from the vasprun.xml
 include_mag: False # include the relaxed magnetization info as as dict
 include_tdos: False # include the light version of the density of states
 include_pdos: False # include heavy dos

@@ -28,6 +28,8 @@ def get_vasp_configs(
     compare_static_and_relax_energies=0.1,
     special_functional=False,
     COHPSteps=2000,
+    COHPstartEnergy=-35.0,
+    COHPendEnergy=5.0,
     reciprocal_kpoints_density_for_lobster=100,
     bandstructure_symprec=0.1,
     bandstructure_kpoints_line_density=20,
@@ -80,6 +82,12 @@ def get_vasp_configs(
         COHPSteps (int):
             how many (E, DOS) points do you want in LOBSTER outputs
                 only applies to xc-calc='all-lobster'
+        COHPstartEnergy (float):
+            starting energy relative to Fermi level (0.0 eV)
+                only applies to xc-calc='all-lobster'
+        COHPendEnergy (float):
+            ending energy relative to Fermi level (0.0 eV)
+                only applies to xc-calc='all-lobster'
         reciprocal_kpoints_density_for_lobster (int):
             kppra for LOBSTER calculations (higher is denser grid)
                 only applies to xc-calc='all-lobster'
@@ -108,6 +116,8 @@ def get_vasp_configs(
     vasp_configs["bs_symprec"] = bandstructure_symprec
     vasp_configs["bs_line_density"] = bandstructure_kpoints_line_density
     vasp_configs["COHPSteps"] = COHPSteps
+    vasp_configs["COHPstartEnergy"] = COHPstartEnergy
+    vasp_configs["COHPendEnergy"] = COHPendEnergy
     vasp_configs["reciprocal_kpoints_density_for_lobster"] = (
         reciprocal_kpoints_density_for_lobster
     )
@@ -339,6 +349,8 @@ def get_analysis_configs(
     only_xc=None,
     analyze_structure=True,
     analyze_trajectory=False,
+    analyze_forces=False,
+    analyze_stress=False,
     analyze_mag=False,
     analyze_charge=False,
     analyze_dos=False,
@@ -394,6 +406,12 @@ def get_analysis_configs(
 
     if analyze_trajectory:
         includes.append("trajectory")
+
+    if analyze_forces:
+        includes.append("forces")
+
+    if analyze_stress:
+        includes.append("stress")
 
     if analyze_mag:
         includes.append("mag")
@@ -2113,6 +2131,7 @@ def get_slabs(
     min_slab_sizes: list[int] | int = 6,
     vacuum_sizes: list[int] | int = 3,
     force_orthogonal_c: bool = True,
+    ox_states: dict | None = None,
     data_dir: str | os.PathLike = os.getcwd().replace("scripts", "data"),
     savename: str = "slabs.json",
     metadata_savename: str = "slabs_metadata.json",
@@ -2162,21 +2181,25 @@ def get_slabs(
 
     if isinstance(min_slab_sizes, int):
         min_slab_sizes = [min_slab_sizes]
-    elif isinstance(min_slab_sizes, list) and not all(
+    elif isinstance(min_slab_sizes, (list, tuple)) and all(
         isinstance(s, int) for s in min_slab_sizes
     ):
-        raise ValueError("min_slab_sizes must be an integer or list of integers.")
+        min_slab_sizes = list(min_slab_sizes)  # Convert tuple to list if needed
     else:
-        raise ValueError("min_slab_sizes must be an integer or list of integers.")
+        raise ValueError(
+            "min_slab_sizes must be an integer, list of integers, or tuple of integers."
+        )
 
     if isinstance(vacuum_sizes, int):
         vacuum_sizes = [vacuum_sizes]
-    elif isinstance(vacuum_sizes, list) and not all(
+    elif isinstance(vacuum_sizes, (list, tuple)) and all(
         isinstance(v, int) for v in vacuum_sizes
     ):
-        raise ValueError("vacuum_sizes must be an integer or list of integers.")
+        vacuum_sizes = list(vacuum_sizes)  # Convert tuple to list if needed
     else:
-        raise ValueError("vacuum_sizes must be an integer or list of integers.")
+        raise ValueError(
+            "vacuum_sizes must be an integer, list of integers, or tuple of integers."
+        )
 
     slabs = {}
     metadata = {}
@@ -2190,17 +2213,24 @@ def get_slabs(
         metadata[cmpd] = {}
         for struc_id in strucs[cmpd]:
             metadata[cmpd][struc_id] = {}
-            st = StrucTools(strucs[cmpd][struc_id])
+            st = StrucTools(strucs[cmpd][struc_id], ox_states=ox_states)
 
             evaluated_miller_indices = set()
-            for m in miller_indices:
-                if isinstance(m, int):
-                    distinct_miller_indices = get_symmetrically_distinct_miller_indices(
-                        st.structure, m
-                    )
-                    evaluated_miller_indices.update(distinct_miller_indices)
-                else:
-                    evaluated_miller_indices.add(tuple(m))
+
+            if isinstance(miller_indices, int):
+                distinct_miller_indices = get_symmetrically_distinct_miller_indices(
+                    st.structure, miller_indices
+                )
+                evaluated_miller_indices.update(distinct_miller_indices)
+            elif isinstance(miller_indices, list):
+                for m in miller_indices:
+                    if isinstance(m, int):
+                        distinct_miller_indices = (
+                            get_symmetrically_distinct_miller_indices(st.structure, m)
+                        )
+                        evaluated_miller_indices.update(distinct_miller_indices)
+                    else:
+                        evaluated_miller_indices.add(tuple(m))
             evaluated_miller_indices = sorted(list(evaluated_miller_indices))
 
             for em in evaluated_miller_indices:
