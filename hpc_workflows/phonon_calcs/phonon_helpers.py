@@ -13,9 +13,9 @@ from pymatgen.analysis.local_env import CrystalNN
 from phonopy import Phonopy
 
 def get_finite_displacement_strucs(query, 
+                                   data_dir,
                                    distance='auto',
-                                   supercell_matrix = None,
-                                   data_dir = DATA_DIR, 
+                                   supercell_matrix = None, 
                                    savename = "strucs.json", 
                                    savename_displacements = "displacements.json", 
                                    remake=False):
