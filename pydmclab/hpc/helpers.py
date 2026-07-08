@@ -12,7 +12,7 @@ from pydmclab.core.query import MPQuery, MPLegacyQuery
 from pydmclab.core.struc import StrucTools
 from pydmclab.core.mag import MagTools
 from pydmclab.core.energies import ChemPots, FormationEnthalpy, MPFormationEnergy
-from pydmclab.utils.handy import read_json, write_json
+from pydmclab.utils.handy import read_json, write_json, convert_numpy_to_native
 from pydmclab.data.configs import load_partition_configs
 
 from pymatgen.core.surface import Slab, get_symmetrically_distinct_miller_indices
@@ -1244,6 +1244,7 @@ def get_results(
 
     data = analyzer.results
 
+    data = convert_numpy_to_native(data)
     write_json(data, fjson)
     return read_json(fjson)
 
