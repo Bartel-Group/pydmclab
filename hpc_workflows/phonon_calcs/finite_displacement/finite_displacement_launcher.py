@@ -299,7 +299,7 @@ def main():
                                             data_dir = DATA_DIR, 
                                             savename = "strucs.json", 
                                             savename_displacements = "displacements.json", 
-                                            remake=False
+                                            remake=remake_strucs
                                         )
     if print_strucs_check:
         check_strucs(strucs)
