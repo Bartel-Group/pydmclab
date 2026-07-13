@@ -12,19 +12,21 @@ from pymatgen.analysis.local_env import CrystalNN
 
 from phonopy import Phonopy
 
-def get_finite_displacement_strucs(query, 
-                                   data_dir,
-                                   distance='auto',
-                                   supercell_matrix = None, 
-                                   savename = "strucs.json", 
-                                   savename_displacements = "displacements.json", 
-                                   remake=False):
+def get_finite_displacement_strucs(query: dict, 
+                                   data_dir: str,
+                                   distance: str|int|float='auto',
+                                   supercell_matrix: list|dict|None = None, 
+                                   savename: str = "strucs.json", 
+                                   savename_displacements: str = "displacements.json", 
+                                   remake: bool=False):
     '''
     Args:
     distance (float or None):
         Distance for finite displacement. If auto will calculate as 1% of minimum interatomic distance in structure.
-    supercell_matrix (list or None):
-        Supercell matrix to use if want to generate supercells. Usually don't use this when doing DFT as structure used to create displacements is usually already supercelled and relaxed.
+    supercell_matrix (list, dict or None):
+        Supercell matrix to use if want to generate supercells. Usually when doing DFT you relax the primitive cell tightly and then supercell here.
+        If list is given will apply same supercell matrix to all structures. 
+        If dict, will apply supercell matrix based on mpid. e.g. {'S3Sr1Zr1_needle: [3,2,1], 'S3Sr1Zr1_perovskite: [2,2,2]}
     data_dir (str):
         Path to directory where displacement data will be saved. If None, data will not be saved.
     savename (str or None):
@@ -63,10 +65,14 @@ def get_finite_displacement_strucs(query,
         if formula not in strucs:
             strucs[formula] = {}
 
+        supercell = supercell_matrix
+        if isinstance(supercell_matrix, dict):
+            supercell = supercell_matrix[mpid]
+
         data = get_displacements_for_phonons(unitcell = struc,
                                              method = "finite_displacement",
                                              distance=distance,
-                                             supercell_matrix=supercell_matrix,
+                                             supercell_matrix=supercell,
                                              data_dir = None)
 
         displaced_supercells = data['displaced_structures']
