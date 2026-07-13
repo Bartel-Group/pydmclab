@@ -24,9 +24,13 @@ def get_finite_displacement_strucs(query: dict,
     distance (float or None):
         Distance for finite displacement. If auto will calculate as 1% of minimum interatomic distance in structure.
     supercell_matrix (list, dict or None):
-        Supercell matrix to use if want to generate supercells. Usually when doing DFT you relax the primitive cell tightly and then supercell here.
-        If list is given will apply same supercell matrix to all structures. 
-        If dict, will apply supercell matrix based on mpid. e.g. {'S3Sr1Zr1_needle: [3,2,1], 'S3Sr1Zr1_perovskite: [2,2,2]}
+        Supercell matrix to use when generating supercells. Usually the primitive cell is relaxed tightly before building the supercell.
+        If list: apply the same supercell matrix to all structures, e.g. [2, 2, 2].
+        If dict: apply a supercell matrix per mpid, e.g. {
+            'S3Sr1Zr1_needle': [3, 2, 1],
+            'S3Sr1Zr1_perovskite': [2, 2, 2]
+        }.
+        Important because you probably want each lattice parameter to be at least 10 - 15 A to avoid displacement image interactions.
     data_dir (str):
         Path to directory where displacement data will be saved. If None, data will not be saved.
     savename (str or None):
