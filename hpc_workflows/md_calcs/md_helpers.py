@@ -7,7 +7,7 @@ import subprocess
 from pydmclab.utils.handy import read_json, write_json
 
 if TYPE_CHECKING:
-    from pydmclab.mlp import Versions
+    from pydmclab.mlp.chgnet import Versions
     from ase.optimize.optimize import Optimizer as ASEOptimizer
     from fairchem.core.units.mlip_unit.api.inference import InferenceSettings
 
