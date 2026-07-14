@@ -40,7 +40,7 @@ for d in [CALCS_DIR, DATA_DIR]:
 
 # set chgnet molecular dynamics configs
 ARCHITECTURE_CONFIGS = get_fairchem_configs(
-    name_or_path="uma-s-1",
+    name_or_path="uma-s-1p2",
     task_name="omat",
     ensembles=("nvt",),
     thermostats=("nh",),
