@@ -1208,27 +1208,6 @@ class AnalyzeVASP(object):
 
         return ap.summary(calc_dir=self.calc_dir, savename="phonons.json") #Analyze phonons has functionality for saving the data already
 
-    @property
-    def forces(self):
-        """
-        Returns final ionic forces from vasprun.xml (preferred) or OUTCAR.
-        Returns:
-            np.ndarray of shape (N_atoms, 3) or None if forces not available
-        This can be for use in finite displacement or hiphive phonon calculations
-        """
-        vr = self.outputs.vasprun
-        if vr and hasattr(vr, 'ionic_steps') and vr.ionic_steps:
-            try:
-                return vr.ionic_steps[-1]["forces"]
-            except (KeyError, IndexError):
-                pass
-        
-        # Fallback to OUTCAR
-        outcar = self.outputs.outcar
-        if outcar and hasattr(outcar, 'forces') and outcar.forces:
-            return outcar.forces[-1]  # Last set of forces
-        
-        return None
     
     def summary(
         self,
