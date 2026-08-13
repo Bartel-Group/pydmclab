@@ -277,6 +277,7 @@ def plot_relative_prop(
     plot_in_j_mol=False,
     atoms_per_formula_units=None,
     colors=["green", "blue", "orange", "purple", "red"],
+    title = ""
     xlabel_kwargs=None,
     ylabel_kwargs=None,
     legend_kwargs=None,
@@ -445,6 +446,7 @@ def plot_relative_prop(
             color="red", ha=ha, va="center", fontsize=14, backgroundcolor="white",
         )
 
+    plt.title(title)
     plt.xlabel("Temperature (K)")
     plt.ylabel(ylabel)
     if ylims is not None:
