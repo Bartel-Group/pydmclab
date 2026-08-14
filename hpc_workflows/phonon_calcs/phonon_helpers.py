@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 import numpy as np
 
@@ -13,8 +15,6 @@ from pymatgen.analysis.local_env import CrystalNN
 from phonopy import Phonopy
 
 ##added later
-from __future__ import annotations
-
 import os
 import json
 
