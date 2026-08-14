@@ -12,6 +12,27 @@ from pymatgen.analysis.local_env import CrystalNN
 
 from phonopy import Phonopy
 
+##added later
+from __future__ import annotations
+
+import os
+import json
+
+import numpy as np
+from tqdm import tqdm
+from scipy.constants import physical_constants
+
+import matcalc as mtc
+
+from pymatgen.core.structure import Structure, PeriodicSite
+from pymatgen.io.ase import AseAtomsAdaptor
+from ase import Atoms
+
+from pydmclab.mlp.fairchem.dynamics import FAIRChemCalculator
+from nequix.calculator import NequixCalculator
+from pydmclab.core.struc import StrucTools
+from pydmclab.utils.handy import convert_numpy_to_native
+
 def get_finite_displacement_strucs(query: dict, 
                                    data_dir: str,
                                    distance: str|int|float='auto',
@@ -453,25 +474,6 @@ def parse_qha_results(qha_results: dict, include_structures: bool = True):
 
     return dos_dict
 
-from __future__ import annotations
-
-import os
-import json
-
-import numpy as np
-from tqdm import tqdm
-from scipy.constants import physical_constants
-
-import matcalc as mtc
-
-from pymatgen.core.structure import Structure, PeriodicSite
-from pymatgen.io.ase import AseAtomsAdaptor
-from ase import Atoms
-
-from pydmclab.mlp.fairchem.dynamics import FAIRChemCalculator
-from nequix.calculator import NequixCalculator
-from pydmclab.core.struc import StrucTools
-from pydmclab.utils.handy import convert_numpy_to_native
 
 EV_TO_J = physical_constants["electron volt-joule relationship"][0]
 AVOGADRO = physical_constants["Avogadro constant"][0]
