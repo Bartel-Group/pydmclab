@@ -452,3 +452,224 @@ def parse_qha_results(qha_results: dict, include_structures: bool = True):
             dos_dict[formula][mpid_minus_scale][volume]['structure'] = structure
 
     return dos_dict
+
+from __future__ import annotations
+from typing import TYPE_CHECKING
+ 
+import os
+ 
+from tqdm import tqdm
+ 
+if TYPE_CHECKING:
+    from matcalc._phonon import PhononCalc  # noqa: F401
+ 
+ 
+def get_model_tag(user_configs: dict) -> str:
+    """
+    Centralizes the per-architecture "model" string used to name scripts,
+    results files, and job names. Replaces the repeated
+    if/elif "chgnet"/"fairchem" blocks scattered across relax_helpers.py.
+ 
+    Add a new elif branch here any time you add a new architecture instead
+    of copy-pasting the if/elif block again.
+ 
+    Args:
+        user_configs (dict): user configs (must contain "architecture" and
+            "relaxer_configs")
+ 
+    Returns:
+        model (str): short string identifying the model, used in filenames
+    """
+ 
+    architecture = user_configs["architecture"]
+ 
+    if architecture.lower() == "chgnet":
+        return user_configs["relaxer_configs"]["model"].replace(".", "")
+ 
+    elif architecture.lower() == "fairchem":
+        model_name = user_configs["relaxer_configs"]["name_or_path"]
+        model_task = user_configs["relaxer_configs"]["task_name"]
+        return f"{model_name}-{model_task}"
+ 
+    elif architecture.lower() == "matcalcphonon":
+        return user_configs["relaxer_configs"]["framework"]
+ 
+    raise ValueError(f"Unrecognized architecture: {architecture}")
+ 
+ 
+def get_matcalc_phonon_configs(
+    framework: str = "tensornet",
+    calculator_kwargs: dict | None = None,
+    atom_disp: float = 0.015,
+    min_length: float | None = 20.0,
+    supercell_matrix=None,
+    t_step: float = 10,
+    t_max: float = 1000,
+    t_min: float = 0,
+    fmax: float = 1e-05,
+    max_steps: int = 5000,
+    optimizer: str = "FIRE",
+    relax_structure: bool = True,
+    relax_calc_kwargs: dict | None = None,
+    imaginary_freq_tol: float = -0.01,
+    on_imaginary_modes: str = "warn",
+    fix_imaginary_attempts: int = 0,
+    symprec: float = 1e-05,
+    write_force_constants: bool | str = False,
+    write_band_structure: bool | str = False,
+    write_total_dos: bool | str = False,
+    write_phonon: bool | str = False,
+    verbose: bool = True,
+) -> dict:
+    """
+    Mirrors get_chgnet_configs / get_fairchem_configs, but for a
+    matcalc.PhononCalc-based phonon workflow.
+ 
+    "relaxer_configs" holds everything needed to build the calculator +
+    instantiate PhononCalc (all constructor-time kwargs).
+    "relax_configs" is left empty because PhononCalc.calc(structure) takes
+    no extra call-time kwargs (unlike relaxer.relax(struc, fmax=..., ...)).
+    Keeping both keys present (even if relax_configs is empty) keeps this
+    compatible with setup_job/collect_results, which just persist whatever
+    is in those two dict keys.
+ 
+    Args:
+        framework (str): mlp framework, passed to get_mlp_calculator
+            ("tensornet", "fairchem", "nequix", "nequix-pft")
+        calculator_kwargs (dict): kwargs for get_mlp_calculator, model-specific
+        atom_disp, min_length, supercell_matrix, t_step, t_max, t_min, fmax,
+        max_steps, optimizer, relax_structure, relax_calc_kwargs,
+        imaginary_freq_tol, on_imaginary_modes, fix_imaginary_attempts,
+        symprec, write_force_constants, write_band_structure,
+        write_total_dos, write_phonon: passed straight through to
+            matcalc.PhononCalc; see matcalc docs for definitions
+        verbose (bool): kept for parity with the other config getters
+ 
+    Returns:
+        architecture_configs (dict): dict of architecture/relaxer_configs/
+            relax_configs, same shape as get_fairchem_configs
+    """
+ 
+    architecture_configs = {
+        "architecture": "MatcalcPhonon",
+        "relaxer_configs": {},
+        "relax_configs": {},
+    }
+ 
+    rc = architecture_configs["relaxer_configs"]
+    rc["framework"] = framework
+    rc["calculator_kwargs"] = calculator_kwargs
+    rc["atom_disp"] = atom_disp
+    rc["min_length"] = min_length
+    rc["supercell_matrix"] = supercell_matrix
+    rc["t_step"] = t_step
+    rc["t_max"] = t_max
+    rc["t_min"] = t_min
+    rc["fmax"] = fmax
+    rc["max_steps"] = max_steps
+    rc["optimizer"] = optimizer
+    rc["relax_structure"] = relax_structure
+    rc["relax_calc_kwargs"] = relax_calc_kwargs
+    rc["imaginary_freq_tol"] = imaginary_freq_tol
+    rc["on_imaginary_modes"] = on_imaginary_modes
+    rc["fix_imaginary_attempts"] = fix_imaginary_attempts
+    rc["symprec"] = symprec
+    rc["write_force_constants"] = write_force_constants
+    rc["write_band_structure"] = write_band_structure
+    rc["write_total_dos"] = write_total_dos
+    rc["write_phonon"] = write_phonon
+    rc["verbose"] = verbose
+ 
+    return architecture_configs
+ 
+ 
+def make_phonon_scripts(
+    batching: dict, user_configs: dict, phonon_template: str, remake: bool = False
+) -> None:
+    """
+    Mirrors make_relax_scripts, but fills in phonon_template.py instead of
+    relax_template.py. Kept as a separate function (rather than branching
+    inside make_relax_scripts) because the placeholder set and the
+    class-instantiation pattern genuinely differ: PhononCalc is built as
+    PhononCalc(calculator, **relaxer_configs) and called as
+    phonon_calculator.calc(struc), not {Architecture}Relaxer(...).relax(...).
+ 
+    Args:
+        batching (dict): {"batch_id": {"launch_dir": str}}
+        user_configs (dict): user configs (architecture == "MatcalcPhonon")
+        phonon_template (str): path to phonon_template.py
+        remake (bool): if True, remake phonon scripts
+ 
+    Returns:
+        None, writes a phonon script for each job (batch)
+    """
+ 
+    model = get_model_tag(user_configs)
+    total_batches = len(batching)
+ 
+    with tqdm(total=total_batches, desc="Making phonon scripts") as pbar:
+ 
+        for batch_id in batching:
+ 
+            launch_dir = batching[batch_id]["launch_dir"]
+ 
+            phonon_script = os.path.join(launch_dir, f"matcalcphonon_{model}_phonon.py")
+ 
+            if os.path.exists(phonon_script) and not remake:
+                pbar.update(1)
+                continue
+ 
+            with open(phonon_template, "r", encoding="utf-8") as template_file:
+                template_lines = template_file.readlines()
+ 
+            phonon_script_lines = template_lines.copy()
+ 
+            for i, line in enumerate(phonon_script_lines):
+ 
+                indent = line[: len(line) - len(line.lstrip())]
+ 
+                if 'intra_op_threads = "placeholder"' in line:
+                    phonon_script_lines[i] = (
+                        f'{indent}intra_op_threads = {user_configs["num_intraop_threads"]}\n'
+                    )
+ 
+                elif 'inter_op_threads = "placeholder"' in line:
+                    phonon_script_lines[i] = (
+                        f'{indent}inter_op_threads = {user_configs["num_interop_threads"]}\n'
+                    )
+ 
+                elif 'phonon_configs = "placeholder"' in line:
+                    config_lines = [
+                        f"{indent}{key} = {repr(value)}\n"
+                        for key, value in user_configs["relaxer_configs"].items()
+                        if key not in ("framework", "calculator_kwargs")
+                    ]
+                    phonon_script_lines[i : i + 1] = config_lines
+ 
+                elif 'framework = "placeholder"' in line:
+                    framework = user_configs["relaxer_configs"]["framework"]
+                    phonon_script_lines[i] = f"{indent}framework = {repr(framework)}\n"
+ 
+                elif 'calculator_kwargs = "placeholder"' in line:
+                    kwargs = user_configs["relaxer_configs"]["calculator_kwargs"]
+                    phonon_script_lines[i] = (
+                        f"{indent}calculator_kwargs = {repr(kwargs)}\n"
+                    )
+ 
+                elif 'save_interval = "placeholder"' in line:
+                    phonon_script_lines[i] = (
+                        f"{indent}save_interval = {user_configs['save_interval']}\n"
+                    )
+ 
+                elif 'results = os.path.join(curr_dir, "placeholder")' in line:
+                    phonon_script_lines[i] = (
+                        f"{indent}results = os.path.join(curr_dir, "
+                        f"'matcalcphonon_{model}_phonon_results.json')\n"
+                    )
+ 
+            with open(phonon_script, "w", encoding="utf-8") as script_file:
+                script_file.writelines(phonon_script_lines)
+ 
+            pbar.update(1)
+ 
+    return
