@@ -2,6 +2,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Literal
 
 import os
+import sys
 import shutil
 import subprocess
 
@@ -126,6 +127,122 @@ def get_fairchem_configs(
     architecture_configs["relax_configs"]["verbose"] = verbose
 
     return architecture_configs
+
+def get_nequix_configs(
+        model_name = 'nequix-mp-1-pft',
+        path = None,
+        backend = 'jax',
+        capacity_multiplier = 1.1,
+        use_compile = True,
+        use_kernel = False #for GPU only
+):
+    """
+    See https://github.com/atomicarchitects/nequix for details on available models, many available models that are fine-tuned for phonons
+
+    Args:
+        model_name (str, default "nequix-mp-1"): Pretrained model alias to load or download.
+        model_path (str | Path, optional): Path to local checkpoint; overrides model_name.
+        backend ({"jax", "torch"}, default "jax"): Compute backend.
+        capacity_multiplier (float, default 1.1): JAX-only; padding factor to limit recompiles.
+        use_compile (bool, default True): Torch-only; on GPU, uses torch.compile().
+        use_kernel (bool, default True): on GPU, use OpenEquivariance kernels.
+
+    Returns:
+        relax_configs (dict): dict of architecture/ relaxer/ relax configurations
+    """
+
+    architecture_configs = {
+        "architecture": "Nequix",
+        "relaxer_configs": {},
+        "relax_configs": {},
+    }
+
+    architecture_configs["relaxer_configs"]["model_name"] = model_name
+    architecture_configs["relaxer_configs"]["path"] = path
+    architecture_configs["relaxer_configs"]["backend"] = backend
+    architecture_configs["relaxer_configs"]["capacity_multiplier"] = capacity_multiplier
+    architecture_configs["relaxer_configs"]["use_compile"] = use_compile
+    architecture_configs["relaxer_configs"]["use_kernel"] = use_kernel
+
+    #need to add relacer configs
+
+    return architecture_configs
+
+def get_phononcalc_configs(architecture,
+                           relaxer_kwargs,
+                           atom_disp= 0.015,
+                           min_length = 20.0,
+                           supercell_matrix = None,
+                           t_step = 20,
+                           t_max = 2000,
+                           t_min = 0,
+                           fmax = 1e-5,
+                           max_steps = 5000,
+                           relax_structure = True,
+                           imaginary_freq_tol: float = -0.01,
+                            on_imaginary_modes: Literal["error", "warn"] = "warn",
+                            fix_imaginary_attempts: int = 0,
+                            symprec: float = 1e-5,
+                            write_force_constants: bool | str = False,
+                            write_band_structure: bool | str = False,
+                            write_total_dos: bool | str = False,
+                            write_phonon: bool | str  = False,
+                           relax_calc_kwargs = {'relax_cell' : True,
+                                                'relax_atoms' :True,
+                                                'cell_filter' : "FrechetCellFilter",
+                                                'cell_filter_kwargs' : {},
+                                                'interval' : 1,
+                                                'perturb_distance': None,
+                                                'fix_symmetry': False,
+                                                'fix_atoms': False,},
+):
+
+
+    '''
+    Configs for matcalc's PhononCalc calculator
+
+    Args:
+        architecture: what MLP architecture to load to the phonon calculator (FAIRCHem, Nequix, etc.)
+        relaxer_kwargs: architecture-specific kwargs for loading the model. Note: these are only the kwargs needed to *load* the model. Relax kwargs are overridden by the other arguments
+
+    '''
+    architecture_configs = {
+        "architecture": architecture,
+        "is_phonon_calc": True,
+        "relaxer_configs": {},
+        "relax_configs": {},
+        "phonon_configs": {}
+    }
+
+    if architecture == 'FAIRChem':
+       architecture_configs['relaxer_configs'] = get_fairchem_configs(**relaxer_kwargs)["relaxer_configs"]
+    elif architecture == 'CHGNet':
+        architecture_configs['relaxer_configs']  = get_chgnet_configs(**relaxer_kwargs)["relaxer_configs"]
+    elif architecture == 'Nequix':
+        architecture_configs['relaxer_configs']  = get_nequix_configs(**relaxer_kwargs)["relaxer_configs"]
+
+    architecture_configs["relax_configs"]["fmax"] = fmax
+    architecture_configs["relax_configs"]["max_steps"] = max_steps
+    architecture_configs["relax_configs"]['relax_structure'] = relax_structure
+    architecture_configs["relax_configs"]["relax_calc_kwargs"] = relax_calc_kwargs
+
+    architecture_configs["phonon_configs"]["atom_disp"] = atom_disp
+    architecture_configs["phonon_configs"]["min_length"] = min_length
+    architecture_configs["phonon_configs"]["supercell_matrix"] = supercell_matrix
+    architecture_configs["phonon_configs"]["t_step"] = t_step
+    architecture_configs["phonon_configs"]["t_max"] = t_max
+    architecture_configs["phonon_configs"]["t_min"] = t_min
+    architecture_configs["phonon_configs"]["imaginary_freq_tol"] = imaginary_freq_tol
+    architecture_configs["phonon_configs"]["on_imaginary_modes"] = on_imaginary_modes
+    architecture_configs["phonon_configs"]["fix_imaginary_attempts"] = fix_imaginary_attempts
+    architecture_configs["phonon_configs"]["symprec"] = symprec
+    architecture_configs["phonon_configs"]["write_force_constants"] = write_force_constants
+    architecture_configs["phonon_configs"]["write_band_structure"] = write_band_structure
+    architecture_configs["phonon_configs"]["write_total_dos"] = write_total_dos
+    architecture_configs["phonon_configs"]["write_phonon"] = write_phonon
+
+    return architecture_configs
+
 
 
 def get_launch_configs(
@@ -355,7 +472,7 @@ def make_relax_scripts(
         remake (bool): if True, remake relax scripts
 
     Returns:
-        None, writes chgnet relax script for each job (batch)
+        None, writes relax/phonon script for each job (batch)
     """
 
     architecture = user_configs["architecture"]
@@ -366,6 +483,10 @@ def make_relax_scripts(
         model_task = user_configs["relaxer_configs"]["task_name"]
         model = f"{model_name}-{model_task}"
 
+    # is this a phonon workflow (has phonon_configs) or a plain relax workflow?
+    is_phonon = "phonon_configs" in user_configs
+    suffix = "phonons" if is_phonon else "relax"
+
     total_batches = len(batching)
 
     with tqdm(total=total_batches, desc="Making relaxation scripts") as pbar:
@@ -375,7 +496,7 @@ def make_relax_scripts(
             launch_dir = batching[batch_id]["launch_dir"]
 
             relax_script = os.path.join(
-                launch_dir, f"{architecture.lower()}_{model}_relax.py"
+                launch_dir, f"{architecture.lower()}_{model}_{suffix}.py"
             )
 
             if os.path.exists(relax_script) and not remake:
@@ -391,9 +512,30 @@ def make_relax_scripts(
                 indent = detect_indent(line)
 
                 if 'from pydmclab.mlp import "placeholder"' in line:
-                    relax_script_lines[i] = (
-                        f"{indent}from pydmclab.mlp.{architecture.lower()}.dynamics import {architecture}Relaxer\n"
-                    )
+                    if is_phonon:
+                        if "nequix" in architecture.lower():
+                            # not yet implemented in pydmclab.mlp -- import straight from source
+                            relax_script_lines[i] = (
+                                f"{indent}from nequix.calculator import NequixCalculator\n"
+                            )
+                        else:
+                            # need the raw ASE Calculator, not the Relaxer wrapper
+                            relax_script_lines[i] = (
+                                f"{indent}from pydmclab.mlp.{architecture.lower()}.dynamics import {architecture}Calculator\n"
+                            )
+                    else:
+                        relax_script_lines[i] = (
+                            f"{indent}from pydmclab.mlp.{architecture.lower()}.dynamics import {architecture}Relaxer\n"
+                        )
+
+                elif 'HELPERS_DIR = "placeholder"' in line:
+                    if is_phonon:
+                        # TODO: point this at wherever phonon_helpers.py actually lives
+                        relax_script_lines[i] = (
+                            f'{indent}HELPERS_DIR = "%s/bin/pydmclab/hpc_workflows/phonon_calcs/" % HOME_PATH\n'
+                        )
+                    else:
+                        relax_script_lines[i] = ""
 
                 elif 'intra_op_threads = "placeholder"' in line:
                     relax_script_lines[i] = (
@@ -422,6 +564,16 @@ def make_relax_scripts(
                     ]
                     relax_script_lines[i : i + 1] = config_lines
 
+                elif 'phonon_configs = "placeholder"' in line:
+                    if is_phonon:
+                        config_lines = [
+                            f"{indent}{key} = {repr(value)}\n"
+                            for key, value in user_configs["phonon_configs"].items()
+                        ]
+                        relax_script_lines[i : i + 1] = config_lines
+                    else:
+                        relax_script_lines[i] = ""
+
                 elif 'save_interval = "placeholder"' in line:
                     relax_script_lines[i] = (
                         f"{indent}save_interval = {user_configs['save_interval']}\n"
@@ -429,10 +581,48 @@ def make_relax_scripts(
 
                 elif 'results = os.path.join(curr_dir, "placeholder")' in line:
                     relax_script_lines[i] = (
-                        f"{indent}results = os.path.join(curr_dir, '{architecture.lower()}_{model}_relax_results.json')\n"
+                        f"{indent}results = os.path.join(curr_dir, '{architecture.lower()}_{model}_{suffix}_results.json')\n"
                     )
 
-                elif 'relaxer = "placeholder"' in line:
+                elif 'calculator = "placeholder"' in line and is_phonon:
+                    # relaxer_configs includes 'optimizer', which the Calculator
+                    # class doesn't accept -- everything else does
+                    calc_keys = [
+                        k for k in user_configs["relaxer_configs"].keys()
+                        if k != "optimizer"
+                    ]
+                    class_call_line = [f"{indent}calculator = {architecture}Calculator(\n"]
+                    calc_config_lines = [
+                        f"{indent}    {key} = {key},\n" for key in calc_keys
+                    ]
+                    end_call_line = [f"{indent})\n"]
+                    relax_script_lines[i : i + 1] = (
+                        class_call_line + calc_config_lines + end_call_line
+                    )
+
+                elif 'phonon_calculator = "placeholder"' in line and is_phonon:
+                    # PhononCalc takes calculator + everything in relax_configs
+                    # and phonon_configs, plus 'optimizer' (pulled from relaxer_configs)
+                    phonon_calc_keys = (
+                        list(user_configs["relax_configs"].keys())
+                        + list(user_configs["phonon_configs"].keys())
+                    )
+                    if "optimizer" in user_configs["relaxer_configs"]:
+                        phonon_calc_keys.append("optimizer")
+
+                    class_call_line = [
+                        f"{indent}phonon_calculator = mtc.PhononCalc(\n",
+                        f"{indent}    calculator,\n",
+                    ]
+                    phonon_calc_config_lines = [
+                        f"{indent}    {key} = {key},\n" for key in phonon_calc_keys
+                    ]
+                    end_call_line = [f"{indent})\n"]
+                    relax_script_lines[i : i + 1] = (
+                        class_call_line + phonon_calc_config_lines + end_call_line
+                    )
+
+                elif 'relaxer = "placeholder"' in line and not is_phonon:
 
                     class_call_line = [f"{indent}relaxer = {architecture}Relaxer(\n"]
                     relaxer_config_lines = [
@@ -444,7 +634,7 @@ def make_relax_scripts(
                         class_call_line + relaxer_config_lines + end_call_line
                     )
 
-                elif 'struc_results = "placeholder"' in line:
+                elif 'struc_results = "placeholder"' in line and not is_phonon:
                     class_call_line = [
                         f"{indent}struc_results = relaxer.relax(ini_struc, \n"
                     ]
@@ -462,8 +652,6 @@ def make_relax_scripts(
 
             pbar.update(1)
 
-            # print(f"\nCreated new relax script for {launch_dir}")
-
     return
 
 
@@ -479,6 +667,9 @@ def make_submission_scripts(
     Returns:
         job_names_by_dir (dict): dict of job names by launch directory
     """
+    # is this a phonon workflow (has phonon_configs) or a plain relax workflow?
+    is_phonon = "phonon_configs" in user_configs
+    suffix = "phonons" if is_phonon else "relax"
 
     architecture = user_configs["architecture"]
     if architecture.lower() == "chgnet":
@@ -497,7 +688,7 @@ def make_submission_scripts(
         if os.path.exists(relax_launcher) and not remake:
             continue
 
-        job_name = f"{architecture.lower()}_{model}_relax_{batch_id}"
+        job_name = f"{architecture.lower()}_{model}_{suffix}_{batch_id}"
 
         with open(relax_launcher, "w", encoding="utf-8") as f:
             f.write("#!/bin/bash -l\n")
@@ -512,7 +703,7 @@ def make_submission_scripts(
             f.write(f"#SBATCH --job-name={job_name}\n")
             f.write(f"#SBATCH --partition={user_configs['partition']}\n")
             f.write("\n")
-            f.write(f"python {architecture.lower()}_{model}_relax.py\n")
+            f.write(f"python {architecture.lower()}_{model}_{suffix}.py\n")
 
         print(f"\nCreated new submission script for {launch_dir}")
 
@@ -580,6 +771,9 @@ def check_job_completion_status(launch_dir: str, user_configs: dict) -> bool:
     Returns:
         job_completed (bool): True if job has completed
     """
+    # is this a phonon workflow (has phonon_configs) or a plain relax workflow?
+    is_phonon = "phonon_configs" in user_configs
+    suffix = "phonons" if is_phonon else "relax"
 
     architecture = user_configs["architecture"]
     if architecture.lower() == "chgnet":
@@ -591,7 +785,7 @@ def check_job_completion_status(launch_dir: str, user_configs: dict) -> bool:
 
     num_ini_strucs = len(read_json(os.path.join(launch_dir, "ini_strucs.json")))
     batch_results = os.path.join(
-        launch_dir, f"{architecture.lower()}_{model}_relax_results.json"
+        launch_dir, f"{architecture.lower()}_{model}_{suffix}_results.json"
     )
     if os.path.exists(batch_results):
         num_relaxed_strucs = len(read_json(batch_results))
@@ -613,6 +807,9 @@ def submit_jobs(batching: dict, user_configs: dict) -> None:
     Returns:
         None, submits jobs if not already in queue or finished
     """
+    # is this a phonon workflow (has phonon_configs) or a plain relax workflow?
+    is_phonon = "phonon_configs" in user_configs
+    suffix = "phonons" if is_phonon else "relax"
 
     architecture = user_configs["architecture"]
     if architecture.lower() == "chgnet":
@@ -628,7 +825,7 @@ def submit_jobs(batching: dict, user_configs: dict) -> None:
 
         launch_dir = batching[batch_id]["launch_dir"]
 
-        job_name = f"{architecture.lower()}_{model}_relax_{batch_id}"
+        job_name = f"{architecture.lower()}_{model}_{suffix}_{batch_id}"
 
         # check if job is already in queue
         if check_job_submission_status(job_name):
@@ -671,6 +868,10 @@ def collect_results(
         results (dict): dict of relaxation results and configs
     """
 
+    # is this a phonon workflow (has phonon_configs) or a plain relax workflow?
+    is_phonon = "phonon_configs" in user_configs
+    suffix = "phonons" if is_phonon else "relax"
+
     architecture = user_configs["architecture"]
     if architecture.lower() == "chgnet":
         model = user_configs["relaxer_configs"]["model"].replace(".", "")
@@ -679,7 +880,7 @@ def collect_results(
         model_task = user_configs["relaxer_configs"]["task_name"]
         model = f"{model_name}-{model_task}"
 
-    fjson = os.path.join(data_dir, f"{architecture.lower()}_{model}_relax_results.json")
+    fjson = os.path.join(data_dir, f"{architecture.lower()}_{model}_{suffix}_results.json")
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
 
@@ -710,7 +911,7 @@ def collect_results(
             batch_relax_results = read_json(
                 os.path.join(
                     launch_dir,
-                    f"{architecture.lower()}_{model}_relax_results.json",
+                    f"{architecture.lower()}_{model}_{suffix}_results.json",
                 )
             )
 

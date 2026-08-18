@@ -6,14 +6,16 @@ from pydmclab.hpc.helpers import check_strucs, check_launch_dirs
 
 
 HOME_PATH = os.environ["HOME"]
-RELAX_HELPERS_DIR = "%s/bin/pydmclab/hpc_workflows/relax_calcs" % HOME_PATH
+PHONON_HELPERS_DIR = "%s/bin/pydmclab/hpc_workflows/phonon_calcs/mlp" % HOME_PATH
 
-if RELAX_HELPERS_DIR not in sys.path:
-    sys.path.append(RELAX_HELPERS_DIR)
+if PHONON_HELPERS_DIR not in sys.path:
+    sys.path.append(PHONON_HELPERS_DIR)
 
-from relax_helpers import (
+from hpc_workflows.phonon_calcs.mlp.phonon_mlp_helpers import (
     # get_chgnet_configs,
     get_fairchem_configs,
+    get_nequix_configs,
+    get_phononcalc_configs,
     get_launch_configs,
     get_slurm_configs,
     get_torch_configs,
@@ -46,19 +48,42 @@ for d in [CALCS_DIR, DATA_DIR]:
 
 # set architecture configs using get_{architecture}_configs
 #   these are model specific and can vary widely
-ARCHITECTURE_CONFIGS = get_fairchem_configs(
-    name_or_path="uma-s-1",
-    task_name="omat",
-    inference_settings="default",
-    overrides=None,
-    optimizer="FIRE",
-    fmax=0.03,
-    steps=500,
-    relax_cell=True,
-    ase_filter="FrechetCellFilter",
-    params_asefilter=None,
-    interval=1,
-    verbose=False,
+relaxer_kwargs = {
+    'name_or_path' : 'uma-s-1p2',
+    'task_name' : 'omat',
+    'inference_settings' : 'default',
+    'overrides' : None,
+    'optimizer' : 'FIRE',
+}
+
+ARCHITECTURE_CONFIGS = get_phononcalc_configs(
+    architecture="FAIRChem",
+    relaxer_kwargs = relaxer_kwargs,
+    atom_disp= 0.015,
+    min_length = 20.0,
+    supercell_matrix = None,
+    t_step = 20,
+    t_max = 2000,
+    t_min = 0,
+    fmax = 1e-5,
+    max_steps = 5000,
+    relax_structure = True,
+    imaginary_freq_tol = -0.01,
+    on_imaginary_modes = "warn",
+    fix_imaginary_attempts = 0,
+    symprec = 1e-5,
+    write_force_constants = False,
+    write_band_structure = False,
+    write_total_dos = False,
+    write_phonon  = False,
+    relax_calc_kwargs = {'relax_cell' : True,
+                        'relax_atoms' :True,
+                        'cell_filter' : "FrechetCellFilter",
+                        'cell_filter_kwargs' : {},
+                        'interval' : 1,
+                        'perturb_distance': None,
+                        'fix_symmetry': False,
+                        'fix_atoms': False,},
 )
 
 # set launch configs
@@ -92,7 +117,7 @@ USER_CONFIGS = {
 
 # location of relax_template.py
 RELAX_TEMPLATE = (
-    "%s/bin/pydmclab/hpc_workflows/relax_calcs/relax_template.py" % HOME_PATH
+    "%s/bin/pydmclab/hpc_workflows/phonon_calcs/mlp/phonon_template.py" % HOME_PATH
 )
 
 

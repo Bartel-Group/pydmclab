@@ -1,4 +1,5 @@
 import os
+import sys
 import torch
 
 from tqdm import tqdm
@@ -6,6 +7,14 @@ from tqdm import tqdm
 from pydmclab.core.struc import StrucTools
 from pydmclab.mlp import "placeholder"
 from pydmclab.utils.handy import read_json, write_json, convert_numpy_to_native
+
+import matcalc as mtc
+
+HOME_PATH = os.environ["HOME"]
+HELPERS_DIR = "placeholder"
+if HELPERS_DIR not in sys.path:
+    sys.path.append(HELPERS_DIR)
+from phonon_helpers import parse_phonon_results
 
 
 def main():
@@ -31,6 +40,9 @@ def main():
     #  see the associated relax method for your chosen model
     relax_configs = "placeholder"
 
+    # phonon-specific settings for matcalc's PhononCalc
+    phonon_configs = "placeholder"
+
     # save settings
     save_interval = "placeholder"
 
@@ -52,24 +64,27 @@ def main():
         if name not in relax_results
     }
 
-    # initialize the relaxer
-    relaxer = "placeholder"
+    # build the ASE calculator for this architecture
+    calculator = "placeholder"
+
+    # initialize matcalc's PhononCalc with the calculator + all relax/phonon settings
+    phonon_calculator = "placeholder"
 
     # relax structures
     total_strucs = len(ini_strucs)
     current_relax_results = {}
-    
+
     with tqdm(total=total_strucs, desc="Relaxing Structures") as pbar:
         for name, ini_struc in ini_strucs.items():
 
             ini_struc = StrucTools(ini_struc).structure
 
-            struc_results = "placeholder"
+            struc_results = phonon_calculator.calc(ini_struc)
 
-            struc_results["trajectory"] = struc_results["trajectory"].as_dict()
+            struc_results = parse_phonon_results(struc_results)
             struc_results = convert_numpy_to_native(struc_results)
             current_relax_results.update({name: struc_results})
-            
+
             pbar.update(1)
 
             # save results on the given save interval

@@ -533,244 +533,88 @@ def sanitize(obj):
         return tuple(sanitize(v) for v in obj)
     return obj
 
-
-def parse_phonon_results(phonon_results: dict) -> dict:
+def parse_phonon_results(phonon_results,
+                        paths = [[[0.0, 0.0, 0.0], [0.5, 0.0, 0.0]],
+                                [[0.5, 0.0, 0.0], [0.5, 0.5, 0.0]],
+                                [[0.5, 0.5, 0.0], [0.0, 0.5, 0.0]],
+                                [[0.0, 0.5, 0.0], [0.0, 0.0, 0.0]],
+                                [[0.0, 0.0, 0.0], [0.0, 0.0, 0.5]],
+                                [[0.0, 0.0, 0.5], [0.5, 0.0, 0.5]],
+                                [[0.5, 0.0, 0.5], [0.5, 0.5, 0.5]],
+                                [[0.5, 0.5, 0.5], [0.0, 0.5, 0.5]],
+                                [[0.0, 0.5, 0.5], [0.0, 0.0, 0.5]]],
+                        Nq = 100):
+    
     """
     Turns the raw dict returned by matcalc.PhononCalc.calc() (which holds a
     live phonopy.Phonopy object, numpy arrays, etc.) into a JSON-serializable
     dict: final structure, per-atom energy, thermal properties (in eV/atom
     units), total DOS, and band structure along a standard path.
     """
-    final_structure = StrucTools(phonon_results["final_structure"]).structure_as_dict
-    natoms = len(final_structure["sites"])
-    phonon = phonon_results["phonon"]
-    natoms_primitive = len(phonon.primitive)
-    thermal_props = phonon_results["thermal_properties"]
-    E0 = phonon_results["energy"] / natoms
-    phonon_results["E_per_at"] = E0
 
-    helmholtz = E0 + (
-        thermal_props["free_energy"] / EV_TO_KJ_PER_MOL / natoms_primitive
-    )
-    entropy = thermal_props["entropy"] / EV_TO_J_PER_MOL / natoms_primitive
-    heat_capacity = thermal_props["heat_capacity"] / EV_TO_J_PER_MOL / natoms_primitive
+    final_structure = StrucTools(phonon_results['final_structure']).structure_as_dict
+    natoms = len(final_structure['sites'])
+    phonon = phonon_results['phonon']
+    natoms_primitive = len(phonon.primitive)
+    thermal_props = phonon_results['thermal_properties']
+    E0 = phonon_results['energy']/natoms
+    phonon_results['E_per_at'] = E0
+
+    helmholtz = E0 + (thermal_props['free_energy']/ EV_TO_KJ_PER_MOL / natoms_primitive) # Convert free energy from kJ/mol to eV/atom and add to E0
+    entropy = thermal_props['entropy']/ EV_TO_J_PER_MOL / natoms_primitive # Convert entropy from J/mol-K to eV/atom-K
+    heat_capacity = thermal_props['heat_capacity']/ EV_TO_J_PER_MOL / natoms_primitive # Convert heat capacity from J/mol-K to eV/atom-K
 
     thermal_properties = [
         {"T": T, "F": F, "S": S, "Cv": Cv}
         for T, F, S, Cv in zip(
-            thermal_props["temperatures"], helmholtz, entropy, heat_capacity
+            thermal_props['temperatures'],
+            helmholtz,
+            entropy,
+            heat_capacity
         )
     ]
 
-    phonon_results["thermal_properties"] = thermal_properties
-    phonon_results["final_structure"] = final_structure
+    phonon_results['thermal_properties'] = thermal_properties
+    phonon_results['final_structure'] = final_structure
+    
+    h = physical_constants['Planck constant in eV/Hz'][0]
+    print("Primitive cell natoms:", len(phonon.primitive))
+    print("Supercell natoms:", len(phonon.supercell))
+    print("Supercell matrix:\n", phonon.supercell_matrix)
 
-    h = physical_constants["Planck constant in eV/Hz"][0]
-
+    # phonon.run_mesh([30, 30, 30])
     phonon.run_total_dos()
     total_dos = phonon.get_total_dos_dict()
-    tdos = total_dos["total_dos"] / (h * 1e12)
-    freq_points_ev = total_dos["frequency_points"] * 1e12 * h
+    tdos = total_dos['total_dos']/(h*1e12) # This is to normalize the DOS to 1/eV (phonopy default is 1/THz)
+    freq_points_ev = total_dos['frequency_points']*1e12*h #convert frequencies from THz to eV
 
-    if "disp_supercells" in phonon_results:
-        disp_supercells = phonon_results["disp_supercells"]
-        phonon_results["disp_supercells"] = [
-            StrucTools(s).structure_as_dict for s in disp_supercells
-        ]
+    if 'disp_supercells' in phonon_results:
+        disp_supercells = phonon_results['disp_supercells']
+        phonon_results['disp_supercells'] = [StrucTools(s).structure_as_dict for s in disp_supercells]
 
     tdos = {
-        "E0": E0,
-        "total_dos": [{"E": E, "total_dos": dos} for E, dos in zip(freq_points_ev, tdos)],
-        "units": {"frequency": "eV", "dos": "states/eV", "energy": "eV/atom"},
-    }
+                'E0': E0,
+                'total_dos': [{'E': E, 'total_dos': dos} for E, dos in zip(freq_points_ev, tdos)],
+                'units': {'frequency': 'eV', 'dos': 'states/eV', 'energy': 'eV/atom'}
+            }
 
-    paths = [
-        [[0.0, 0.0, 0.0], [0.5, 0.0, 0.0]],
-        [[0.5, 0.0, 0.0], [0.5, 0.5, 0.0]],
-        [[0.5, 0.5, 0.0], [0.0, 0.5, 0.0]],
-        [[0.0, 0.5, 0.0], [0.0, 0.0, 0.0]],
-        [[0.0, 0.0, 0.0], [0.0, 0.0, 0.5]],
-        [[0.0, 0.0, 0.5], [0.5, 0.0, 0.5]],
-        [[0.5, 0.0, 0.5], [0.5, 0.5, 0.5]],
-        [[0.5, 0.5, 0.5], [0.0, 0.5, 0.5]],
-        [[0.0, 0.5, 0.5], [0.0, 0.0, 0.5]],
-    ]
-    Nq = 100
 
-    def get_band(q_start, q_stop, N):
-        return np.array([q_start + (q_stop - q_start) * i / (N - 1) for i in range(N)])
+    if paths:    
+        def get_band(q_start, q_stop, N):
+            """ Return path between q_start and q_stop """
+            return np.array([q_start + (q_stop-q_start)*i/(N-1) for i in range(N)])
 
-    bands = [get_band(np.array(p[0]), np.array(p[1]), Nq) for p in paths]
+        bands = []
+        for path in paths:
+            qpoints = get_band(np.array(path[0]), np.array(path[1]), Nq)
+            bands.append(qpoints)
+        
+        phonon.run_band_structure(bands)
+        bs = phonon.get_band_structure_dict()
+        phonon_results['band_structure'] = bs
 
-    phonon.run_band_structure(bands)
-    bs = phonon.get_band_structure_dict()
-
-    phonon_results["total_dos"] = tdos
-    phonon_results["band_structure"] = bs
-    phonon_results.pop("phonon")
+    phonon_results['total_dos'] = tdos
+    phonon_results.pop('phonon')
 
     phonon_results = sanitize(phonon_results)
-    return convert_numpy_to_native(phonon_results)
-
-
-def get_job_basename(user_configs: dict) -> str:
-    """
-    Filename stub for phonon jobs, e.g. "matcalcphonon_fairchem_phonon".
-    Self-contained (doesn't import relax_helpers.get_model_tag) since this
-    workflow only ever produces this one shape of tag. If you add a second
-    matcalc-based property calc (elasticity, EOS, etc.) alongside phonons,
-    generalize this the same way relax_helpers.get_model_tag is generalized,
-    rather than hard-coding a third variant here.
-    """
-    framework = user_configs["relaxer_configs"]["framework"]
-    return f"matcalcphonon_{framework}_phonon"
-
-
-def get_matcalc_phonon_configs(
-    framework: str = "tensornet",
-    calculator_kwargs: dict | None = None,
-    atom_disp: float = 0.015,
-    min_length: float | None = 20.0,
-    supercell_matrix=None,
-    t_step: float = 10,
-    t_max: float = 1000,
-    t_min: float = 0,
-    fmax: float = 1e-05,
-    max_steps: int = 5000,
-    optimizer: str = "FIRE",
-    relax_structure: bool = True,
-    relax_calc_kwargs: dict | None = None,
-    imaginary_freq_tol: float = -0.01,
-    on_imaginary_modes: str = "warn",
-    fix_imaginary_attempts: int = 0,
-    symprec: float = 1e-05,
-    write_force_constants: bool | str = False,
-    write_band_structure: bool | str = False,
-    write_total_dos: bool | str = False,
-    write_phonon: bool | str = False,
-    verbose: bool = True,
-) -> dict:
-    """
-    Mirrors get_chgnet_configs / get_fairchem_configs in relax_helpers.py,
-    but for a matcalc.PhononCalc-based phonon workflow. "relax_configs" is
-    intentionally left empty: PhononCalc.calc(structure) takes no extra
-    call-time kwargs (everything lives on the constructor).
-    """
-
-    architecture_configs = {
-        "architecture": "MatcalcPhonon",
-        "relaxer_configs": {},
-        "relax_configs": {},
-    }
-
-    rc = architecture_configs["relaxer_configs"]
-    rc["framework"] = framework
-    rc["calculator_kwargs"] = calculator_kwargs
-    rc["atom_disp"] = atom_disp
-    rc["min_length"] = min_length
-    rc["supercell_matrix"] = supercell_matrix
-    rc["t_step"] = t_step
-    rc["t_max"] = t_max
-    rc["t_min"] = t_min
-    rc["fmax"] = fmax
-    rc["max_steps"] = max_steps
-    rc["optimizer"] = optimizer
-    rc["relax_structure"] = relax_structure
-    rc["relax_calc_kwargs"] = relax_calc_kwargs
-    rc["imaginary_freq_tol"] = imaginary_freq_tol
-    rc["on_imaginary_modes"] = on_imaginary_modes
-    rc["fix_imaginary_attempts"] = fix_imaginary_attempts
-    rc["symprec"] = symprec
-    rc["write_force_constants"] = write_force_constants
-    rc["write_band_structure"] = write_band_structure
-    rc["write_total_dos"] = write_total_dos
-    rc["write_phonon"] = write_phonon
-    rc["verbose"] = verbose
-
-    return architecture_configs
-
-
-def make_phonon_scripts(
-    batching: dict, user_configs: dict, phonon_template: str, remake: bool = False
-) -> None:
-    """
-    Mirrors make_relax_scripts in relax_helpers.py, but fills in
-    phonon_template.py: PhononCalc is built as
-    PhononCalc(calculator, **relaxer_configs) and called as
-    phonon_calculator.calc(struc), not {Architecture}Relaxer(...).relax(...),
-    so the placeholder set genuinely differs and this stays a separate
-    function rather than a branch inside make_relax_scripts.
-    """
-
-    if user_configs["architecture"].lower() != "matcalcphonon":
-        raise ValueError(
-            "make_phonon_scripts expects user_configs from "
-            "get_matcalc_phonon_configs (architecture == 'MatcalcPhonon')."
-        )
-
-    job_basename = get_job_basename(user_configs)  # local version, above
-    total_batches = len(batching)
-
-    with tqdm(total=total_batches, desc="Making phonon scripts") as pbar:
-
-        for batch_id in batching:
-
-            launch_dir = batching[batch_id]["launch_dir"]
-
-            phonon_script = os.path.join(launch_dir, f"{job_basename}.py")
-
-            if os.path.exists(phonon_script) and not remake:
-                pbar.update(1)
-                continue
-
-            with open(phonon_template, "r", encoding="utf-8") as template_file:
-                template_lines = template_file.readlines()
-
-            phonon_script_lines = template_lines.copy()
-
-            for i, line in enumerate(phonon_script_lines):
-
-                indent = line[: len(line) - len(line.lstrip())]
-
-                if 'intra_op_threads = "placeholder"' in line:
-                    phonon_script_lines[i] = (
-                        f'{indent}intra_op_threads = {user_configs["num_intraop_threads"]}\n'
-                    )
-
-                elif 'inter_op_threads = "placeholder"' in line:
-                    phonon_script_lines[i] = (
-                        f'{indent}inter_op_threads = {user_configs["num_interop_threads"]}\n'
-                    )
-
-                elif 'phonon_configs = "placeholder"' in line:
-                    config_lines = [
-                        f"{indent}{key} = {repr(value)}\n"
-                        for key, value in user_configs["relaxer_configs"].items()
-                        if key not in ("framework", "calculator_kwargs")
-                    ]
-                    phonon_script_lines[i : i + 1] = config_lines
-
-                elif 'framework = "placeholder"' in line:
-                    framework = user_configs["relaxer_configs"]["framework"]
-                    phonon_script_lines[i] = f"{indent}framework = {repr(framework)}\n"
-
-                elif 'calculator_kwargs = "placeholder"' in line:
-                    kwargs = user_configs["relaxer_configs"]["calculator_kwargs"]
-                    phonon_script_lines[i] = f"{indent}calculator_kwargs = {repr(kwargs)}\n"
-
-                elif 'save_interval = "placeholder"' in line:
-                    phonon_script_lines[i] = (
-                        f"{indent}save_interval = {user_configs['save_interval']}\n"
-                    )
-
-                elif 'results = os.path.join(curr_dir, "placeholder")' in line:
-                    phonon_script_lines[i] = (
-                        f"{indent}results = os.path.join(curr_dir, '{job_basename}_results.json')\n"
-                    )
-
-            with open(phonon_script, "w", encoding="utf-8") as script_file:
-                script_file.writelines(phonon_script_lines)
-
-            pbar.update(1)
-
-    return
+    return phonon_results
