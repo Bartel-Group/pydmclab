@@ -14,7 +14,7 @@ HOME_PATH = os.environ["HOME"]
 HELPERS_DIR = "placeholder"
 if HELPERS_DIR not in sys.path:
     sys.path.append(HELPERS_DIR)
-from phonon_helpers import parse_phonon_results
+from phonon_helpers import parse_phonon_results, sanitize
 
 
 def main():
@@ -89,6 +89,7 @@ def main():
             if "trajectory" in struc_results:
                 struc_results["trajectory"] = struc_results["trajectory"].as_dict()            
             
+            struc_results = sanitize(struc_results)
             struc_results = convert_numpy_to_native(struc_results)
             current_relax_results.update({name: struc_results})
 
