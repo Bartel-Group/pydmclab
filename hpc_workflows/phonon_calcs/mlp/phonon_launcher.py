@@ -27,6 +27,8 @@ from hpc_workflows.phonon_calcs.mlp.phonon_mlp_helpers import (
     check_collected_results,
 )
 
+from pydmclab.hpc.helpers import get_query, get_strucs
+
 # where is this file
 SCRIPTS_DIR = os.getcwd()
 
@@ -144,6 +146,8 @@ def main():
     print_results_check = True
 
     # ----------------------------
+
+    query = get_query()
 
     # retrieve structures
     strucs = read_json(os.path.join(DATA_DIR, "strucs.json"))

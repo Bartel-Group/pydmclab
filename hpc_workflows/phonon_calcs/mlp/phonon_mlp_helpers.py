@@ -224,6 +224,9 @@ def get_phononcalc_configs(architecture,
     architecture_configs["relax_configs"]["fmax"] = fmax
     architecture_configs["relax_configs"]["max_steps"] = max_steps
     architecture_configs["relax_configs"]['relax_structure'] = relax_structure
+    relax_calc_kwargs = dict(relax_calc_kwargs)  # don't mutate the caller's dict
+    if relax_calc_kwargs.get("cell_filter") == "FrechetCellFilter":
+        relax_calc_kwargs.pop("cell_filter") #this way it will do the default which is FechetCellFilter class, not a string
     architecture_configs["relax_configs"]["relax_calc_kwargs"] = relax_calc_kwargs
 
     architecture_configs["phonon_configs"]["atom_disp"] = atom_disp
