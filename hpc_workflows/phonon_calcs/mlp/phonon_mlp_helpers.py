@@ -500,6 +500,8 @@ def make_relax_scripts(
         model_name = user_configs["relaxer_configs"]["name_or_path"]
         model_task = user_configs["relaxer_configs"]["task_name"]
         model = f"{model_name}-{model_task}"
+    elif architecture.lower() == "nequix":
+        model = user_configs["relaxer_configs"]["model_name"]
 
     # is this a phonon workflow (has phonon_configs) or a plain relax workflow?
     is_phonon = "phonon_configs" in user_configs
