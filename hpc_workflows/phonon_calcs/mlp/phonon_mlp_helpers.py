@@ -732,6 +732,8 @@ def make_submission_scripts(
         model_name = user_configs["relaxer_configs"]["name_or_path"]
         model_task = user_configs["relaxer_configs"]["task_name"]
         model = f"{model_name}-{model_task}"
+    elif architecture.lower() == "nequix":
+        model = user_configs["relaxer_configs"]["model_name"]
 
     for batch_id in batching:
 
@@ -836,6 +838,8 @@ def check_job_completion_status(launch_dir: str, user_configs: dict) -> bool:
         model_name = user_configs["relaxer_configs"]["name_or_path"]
         model_task = user_configs["relaxer_configs"]["task_name"]
         model = f"{model_name}-{model_task}"
+    elif architecture.lower() == "nequix":
+        model = user_configs["relaxer_configs"]["model_name"]
 
     num_ini_strucs = len(read_json(os.path.join(launch_dir, "ini_strucs.json")))
     batch_results = os.path.join(
@@ -872,6 +876,8 @@ def submit_jobs(batching: dict, user_configs: dict) -> None:
         model_name = user_configs["relaxer_configs"]["name_or_path"]
         model_task = user_configs["relaxer_configs"]["task_name"]
         model = f"{model_name}-{model_task}"
+    elif architecture.lower() == "nequix":
+        model = user_configs["relaxer_configs"]["model_name"]
 
     scripts_dir = os.getcwd()
 
@@ -933,6 +939,8 @@ def collect_results(
         model_name = user_configs["relaxer_configs"]["name_or_path"]
         model_task = user_configs["relaxer_configs"]["task_name"]
         model = f"{model_name}-{model_task}"
+    elif architecture.lower() == "nequix":
+        model = user_configs["relaxer_configs"]["model_name"]
 
     fjson = os.path.join(data_dir, f"{architecture.lower()}_{model}_{suffix}_results.json")
     if os.path.exists(fjson) and not remake:
