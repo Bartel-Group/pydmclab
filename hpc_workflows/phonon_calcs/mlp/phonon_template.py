@@ -70,6 +70,8 @@ def main():
     # initialize matcalc's PhononCalc with the calculator + all relax/phonon settings
     phonon_calculator = "placeholder"
 
+    relaxer = "placeholder"
+
     # relax structures
     total_strucs = len(ini_strucs)
     current_relax_results = {}
