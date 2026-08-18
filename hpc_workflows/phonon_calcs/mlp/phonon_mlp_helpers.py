@@ -587,25 +587,10 @@ def make_relax_scripts(
                         f"{indent}results = os.path.join(curr_dir, '{architecture.lower()}_{model}_{suffix}_results.json')\n"
                     )
 
-                elif 'calculator = "placeholder"' in line and is_phonon:
-                    # relaxer_configs includes 'optimizer', which the Calculator
-                    # class doesn't accept -- everything else does
-                    calc_keys = [
-                        k for k in user_configs["relaxer_configs"].keys()
-                        if k != "optimizer"
-                    ]
-                    class_call_line = [f"{indent}calculator = {architecture}Calculator(\n"]
-                    calc_config_lines = [
-                        f"{indent}    {key} = {key},\n" for key in calc_keys
-                    ]
-                    end_call_line = [f"{indent})\n"]
-                    relax_script_lines[i : i + 1] = (
-                        class_call_line + calc_config_lines + end_call_line
-                    )
-
                 elif 'phonon_calculator = "placeholder"' in line and is_phonon:
                     # PhononCalc takes calculator + everything in relax_configs
                     # and phonon_configs, plus 'optimizer' (pulled from relaxer_configs)
+                    #need to check phonon_calculator first becausr calculator=placeholder is asubstring of phonon_calculator = placeholder as well! Might want to make this check more bulletproof in the future
                     phonon_calc_keys = (
                         list(user_configs["relax_configs"].keys())
                         + list(user_configs["phonon_configs"].keys())
@@ -623,6 +608,22 @@ def make_relax_scripts(
                     end_call_line = [f"{indent})\n"]
                     relax_script_lines[i : i + 1] = (
                         class_call_line + phonon_calc_config_lines + end_call_line
+                    )
+
+                elif 'calculator = "placeholder"' in line and is_phonon:
+                    # relaxer_configs includes 'optimizer', which the Calculator
+                    # class doesn't accept -- everything else does
+                    calc_keys = [
+                        k for k in user_configs["relaxer_configs"].keys()
+                        if k != "optimizer"
+                    ]
+                    class_call_line = [f"{indent}calculator = {architecture}Calculator(\n"]
+                    calc_config_lines = [
+                        f"{indent}    {key} = {key},\n" for key in calc_keys
+                    ]
+                    end_call_line = [f"{indent})\n"]
+                    relax_script_lines[i : i + 1] = (
+                        class_call_line + calc_config_lines + end_call_line
                     )
 
                 elif 'relaxer = "placeholder"' in line and not is_phonon:
