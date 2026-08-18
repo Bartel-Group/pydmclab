@@ -141,7 +141,6 @@ def get_nequix_configs(
         ase_filter: str | None = "FrechetCellFilter",
         params_asefilter: dict | None = None,
         interval: int | None = 1,
-        verbose: bool = True,
 ):
     """
     See https://github.com/atomicarchitects/nequix for details on available models, many available models that are fine-tuned for phonons
