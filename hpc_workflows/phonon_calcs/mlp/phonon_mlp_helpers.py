@@ -176,9 +176,8 @@ def get_nequix_configs(
     architecture_configs["relax_configs"]["relax_cell"] = relax_cell
     if not ase_filter == "FrechetCellFilter":
         architecture_configs["relax_configs"]["ase_filter"] = ase_filter
-    architecture_configs["relax_configs"]["params_asefilter"] = params_asefilter
+    architecture_configs["relax_configs"]["cell_filter_kwargs"] = params_asefilter
     architecture_configs["relax_configs"]["interval"] = interval
-    architecture_configs["relax_configs"]["verbose"] = verbose
 
     return architecture_configs
 
@@ -671,8 +670,10 @@ def make_relax_scripts(
 
                         relaxer_config_lines = [
                             f"{indent}    {key} = {key},\n"
-                            for key in user_configs["relaxer_configs"].keys()
+                            for key in user_configs["relax_configs"].keys()
                         ]
+                        if "optimizer" in user_configs["relaxer_configs"]:
+                            relaxer_config_lines.append(f"{indent}    optimizer = optimizer,\n")
                         end_call_line = [f"{indent})\n"]
                         relax_script_lines[i : i + 1] = (
                             calc_line + class_call_line + relaxer_config_lines + end_call_line
