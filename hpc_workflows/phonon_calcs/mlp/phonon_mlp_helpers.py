@@ -134,7 +134,14 @@ def get_nequix_configs(
         backend = 'jax',
         capacity_multiplier = 1.1,
         use_compile = True,
-        use_kernel = False #for GPU only
+        use_kernel = False, #for GPU only
+        fmax: float | None = 0.1,
+        steps: int | None = 500,
+        relax_cell: bool | None = True,
+        ase_filter: str | None = "FrechetCellFilter",
+        params_asefilter: dict | None = None,
+        interval: int | None = 1,
+        verbose: bool = True,
 ):
     """
     See https://github.com/atomicarchitects/nequix for details on available models, many available models that are fine-tuned for phonons
@@ -164,7 +171,13 @@ def get_nequix_configs(
     architecture_configs["relaxer_configs"]["use_compile"] = use_compile
     architecture_configs["relaxer_configs"]["use_kernel"] = use_kernel
 
-    #need to add relacer configs
+    architecture_configs["relax_configs"]["fmax"] = fmax
+    architecture_configs["relax_configs"]["max_steps"] = steps
+    architecture_configs["relax_configs"]["relax_cell"] = relax_cell
+    architecture_configs["relax_configs"]["ase_filter"] = ase_filter
+    architecture_configs["relax_configs"]["params_asefilter"] = params_asefilter
+    architecture_configs["relax_configs"]["interval"] = interval
+    architecture_configs["relax_configs"]["verbose"] = verbose
 
     return architecture_configs
 
@@ -204,6 +217,7 @@ def get_phononcalc_configs(architecture,
     Args:
         architecture: what MLP architecture to load to the phonon calculator (FAIRCHem, Nequix, etc.)
         relaxer_kwargs: architecture-specific kwargs for loading the model. Note: these are only the kwargs needed to *load* the model. Relax kwargs are overridden by the other arguments
+                        Note: currently calling it relaxer kwargs but should probably change all of the wording to calculator_kwargs since the calculator is not only relaxing but also calculating static forces of displaced structures
 
     '''
     architecture_configs = {
@@ -489,6 +503,9 @@ def make_relax_scripts(
     # is this a phonon workflow (has phonon_configs) or a plain relax workflow?
     is_phonon = "phonon_configs" in user_configs
     suffix = "phonons" if is_phonon else "relax"
+    # Nequix has no pydmclab.mlp Relaxer class -- build the raw calculator
+    # and wrap it in matcalc.RelaxCalc instead, same as the phonon path does
+    uses_raw_calculator = is_phonon or "nequix" in architecture.lower()
 
     total_batches = len(batching)
 
@@ -627,29 +644,58 @@ def make_relax_scripts(
                     )
 
                 elif 'relaxer = "placeholder"' in line and not is_phonon:
+                    if uses_raw_calculator:
+                        # no dedicated pydmclab.mlp Relaxer -- build the raw calculator, then wrap it in matcalc.RelaxCalc
+                        calc_keys = [
+                            k for k in user_configs["relaxer_configs"].keys()
+                            if k != "optimizer"
+                        ]
+                        calc_line = (
+                            [f"{indent}calculator = {architecture}Calculator(\n"]
+                            + [f"{indent}    {key} = {key},\n" for key in calc_keys]
+                            + [f"{indent})\n"]
+                        )
 
-                    class_call_line = [f"{indent}relaxer = {architecture}Relaxer(\n"]
-                    relaxer_config_lines = [
-                        f"{indent}    {key} = {key},\n"
-                        for key in user_configs["relaxer_configs"].keys()
-                    ]
-                    end_call_line = [f"{indent})\n"]
-                    relax_script_lines[i : i + 1] = (
-                        class_call_line + relaxer_config_lines + end_call_line
-                    )
+                        class_call_line = (
+                            [f"{indent}relaxer = mtc.RelaxCalc(\n", f"{indent}    calculator,\n"]
+
+                        relaxer_config_lines = [
+                            f"{indent}    {key} = {key},\n"
+                            for key in user_configs["relaxer_configs"].keys()
+                        ]
+                        end_call_line = [f"{indent})\n"]
+                        relax_script_lines[i : i + 1] = (
+                            calc_line + class_call_line + relaxer_config_lines + end_call_line
+                        )
+
+                    else:
+                        class_call_line = [f"{indent}relaxer = {architecture}Relaxer(\n"]
+                        relaxer_config_lines = [
+                            f"{indent}    {key} = {key},\n"
+                            for key in user_configs["relaxer_configs"].keys()
+                        ]
+                        end_call_line = [f"{indent})\n"]
+                        relax_script_lines[i : i + 1] = (
+                            class_call_line + relaxer_config_lines + end_call_line
+                        )
 
                 elif 'struc_results = "placeholder"' in line and not is_phonon:
-                    class_call_line = [
-                        f"{indent}struc_results = relaxer.relax(ini_struc, \n"
-                    ]
-                    relax_structure_config_lines = [
-                        f"{indent}    {key} = {key},\n"
-                        for key in user_configs["relax_configs"].keys()
-                    ]
-                    end_call_line = [f"{indent})\n"]
-                    relax_script_lines[i : i + 1] = (
-                        class_call_line + relax_structure_config_lines + end_call_line
-                    )
+                    if uses_raw_calculator:
+                        relax_script_lines[i] = (
+                            f"{indent}struc_results = relaxer.calc(ini_struc)\n"
+                        )
+                    else:
+                        class_call_line = [
+                            f"{indent}struc_results = relaxer.relax(ini_struc, \n"
+                        ]
+                        relax_structure_config_lines = [
+                            f"{indent}    {key} = {key},\n"
+                            for key in user_configs["relax_configs"].keys()
+                        ]
+                        end_call_line = [f"{indent})\n"]
+                        relax_script_lines[i : i + 1] = (
+                            class_call_line + relax_structure_config_lines + end_call_line
+                        )
 
             with open(relax_script, "w", encoding="utf-8") as script_file:
                 script_file.writelines(relax_script_lines)
