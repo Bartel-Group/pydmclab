@@ -174,7 +174,8 @@ def get_nequix_configs(
     architecture_configs["relax_configs"]["fmax"] = fmax
     architecture_configs["relax_configs"]["max_steps"] = steps
     architecture_configs["relax_configs"]["relax_cell"] = relax_cell
-    architecture_configs["relax_configs"]["ase_filter"] = ase_filter
+    if not ase_filter == "FrechetCellFilter":
+        architecture_configs["relax_configs"]["ase_filter"] = ase_filter
     architecture_configs["relax_configs"]["params_asefilter"] = params_asefilter
     architecture_configs["relax_configs"]["interval"] = interval
     architecture_configs["relax_configs"]["verbose"] = verbose
