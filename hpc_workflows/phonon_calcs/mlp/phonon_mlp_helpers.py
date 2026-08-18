@@ -659,6 +659,7 @@ def make_relax_scripts(
 
                         class_call_line = (
                             [f"{indent}relaxer = mtc.RelaxCalc(\n", f"{indent}    calculator,\n"]
+                        )
 
                         relaxer_config_lines = [
                             f"{indent}    {key} = {key},\n"
