@@ -547,9 +547,15 @@ def make_relax_scripts(
                                 f"{indent}from pydmclab.mlp.{architecture.lower()}.dynamics import {architecture}Calculator\n"
                             )
                     else:
-                        relax_script_lines[i] = (
-                            f"{indent}from pydmclab.mlp.{architecture.lower()}.dynamics import {architecture}Relaxer\n"
-                        )
+                        if "nequix" in architecture.lower():
+                            # not yet implemented in pydmclab.mlp -- import straight from source
+                            relax_script_lines[i] = (
+                                f"{indent}from nequix.calculator import NequixCalculator\n"
+                            )
+                        else:
+                            relax_script_lines[i] = (
+                                f"{indent}from pydmclab.mlp.{architecture.lower()}.dynamics import {architecture}Relaxer\n"
+                            )
 
                 elif 'HELPERS_DIR = "placeholder"' in line:
                     if is_phonon:
