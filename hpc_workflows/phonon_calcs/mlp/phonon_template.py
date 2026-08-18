@@ -81,11 +81,17 @@ def main():
 
             ini_struc = StrucTools(ini_struc).structure
 
-            struc_results = phonon_calculator.calc(ini_struc)
+            struc_results = "placeholder"
 
-            struc_results = parse_phonon_results(struc_results)
+            if "phonon_configs" != "placeholder":
+                struc_results = parse_phonon_results(struc_results)
+
+            if "trajectory" in struc_results:
+                struc_results["trajectory"] = struc_results["trajectory"].as_dict()            
+            
             struc_results = convert_numpy_to_native(struc_results)
             current_relax_results.update({name: struc_results})
+
 
             pbar.update(1)
 

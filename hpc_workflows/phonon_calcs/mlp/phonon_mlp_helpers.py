@@ -683,23 +683,28 @@ def make_relax_scripts(
                             class_call_line + relaxer_config_lines + end_call_line
                         )
 
-                elif 'struc_results = "placeholder"' in line and not is_phonon:
-                    if uses_raw_calculator:
-                        relax_script_lines[i] = (
-                            f"{indent}struc_results = relaxer.calc(ini_struc)\n"
-                        )
-                    else:
-                        class_call_line = [
-                            f"{indent}struc_results = relaxer.relax(ini_struc, \n"
-                        ]
-                        relax_structure_config_lines = [
-                            f"{indent}    {key} = {key},\n"
-                            for key in user_configs["relax_configs"].keys()
-                        ]
-                        end_call_line = [f"{indent})\n"]
-                        relax_script_lines[i : i + 1] = (
-                            class_call_line + relax_structure_config_lines + end_call_line
-                        )
+                elif 'struc_results = "placeholder"' in line:
+                    if not is_phonon:
+                        if uses_raw_calculator:
+                            relax_script_lines[i] = (
+                                f"{indent}struc_results = relaxer.calc(ini_struc)\n"
+                            )
+                        else:
+                            class_call_line = [
+                                f"{indent}struc_results = relaxer.relax(ini_struc, \n"
+                            ]
+                            relax_structure_config_lines = [
+                                f"{indent}    {key} = {key},\n"
+                                for key in user_configs["relax_configs"].keys()
+                            ]
+                            end_call_line = [f"{indent})\n"]
+                            relax_script_lines[i : i + 1] = (
+                                class_call_line + relax_structure_config_lines + end_call_line
+                            )
+                    if is_phonon:
+                        #phonon calculator has already been initiated with all arguments and calc() takes no arguments
+                        relax_script_lines[i] = f"{indent}struc_results = phonon_calculator.calc(ini_struc)\n"
+
 
             with open(relax_script, "w", encoding="utf-8") as script_file:
                 script_file.writelines(relax_script_lines)
