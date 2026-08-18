@@ -11,7 +11,7 @@ PHONON_HELPERS_DIR = "%s/bin/pydmclab/hpc_workflows/phonon_calcs/mlp" % HOME_PAT
 if PHONON_HELPERS_DIR not in sys.path:
     sys.path.append(PHONON_HELPERS_DIR)
 
-from hpc_workflows.phonon_calcs.mlp.phonon_mlp_helpers import (
+from phonon_mlp_helpers import (
     # get_chgnet_configs,
     get_fairchem_configs,
     get_nequix_configs,
