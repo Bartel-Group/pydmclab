@@ -556,13 +556,9 @@ def make_relax_scripts(
                             )
 
                 elif 'HELPERS_DIR = "placeholder"' in line:
-                    if is_phonon:
-                        # TODO: point this at wherever phonon_helpers.py actually lives
-                        relax_script_lines[i] = (
-                            f'{indent}HELPERS_DIR = "%s/bin/pydmclab/hpc_workflows/phonon_calcs/" % HOME_PATH\n'
-                        )
-                    else:
-                        relax_script_lines[i] = ""
+                    relax_script_lines[i] = (
+                        f'{indent}HELPERS_DIR = "%s/bin/pydmclab/hpc_workflows/phonon_calcs/" % HOME_PATH\n'
+                    )
 
                 elif 'intra_op_threads = "placeholder"' in line:
                     relax_script_lines[i] = (
