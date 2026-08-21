@@ -181,6 +181,7 @@ def get_displacements_for_phonons(
 
         unitcell = get_phonopy_structure(pymatgen_struc)
         phonon = Phonopy(unitcell=unitcell, supercell_matrix=supercell_matrix)
+        out['supercell'] = phonon.supercell
 
         if distance == 'auto':
             distance = estimate_displacement_distance(st.structure_as_dict,
