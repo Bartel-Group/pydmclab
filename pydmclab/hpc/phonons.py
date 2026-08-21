@@ -285,8 +285,8 @@ class AnalyzePhonons(object):
         F = helmholtz.helmholtz()
         if include_heat_capacity: 
             Cv = helmholtz.heat_capacity()
-            for i in range(len(F['data'])):
-                F['data'][i]['Cv'] = Cv['data'][i]['Cv']
+            for i in range(len(F['thermal_properties'])):
+                F['thermal_properties'][i]['Cv'] = Cv['thermal_properties'][i]['Cv']
         return F
 
     def phonopy_thermal_properties(
