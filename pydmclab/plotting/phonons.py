@@ -312,8 +312,8 @@ def plot_relative_prop(
     prop : str
         Property to take the difference of ('F', 'S', 'Cv', …).
     align_at_0K : bool
-        If True, shift every curve so that its 0 K value matches the lowest
-        0 K value across all datasets. Useful for comparing relative changes
+        If True, shift every curve so that its 0 K value matches DFT if DFt in the datasets, else matches
+        the lowest 0 K value across all datasets. Useful for comparing relative changes
         with temperature without an absolute offset.
     figsize : tuple
         Figure size.
@@ -368,10 +368,15 @@ def plot_relative_prop(
         temps_by[ds_label] = temps
 
     if align_at_0K:
-        lowest_0K = min(d[0] for d in deltas.values())
+        reference_0K = (
+            deltas["dft"][0]
+            if "dft" in deltas
+            else min(d[0] for d in deltas.values())
+        )
+
         for ds_label in deltas:
-            offset = deltas[ds_label][0] - lowest_0K
-            deltas[ds_label] = deltas[ds_label] - offset
+            offset = deltas[ds_label][0] - reference_0K
+            deltas[ds_label] -= offset
 
     if atoms_per_formula_units is not None:
         for ds_label in deltas:
