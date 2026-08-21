@@ -34,6 +34,7 @@ class AnalyzePhonons(object):
                  mesh: int|list|float=[30, 30, 30],
                  dataset: dict = None,
                  E0: float = 0,
+                 init_kwargs: dict ={}
 ):
         """
         Class to analyze phonon data from a VASP calculation using Phonopy, Can return force constants, dynamical matrix, mesh data, thermal properties, band structure, and total density of states.
@@ -70,6 +71,8 @@ class AnalyzePhonons(object):
                 In eV/atom.
                 Optional static 0 K energy of the supercell. This is added to the phonon free energy to get the total free energy.
                 If E0 is not provided, the Helmholtz free energy will only include the phonon contribution.
+            init_kwargs:
+                See https://github.com/phonopy/phonopy/blob/main/phonopy/api_phonopy.py for other init kwargs available
         """
 
         self.unitcell = StrucTools(unitcell).structure_as_dict
@@ -90,7 +93,7 @@ class AnalyzePhonons(object):
 
         unitcell = get_phonopy_structure(self.pymatgen_struc) #PhonopyAtoms structure object
 
-        phonon = Phonopy(unitcell, primitive_matrix, symprec=symprec) 
+        phonon = Phonopy(unitcell=unitcell, primitive_matrix=primitive_matrix, symprec=symprec, **init_kwargs) 
         self.natoms = len(phonon.primitive) #natoms in primitive cell. results reported from phonopy are corresponding to number of atoms in the primitive. If you force it to not do a transformation to the primitive then phonon.primitive will correspond to whatever transformation you specified (whether it be the unitcell or another cell)
         phonon.dataset = dataset
 
