@@ -125,7 +125,7 @@ def compute_all_phonon_properties(results,
         static_key = sets_of_forces[mpid]['key']
 
         print(f"Forces for {mpid} found with shape {np.array(forces).shape}")
-        supercell = displacements[mpid]['unitcell']
+        supercell = displacements[mpid]['supercell']
         disp_strucs = displacements[mpid]['displaced_structures']
         calc_method = displacements[mpid]['calc_method']
         dataset = displacements[mpid]['dataset']
