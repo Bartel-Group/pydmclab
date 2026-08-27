@@ -36,7 +36,8 @@ from pydmclab.utils.handy import convert_numpy_to_native
 def get_finite_displacement_strucs(query: dict, 
                                    data_dir: str,
                                    distance: str|int|float='auto',
-                                   supercell_matrix: list|dict|None = None, 
+                                   supercell_matrix: list|dict|None = None,
+                                   symprec=1e-05, 
                                    savename: str = "strucs.json", 
                                    savename_displacements: str = "displacements.json", 
                                    remake: bool=False):
@@ -98,6 +99,7 @@ def get_finite_displacement_strucs(query: dict,
                                              method = "finite_displacement",
                                              distance=distance,
                                              supercell_matrix=supercell,
+                                             symprec=symprec,
                                              data_dir = None)
 
         displaced_supercells = data['displaced_structures']
@@ -119,6 +121,7 @@ def get_displacements_for_phonons(
                     remake: bool|None = False,
                     distance: float|str = 'auto',
                     supercell_matrix: list|None = None,
+                    symprec: int = 1e-05,
                     mc: bool = True,
                     n_structures: int|None = None,
                     rattle_std: float|None = None,
@@ -180,7 +183,9 @@ def get_displacements_for_phonons(
     if method == "finite_displacement":
 
         unitcell = get_phonopy_structure(pymatgen_struc)
-        phonon = Phonopy(unitcell=unitcell, supercell_matrix=supercell_matrix)
+        phonon = Phonopy(unitcell=unitcell, 
+                         supercell_matrix=supercell_matrix, 
+                         symprec=symprec)
         out['supercell'] = get_pmg_structure(phonon.supercell).as_dict()
 
         if distance == 'auto':
