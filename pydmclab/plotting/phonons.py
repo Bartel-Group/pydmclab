@@ -94,7 +94,6 @@ def plot_phonon_bandstructure(bs_dict,
     # Labels and formatting
     plt.ylabel(ylabel)
     plt.xlabel("Wave Vector")
-    plt.grid(alpha=0.2, axis='y')
     plt.xlim(0, tick_positions[-1])
     plt.title(title)
     plt.tight_layout()
@@ -143,7 +142,6 @@ def plot_phonon_dos(dos_dict,
     if ylims is not None:
         plt.ylim(ylims)
     plt.title(title)
-    plt.grid(alpha=0.3)
     plt.tight_layout()
     plt.show()
 
