@@ -342,7 +342,7 @@ class AnalyzePhonons(object):
         savename: str = "phonons.json",
         remake: bool = False,
         include_mesh: bool = False,
-        include_force_constants: bool= True,
+        include_force_constants: bool= False,
         include_band_structure = True,
         include_total_dos: bool = True,
         include_thermal_properties: bool = True,
