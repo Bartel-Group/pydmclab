@@ -476,7 +476,7 @@ class AnalyzeVASP(object):
                 structures = [step["structure"].as_dict() for step in vr.ionic_steps]
                 forces = [step["forces"] for step in vr.ionic_steps]
                 stresses = [step["stress"] for step in vr.ionic_steps]
-                return list(zip(range(len(energies)), energies, structures, forces, stresses))
+                return convert_numpy_to_native(list(zip(range(len(energies)), energies, structures, forces, stresses)))
             return None
         else:
             return None
