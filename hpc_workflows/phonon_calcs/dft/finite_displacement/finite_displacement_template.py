@@ -181,7 +181,7 @@ def main():
                                             init_kwargs=init_kwargs,
                                             band_structure_kwargs=band_structure_kwargs,
                                             query=query,
-                                            savename='phonons_test.json',
+                                            savename='phonons.json',
                                             data_dir=DATA_DIR,
                                             remake=remake_phonons,)
 
