@@ -487,37 +487,6 @@ EV_TO_J_PER_MOL = EV_TO_J * AVOGADRO
 EV_TO_KJ_PER_MOL = EV_TO_J_PER_MOL / 1000.0
 
 
-def get_mlp_calculator(framework: str = "tensornet", calculator_kwargs: dict | None = None):
-    """
-    Get MLP calculator based on specified type and kwargs.
-
-    Args:
-        framework (str): 'tensornet', 'fairchem', 'nequix', 'nequix-pft'.
-        calculator_kwargs (dict): kwargs specific to the chosen calculator.
-            For 'tensornet': {'name': str} e.g. {'name': 'r2scan'}
-            For 'fairchem': {'name_or_path': str, 'task_name': str}
-            For 'nequix'/'nequix-pft': {'model_name': str}
-    """
-    if framework == "tensornet":
-        if calculator_kwargs is None:
-            calculator_kwargs = {"name": "r2scan"}
-        mlp_calculator = mtc.load_fp(**calculator_kwargs)
-    elif framework == "fairchem":
-        if calculator_kwargs is None:
-            calculator_kwargs = {"name_or_path": "uma-s-1p2", "task_name": "omat"}
-        mlp_calculator = FAIRChemCalculator(**calculator_kwargs)
-    elif framework == "nequix":
-        if calculator_kwargs is None:
-            calculator_kwargs = {"model_name": "nequix-mp-1"}
-        mlp_calculator = NequixCalculator(**calculator_kwargs, use_kernel=False)
-    elif framework == "nequix-pft":
-        if calculator_kwargs is None:
-            calculator_kwargs = {"model_name": "nequix-mp-1-pft"}
-        mlp_calculator = NequixCalculator(**calculator_kwargs, use_kernel=False)
-    else:
-        raise ValueError(f"Unsupported calculator: {framework}")
-    return mlp_calculator
-
 
 def sanitize(obj):
     if isinstance(obj, Structure):

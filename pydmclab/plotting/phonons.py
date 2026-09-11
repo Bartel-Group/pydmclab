@@ -3,8 +3,6 @@ import sys
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.constants import physical_constants
-from pydmclab.utils.handy import read_json, write_json, convert_numpy_to_native
-from pydmclab.core.struc import StrucTools
 
 from scipy.integrate import trapezoid
 from scipy.interpolate import interp1d
@@ -17,7 +15,7 @@ EV_TO_J_PER_MOL = EV_TO_J * AVOGADRO
 EV_TO_KJ_PER_MOL = EV_TO_J_PER_MOL / 1000.0
 
 
-#This code needs a lot of cleanup and refactoring, but I want to get some quick plotting in before I spend time on that. So apologies for the messiness here.
+#This code is a work in progress
 
 def plot_phonon_bandstructure(bs_dict, 
                               labels=None, 
@@ -25,23 +23,20 @@ def plot_phonon_bandstructure(bs_dict,
                               title="", 
                               figsize=(8, 6)):
     """
-    Plot a phonon band structure from Phonopy-style qpoints and frequencies.
-
-    Parameters
-    ----------
-    bs_dict : dict
-        {
-        'qpoints': list of np.ndarray (npaths, npoints, 3),
-        'frequencies': list of np.ndarray (npaths, npoints, nbranches)
-         }
-    labels : list of str or None
-        High symmetry point labels. Must have length = npaths + 1.
-        Example: ["Γ", "X", "K", "Γ", "L"] for 4 paths
-        Note: The middle labels connect paths (end of one = start of next)
-    ylabel : str
-        Label for y-axis
-    figsize : tuple
-        Figure size
+    args:
+        bs_dict : dict
+            {
+            'qpoints': list of np.ndarray (npaths, npoints, 3),
+            'frequencies': list of np.ndarray (npaths, npoints, nbranches)
+            }
+        labels : list of str or None
+            High symmetry point labels. Must have length = npaths + 1.
+            Example: ["Γ", "X", "K", "Γ", "L"] for 4 paths
+            Note: The middle labels connect paths (end of one = start of next)
+        ylabel : str
+            Label for y-axis
+        figsize : tuple
+            Figure size
     """
     qpoints = np.array(bs_dict['qpoints'])
     frequencies = np.array(bs_dict['frequencies'])
@@ -105,22 +100,19 @@ def plot_phonon_dos(dos_dict,
                     figsize=(6,4), 
                     ylims=None):
     """
-    Plot phonon density of states.
-
-    Parameters
-    ----------
-    dos_dict : dict
-            {
-                'total_dos': [
-                    {'E': -0.004, 'total_dos': 0.0},
-                    {'E': 0.0, 'total_dos': 1.2},
-                    ...
-                ]
-            }
-    ylabel : str
-        Label for y-axis
-    figsize : tuple
-        Figure size
+    args:
+        dos_dict : dict
+                {
+                    'total_dos': [
+                        {'E': -0.004, 'total_dos': 0.0},
+                        {'E': 0.0, 'total_dos': 1.2},
+                        ...
+                    ]
+                }
+        ylabel : str
+            Label for y-axis
+        figsize : tuple
+            Figure size
     """
     frequencies = np.array([r['E'] for r in dos_dict['total_dos']])
     dos = np.array([r['total_dos'] for r in dos_dict['total_dos']])
@@ -152,11 +144,6 @@ def plot_thermal_properties(thermal_props,
                             plot_in_j_mol=False, 
                             atoms_per_formula_units=None):
     """
-    Plot thermal properties (Helmholtz free energy, entropy, heat capacity).
-
-    Properties with the same units share the same axis.
-    Properties with different units get separate axes (e.g., F on left, S/Cv on right).
-
     Args:
         thermal_props (list[dict]):
            [{'T': float (K), 
@@ -177,30 +164,23 @@ def plot_thermal_properties(thermal_props,
     if isinstance(plot_props, str):
         plot_props = [plot_props]
 
-    # Define unit groups: which properties share units
-    # "F" is in eV/atom or kJ/mol, "S" and "Cv" are in J/K/mol
     prop_to_group = {
         "F": "energy",
         "S": "thermal",
         "Cv": "thermal"
     }
 
-    # Collect data
     temperatures = [point['T'] for point in thermal_props]
     props = {prop: [point[prop] for point in thermal_props] for prop in plot_props}
 
-    # Create figure and axes
     fig, ax1 = plt.subplots(figsize=figsize)
     axes = [ax1]
     ax = ax1
     current_side = "left"
 
-    # Plot each property, creating new axes for different unit groups
     colors = ['blue', 'red', 'green', 'orange', 'purple']
     color_idx = 0
-
     
-    # Check which groups are needed
     needed_groups = []
 
     for prop in plot_props:
@@ -210,18 +190,15 @@ def plot_thermal_properties(thermal_props,
         if group and group not in needed_groups:
             needed_groups.append(group)
 
-        # Scale by atoms_per_formula_units if provided
         if atoms_per_formula_units is not None:
                 props[prop] = [val * atoms_per_formula_units for val in props[prop]]
 
-        # Convert units if requested
         if plot_in_j_mol:
                 if prop == "F":
                     props[prop] = [val * EV_TO_KJ_PER_MOL for val in props[prop]]
                 elif prop == "S" or prop == "Cv":
                     props[prop] = [val * EV_TO_J_PER_MOL for val in props[prop]]
         
-        # Determine which axis to use
         group_idx = needed_groups.index(group) if group in needed_groups else 0
         if group_idx == 0:
             ax = axes[0]  # Use left axis for first group
@@ -246,7 +223,6 @@ def plot_thermal_properties(thermal_props,
         ax.plot(temperatures, props[prop], color=colors[color_idx], linewidth=1.5, label=prop)
         color_idx += 1
 
-    # Add legend - collect handles and labels from all axes
     handles_labels = []
     for ax in axes:
         handles, labels = ax.get_legend_handles_labels()
@@ -257,7 +233,6 @@ def plot_thermal_properties(thermal_props,
         handles, labels = zip(*handles_labels)
         ax1.legend(handles, labels, loc='best', fontsize=12)
 
-    # Set x-axis on the primary axis
     ax1.set_xlabel("Temperature (K)", fontsize=15)
     ax1.tick_params(axis='x', labelsize=15)
     plt.title(title)
@@ -285,7 +260,7 @@ def plot_relative_prop(
     Plot the difference in a thermal property between two structures, for one or
     more datasets (e.g. DFT vs matcalc).
 
-    The difference is always (second structure − first structure) within each dataset.
+    The difference is always (second structure - first structure) within each dataset.
 
     Parameters
     ----------
@@ -297,7 +272,7 @@ def plot_relative_prop(
         Example:
             {
                 'DFT':     {'needle': [...], 'perovskite': [...]},
-                'matcalc': {'needle': [...], 'perovskite': [...]},
+                'matcalc': {'needle': [...], 'perovskite': [...],
             }
 
         if only one dataset is provided, outer keys don't matter and will be ignored in the legend (e.g. just "ΔF: perovskite - needle" instead of "ΔF: perovskite - needle [DFT]").
@@ -506,7 +481,7 @@ def plot_phonon_dos_comparison(
     THz_factor = h * 1e12  # eV → THz conversion factor
 
     colors = ['blue', 'red', 'green', 'orange', 'purple', 'brown']
-    linestyles = ['-', '--', '--', '--', '--', '--']  # first solid, rest dashed
+    linestyles = ['-', '--', '--', '--', '--', '--'] 
 
     multi = len(dos_dict) > 1
 
@@ -517,7 +492,6 @@ def plot_phonon_dos_comparison(
         ylabel = "DOS (states/eV)" if not (multi and normalize) else "Normalized DOS (arb. units)"
         xlabel = "Energy (eV)"
 
-    # Parse all datasets up front
     parsed = {}
     for label, records in dos_dict.items():
         freqs = np.array([r['E'] for r in records])
@@ -529,7 +503,6 @@ def plot_phonon_dos_comparison(
 
     plt.figure(figsize=figsize)
 
-    # Reference dataset (first key) for fill_between and shape metrics
     ref_label = next(iter(parsed))
     ref_freqs, ref_dos = parsed[ref_label]
     ref_norm = trapezoid(ref_dos, ref_freqs) if multi and normalize else 1.0
@@ -550,7 +523,6 @@ def plot_phonon_dos_comparison(
 
         plt.plot(freqs, dos_plot, color=color, linewidth=1.2, linestyle=ls, label=label)
 
-        # Fill between this dataset and the reference (skip the reference itself)
         if fill_between and multi and i > 0:
             common_freq = np.linspace(
                 max(ref_freqs[0], freqs[0]),
@@ -564,7 +536,6 @@ def plot_phonon_dos_comparison(
             plt.fill_between(common_freq, dos_ref_c, dos_this_c,
                              alpha=0.15, color=color, label=f'{ref_label}↔{label} diff')
 
-        # Shape metrics vs reference
         if multi and i > 0:
             common_freq = np.linspace(
                 max(ref_freqs[0], freqs[0]),
@@ -580,7 +551,6 @@ def plot_phonon_dos_comparison(
                 'cosine_sim': 1 - cosine(dos_ref_c, dos_this_c),
             }
 
-    # Single-dataset shading
     if not multi:
         _, (freqs, dos) = next(iter(parsed.items())), (ref_freqs, ref_dos)
         plt.fill_between(ref_freqs, ref_dos, color='lightblue', alpha=0.5)
@@ -621,7 +591,7 @@ def plot_thermal_properties_comparison(
                 'matcalc': [{'T': 0, 'F': -1.0, 'S': 0.0, 'Cv': 0.0}, ...],
             }
     plot_props : list or str
-        Which properties to plot. Options: "F" for Helmholtz free energy, "S" for entropy, "Cv" for heat capacity. Default is ["F", "S"].
+        Which properties to plot. Options: "F" for Helmholtz free energy, "S" for entropy, "Cv" for heat capacity.
     title : str
         Title for the plot.
     figsize : tuple
@@ -674,7 +644,6 @@ def plot_thermal_properties_comparison(
         for label, data in thermal_props_dict.items()
     }
 
-    # ── Align F to reference dataset's starting point ─────────────────────────
     if align_F_to_reference and "F" in plot_props:
         ref_label   = labels[0]
         ref_F_start = parsed[ref_label]["F"][0]
@@ -682,7 +651,6 @@ def plot_thermal_properties_comparison(
             offset = parsed[label]["F"][0] - ref_F_start
             parsed[label]["F"] = [v - offset for v in parsed[label]["F"]]
 
-    # Axis setup
     fig, ax1 = plt.subplots(figsize=figsize)
     axes = [ax1]
 
@@ -728,7 +696,6 @@ def plot_thermal_properties_comparison(
 
     single_prop = len(plot_props) == 1
 
-    # Plot
     for prop_idx, prop in enumerate(plot_props):
         group     = prop_to_group.get(prop, "energy")
         group_idx = needed_groups.index(group) if group in needed_groups else 0
@@ -743,7 +710,6 @@ def plot_thermal_properties_comparison(
             )
 
             ls, marker, markevery = ds_style(ds_idx, single_prop)
-            # When multiple props, fall back to prop-based linestyle
             if not single_prop:
                 ls = ls_prop
 
@@ -773,84 +739,6 @@ def plot_thermal_properties_comparison(
     plt.tight_layout()
     plt.show()
     
-
-
-    # def plot_phonon_dos(self, volume=None, remove_imaginary=False):
-    #     """
-    #     Plot phonon density of states for a specific volume.
-    #     Args:
-    #         formula (str): Chemical formula of the material.
-    #         mpid (str): Materials Project ID.
-    #         volume (float): Volume of the structure. If none, will plot phonon dos for all the volumes.
-    #         remove_imaginary (bool): Whether to remove imaginary frequencies. Default is False.
-    #     """
-    #     phonon_dos_dict = self.phonon_dos(remove_imaginary=remove_imaginary)
-        
-    #     if not volume:
-    #         plt.figure(figsize=(10, 6))
-    #         for volume in phonon_dos_dict:
-    #             phonon_dos = phonon_dos_dict[str(volume)]
-
-    #             frequency_points = np.array([d['E'] for d in phonon_dos['dos']])
-    #             total_dos = np.array([d['dos'] for d in phonon_dos['dos']])
-    #             label = f"{float(volume):.2f} A^3"
-    #             plt.plot(frequency_points, total_dos, label=label)
-
-    #         plt.title(f"Phonon Density of States for {mpid}", fontsize=14)
-    #         plt.legend(title="Volumes", loc="best", fontsize=10)
-
-    #     else:
-    #         phonon_dos = phonon_dos_dict[str(volume)]
-
-    #         frequency_points = np.array([d['E'] for d in phonon_dos['dos']])
-    #         total_dos = np.array([d['dos'] for d in phonon_dos['dos']])
-
-    #         plt.figure(figsize=(10, 6))
-    #         plt.plot(frequency_points, total_dos, label=f"{volume:.2f} A^3")
-    #         plt.title(f"Phonon Density of States for {volume:.2f} A^3", fontsize=14)
-            
-    #     plt.xlabel("Energy (eV)", fontsize=12)
-    #     plt.ylabel("Phonon DOS (1/eV)", fontsize=12)
-
-    
-   
-    # def plot_helmholtz_free_energy(self, temp_cutoff=None):
-    #     """
-    #     Plot Temperature vs Helmholtz Free Energy at Different Volumes.
-
-    #     Args:
-    #         F (dict): Dictionary containing Helmholtz free energy data for different volumes.
-    #         temp_cutoff (tuple): Optional temperature range (min_temp, max_temp) for filtering.
-    #     """
-
-    #     F = self.helmholtz()
-
-    #     plt.figure(figsize=(10, 6))  
-
-    #     volumes = list(F.keys())  
-
-    #     for vol in volumes:
-    #         # Extract Helmholtz free energies and temperatures
-    #         data = F[vol]['data']
-    #         if temp_cutoff:
-    #             data = [d for d in data if temp_cutoff[0] <= d['T'] <= temp_cutoff[1]]
-
-    #         Fs = [i['F'] for i in data]
-    #         Ts = [i['T'] for i in data]
-
-    #         plt.plot(Ts, Fs, label=f"{float(vol):.2f}")  # Format volume label to 2 decimals
-
-    #     # Add title and axis labels
-    #     # plt.title("Temperature vs Helmholtz Free Energy at Different Volumes", fontsize=14)
-    #     plt.xlabel("Temperature (K)")
-    #     plt.ylabel("Helmholtz Free Energy (eV/atom)" if self.natoms else "Helmholtz Free Energy (eV/cell)")
-
-    #     # Add legend and grid
-    #     plt.legend(title="Volumes", loc="best", fontsize=10)
-
-
-    #     # Display the plot
-    #     plt.show()
 
     # def plot_gibbs_free_energy(self, temp_cutoff=None):
     #     """
