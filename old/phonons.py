@@ -480,10 +480,10 @@ class Gibbs(object):
         return read_json(fjson)
 
 
-def main():
-    plot_Gs()
-    return
+# def main():
+#     plot_Gs()
+#     return
 
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()

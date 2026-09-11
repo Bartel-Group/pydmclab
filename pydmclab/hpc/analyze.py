@@ -474,7 +474,9 @@ class AnalyzeVASP(object):
             if vr and nsites:
                 energies = [step["e_wo_entrp"] / nsites for step in vr.ionic_steps]
                 structures = [step["structure"].as_dict() for step in vr.ionic_steps]
-                return list(zip(range(len(energies)), energies, structures))
+                forces = [step["forces"] for step in vr.ionic_steps]
+                stresses = [step["stress"] for step in vr.ionic_steps]
+                return convert_numpy_to_native(list(zip(range(len(energies)), energies, structures, forces, stresses)))
             return None
         else:
             return None
@@ -1186,20 +1188,29 @@ class AnalyzeVASP(object):
         entry.data["queried"] = False
         return entry.as_dict()
 
-    def phonons(
+    def summarize_phonons_dfpt(
         self,
         supercell_matrix=None,
         mesh=100,
     ):
+        """
+        Returns summary of phonon data and corresponding thermal properties data from a dfpt calculation.
+        """
 
         from pydmclab.hpc.phonons import AnalyzePhonons
+        from phonopy.interface.vasp import read_vasp
 
-        ap = AnalyzePhonons(self.calc_dir, supercell_matrix=supercell_matrix, mesh=mesh)
+        vr = self.outputs.vasprun
+        supercell = read_vasp(os.path.join(self.calc_dir, "POSCAR"))
+        force_constants = vr.force_constants
+
+        ap = AnalyzePhonons(unitcell=supercell, force_data=force_constants, supercell_matrix=supercell_matrix, mesh=mesh)
         if not ap:
             return None
 
-        return ap.summary()
+        return ap.summary(calc_dir=self.calc_dir, savename="phonons.json") #Analyze phonons has functionality for saving the data already
 
+    
     def summary(
         self,
         relax_static_energy_diff_tol=0.1,
@@ -1222,7 +1233,7 @@ class AnalyzeVASP(object):
         include_tcobi=False,
         include_pcobi=False,
         include_entry=False,
-        include_phonons=False,
+        include_phonons_dfpt=False,
     ):
         """
         Returns all desired data for post-processing DFT calculations
@@ -1234,7 +1245,8 @@ class AnalyzeVASP(object):
             include_mag (bool, optional): _description_. Defaults to False.
             include_dos (bool, optional): _description_. Defaults to False.
             include_gap (bool, optional): _description_. Defaults to True.
-            include_phonons (bool, optional): _description_. Defaults to False.
+            include_phonons_dfpt (bool, optional): _description_. Defaults to False.
+            include_forces (bool, optional): _description_. Defaults to False.
         Raises:
             NotImplementedError: _description_
 
@@ -1345,12 +1357,11 @@ class AnalyzeVASP(object):
                 data["pcobi"] = None
         if include_entry:
             data["entry"] = self.computed_structure_entry
-
-        if include_phonons:
+        if include_phonons_dfpt:
             if convergence:
-                data["phonons"] = self.phonons(supercell_matrix=None, mesh=100)
+                data["phonons_dfpt"] = self.summarize_phonons_dfpt(supercell_matrix=None, mesh=100)
             else:
-                data["phonons"] = None
+                data["phonons_dfpt"] = None
 
         return data
 
@@ -1519,7 +1530,7 @@ def _results_for_calc_dir(calc_dir, configs):
     #     configs["include_structure"] = False
 
     if calc != "dfpt":
-        configs["include_phonons"] = False
+        configs["include_phonons_dfpt"] = False
 
     verbose = configs["verbose"]
     relax_static_energy_diff_tol = configs["relax_static_energy_diff_tol"]
@@ -1539,7 +1550,7 @@ def _results_for_calc_dir(calc_dir, configs):
     include_tcobi = configs["include_tcobi"]
     include_pcobi = configs["include_pcobi"]
     include_entry = configs["include_entry"]
-    include_phonons = configs["include_phonons"]
+    include_phonons_dfpt = configs["include_phonons_dfpt"]
     check_relax = configs["check_relax_energy"]
     create_cif = configs["create_cif"]
 
@@ -1566,7 +1577,7 @@ def _results_for_calc_dir(calc_dir, configs):
         include_tcobi=include_tcobi,
         include_pcobi=include_pcobi,
         include_entry=include_entry,
-        include_phonons=include_phonons,
+        include_phonons_dfpt=include_phonons_dfpt,
     )
 
     # store the relax energy if we asked to

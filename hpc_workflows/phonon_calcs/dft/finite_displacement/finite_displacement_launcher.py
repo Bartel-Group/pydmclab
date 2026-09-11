@@ -1,11 +1,12 @@
 import os
+import sys
 from shutil import copyfile
 from pydmclab.data.configs import load_base_configs
 
 from pydmclab.hpc.helpers import (
     get_query,
     check_query,
-    get_strucs,
+    #get_strucs,
     check_strucs,
     get_magmoms,
     check_magmoms,
@@ -43,6 +44,17 @@ from pydmclab.hpc.analyze import AnalyzeVASP
 #   pydmclab is assumed to be in /users/{number}/{username}/bin/pydmclab
 #   and $HOME points to /users/{number}/{username}
 HOME_PATH = os.environ["HOME"]
+
+#importing phonon helpers
+PHONON_HELPERS_DIR = "%s/bin/pydmclab/hpc_workflows/phonon_calcs" % HOME_PATH
+
+if PHONON_HELPERS_DIR not in sys.path:
+    sys.path.append(PHONON_HELPERS_DIR)
+
+from phonon_helpers import (
+    get_finite_displacement_strucs,
+)
+
 _, _, _, USER_NAME = HOME_PATH.split("/")
 SCRATCH_PATH = os.path.join(os.environ["SCRATCH_GLOBAL"], USER_NAME)
 
@@ -84,12 +96,12 @@ BASE_CONFIGS = load_base_configs()
 
 # if you need data from MP as a starting point (often the case), you need your API key
 #  see pydmclab.core.query.MPQuery
-API_KEY = None
+API_KEY = 'OWPbe4n9P7573z2mpKItcv1yxPZlEbN9'
 
 # what to query MP for (if you need MP data)
 #  e.g., 'MnO2', ['MnO2', 'TiO2'], 'Ca-Ti-O, etc
 #  see pydmclab.hpc.helpers.get_query
-COMPOSITIONS = None
+COMPOSITIONS = 'Si'
 
 # any configurations related to LaunchTools
 #  see pydmclab.hpc.helpers.get_launch_configs
@@ -106,11 +118,11 @@ LAUNCH_CONFIGS = get_launch_configs(
 #  see pydmclab.data.data._hpc_configs.yaml (SUB_CONFIGS)
 #  see pydmclab.hpc.submit.SubmitTools
 SUB_CONFIGS = get_sub_configs(
-    relaxation_xcs=["gga"],
-    static_addons={"gga": ["lobster"]},
+    relaxation_xcs=[],
+    static_addons={},
     prioritize_relaxes=True,
     start_with_loose=False,
-    custom_calc_list=None,
+    custom_calc_list=["metagga-static"],
     restart_these_calcs=None,
     submit_calculations_in_parallel=False,
     machine="msi",
@@ -125,7 +137,7 @@ SUB_CONFIGS = get_sub_configs(
 SLURM_CONFIGS = get_slurm_configs(
     total_nodes=1,
     cores_per_node=8,
-    walltime_in_hours=95,
+    walltime_in_hours=4,
     mem_per_core="all",
     partition="msismall,msidmc",
     error_file="log.e",
@@ -148,8 +160,6 @@ VASP_CONFIGS = get_vasp_configs(
     compare_static_and_relax_energies=0.1,
     special_functional=False,
     COHPSteps=2000,
-    COHPstartEnergy=-35.0,
-    COHPendEnergy=5.0,
     reciprocal_kpoints_density_for_lobster=100,
     bandstructure_symprec=0.1,
     bandstructure_kpoints_line_density=20,
@@ -165,13 +175,12 @@ ANALYSIS_CONFIGS = get_analysis_configs(
     only_xc=None,
     analyze_structure=True,
     analyze_trajectory=False,
-    analyze_forces=False,
-    analyze_stress=False,
     analyze_mag=False,
     analyze_charge=False,
     analyze_dos=False,
     analyze_bonding=False,
-    analyze_phonons_dfpt=False,
+    analyze_phonons_dfpt=False,#This is false because not doing dfpt. For dinite displacement need to get forces from each individual calc and then go from there. 
+    analyze_forces = True,
     exclude=None,
     remake_results=False,
     verbose=False,
@@ -214,7 +223,7 @@ def get_custom_data(savename="custom.json", remake=False):
     d = {}
     write_json(d, fjson)
     return read_json(fjson)
-
+    
 
 def main():
     # make a submission script so you can execute launcher.py on the cluster
@@ -225,15 +234,15 @@ def main():
     print_query_check = True
 
     # remake strucs? print strucs summary?
-    remake_strucs = False
+    remake_strucs = True
     print_strucs_check = True
 
     # remake magmoms? print magmoms summary?
-    remake_magmoms = False
+    remake_magmoms = True
     print_magmoms_check = True
 
     # remake launch directories? print launch_dirs summary?
-    remake_launch_dirs = False
+    remake_launch_dirs = True
     print_launch_dirs_check = True
 
     # turn purge safety on or off? print file locations?
@@ -284,12 +293,14 @@ def main():
     #  replace with your own function for making structures
     #  if you don't want to just use the structures as is from the query
     #  eg make substitutions, create defects, make supercells, etc
-    strucs = get_strucs(
-        query=query,
-        data_dir=DATA_DIR,
-        savename="strucs.json",
-        remake=remake_strucs,
-    )
+    strucs = get_finite_displacement_strucs(query,
+                                            distance='auto',
+                                            supercell_matrix = None,
+                                            data_dir = DATA_DIR, 
+                                            savename = "strucs.json", 
+                                            savename_displacements = "displacements.json", 
+                                            remake=remake_strucs
+                                        )
     if print_strucs_check:
         check_strucs(strucs)
 

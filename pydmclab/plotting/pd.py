@@ -1,7 +1,8 @@
 from pydmclab.core.comp import CompTools
 from pydmclab.core.hulls import GetHullInputData, AnalyzeHull, MixingHull
-from pydmclab.plotting.utils import set_rc_params, get_colors
+from pydmclab.plotting.utils import set_rc_params, get_colors, get_label
 from pydmclab.utils.handy import read_json, write_json
+
 
 import os
 import numpy as np
@@ -207,8 +208,11 @@ class BinaryPD(object):
             savename (_type_, optional): _description_. Defaults to None.
             show (bool, optional): _description_. Defaults to True.
         """
-        stable_params["color"] = color_palette[stable_params["color"]]
-        unstable_params["edgecolor"] = color_palette[unstable_params["edgecolor"]]
+        # Only lookup color names in palette if they're strings
+        if isinstance(stable_params["color"], str):
+            stable_params["color"] = color_palette[stable_params["color"]]
+        if isinstance(unstable_params["edgecolor"], str):
+            unstable_params["edgecolor"] = color_palette[unstable_params["edgecolor"]]
 
         stable_to_plot = self.stable
         unstable_to_plot = self.unstable
@@ -268,7 +272,6 @@ class BinaryPD(object):
 
         if legend:
             ax = plt.legend(loc=legend if isinstance(legend, str) else "best")
-
 
 class TernaryPD(object):
     def __init__(self, stability_data, end_members):
@@ -434,6 +437,7 @@ class TernaryPD(object):
         title=None,
         savename=None,
         show=True,
+        unstable_colorbar=None,
     ):
         """_summary_
 
@@ -447,6 +451,7 @@ class TernaryPD(object):
             title (_type_, optional): _description_. Defaults to None.
             savename (_type_, optional): _description_. Defaults to None.
             show (bool, optional): _description_. Defaults to True.
+            unstable_colorbar (_type_, optional): Property name to use for colorbar values (e.g., 'Ed' if want Ed and this is the key provided in stability data dictionary). Defaults to None.
         """
         data = self.data
 
@@ -471,7 +476,54 @@ class TernaryPD(object):
             y.append(d["y"])
             labels.append(d["formula"])
 
-        ax = plt.scatter(x, y, label="unstable", **unstable_params, zorder=1)
+        unstable_kwargs = unstable_params.copy()
+        if unstable_colorbar is not None:
+            # Extract colorbar values from unstable points
+            formulas = [d["formula"] for d in unstable_to_plot]
+            c_values = np.asarray([self.data[f][unstable_colorbar] for f in formulas], dtype=float)
+            c_values = np.atleast_1d(c_values)
+            print("Unstable colorbar values:", c_values)
+            # Modify unstable_kwargs to use colormap instead of fixed edgecolor
+            unstable_kwargs.pop("edgecolor", None)
+            unstable_kwargs.pop("color", None)
+            unstable_kwargs.update({
+                "c": c_values,
+                "cmap": "Reds",
+                "vmin": 0,
+                "vmax": 0.12,
+            })
+
+        scatter = plt.scatter(x, y, label="unstable", **unstable_kwargs, zorder=1)
+
+        if unstable_colorbar is not None:
+            if unstable_colorbar == 'Ed':
+                unstable_colorbar_label = r"\mathit{E}_{d}"
+            else:
+                unstable_colorbar_label = f"{unstable_colorbar}"
+
+            cbar = plt.colorbar(scatter, label=f"${unstable_colorbar_label} \\,(eV/atom)$")
+            cbar.ax.yaxis.label.set_size(20)
+            cbar.ax.tick_params(labelsize=18)
+
+        if label_compounds:
+            for cmpd in label_compounds:
+                if cmpd in self.data:
+                    label_x, label_y = triangle_to_square(
+                        (data[cmpd]["a"], data[cmpd]["b"], data[cmpd]["c"])
+                    )
+                    els_order_for_label = [self.left_end, self.right_end, self.top_end]
+                    plt.annotate(
+                        get_label(cmpd, els_order_for_label),
+                        xy=(label_x, label_y),
+                        xytext=(5, 5),
+                        textcoords="offset points",
+                        fontsize=20,
+                        ha="left",
+                        va="bottom",
+                        bbox={"facecolor": "white", "alpha": 0.75, "edgecolor": None, "pad": 0.5},
+                    )
+                else:
+                    print(f"Warning: compound {cmpd} not found in ternary data")
 
         lines_to_plot = self.lines_to_plot
         for l in lines_to_plot:
@@ -484,7 +536,7 @@ class TernaryPD(object):
         ax = plt.gca().tick_params(bottom=False, top=False, left=False, right=False)
 
         if label_els:
-            el_label_size = 18
+            el_label_size = 30
             left_el_pos = (-0.02, -0.05)
             right_el_pos = (1.02, -0.05)
             top_el_pos = (0.5, 0.89)
@@ -511,7 +563,7 @@ class TernaryPD(object):
             )
 
         if legend:
-            ax = plt.legend(loc=legend if isinstance(legend, str) else "best")
+            ax = plt.legend(loc=legend if isinstance(legend, str) else "best", fontsize=20)
 
 
 def triangle_to_square(pt):
