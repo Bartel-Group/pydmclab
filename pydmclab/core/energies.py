@@ -12,6 +12,7 @@ from pydmclab.data.thermochem import (
     mus_at_0K,
     mus_at_T,
     mus_from_mp_no_corrections,
+    mus_from_mp_no_corrections_matbench_source,
     mus_from_omat,
     mus_from_matpes_pbe,
     mus_from_matpes_r2scan,
@@ -124,7 +125,7 @@ class ChemPots(object):
         standard, functional = self.standard, self.functional
         if T == 0:
             # use DFT data at 0 K
-            if (standard == "dmc"):
+            if standard == "dmc":
                 # use DMC data
                 all_mus = mus_at_0K()
                 all_mus = all_mus[standard]
@@ -139,9 +140,13 @@ class ChemPots(object):
                     mus = mus_from_matpes_pbe()
                 elif functional == "r2scan" or functional == "scan":
                     mus = mus_from_matpes_r2scan()
+            elif standard == "mp_matbench":
+                # use Matbench data
+                mus = mus_from_mp_no_corrections_matbench_source()
             else:
-                # use MP data
+                # use MP data with no corrections
                 mus = mus_from_mp_no_corrections()
+
         else:
             # use experimental data at T > 0 K
             allowed_Ts = list(range(300, 2100, 100))

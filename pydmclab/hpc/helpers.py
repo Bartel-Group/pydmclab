@@ -433,9 +433,6 @@ def get_analysis_configs(
     if analyze_phonons_dfpt:
         includes.append("phonons_dfpt")
 
-    if analyze_forces:
-        includes.append("forces")
-
     for include in includes:
         analysis_configs["include_" + include] = True
 

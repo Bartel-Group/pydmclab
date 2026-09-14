@@ -5,8 +5,6 @@ import numpy as np
 
 from pydmclab.utils.handy import read_json, write_json, convert_numpy_to_native
 from pydmclab.core.struc import StrucTools
-from pydmclab.core.comp import CompTools
-from pydmclab.hpc.phonons import AnalyzePhonons
 
 from pymatgen.io.ase import AseAtomsAdaptor
 from pymatgen.io.phonopy import get_phonopy_structure, get_pmg_structure
@@ -14,24 +12,10 @@ from pymatgen.analysis.local_env import CrystalNN
 
 from phonopy import Phonopy
 
-##added later
-import os
-import json
-
-import numpy as np
-from tqdm import tqdm
 from scipy.constants import physical_constants
 
-import matcalc as mtc
-
 from pymatgen.core.structure import Structure, PeriodicSite
-from pymatgen.io.ase import AseAtomsAdaptor
 from ase import Atoms
-
-from pydmclab.mlp.fairchem.dynamics import FAIRChemCalculator
-from nequix.calculator import NequixCalculator
-from pydmclab.core.struc import StrucTools
-from pydmclab.utils.handy import convert_numpy_to_native
 
 def get_finite_displacement_strucs(query: dict, 
                                    data_dir: str,
@@ -215,7 +199,7 @@ def get_displacements_for_phonons(
     pmg_displaced_strucs = [struc.as_dict() for struc in pmg_displaced_strucs]
     out["displaced_structures"] = pmg_displaced_strucs
 
-    out = convert_numpy_to_native(out)  # Make sure the output is JSON serializable
+    out = convert_numpy_to_native(out)
 
     if data_dir is not None:
         write_json(out, fjson)
@@ -238,7 +222,7 @@ def estimate_displacement_distance(structure: str|dict,
     nn_info = nn.get_all_nn_info(struc)
     
     min_dist = float("inf")
-    for i, neighbors in enumerate(nn_info):  # Fixed enumerate usage
+    for i, neighbors in enumerate(nn_info): 
         site1 = struc.sites[i]
         for neighbor in neighbors:
             site2 = neighbor['site']
@@ -276,7 +260,6 @@ def get_set_of_forces(results,
                              e.g. {SrZrS3--SrZrS3_needle--etc : {'forces': [list of arrays]}}
     REMINDER: When you generate the displacements, you do STATIC calculations on those displaced structures to get the forces (no relaxation).
     '''
-    # We'll collect (index, forces, representative_key) entries so we can sort by index
     if mpid is None:
         raw_sets = {}
     else:
@@ -293,8 +276,6 @@ def get_set_of_forces(results,
         mpid_minus_disp = "_".join(parts[:-1])
         index_str = parts[-1]
 
-        # Expect the MPID to have a displacement index appended after an underscore.
-        # If this is not the case, raise an error so the caller can fix the MPID naming.
         if len(parts) < 2:
             raise ValueError(f"Expected displaced MPID with an underscore and index (e.g. 'base_01'), got '{r_mpid}' from key '{key}'")
 
@@ -486,37 +467,6 @@ AVOGADRO = physical_constants["Avogadro constant"][0]
 EV_TO_J_PER_MOL = EV_TO_J * AVOGADRO
 EV_TO_KJ_PER_MOL = EV_TO_J_PER_MOL / 1000.0
 
-
-def get_mlp_calculator(framework: str = "tensornet", calculator_kwargs: dict | None = None):
-    """
-    Get MLP calculator based on specified type and kwargs.
-
-    Args:
-        framework (str): 'tensornet', 'fairchem', 'nequix', 'nequix-pft'.
-        calculator_kwargs (dict): kwargs specific to the chosen calculator.
-            For 'tensornet': {'name': str} e.g. {'name': 'r2scan'}
-            For 'fairchem': {'name_or_path': str, 'task_name': str}
-            For 'nequix'/'nequix-pft': {'model_name': str}
-    """
-    if framework == "tensornet":
-        if calculator_kwargs is None:
-            calculator_kwargs = {"name": "r2scan"}
-        mlp_calculator = mtc.load_fp(**calculator_kwargs)
-    elif framework == "fairchem":
-        if calculator_kwargs is None:
-            calculator_kwargs = {"name_or_path": "uma-s-1p2", "task_name": "omat"}
-        mlp_calculator = FAIRChemCalculator(**calculator_kwargs)
-    elif framework == "nequix":
-        if calculator_kwargs is None:
-            calculator_kwargs = {"model_name": "nequix-mp-1"}
-        mlp_calculator = NequixCalculator(**calculator_kwargs, use_kernel=False)
-    elif framework == "nequix-pft":
-        if calculator_kwargs is None:
-            calculator_kwargs = {"model_name": "nequix-mp-1-pft"}
-        mlp_calculator = NequixCalculator(**calculator_kwargs, use_kernel=False)
-    else:
-        raise ValueError(f"Unsupported calculator: {framework}")
-    return mlp_calculator
 
 
 def sanitize(obj):

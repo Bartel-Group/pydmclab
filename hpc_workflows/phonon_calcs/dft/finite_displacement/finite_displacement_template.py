@@ -7,16 +7,9 @@ from pydmclab.utils.handy import read_json, write_json, convert_numpy_to_native
 from pydmclab.hpc.phonons import AnalyzePhonons
 from scipy.constants import physical_constants
 import pandas as pd
-# from sumo.plotting.phonon_bs_plotter import SPhononBSPlotter
-
-# from pydmclab.core.struc import StrucTools
-# from pymatgen.core import Structure
-# from pydmclab.hpc.helpers import get_query
-# from pymatgen.io.ase import AseAtomsAdaptor
 
 # set up some paths that will point to where your data/calculations will live
-#  these are just defaults, you can change the `_DIR` variables to point to wherever you want
-#
+
 # The home directory path is used to point to your local copy of the pydmclab repo
 #   pydmclab is assumed to be in /users/{number}/{username}/bin/pydmclab
 #   and $HOME points to /users/{number}/{username}
@@ -151,7 +144,7 @@ def compute_all_phonon_properties(results,
         )
 
         summary = analyzer.summary(temperatures=temperatures,
-                                   band_structure_kwargs=band_structure_kwargs)
+                                   band_structure_kwargs=band_structure_kwargs,)
 
         out[phonon_key] = {'phonons': summary}
         out[phonon_key]['forces'] = forces
