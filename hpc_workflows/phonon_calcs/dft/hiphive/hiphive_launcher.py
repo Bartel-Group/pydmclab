@@ -96,12 +96,12 @@ BASE_CONFIGS = load_base_configs()
 
 # if you need data from MP as a starting point (often the case), you need your API key
 #  see pydmclab.core.query.MPQuery
-API_KEY = 'OWPbe4n9P7573z2mpKItcv1yxPZlEbN9'
+API_KEY = None
 
 # what to query MP for (if you need MP data)
 #  e.g., 'MnO2', ['MnO2', 'TiO2'], 'Ca-Ti-O, etc
 #  see pydmclab.hpc.helpers.get_query
-COMPOSITIONS = 'Si'
+COMPOSITIONS = None
 
 # any configurations related to LaunchTools
 #  see pydmclab.hpc.helpers.get_launch_configs

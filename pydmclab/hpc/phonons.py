@@ -31,7 +31,7 @@ class AnalyzePhonons(object):
                  force_data: np.ndarray|list, 
                  primitive_matrix: list|str = "auto",
                  symprec=1e-5,
-                 mesh: int|list|float=[30, 30, 30],
+                 mesh: int|list|float=100.0,
                  dataset: dict = None,
                  E0: float = 0,
                  init_kwargs: dict ={}
