@@ -478,12 +478,3 @@ class Gibbs(object):
         out = {"data": Gs}
         write_json(out, fjson)
         return read_json(fjson)
-
-
-def main():
-    plot_Gs()
-    return
-
-
-if __name__ == "__main__":
-    main()

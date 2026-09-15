@@ -231,7 +231,7 @@ class DefectStructures(object):
         self.how_many = how_many
         self.n_strucs = n_strucs
 
-    def vacancies(self, el_to_remove: str, *, algo_to_use: int = 0) -> dict[int, dict]:
+    def vacancies(self, el_to_remove: str, *, algo_to_use: int = 0, scaling_factor: int = 1000) -> dict[int, dict]:
         """
         Args:
             el_to_remove (str): element to remove
@@ -252,12 +252,12 @@ class DefectStructures(object):
         vacancy = st.change_occ_for_el(el_to_remove, {el_to_remove: x_el_defect})
         st = StrucTools(vacancy, ox_states=self.ox_states)
 
-        strucs = st.get_ordered_structures(algo=algo_to_use, n_strucs=self.n_strucs)
+        strucs = st.get_ordered_structures(algo=algo_to_use, n_strucs=self.n_strucs, scaling_factor=scaling_factor)
 
         return strucs
 
     def substitutions(
-        self, substitution: str, *, algo_to_use: int = 0
+        self, substitution: str, *, algo_to_use: int = 0, scaling_factor: int = 1000
     ) -> dict[int, dict]:
         """
         Args:
@@ -284,7 +284,7 @@ class DefectStructures(object):
         )
         st = StrucTools(sub, ox_states=self.ox_states)
 
-        strucs = st.get_ordered_structures(algo=algo_to_use, n_strucs=self.n_strucs)
+        strucs = st.get_ordered_structures(algo=algo_to_use, n_strucs=self.n_strucs, scaling_factor=scaling_factor)
 
         return strucs
 

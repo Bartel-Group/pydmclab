@@ -780,6 +780,7 @@ class SolidSolutionGenerator:
         endmembers: List[Structure],
         num_solns: Optional[int] = None,
         supercell_dim: Optional[List[int]] = None,
+        data_dir: str = os.getcwd()
     ) -> None:
         """Initialize the SolidSolutionGenerator.
 
@@ -795,6 +796,8 @@ class SolidSolutionGenerator:
 
         self.endmembers = endmembers
         self.supercell_dim = supercell_dim or [2, 2, 2]
+        self.data_dir = Path(data_dir)
+
 
         # Initialize attributes that will be set during processing
         self.element_a: Optional[str] = None
@@ -806,18 +809,21 @@ class SolidSolutionGenerator:
         self.num_solns = num_solns
 
         # Create necessary directories
-        self.dirs: Dict[str, str] = {
-            "output": "Ordered_Solutions",
-            "json": "json_files",
-            "sqs": "SQS",
-            "temp": "working_dir",
+        self.dirs: Dict[str, Path] = {
+            "output": self.data_dir / "Ordered_Solutions",
+            "json": self.data_dir / "json_files",
+            "sqs": self.data_dir / "SQS",
+            "temp": self.data_dir / "working_dir",
         }
         self._create_directories()
-
+    
     def _create_directories(self) -> None:
         """Create necessary working directories."""
+        # Create base data directory if it doesn't exist
+        self.data_dir.mkdir(parents=True, exist_ok=True)
+        # Create all subdirectories
         for dir_path in self.dirs.values():
-            Path(dir_path).mkdir(exist_ok=True)
+            dir_path.mkdir(parents=True, exist_ok=True)
 
     def generate_solid_solutions(self) -> List[Structure]:
         """

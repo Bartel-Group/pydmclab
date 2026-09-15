@@ -1,6 +1,7 @@
 import multiprocessing as multip
 import os
 import warnings
+import numpy as np
 import subprocess
 
 from pydmclab.hpc.launch import LaunchTools
@@ -11,7 +12,7 @@ from pydmclab.core.query import MPQuery, MPLegacyQuery
 from pydmclab.core.struc import StrucTools
 from pydmclab.core.mag import MagTools
 from pydmclab.core.energies import ChemPots, FormationEnthalpy, MPFormationEnergy
-from pydmclab.utils.handy import read_json, write_json
+from pydmclab.utils.handy import read_json, write_json, convert_numpy_to_native
 from pydmclab.data.configs import load_partition_configs
 
 from pymatgen.core.surface import Slab, get_symmetrically_distinct_miller_indices
@@ -355,7 +356,7 @@ def get_analysis_configs(
     analyze_charge=False,
     analyze_dos=False,
     analyze_bonding=False,
-    analyze_phonons=False,
+    analyze_phonons_dfpt=False,
     exclude=None,
     remake_results=False,
     verbose=False,
@@ -383,6 +384,10 @@ def get_analysis_configs(
             True to include pdos, tdos in your results
         analyze_bonding (bool):
             True to include tcohp, pcohp, tcoop, pcoop, tcobi, pcobi in your results
+        analyze_phonons_dfpt (bool):
+            True to include phonon data and thermal properties from a dfpt calculation
+        analyze_forces (bool):
+            True to include forces in your results
         exclude (list):
             list of strings to exclude from analysis
                 overwrites other options
@@ -425,8 +430,8 @@ def get_analysis_configs(
     if analyze_bonding:
         includes.extend(["tcohp", "pcohp", "tcoop", "pcoop", "tcobi", "pcobi"])
 
-    if analyze_phonons:
-        includes.append("phonons")
+    if analyze_phonons_dfpt:
+        includes.append("phonons_dfpt")
 
     for include in includes:
         analysis_configs["include_" + include] = True
@@ -721,6 +726,57 @@ def check_strucs(strucs):
             print("\tID: %s" % ID)
             struc = strucs[formula][ID]
             print("\tstructure formula: %s" % StrucTools(struc).formula)
+
+def get_qha_strucs(query: dict,
+                   scale=np.linspace(0.99, 1.01, 5),
+                   data_dir: str = os.getcwd().replace("scripts", "data"),
+                   savename="strucs.json",
+                   remake=False):
+    """
+    Scales the structures' volumes for Quasi-Harmonic Approximation (QHA) and returns a strained structures dictionary.
+    Can write the strained structures to a json file if needed.
+
+    Args:
+        query (dict)
+            {ID (str) : {'structure' : Pymatgen Structure as dict,
+                        '<other property>' : whatever you queried for}}
+        scale (list): 
+            List of scale factors to apply to the structure volume. For QHA, you need at least 5 volume points.
+        data_dir (str): 
+            Directory to save the JSON file.
+        savename (str): 
+            filename for fjson in DATA_DIR  
+        remake (bool): 
+            write (True) or just read (False) fjson  
+
+    Returns:
+        {formula_indicator (str) :
+            {struc_indicator (str) with scale factor as suffix:
+                Pymatgen Structure object as dict}}
+        e.g., if you got some MP data, this might return something like:
+            {'Cl3Cs1Pb1' : {'mp-1234_1.02' : Structure.as_dict}, {'mp-1234_1.04' : Structure.as_dict}, ...} 
+    """
+
+    fjson = os.path.join(data_dir, savename) if data_dir else None
+    if fjson and os.path.exists(fjson) and not remake:
+        return read_json(fjson)
+
+    QHA_strucs = {}
+  
+    def scale_and_update(mpid, s):
+        st = StrucTools(s)
+        formula = st.compact_formula
+        
+        for i in scale:
+            scaled_st = st.scale_structure(i)
+            new_mpid = f"{mpid}_{np.round(i, 3)}"
+            QHA_strucs.setdefault(formula, {})[new_mpid] = scaled_st.as_dict()
+
+    for mpid in query:
+        scale_and_update(mpid, query[mpid]['structure'])
+    
+    write_json(QHA_strucs, fjson)
+    return read_json(fjson)
 
 
 def get_magmoms(
@@ -1185,6 +1241,7 @@ def get_results(
 
     data = analyzer.results
 
+    data = convert_numpy_to_native(data)
     write_json(data, fjson)
     return read_json(fjson)
 
