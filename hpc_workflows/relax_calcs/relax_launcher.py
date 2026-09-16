@@ -4,7 +4,6 @@ import os
 from pydmclab.utils.handy import read_json
 from pydmclab.hpc.helpers import check_strucs, check_launch_dirs
 
-
 HOME_PATH = os.environ["HOME"]
 RELAX_HELPERS_DIR = "%s/bin/pydmclab/hpc_workflows/relax_calcs" % HOME_PATH
 
@@ -162,6 +161,8 @@ def main():
         batching=batching,
         user_configs=USER_CONFIGS,
         data_dir=DATA_DIR,
+        include_obs=True,
+        savename=None,
         remake=remake_results,
     )
     if print_results_check:

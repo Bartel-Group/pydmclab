@@ -657,6 +657,7 @@ def collect_results(
     user_configs: dict,
     data_dir: str,
     include_obs: bool = True,
+    savename: str | None = None,
     remake: bool = True,
 ) -> dict:
     """
@@ -664,7 +665,8 @@ def collect_results(
         batching (dict): {"batch_id": {"launch_dir": str}}
         user_configs (dict): user configs
         data_dir (str): path to data directory
-        include_obs (bool): whether to include obs in collected resultsß
+        include_obs (bool): whether to include obs in collected results
+        savename (str | None): name of master results json file (uses default name if None)
         remake (bool): if True, remake results
 
     Returns:
@@ -679,7 +681,10 @@ def collect_results(
         model_task = user_configs["relaxer_configs"]["task_name"]
         model = f"{model_name}-{model_task}"
 
-    fjson = os.path.join(data_dir, f"{architecture.lower()}_{model}_relax_results.json")
+    if savename is None:
+        savename = f"{architecture.lower()}_{model}_relax_results.json"
+
+    fjson = os.path.join(data_dir, savename)
     if os.path.exists(fjson) and not remake:
         return read_json(fjson)
 
