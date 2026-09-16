@@ -12,6 +12,8 @@ from pydmclab.hpc.helpers import (
     get_launch_dirs,
     check_launch_dirs,
     submit_calcs,
+    get_fp_results,
+    check_fp_results,
     get_results,
     check_results,
     get_gs,
@@ -21,6 +23,7 @@ from pydmclab.hpc.helpers import (
     get_launch_configs,
     get_sub_configs,
     get_slurm_configs,
+    get_fp_configs,
     get_vasp_configs,
     get_analysis_configs,
     make_sub_for_launcher,
@@ -109,6 +112,7 @@ SUB_CONFIGS = get_sub_configs(
     relaxation_xcs=["gga"],
     static_addons={"gga": ["lobster"]},
     prioritize_relaxes=True,
+    start_with_fp=True,
     start_with_loose=False,
     custom_calc_list=None,
     restart_these_calcs=None,
@@ -131,6 +135,20 @@ SLURM_CONFIGS = get_slurm_configs(
     error_file="log.e",
     output_file="log.o",
     account="cbartel",
+)
+
+# any configurations related to FPSetUp
+#   see pydmclab.hpc.helperse get fp_configs
+#   see pydmclab.data.data._hpc_configs.yaml (FP_CONFIGS)
+#   see pydmclab.hpc.fp.FPSetUp
+FP_CONFIGS = get_fp_configs(
+    optimizer="FIRE",
+    relax_cell=True,
+    fmax=0.03,
+    steps=500,
+    interval=1,
+    cell_filter="Frechet",
+    params_cell_filter=None,
 )
 
 # any configurations related to VASPSetUp
@@ -180,6 +198,7 @@ ANALYSIS_CONFIGS = get_analysis_configs(
 # update our configs based on the specific configs we've nust created
 CONFIGS = BASE_CONFIGS.copy()
 CONFIGS.update(VASP_CONFIGS)
+CONFIGS.update(FP_CONFIGS)
 CONFIGS.update(SLURM_CONFIGS)
 CONFIGS.update(SUB_CONFIGS)
 CONFIGS.update(LAUNCH_CONFIGS)
@@ -244,7 +263,11 @@ def main():
     remake_subs = True
     ready_to_launch = True
 
-    # remake compiled results? print results summary?
+    # remake compiled FP results? print FP results summary?
+    remake_fp_results = True
+    print_fp_results_check = True
+
+    # remake compiled VASP results? print VASP results summary?
     remake_results = True
     print_results_check = True
 
@@ -342,7 +365,18 @@ def main():
             n_procs=CONFIGS["n_procs_for_submission"],
         )
 
-    # analyze calculations
+    # analyze FP calculations
+    #  collect results of completed FP calcs (from traj.json files in each calc_dir)
+    fp_results = get_fp_results(
+        launch_dirs=launch_dirs,
+        include_full_trajs=False,
+        data_dir=DATA_DIR,
+        remake=remake_fp_results,
+    )
+    if print_fp_results_check:
+        check_fp_results(fp_results)
+
+    # analyze VASP calculations
     #  see if they're done
     #  compile their results
     #  note: a lot of the analysis happens within each submission script, so this should be fast
