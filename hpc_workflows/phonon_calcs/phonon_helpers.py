@@ -175,6 +175,9 @@ def get_displacements_for_phonons(
         if distance == 'auto':
             distance = estimate_displacement_distance(st.structure_as_dict,
                                            fraction= 0.01)
+            print(f"Auto-calculated finite displacement distance: {distance:.4f} Angstroms (1% of minimum interatomic distance)")
+
+        out['displacement_distance'] = distance
 
         displacement_data = phonon.generate_displacements(distance=distance)
         supercells_with_displacements = phonon.supercells_with_displacements #returns a list of PhonopyAtoms supercells
