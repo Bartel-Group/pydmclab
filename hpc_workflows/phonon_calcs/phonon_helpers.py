@@ -308,7 +308,7 @@ def get_set_of_forces(results,
     # Post-process collected raw entries into ordered lists by index
     if mpid is None:
 
-        force_sets = {}
+        set_of_forces = {}
 
         for base, info in raw_sets.items():
 
@@ -317,7 +317,7 @@ def get_set_of_forces(results,
 
             all_converged = all(f is not None for f in forces_ordered)
 
-            force_sets[base] = {
+            set_of_forces[base] = {
                 'forces': forces_ordered,
                 'all_converged': all_converged,
                 'key': info.get('key')}
