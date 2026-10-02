@@ -105,9 +105,11 @@ def compute_all_phonon_properties(results,
 
     filtered_forces = {}
     for mpid, data in sets_of_forces.items():
-        forces = data.get('forces')
-        if forces is None or (hasattr(forces, "__len__") and len(forces) == 0):
-            print(f"Forces for mpid {mpid} not converged, skipping for now. Remake phonons once converged.")
+        if not data.get('all_converged', False):
+            print(
+                f"Forces for mpid {mpid} not fully converged, "
+                f"skipping for now. Remake phonons once converged."
+            )
             continue
         filtered_forces[mpid] = data
 
