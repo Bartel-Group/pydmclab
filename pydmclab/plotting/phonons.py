@@ -7,6 +7,9 @@ from scipy.constants import physical_constants
 from scipy.integrate import trapezoid
 from scipy.interpolate import interp1d
 from scipy.spatial.distance import cosine
+import random
+
+from pydmclab.plotting.utils import set_rc_params, get_colors, get_label
 
 # Conversion factors: eV/atom -> J/mol or kJ/mol
 EV_TO_J = physical_constants['electron volt-joule relationship'][0]
@@ -14,6 +17,7 @@ AVOGADRO = physical_constants['Avogadro constant'][0]
 EV_TO_J_PER_MOL = EV_TO_J * AVOGADRO
 EV_TO_KJ_PER_MOL = EV_TO_J_PER_MOL / 1000.0
 
+COLORS = get_colors('tab10')
 
 #This code is a work in progress
 
@@ -38,6 +42,7 @@ def plot_phonon_bandstructure(bs_dict,
         figsize : tuple
             Figure size
     """
+    set_rc_params()
     qpoints = np.array(bs_dict['qpoints'])
     frequencies = np.array(bs_dict['frequencies'])
 
@@ -78,7 +83,7 @@ def plot_phonon_bandstructure(bs_dict,
 
     # Draw vertical lines at high-symmetry points
     for pos in tick_positions:
-        plt.axvline(pos, color="gray", linewidth=0.6, alpha=0.5)
+        plt.axvline(pos, color=COLORS['gray'], linewidth=0.6, alpha=0.5)
 
     # Apply x-axis labels
     if labels is not None:
@@ -98,7 +103,10 @@ def plot_phonon_dos(dos_dict,
                     plot_in_thz=False, 
                     title="", 
                     figsize=(6,4), 
-                    ylims=None):
+                    ylims=None,
+                    colors={"total": "blue"},
+                    color_palette=get_colors('tab10'),
+                    params={"line_alpha": 0.9, "fill_alpha": 0.2, "lw": 1}):
     """
     args:
         dos_dict : dict
@@ -114,6 +122,7 @@ def plot_phonon_dos(dos_dict,
         figsize : tuple
             Figure size
     """
+    set_rc_params()
     frequencies = np.array([r['E'] for r in dos_dict['total_dos']])
     dos = np.array([r['total_dos'] for r in dos_dict['total_dos']])
 
@@ -126,9 +135,15 @@ def plot_phonon_dos(dos_dict,
     else:
         ylabel = "DOS (states/eV)"
         xlabel = "Energy (eV)"
+
+    if 'total' in colors:
+        color = color_palette[colors['total']]
+    else:
+        color = color_palette[random.choice(list(color_palette.keys()))]
+
     plt.figure(figsize=figsize)
-    plt.plot(frequencies, dos, color='blue', linewidth=1.2)
-    plt.fill_between(frequencies, dos, color='lightblue', alpha=0.5)
+    plt.plot(frequencies, dos, color=color, linewidth=1.2, alpha=params['line_alpha'])
+    plt.fill_between(frequencies, dos, color=color, alpha=params['fill_alpha'])
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     if ylims is not None:
@@ -142,7 +157,9 @@ def plot_thermal_properties(thermal_props,
                             plot_props=["F", "S"], 
                             title="", figsize=(8,4), 
                             plot_in_j_mol=False, 
-                            atoms_per_formula_units=None):
+                            atoms_per_formula_units=None,
+                            colors = {'F': 'blue', 'S': 'red', 'Cv': 'green'},
+                            color_palette = get_colors('tab10'),):
     """
     Args:
         thermal_props (list[dict]):
@@ -161,6 +178,7 @@ def plot_thermal_properties(thermal_props,
         atoms_per_formula_units : int or None
             Number of atoms per formula unit. If provided, scales per-atom to per-formula-unit.
     """
+    set_rc_params()
     if isinstance(plot_props, str):
         plot_props = [plot_props]
 
@@ -178,7 +196,6 @@ def plot_thermal_properties(thermal_props,
     ax = ax1
     current_side = "left"
 
-    colors = ['blue', 'red', 'green', 'orange', 'purple']
     color_idx = 0
     
     needed_groups = []
@@ -212,7 +229,7 @@ def plot_thermal_properties(thermal_props,
                 ax = axes[group_idx]
 
         if plot_in_j_mol:
-            ylabel = f"{prop} ({'kJ/mol' if prop == 'F' else 'J/K/mol'}{'-fu' if formula_units else ''})"
+            ylabel = f"{prop} ({'kJ/mol' if prop == 'F' else 'J/K/mol'}{'-fu' if atoms_per_formula_units else ''})"
         else:
             ylabel = f"{prop} (eV/atom)" if prop == "F" else f"{prop} (eV/atom/K)"
             if atoms_per_formula_units is not None:
@@ -220,7 +237,7 @@ def plot_thermal_properties(thermal_props,
 
         ax.set_ylabel(ylabel, fontsize=15)
         ax.tick_params(axis='y', labelsize=15)
-        ax.plot(temperatures, props[prop], color=colors[color_idx], linewidth=1.5, label=prop)
+        ax.plot(temperatures, props[prop], color=color_palette[colors[prop]], linewidth=1.5, label=prop)
         color_idx += 1
 
     handles_labels = []
@@ -249,12 +266,14 @@ def plot_relative_prop(
     xlims=None,
     plot_in_j_mol=False,
     atoms_per_formula_units=None,
-    colors=["green", "blue", "orange", "purple", "red"],
+    colors={"DFT": "black"},
+    color_palette=get_colors('tab10'),
     title = "",
     xlabel_kwargs=None,
     ylabel_kwargs=None,
     legend_kwargs=None,
 ):
+    set_rc_params()
     
     """
     Plot the difference in a thermal property between two structures, for one or
@@ -375,7 +394,11 @@ def plot_relative_prop(
             if len(thermal_props_dict) == 1
             else f"{ds_label}"
         )
-        color             = colors[i % len(colors)]
+        if ds_label in colors:
+            color = color_palette[colors[ds_label]]
+        else:
+            color = color_palette[random.choice(list(color_palette.keys()))]
+
         ls, marker, markevery = ds_style(i)
 
         plt.plot(
@@ -390,7 +413,7 @@ def plot_relative_prop(
             label=legend_label,
         )
 
-    plt.axhline(0, color="black", linestyle="--", linewidth=0.8)
+    plt.axhline(0, color=COLORS['black'], linestyle="--", linewidth=0.8)
 
     first_label = next(iter(thermal_props_dict))
     delta_ref   = deltas[first_label]
@@ -414,14 +437,14 @@ def plot_relative_prop(
         ax = plt.gca()
         ymin, ymax = ax.get_ylim()
         xmin, xmax = ax.get_xlim()
-        plt.axvline(trans_T, color="red", linestyle=":", linewidth=1.2)
+        plt.axvline(trans_T, color=COLORS['red'], linestyle=":", linewidth=1.2)
         x_off   = 0.03 * (xmax - xmin)
         label_x = trans_T + x_off if (trans_T + x_off) < xmax else trans_T - x_off
         label_y = max(ymin + 0.05 * (ymax - ymin), ymin + 0.25 * (ymax - ymin))
         ha      = "left" if label_x > trans_T else "right"
         plt.text(
             label_x, label_y, f"T_trans = {trans_T:.1f} K",
-            color="red", ha=ha, va="center", fontsize=14, backgroundcolor="white",
+            color=COLORS['red'], ha=ha, va="center", fontsize=14, backgroundcolor="white",
         )
 
     plt.title(title)
@@ -440,6 +463,8 @@ def plot_phonon_dos_comparison(
     plot_in_thz=False,
     title="",
     figsize=(6, 4),
+    colors={"DFT": "black",},
+    color_palette=get_colors('tab10'),
     ylabel_kwargs=None,
     xlabel_kwargs=None,
     legend_kwargs=None,
@@ -474,13 +499,13 @@ def plot_phonon_dos_comparison(
         If True and more than one dataset is provided, normalize each DOS to unit area
         before plotting.
     """
+    set_rc_params()
     if not dos_dict:
         raise ValueError("dos_dict is empty.")
 
     h = physical_constants['Planck constant in eV/Hz'][0]
     THz_factor = h * 1e12  # eV → THz conversion factor
 
-    colors = ['blue', 'red', 'green', 'orange', 'purple', 'brown']
     linestyles = ['-', '--', '--', '--', '--', '--'] 
 
     multi = len(dos_dict) > 1
@@ -511,7 +536,10 @@ def plot_phonon_dos_comparison(
     shape_metrics = {}
 
     for i, (label, (freqs, dos)) in enumerate(parsed.items()):
-        color = colors[i % len(colors)]
+        if label in colors:
+            color = color_palette[colors[label]]
+        else:
+            color = color_palette[random.choice(list(color_palette.keys()))]
         ls    = linestyles[min(i, len(linestyles) - 1)]
 
         if multi and normalize:
@@ -553,7 +581,7 @@ def plot_phonon_dos_comparison(
 
     if not multi:
         _, (freqs, dos) = next(iter(parsed.items())), (ref_freqs, ref_dos)
-        plt.fill_between(ref_freqs, ref_dos, color='lightblue', alpha=0.5)
+        plt.fill_between(ref_freqs, ref_dos, color=COLORS['lightblue'], alpha=0.5)
 
     if multi:
         plt.legend(**(legend_kwargs or {}))
@@ -578,7 +606,8 @@ def plot_thermal_properties_comparison(
     figsize=(8, 4),
     plot_in_j_mol=False,
     atoms_per_formula_units=None,
-    colors=["blue", "red", "green", "orange", "purple"],
+    colors={"DFT": "black",},
+    color_palette=get_colors('tab10'),
     align_F_to_reference=False,
 ):
     """
@@ -606,6 +635,7 @@ def plot_thermal_properties_comparison(
         If True, shift F for every non-reference dataset so that its value at
         the first temperature matches the reference (first) dataset. 
     """
+    set_rc_params()
     if isinstance(plot_props, str):
         plot_props = [plot_props]
     if not thermal_props_dict:
@@ -703,7 +733,11 @@ def plot_thermal_properties_comparison(
         ls_prop   = prop_linestyles[prop_idx % len(prop_linestyles)]
 
         for ds_idx, label in enumerate(labels):
-            color        = colors[ds_idx % len(colors)]
+            if label in colors:
+                color = color_palette[colors[label]]
+            else:
+                color = color_palette[random.choice(list(color_palette.keys()))]
+                
             legend_label = (
                 rf"$\mathit{{{prop}}}$ ({label})" if multi
                 else rf"$\mathit{{{prop}}}$"
