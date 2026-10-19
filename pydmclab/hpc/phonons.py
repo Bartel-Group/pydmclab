@@ -114,8 +114,7 @@ class AnalyzePhonons(object):
                 )
 
             # self.dynamical_matrix = phonon.dynamical_matrix # This is just a phonopy.dynamical_matrix.DynamicalMatrix object. Need it to run mesh.
-            _mesh_out = phonon.run_mesh(mesh,) #Need to run this in order to run everything else downstream
-            print("gamma_centered mesh generated")
+            _mesh_out = phonon.run_mesh(mesh,) #is_gamma_center=False) #Need to run this in order to run everything else downstream
             self.phonon = phonon
 
         self._band_structure = None
