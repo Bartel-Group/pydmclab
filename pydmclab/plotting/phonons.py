@@ -18,6 +18,15 @@ EV_TO_J_PER_MOL = EV_TO_J * AVOGADRO
 EV_TO_KJ_PER_MOL = EV_TO_J_PER_MOL / 1000.0
 
 COLORS = get_colors('tab10')
+PROPERTY_MATH = {
+    'F': r'\mathit{F}',
+    'S': r'\mathit{S}',
+    'Cv': r'\mathit{C}\mathrm{v}',
+}
+
+
+def _property_math(prop):
+    return PROPERTY_MATH.get(prop, rf'\mathit{{{prop}}}')
 
 #This code is a work in progress
 
@@ -190,6 +199,7 @@ def plot_thermal_properties(thermal_props,
 
     temperatures = [point['T'] for point in thermal_props]
     props = {prop: [point[prop] for point in thermal_props] for prop in plot_props}
+    scale_thermal_to_mev = not plot_in_j_mol and 'S' in plot_props
 
     fig, ax1 = plt.subplots(figsize=figsize)
     axes = [ax1]
@@ -215,6 +225,8 @@ def plot_thermal_properties(thermal_props,
                     props[prop] = [val * EV_TO_KJ_PER_MOL for val in props[prop]]
                 elif prop == "S" or prop == "Cv":
                     props[prop] = [val * EV_TO_J_PER_MOL for val in props[prop]]
+        elif scale_thermal_to_mev and prop in {'S', 'Cv'}:
+            props[prop] = [val * 1000 for val in props[prop]]
         
         group_idx = needed_groups.index(group) if group in needed_groups else 0
         if group_idx == 0:
@@ -228,16 +240,20 @@ def plot_thermal_properties(thermal_props,
             else:
                 ax = axes[group_idx]
 
+        property_label = rf"${_property_math(prop)}$"
         if plot_in_j_mol:
-            ylabel = f"{prop} ({'kJ/mol' if prop == 'F' else 'J/K/mol'}{'-fu' if atoms_per_formula_units else ''})"
+            ylabel = f"{property_label} ({'kJ/mol' if prop == 'F' else 'J/K/mol'}{'-fu' if atoms_per_formula_units else ''})"
+        elif prop == 'F':
+            ylabel = f"{property_label} (eV/atom)"
         else:
-            ylabel = f"{prop} (eV/atom)" if prop == "F" else f"{prop} (eV/atom/K)"
+            thermal_unit = 'meV/K' if scale_thermal_to_mev else 'eV/K'
+            ylabel = f"{property_label} ({thermal_unit}/atom)"
             if atoms_per_formula_units is not None:
-                ylabel = ylabel.replace("atom", "fu")
+                ylabel = ylabel.replace('/atom', '/fu')
 
         ax.set_ylabel(ylabel, fontsize=15)
         ax.tick_params(axis='y', labelsize=15)
-        ax.plot(temperatures, props[prop], color=color_palette[colors[prop]], linewidth=1.5, label=prop)
+        ax.plot(temperatures, props[prop], color=color_palette[colors[prop]], linewidth=1.5, label=property_label)
         color_idx += 1
 
     handles_labels = []
@@ -380,9 +396,17 @@ def plot_relative_prop(
             deltas[ds_label] = deltas[ds_label] * factor
         unit = "kJ/mol" if prop == "F" else "J/K/mol"
     else:
-        unit = "eV/fu" if atoms_per_formula_units else "eV/atom"
+        if prop == "F":
+            unit = "eV/fu" if atoms_per_formula_units else "eV/atom"
+        elif prop == 'S':
+            for ds_label in deltas:
+                deltas[ds_label] = deltas[ds_label] * 1000
+            unit = 'meV/K/fu' if atoms_per_formula_units else 'meV/K/atom'
+        else:
+            unit = "eV/K/fu" if atoms_per_formula_units else "eV/K/atom"
 
-    ylabel = f"Δ{prop} ({unit}{'-fu' if (atoms_per_formula_units and plot_in_j_mol) else ''})"
+    property_math = _property_math(prop)
+    ylabel = rf"$\Delta {property_math}$ ({unit}{'-fu' if (atoms_per_formula_units and plot_in_j_mol) else ''})"
 
     plt.figure(figsize=figsize)
 
@@ -390,7 +414,7 @@ def plot_relative_prop(
         struct_labels = list(structures.keys())
         lbl_a, lbl_b  = struct_labels
         legend_label  = (
-            f"Δ{prop}: {lbl_b} - {lbl_a}"
+            rf"$\Delta {property_math}$: {lbl_b} - {lbl_a}"
             if len(thermal_props_dict) == 1
             else f"{ds_label}"
         )
@@ -443,7 +467,7 @@ def plot_relative_prop(
         label_y = max(ymin + 0.05 * (ymax - ymin), ymin + 0.25 * (ymax - ymin))
         ha      = "left" if label_x > trans_T else "right"
         plt.text(
-            label_x, label_y, f"T_trans = {trans_T:.1f} K",
+            label_x, label_y, rf"$T_{{\mathrm{{trans}}}} = {trans_T:.1f}\ \mathrm{{K}}$",
             color=COLORS['red'], ha=ha, va="center", fontsize=14, backgroundcolor="white",
         )
 
@@ -646,6 +670,7 @@ def plot_thermal_properties_comparison(
     labels           = list(thermal_props_dict.keys())
     datasets         = list(thermal_props_dict.values())
     multi            = len(labels) > 1
+    scale_thermal_to_mev = not plot_in_j_mol and 'S' in plot_props
 
     for prop in plot_props:
         for label, data in thermal_props_dict.items():
@@ -664,6 +689,8 @@ def plot_thermal_properties_comparison(
         if plot_in_j_mol:
             factor = EV_TO_KJ_PER_MOL if prop == "F" else EV_TO_J_PER_MOL
             vals = [v * factor for v in vals]
+        elif scale_thermal_to_mev and prop in {'S', 'Cv'}:
+            vals = [v * 1000 for v in vals]
         return vals
 
     parsed = {
@@ -695,12 +722,14 @@ def plot_thermal_properties_comparison(
     def ylabel_for(prop, aligned=False):
         if plot_in_j_mol:
             unit = "kJ/mol" if prop == "F" else "J/K/mol"
+        elif prop == 'F':
+            unit = 'eV/atom'
         else:
-            unit = "eV/atom" if prop == "F" else "eV/atom/K"
+            unit = 'meV/K/atom' if scale_thermal_to_mev else 'eV/K/atom'
         if atoms_per_formula_units is not None:
-            unit = unit.replace("atom", "fu")
+            unit = unit.replace("/atom", "/fu")
         suffix = " [aligned]" if (aligned and prop == "F") else ""
-        return rf"$\mathit{{{prop}}}$ ({unit}){suffix}"
+        return rf"${_property_math(prop)}$ ({unit}){suffix}"
 
     for prop in plot_props:
         group     = prop_to_group.get(prop, "energy")
@@ -739,8 +768,8 @@ def plot_thermal_properties_comparison(
                 color = color_palette[random.choice(list(color_palette.keys()))]
                 
             legend_label = (
-                rf"$\mathit{{{prop}}}$ ({label})" if multi
-                else rf"$\mathit{{{prop}}}$"
+                rf"${_property_math(prop)}$ ({label})" if multi
+                else rf"${_property_math(prop)}$"
             )
 
             ls, marker, markevery = ds_style(ds_idx, single_prop)
