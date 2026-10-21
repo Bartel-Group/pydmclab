@@ -20,7 +20,7 @@ EV_TO_KJ_PER_MOL = EV_TO_J_PER_MOL / 1000.0
 COLORS = get_colors('tab10')
 PROPERTY_MATH = {
     'F': r'\mathit{F}',
-    'S': r'\mathit{S}',
+    'S': r'\mathit{S}_{\mathrm{vib}}^{\mathrm{HA}}',
     'Cv': r'\mathit{C}\mathrm{v}',
 }
 
