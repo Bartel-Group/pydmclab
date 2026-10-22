@@ -34,7 +34,7 @@ def plot_phonon_bandstructure(bs_dict,
                               labels=None, 
                               ylabel="Energy (eV)", 
                               title="", 
-                              figsize=(8, 6)):
+                              figsize=(8, 8)):
     """
     args:
         bs_dict : dict
@@ -105,13 +105,14 @@ def plot_phonon_bandstructure(bs_dict,
     plt.xlabel("Wave Vector")
     plt.xlim(0, tick_positions[-1])
     plt.title(title)
+    plt.gca().set_box_aspect(1)
     plt.tight_layout()
     plt.show()
 
 def plot_phonon_dos(dos_dict, 
                     plot_in_thz=False, 
                     title="", 
-                    figsize=(6,4), 
+                    figsize=(6,6),
                     ylims=None,
                     colors={"total": "blue"},
                     color_palette=get_colors('tab10'),
@@ -158,13 +159,14 @@ def plot_phonon_dos(dos_dict,
     if ylims is not None:
         plt.ylim(ylims)
     plt.title(title)
+    plt.gca().set_box_aspect(1)
     plt.tight_layout()
     plt.show()
 
 
 def plot_thermal_properties(thermal_props, 
                             plot_props=["F", "S"], 
-                            title="", figsize=(8,4), 
+                            title="", figsize=(8,8),
                             plot_in_j_mol=False, 
                             atoms_per_formula_units=None,
                             colors = {'F': 'blue', 'S': 'red', 'Cv': 'green'},
@@ -269,6 +271,7 @@ def plot_thermal_properties(thermal_props,
     ax1.set_xlabel("Temperature (K)", fontsize=15)
     ax1.tick_params(axis='x', labelsize=15)
     plt.title(title)
+    ax1.set_box_aspect(1)
     plt.tight_layout()
     plt.show()
 
@@ -277,7 +280,7 @@ def plot_relative_prop(
     thermal_props_dict,
     prop="F",
     align_at_0K=False,
-    figsize=(6, 4),
+    figsize=(6, 6),
     ylims=None,
     xlims=None,
     plot_in_j_mol=False,
@@ -467,7 +470,7 @@ def plot_relative_prop(
         label_y = max(ymin + 0.05 * (ymax - ymin), ymin + 0.25 * (ymax - ymin))
         ha      = "left" if label_x > trans_T else "right"
         plt.text(
-            label_x, label_y, rf"$T_{{\mathrm{{trans}}}} = {trans_T:.1f}\ \mathrm{{K}}$",
+            label_x, label_y, rf"$T_{{\mathrm{{trans}}}} = {trans_T:.0f}\ \mathrm{{K}}$",
             color=COLORS['red'], ha=ha, va="center", fontsize=14, backgroundcolor="white",
         )
 
@@ -479,6 +482,7 @@ def plot_relative_prop(
     if xlims is not None:
         plt.xlim(xlims)
     plt.legend(**(legend_kwargs or {'loc': 'best', 'fontsize': 12}))
+    plt.gca().set_box_aspect(1)
     plt.tight_layout()
     plt.show()
 
@@ -486,7 +490,7 @@ def plot_phonon_dos_comparison(
     dos_dict,
     plot_in_thz=False,
     title="",
-    figsize=(6, 4),
+    figsize=(6, 6),
     colors={"DFT": "black",},
     color_palette=get_colors('tab10'),
     ylabel_kwargs=None,
@@ -620,6 +624,7 @@ def plot_phonon_dos_comparison(
         plt.ylim(ylims)
     plt.title(title)
     # plt.grid(alpha=0.3)
+    plt.gca().set_box_aspect(1)
     plt.tight_layout()
     plt.show()
 
@@ -627,7 +632,7 @@ def plot_thermal_properties_comparison(
     thermal_props_dict,
     plot_props=["F", "S"],
     title="",
-    figsize=(8, 4),
+    figsize=(8, 8),
     plot_in_j_mol=False,
     atoms_per_formula_units=None,
     colors={"DFT": "black",},
@@ -799,6 +804,7 @@ def plot_thermal_properties_comparison(
     ax1.set_xlabel("Temperature (K)", fontsize=15)
     ax1.tick_params(axis="x", labelsize=15)
     plt.title(title)
+    ax1.set_box_aspect(1)
     plt.tight_layout()
     plt.show()
     
