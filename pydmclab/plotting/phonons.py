@@ -292,6 +292,7 @@ def plot_relative_prop(
     ylabel_kwargs=None,
     legend_kwargs=None,
     show=True,
+    box_aspect=1,
 ):
     set_rc_params()
     
@@ -337,6 +338,8 @@ def plot_relative_prop(
         If True, convert F → kJ/mol and S/Cv → J/K/mol.
     show : bool
         If False, leave the figure open without displaying it.
+    box_aspect : float or None
+        Aspect ratio of the axes box. Set to None to let it fill the figure.
     atoms_per_formula_units : int or None
         If provided, scales per-atom values to per-formula-unit.
     colors : list[str]
@@ -486,7 +489,8 @@ def plot_relative_prop(
     if xlims is not None:
         plt.xlim(xlims)
     plt.legend(**(legend_kwargs or {'loc': 'best', 'fontsize': 12}))
-    plt.gca().set_box_aspect(1)
+    if box_aspect is not None:
+        ax.set_box_aspect(box_aspect)
     plt.tight_layout()
     if show:
         plt.show()
