@@ -449,6 +449,11 @@ def plot_relative_prop(
 
     plt.axhline(0, color=COLORS['black'], linestyle="--", linewidth=0.8)
 
+    if ylims is not None:
+        ax.set_ylim(ylims)
+    if xlims is not None:
+        ax.set_xlim(xlims)
+
     first_label = next(iter(thermal_props_dict))
     delta_ref   = deltas[first_label]
     temps_ref   = temps_by[first_label]
@@ -468,26 +473,28 @@ def plot_relative_prop(
                 trans_T = t1 - f1 * (t2 - t1) / (f2 - f1) if (f2 - f1) != 0 else (t1 + t2) / 2
 
     if trans_T is not None:
-        ax = plt.gca()
         ymin, ymax = ax.get_ylim()
         xmin, xmax = ax.get_xlim()
-        plt.axvline(trans_T, color=COLORS['red'], linestyle=":", linewidth=1.2)
-        x_off   = 0.03 * (xmax - xmin)
-        label_x = trans_T + x_off if (trans_T + x_off) < xmax else trans_T - x_off
-        label_y = max(ymin + 0.05 * (ymax - ymin), ymin + 0.25 * (ymax - ymin))
-        ha      = "left" if label_x > trans_T else "right"
-        plt.text(
-            label_x, label_y, rf"$T_{{\mathrm{{trans}}}} = {trans_T:.0f}\ \mathrm{{K}}$",
-            color=COLORS['red'], ha=ha, va="center", fontsize=14, backgroundcolor="white",
-        )
+        if xmin <= trans_T <= xmax:
+            ax.axvline(trans_T, color=COLORS['red'], linestyle=":", linewidth=1.2)
+            x_off = 0.03 * (xmax - xmin)
+            label_x = trans_T + x_off if (trans_T + x_off) < xmax else trans_T - x_off
+            label_y = ymin + 0.25 * (ymax - ymin)
+            ha = "left" if label_x > trans_T else "right"
+            ax.text(
+                label_x,
+                label_y,
+                rf"$T_{{\mathrm{{trans}}}} = {trans_T:.0f}\ \mathrm{{K}}$",
+                color=COLORS['red'],
+                ha=ha,
+                va="center",
+                fontsize=14,
+                backgroundcolor="white",
+            )
 
     plt.title(title)
     plt.xlabel("Temperature (K)")
     plt.ylabel(ylabel)
-    if ylims is not None:
-        plt.ylim(ylims)
-    if xlims is not None:
-        plt.xlim(xlims)
     plt.legend(**(legend_kwargs or {'loc': 'best', 'fontsize': 12}))
     if box_aspect is not None:
         ax.set_box_aspect(box_aspect)
