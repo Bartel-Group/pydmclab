@@ -291,6 +291,7 @@ def plot_relative_prop(
     xlabel_kwargs=None,
     ylabel_kwargs=None,
     legend_kwargs=None,
+    show=True,
 ):
     set_rc_params()
     
@@ -334,6 +335,8 @@ def plot_relative_prop(
         x-axis limits.
     plot_in_j_mol : bool
         If True, convert F → kJ/mol and S/Cv → J/K/mol.
+    show : bool
+        If False, leave the figure open without displaying it.
     atoms_per_formula_units : int or None
         If provided, scales per-atom values to per-formula-unit.
     colors : list[str]
@@ -412,6 +415,7 @@ def plot_relative_prop(
     ylabel = rf"$\Delta {property_math}$ ({unit}{'-fu' if (atoms_per_formula_units and plot_in_j_mol) else ''})"
 
     plt.figure(figsize=figsize)
+    ax = plt.gca()
 
     for i, (ds_label, structures) in enumerate(thermal_props_dict.items()):
         struct_labels = list(structures.keys())
@@ -484,7 +488,9 @@ def plot_relative_prop(
     plt.legend(**(legend_kwargs or {'loc': 'best', 'fontsize': 12}))
     plt.gca().set_box_aspect(1)
     plt.tight_layout()
-    plt.show()
+    if show:
+        plt.show()
+    return ax
 
 def plot_phonon_dos_comparison(
     dos_dict,
