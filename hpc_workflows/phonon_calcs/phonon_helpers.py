@@ -511,7 +511,8 @@ def parse_phonon_results(phonon_results,
                                 [[0.5, 0.0, 0.5], [0.5, 0.5, 0.5]],
                                 [[0.5, 0.5, 0.5], [0.0, 0.5, 0.5]],
                                 [[0.0, 0.5, 0.5], [0.0, 0.0, 0.5]]],
-                        Nq = 100):
+                        Nq = 100,
+                        save_disp_supercells=False):
     
     """
     Turns the raw dict returned by matcalc.PhononCalc.calc() (which holds a
@@ -556,7 +557,7 @@ def parse_phonon_results(phonon_results,
     tdos = total_dos['total_dos']/(h*1e12) # This is to normalize the DOS to 1/eV (phonopy default is 1/THz)
     freq_points_ev = total_dos['frequency_points']*1e12*h #convert frequencies from THz to eV
 
-    if 'disp_supercells' in phonon_results:
+    if 'disp_supercells' in phonon_results and save_disp_supercells:
         disp_supercells = phonon_results['disp_supercells']
         phonon_results['disp_supercells'] = [StrucTools(s).structure_as_dict for s in disp_supercells]
 
