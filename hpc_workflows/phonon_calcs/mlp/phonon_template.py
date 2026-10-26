@@ -84,7 +84,7 @@ def main():
             struc_results = "placeholder"
 
             if phonon_calculator != "placeholder":
-                struc_results = parse_phonon_results(struc_results)
+                struc_results = parse_phonon_results(struc_results, save_disp_supercells=False)
 
             if "trajectory" in struc_results:
                 struc_results["trajectory"] = struc_results["trajectory"].as_dict()            
