@@ -1,5 +1,12 @@
 import unittest
-from pydmclab.core.hulls import GetHullInputData, AnalyzeHull, ParallelHulls, MixingHull
+from pydmclab.core.hulls import (
+    GetHullInputData,
+    AnalyzeHull,
+    ParallelHulls,
+    MixingHull,
+    UMAHull,
+)
+from pydmclab.data.thermochem import uma_s1p2p1_mp_formation_energies
 from pydmclab.utils.handy import read_json
 
 
@@ -306,6 +313,98 @@ class UnitTestHulls(unittest.TestCase):
             out["Li1Mn2O4"]["E_mix_per_fu"] / out["Li1Mn2O4"]["E_mix_per_at"],
             (10 / 11) * (69 / 20) + (1 / 11) * 4,
             places=4,
+        )
+
+
+class UnitTestUMAHull(unittest.TestCase):
+    def test_single_vs_list_input(self):
+        refs = {"Mn1O1": -2.0}
+        single = UMAHull(("MnO2", -1.5), refs).hull_output_data
+        listed = UMAHull([("MnO2", -1.5)], refs).hull_output_data
+        self.assertEqual(single, listed)
+        self.assertEqual(len(single), 1)
+
+    def test_formula_is_cleaned(self):
+        out = UMAHull(("O2Mn", -1.5), {"Mn1O1": -2.0}).hull_output_data[0]
+        self.assertEqual(out["formula"], "Mn1O2")
+
+    def test_reference_compounds(self):
+        refs = {"Mn1O1": -2.0, "Fe2O3": -1.7, "Li1Mn1O2": -2.1, "Mn1": -0.1}
+        hull = UMAHull(("MnO2", -1.5), refs)
+        # only references made of a subset of Mn-O, plus elements at Ef = 0
+        self.assertEqual(hull.els, ["Mn", "O"])
+        self.assertEqual(
+            hull.reference_compounds, {"Mn1O1": -2.0, "Mn1": 0.0, "O1": 0.0}
+        )
+
+    def test_stable(self):
+        # MnO2 -> MnO + 1/2 O2
+        out = UMAHull(("MnO2", -1.5), {"Mn1O1": -2.0}).hull_output_data[0]
+        Ed_hard = (1 / 3) * ((-1.5 * 3) - (-2 * 2))
+        self.assertAlmostEqual(out["Ed"], Ed_hard, places=6)
+        self.assertTrue(out["stability"])
+        self.assertEqual(out["rxn"], "1.0_Mn1O1 + 1.0_O")
+        self.assertIsNone(out["dE_polymorph"])
+
+    def test_unstable(self):
+        out = UMAHull(("MnO2", -1.0), {"Mn1O1": -2.0}).hull_output_data[0]
+        Ed_hard = (1 / 3) * ((-1.0 * 3) - (-2 * 2))
+        self.assertAlmostEqual(out["Ed"], Ed_hard, places=6)
+        self.assertFalse(out["stability"])
+        self.assertEqual(out["rxn"], "1.0_Mn1O1 + 1.0_O")
+
+    def test_element(self):
+        # an element at Ef = 0 ties w/ its own reference
+        out = UMAHull(("Cu", 0.0), {}).hull_output_data[0]
+        self.assertAlmostEqual(out["Ed"], 0, places=8)
+        self.assertTrue(out["stability"])
+        self.assertEqual(out["rxn"], "1.0_Cu (ref)")
+        self.assertEqual(out["dE_polymorph"], 0)
+
+    def test_polymorph(self):
+        refs = {"Mn1O1": -2.0, "Mn1O2": -1.5}
+        out = UMAHull(("MnO2", -1.4), refs).hull_output_data[0]
+        self.assertAlmostEqual(out["Ed"], 0.1, places=6)
+        self.assertAlmostEqual(out["dE_polymorph"], 0.1, places=6)
+        self.assertFalse(out["stability"])
+        self.assertEqual(out["rxn"], "1.0_Mn1O2 (ref)")
+
+        out = UMAHull(("MnO2", -1.6), refs).hull_output_data[0]
+        self.assertAlmostEqual(out["dE_polymorph"], -0.1, places=6)
+        self.assertTrue(out["stability"])
+
+    def test_new_compounds_compete(self):
+        # MnO2 competes w/ the new MnO (no MnO in the reference data)
+        out = UMAHull([("MnO", -2.0), ("MnO2", -1.0)], {}).hull_output_data
+        self.assertEqual(out[1]["rxn"], "1.0_Mn1O1 (input 0) + 1.0_O")
+        self.assertAlmostEqual(out[1]["Ed"], (1 / 3) * (-3 + 4), places=6)
+        # and MnO competes w/ the new MnO2: MnO -> 1/2 Mn + 1/2 MnO2
+        self.assertAlmostEqual(out[0]["Ed"], -2.0 - 0.5 * (-1.0 * 3) / 2, places=6)
+        self.assertEqual(out[0]["rxn"], "0.5_Mn + 0.5_Mn1O2 (input 1)")
+
+    def test_unrelated_spaces(self):
+        refs = {"Mn1O1": -2.0, "Cl1Na1": -2.1}
+        alone = UMAHull(("MnO2", -1.5), refs).hull_output_data[0]
+        together = UMAHull([("MnO2", -1.5), ("NaCl", -2.0)], refs).hull_output_data
+        self.assertEqual(alone, together[0])
+        self.assertAlmostEqual(together[1]["Ed"], 0.1, places=6)
+
+    def test_packaged_data(self):
+        refs = uma_s1p2p1_mp_formation_energies()
+        self.assertIn("Co1Li1O2", refs)
+
+        # hypothetical LiCoO2 polymorph, 30 meV/atom below UMA's LiCoO2 (see test_energies.py)
+        #   its UMA energy was set as -5.7276 - 0.030 eV/atom, but -5.7276 is a rounded
+        #   ground-state energy (-5.727614457894556 eV/atom w/ the packaged data), so Ed and
+        #   dE_polymorph come out as -0.030 + 0.0000144579 = -0.0299855 instead of -0.030
+        out = UMAHull(("LiCoO2", -1.9063681179807537)).hull_output_data[0]
+        self.assertEqual(out["formula"], "Co1Li1O2")
+        self.assertTrue(out["stability"])
+        self.assertEqual(out["rxn"], "1.0_Co1Li1O2 (ref)")
+        self.assertAlmostEqual(out["Ed"], -0.029985542105444463, places=6)
+        self.assertAlmostEqual(out["dE_polymorph"], -0.02998554210544402, places=6)
+        self.assertAlmostEqual(
+            out["Ef"] - out["dE_polymorph"], refs["Co1Li1O2"], places=8
         )
 
 

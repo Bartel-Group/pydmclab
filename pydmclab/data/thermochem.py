@@ -520,6 +520,46 @@ def gas_thermo_data():
         return read_json(fjson)
 
 
+def omat24_mp2020_style_compatibility_yaml() -> str:
+    """
+    MP2020-style compatibility config w/ OMat24 corrections
+        from https://github.com/facebookresearch/fairchem/blob/main/src/fairchem/data/omat/entries/OMat24Compatibility.yaml
+
+    Used by pydmclab.core.energies.UMAFormationEnergy
+
+    Returns:
+        path (str) to omat24_mp2020-style_compatibility.yaml
+            (pymatgen's MaterialsProject2020Compatibility takes a config file path)
+    """
+    return os.path.join(DATA_PATH, "omat24_mp2020-style_compatibility.yaml")
+
+
+def uma_s1p2p1_mp_elemental_references() -> dict[str, float]:
+    """
+    UMA elemental reference energies for MP structures
+        model = uma-s-1p2p1, task = omat, atoms + cell relaxed, fmax < 0.03 eV/A
+
+    Used by pydmclab.core.energies.UMAFormationEnergy
+
+    Returns:
+        {el (str) : UMA total energy (float, eV/atom)}
+    """
+    return read_json(os.path.join(DATA_PATH, "uma-s1p2p1-mp_elemental_references.json"))
+
+
+def uma_s1p2p1_mp_formation_energies() -> dict[str, float]:
+    """
+    UMA formation energies for MP structures (w/ MP2020-style OMat24 corrections)
+        model = uma-s-1p2p1, task = omat, atoms + cell relaxed, fmax < 0.03 eV/A
+
+    Used by pydmclab.core.hulls.UMAHull
+
+    Returns:
+        {formula (str, CompTools(formula).clean) : Ef (float, eV/atom)}
+    """
+    return read_json(os.path.join(DATA_PATH, "uma-s1p2p1-mp_formation_energies.json"))
+
+
 def main():
     # mus_from_bartel2019_npj()
     # ssub()

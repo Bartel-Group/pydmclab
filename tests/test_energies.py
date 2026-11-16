@@ -1,3 +1,4 @@
+import os
 import unittest
 from pydmclab.core.energies import (
     ChemPots,
@@ -5,9 +6,16 @@ from pydmclab.core.energies import (
     FormationEnergy,
     DefectFormationEnergy,
     ReactionEnergy,
+    UMAFormationEnergy,
 )
+from pydmclab.core.struc import StrucTools
+from pydmclab.data.thermochem import uma_s1p2p1_mp_elemental_references
+
+from pymatgen.core import Lattice, Structure
 
 import numpy as np
+
+TEST_DATA = os.path.join("..", "pydmclab", "data", "test_data", "energies")
 
 
 class UnitTestChemPots(unittest.TestCase):
@@ -326,6 +334,97 @@ class UnitTestReactions(unittest.TestCase):
         self.assertEqual(rxn.coefs["Co8La8O23"], 1)
         self.assertAlmostEqual(rxn.species["Co8La8O23"]["E"], -7.9749393, places=5)
         self.assertAlmostEqual(rxn.dE_rxn, -0.57901667, places=3)
+
+
+class UnitTestUMAFormationEnergy(unittest.TestCase):
+    def setUp(self):
+        self.uma = UMAFormationEnergy()
+        self.mus = uma_s1p2p1_mp_elemental_references()
+
+        # LiCoO2 (R-3m), 4 atoms
+        self.licoo2 = Structure.from_spacegroup(
+            "R-3m",
+            Lattice.hexagonal(2.82, 14.05),
+            ["Li", "Co", "O"],
+            [[0, 0, 0], [0, 0, 0.5], [0, 0, 0.24]],
+        )
+        self.E_licoo2 = -5.7276 - 0.030
+
+        # fcc Cu, 4 atoms
+        self.cu = Structure.from_spacegroup(
+            "Fm-3m", Lattice.cubic(3.6), ["Cu"], [[0, 0, 0]]
+        )
+
+    def test_packaged_references(self):
+        self.assertEqual(self.uma.elemental_references, self.mus)
+        self.assertEqual(self.mus["Co"], -7.036621506169756)
+        self.assertEqual(self.mus["Cl"], -1.8500821359903892)
+
+    def test_correction(self):
+        # OMat24 corrections: oxide (-0.657 eV/O) + Co GGA/GGA+U mixing (-2.151 eV/Co)
+        correction = self.uma.correction_per_atom(self.licoo2, self.E_licoo2)
+        self.assertAlmostEqual(correction, (2 * -0.657 + -2.151) / 4, places=6)
+
+        # no correction for an element that is not an anion
+        self.assertEqual(self.uma.correction_per_atom(self.cu, self.mus["Cu"]), 0)
+
+    def test_Ef(self):
+        Ef = self.uma.formation_energy(self.licoo2, self.E_licoo2)
+        correction = (2 * -0.657 + -2.151) / 4
+        mus = self.mus
+        Ef_hard = (
+            self.E_licoo2
+            + correction
+            - (mus["Li"] + mus["Co"] + 2 * mus["O"]) / 4
+        )
+        self.assertAlmostEqual(Ef, Ef_hard, places=6)
+
+        # an element at its reference energy has Ef = 0
+        self.assertAlmostEqual(
+            self.uma.formation_energy(self.cu, self.mus["Cu"]), 0, places=8
+        )
+
+    def test_structure_input_types(self):
+        Ef = self.uma.formation_energy(self.licoo2, self.E_licoo2)
+        for s in [
+            self.licoo2.as_dict(),
+            StrucTools(self.licoo2).structure,
+        ]:
+            self.assertAlmostEqual(
+                self.uma.formation_energy(s, self.E_licoo2), Ef, places=8
+            )
+
+    def test_user_references(self):
+        mus = {"Li": -1.0, "Co": -2.0, "O": -3.0}
+        uma = UMAFormationEnergy(elemental_references=mus)
+        Ef = uma.formation_energy(self.licoo2, -5)
+        correction = (2 * -0.657 + -2.151) / 4
+        self.assertAlmostEqual(Ef, -5 + correction - (-1 - 2 - 6) / 4, places=6)
+
+    def test_user_compatibility_yaml(self):
+        # fake corrections: oxide (-1.0 eV/O) + Co GGA/GGA+U mixing (-2.0 eV/Co)
+        uma = UMAFormationEnergy(
+            compatibility_yaml=os.path.join(
+                TEST_DATA, "fake_mp2020-style_compatibility.yaml"
+            )
+        )
+        correction = uma.correction_per_atom(self.licoo2, self.E_licoo2)
+        self.assertAlmostEqual(correction, (2 * -1.0 + -2.0) / 4, places=6)
+
+        # packaged elemental references are still used
+        Ef = uma.formation_energy(self.licoo2, self.E_licoo2)
+        mus = self.mus
+        Ef_hard = (
+            self.E_licoo2
+            + correction
+            - (mus["Li"] + mus["Co"] + 2 * mus["O"]) / 4
+        )
+        self.assertAlmostEqual(Ef, Ef_hard, places=6)
+
+    def test_missing_reference(self):
+        uma = UMAFormationEnergy(elemental_references={"Li": -1.0, "O": -3.0})
+        with self.assertRaises(KeyError):
+            uma.formation_energy(self.licoo2, self.E_licoo2)
 
 
 if __name__ == "__main__":

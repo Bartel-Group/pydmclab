@@ -1,0 +1,78 @@
+# Fake MP2020-style compatibility corrections, used only by tests/test_energies.py
+# Same structure as omat24_mp2020-style_compatibility.yaml, but w/ made-up round numbers
+#   so a test can confirm a user-supplied yaml is used instead of the packaged one
+Name: Fake-
+Corrections:
+  # Energy corrections in eV/atom
+  GGAUMixingCorrections:
+    O:
+      V: -1.0
+      Cr: -1.0
+      Mn: -1.0
+      Fe: -1.0
+      Co: -2.0
+      Ni: -1.0
+      W: -1.0
+      Mo: -1.0
+    F:
+      V: -1.0
+      Cr: -1.0
+      Mn: -1.0
+      Fe: -1.0
+      Co: -2.0
+      Ni: -1.0
+      W: -1.0
+      Mo: -1.0
+  CompositionCorrections:
+    oxide: -1.0
+    peroxide: -0.5
+    superoxide: -0.25
+    S: -0.5
+    F: -0.5
+    Cl: -0.5
+    Br: -0.5
+    I: -0.5
+    N: -0.5
+    Se: -0.5
+    Si: 0.1
+    Sb: -0.5
+    Te: -0.5
+    H: -0.5
+    ozonide: 0
+Uncertainties:
+  # Uncertainties corresponding to each energy correction (eV/atom)
+  GGAUMixingCorrections:
+    O:
+      V: 0.01
+      Cr: 0.01
+      Mn: 0.01
+      Fe: 0.01
+      Co: 0.01
+      Ni: 0.01
+      W: 0.01
+      Mo: 0.01
+    F:
+      V: 0.01
+      Cr: 0.01
+      Mn: 0.01
+      Fe: 0.01
+      Co: 0.01
+      Ni: 0.01
+      W: 0.01
+      Mo: 0.01
+  CompositionCorrections:
+    oxide: 0.01
+    peroxide: 0.01
+    superoxide: 0.01
+    S: 0.01
+    F: 0.01
+    Cl: 0.01
+    Br: 0.01
+    I: 0.01
+    N: 0.01
+    Se: 0.01
+    Si: 0.01
+    Sb: 0.01
+    Te: 0.01
+    H: 0.01
+    ozonide: 0
