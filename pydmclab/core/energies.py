@@ -6,6 +6,8 @@ from pymatgen.core.composition import Composition
 from pymatgen.entries.computed_entries import ComputedStructureEntry
 from pymatgen.analysis.phase_diagram import PhaseDiagram
 from pymatgen.entries.mixing_scheme import MaterialsProjectDFTMixingScheme
+from pymatgen.entries.compatibility import MaterialsProject2020Compatibility
+from pymatgen.core.structure import Structure
 
 from pydmclab.data.thermochem import (
     mp2020_compatibility_dmus,
@@ -16,6 +18,8 @@ from pydmclab.data.thermochem import (
     mus_from_omat,
     mus_from_matpes_pbe,
     mus_from_matpes_r2scan,
+    omat24_mp2020_style_compatibility_yaml,
+    uma_s1p2p1_mp_elemental_references,
     #    mus_from_bartel2019_npj,
 )
 from pydmclab.data.features import atomic_masses
@@ -1022,6 +1026,116 @@ class MPFormationEnergy(object):
                 ID = e.data["material_id"]
                 d[formula][ID] = Ef
         return d
+
+
+class UMAFormationEnergy(object):
+    """
+    Takes in UMA-relaxed structure and corresponding total energy prediction and
+    applies a MP2020-style compatibility correction to obtain formation energy (eV/atom).
+
+    This formation energy is consistent with the reference data used to construct
+    convex hulls for determining stability (w/ pydmclab.core.hulls.UMAHull).
+
+    Compatible UMA settings (new calculations must match the reference data):
+        model = uma-s-1p2p1
+        task = omat
+        relaxation = atoms and cell relaxed
+        convergence = fmax < 0.03 eV/A
+
+    Caution:
+        corrections follow pymatgen's MP2020 code. MP2020 guesses oxidation states to decide
+        which anions (Br, I, Se, Si, Sb, Te, H, N, F, Cl) to correct, but gives up when the
+        reduced formula has > 20 atoms and then corrects only the most electronegative element
+        (O and S are still corrected from the structure).
+            e.g., Sb8Cl27F13 gets the F correction but not the Cl one
+        treat results for large reduced formulas w/ several anions with care
+    """
+
+    def __init__(
+        self,
+        elemental_references: dict[str, float] | None = None,
+        compatibility_yaml: str | None = None,
+    ) -> None:
+        """
+        Args:
+            elemental_references (dict)
+                {el (str) : UMA total energy (float, eV/atom)}
+                    if None, uses pydmclab.data.thermochem.uma_s1p2p1_mp_elemental_references()
+
+            compatibility_yaml (str)
+                path to MP2020-style compatibility yaml
+                    if None, uses pydmclab.data.thermochem.omat24_mp2020_style_compatibility_yaml()
+        """
+        if elemental_references is None:
+            elemental_references = uma_s1p2p1_mp_elemental_references()
+        if compatibility_yaml is None:
+            compatibility_yaml = omat24_mp2020_style_compatibility_yaml()
+
+        self.elemental_references = dict(elemental_references)
+        self.compat = MaterialsProject2020Compatibility(
+            config_file=compatibility_yaml, check_potcar=False
+        )
+
+    def correction_per_atom(
+        self, structure: Structure | dict | str, E_per_atom: float
+    ) -> float:
+        """
+        Args:
+            structure (Structure)
+                UMA-relaxed structure
+                    or Structure.as_dict() or path to a structure file
+
+            E_per_atom (float)
+                UMA total energy (eV/atom), uncorrected
+
+        Returns:
+            MP2020-style correction (float, eV/atom) for this structure
+        """
+        structure = StrucTools(structure).structure
+        els = structure.composition.elements
+
+        # pymatgen needs the run type and U values to decide which corrections apply
+        most_electronegative = max(els, key=lambda el: el.X).symbol
+        u_values = self.compat.u_settings.get(most_electronegative, {})
+        hubbards = {
+            el.symbol: u_values[el.symbol] for el in els if el.symbol in u_values
+        }
+        parameters = {"run_type": "GGA+U" if hubbards else "GGA", "hubbards": hubbards}
+        entry = ComputedStructureEntry(
+            structure, E_per_atom * len(structure), parameters=parameters
+        )
+
+        adjustments = self.compat.get_adjustments(entry)
+        return sum(adj.value for adj in adjustments) / len(structure)
+
+    def formation_energy(
+        self, structure: Structure | dict | str, E_per_atom: float
+    ) -> float:
+        """
+        Args:
+            structure (Structure)
+                UMA-relaxed structure
+                    or Structure.as_dict() or path to a structure file
+
+            E_per_atom (float)
+                UMA total energy (eV/atom), uncorrected
+
+        Returns:
+            formation energy (float, eV/atom)
+                to be used in subsequent convex hull analysis (w/ pydmclab.core.hulls.UMAHull)
+        """
+        amts = CompTools(StrucTools(structure).compact_formula).amts
+        mus = self.elemental_references
+
+        missing = [el for el in amts if el not in mus]
+        if missing:
+            raise KeyError(f"no UMA elemental reference for {', '.join(missing)}")
+
+        E = E_per_atom + self.correction_per_atom(structure, E_per_atom)
+        weighted_elemental_energies = sum(amts[el] * mus[el] for el in amts) / sum(
+            amts.values()
+        )
+        return float(E - weighted_elemental_energies)
 
 
 def main():

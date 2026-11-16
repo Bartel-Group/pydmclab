@@ -1,8 +1,9 @@
 import os
+import re
 import numpy as np
 
 from scipy.spatial import ConvexHull
-from scipy.optimize import minimize
+from scipy.optimize import minimize, linprog
 
 import multiprocessing as multip
 
@@ -12,9 +13,9 @@ from pymatgen.core.composition import Composition
 from pydmclab.core.comp import CompTools
 from pydmclab.utils.handy import read_json, write_json
 from pydmclab.core.energies import ReactionEnergy
+from pydmclab.data.thermochem import uma_s1p2p1_mp_formation_energies
 
-from typing import Literal
-
+from typing import Any, Literal, cast
 
 # HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -33,6 +34,9 @@ Contents:
                 - w/ ParallelHullAnalysis
     2) Class for having compound end-members (mixing hulls)
         - e.g., for alloys, solid solutions, voltage curves, etc
+    3) Class for evaluating stability against UMA reference data (UMAHull)
+        - formation energies from pydmclab.core.energies.UMAFormationEnergy
+        - compared against UMA formation energies for MP structures
 
 """
 
@@ -1422,6 +1426,227 @@ class MixingHull(object):
             mixing_energies[c]["stability"] = False
 
         return mixing_energies
+
+
+class UMAHull(object):
+    """
+    Evaluate the stability of new compounds against the UMA reference data.
+
+    Compatible UMA settings (new calculations must match the reference data):
+        model = uma-s-1p2p1
+        task = omat
+        relaxation = atoms and cell relaxed
+        convergence = fmax < 0.03 eV/A
+        formation energies computed w/ pydmclab.core.energies.UMAFormationEnergy
+
+    Each compound is compared with every reference compound made of a subset of its
+    elements, including known polymorphs of the same formula. Elements are at Ef = 0.
+    One check therefore covers both polymorph and decomposition stability.
+
+        Ed > 0      energy above the hull (unstable)
+        Ed <= 0     energy below the hull formed by everything else (stable)
+
+        rxn         the lowest-energy competitor at the compound's composition (it is
+                    not necessarily what the compound decomposes to). This competitor is
+                    whichever is lower in energy of:
+                        - a reference polymorph of the same formula
+                            e.g. '1.0_Co1Li1O2 (ref)'
+                        - phase separation into other compounds and/or elements
+                            e.g. '0.5_Mn + 0.5_Mn1O2' for MnO
+                    if Ed > 0, the compound decomposes into this competitor
+                    if Ed <= 0, the compound is lower in energy than this competitor by |Ed|
+                    coefficients are formula units per formula unit of the compound
+
+        dE_polymorph    Ef minus the lowest Ef of another polymorph of the same
+                        formula (None if there is none); > 0 means a lower-energy
+                        polymorph exists
+
+    Usually one compound is evaluated at a time. If several are passed, they go on the
+    same hull, meaning a given compound also competes with the other new compounds in the
+    same chemical space. Compounds in unrelated chemical spaces do not affect each other.
+    In rxn, a new compound is labelled by its position in the input list, e.g.
+    '1.0_Co1Li1O2 (input 0)', and a reference polymorph of the formula being evaluated is
+    labeled '(ref)'.
+    """
+
+    def __init__(
+        self,
+        compounds: list[tuple[str, float]] | tuple[str, float],
+        ref_formation_energies: dict[str, float] | None = None,
+    ) -> None:
+        """
+        Args:
+            compounds (list or tuple)
+                [(formula (str), Ef (float, eV/atom)), ...] for the compounds to evaluate
+                    or a single (formula, Ef)
+
+            ref_formation_energies (dict)
+                {formula (str) : Ef (float, eV/atom)} of the UMA reference data
+                    formulas are expected to be CompTools(formula).clean
+                    if None, uses pydmclab.data.thermochem.uma_s1p2p1_mp_formation_energies()
+        """
+        if ref_formation_energies is None:
+            ref_formation_energies = uma_s1p2p1_mp_formation_energies()
+
+        # a single (formula, Ef) --> [(formula, Ef)]
+        if compounds and isinstance(compounds[0], str):
+            compound_list = cast(list[tuple[str, float]], [compounds])
+        else:
+            compound_list = cast(list[tuple[str, float]], compounds)
+        self.compounds = [
+            (CompTools(formula).clean, float(Ef)) for formula, Ef in compound_list
+        ]
+        self.ref_formation_energies = dict(ref_formation_energies)
+
+        # every entry a compound can compete with: reference compounds and new compounds
+        #   input is the position of a new compound in the input list (None for reference)
+        self.entries = [
+            {
+                "label": self.rxn_label(formula),
+                "formula": formula,
+                "Ef": Ef,
+                "input": None,
+            }
+            for formula, Ef in self.reference_compounds.items()
+        ] + [
+            {
+                "label": f"{self.rxn_label(formula)} (input {i})",
+                "formula": formula,
+                "Ef": Ef,
+                "input": i,
+            }
+            for i, (formula, Ef) in enumerate(self.compounds)
+        ]
+
+        # {formula (str) : {el (str) : amt (float)}}, parsed once per formula
+        self.amts = {e["formula"]: CompTools(e["formula"]).amts for e in self.entries}
+
+    def rxn_label(self, formula: str) -> str:
+        """
+        Args:
+            formula (str)
+                clean formula
+
+        Returns:
+            how the formula is written in rxn (str)
+                elements by symbol (e.g. 'O' not 'O1'), as in AnalyzeHull
+                compounds as the clean formula (e.g. 'Mn1O2')
+        """
+        els = CompTools(formula).els
+        return els[0] if len(els) == 1 else formula
+
+    @property
+    def els(self) -> list[str]:
+        """
+        Returns:
+            sorted list of elements (str) across all compounds to evaluate
+        """
+        return sorted(
+            {el for formula, _ in self.compounds for el in CompTools(formula).els}
+        )
+
+    @property
+    def reference_compounds(self) -> dict[str, float]:
+        """
+        Returns:
+            {formula (str) : Ef (float, eV/atom)}
+                for every reference compound made only of elements in self.els
+                plus the elements themselves at Ef = 0
+        """
+        els = set(self.els)
+        # reference formulas are already clean
+        reference = {
+            formula: float(Ef)
+            for formula, Ef in self.ref_formation_energies.items()
+            if set(re.findall("[A-Z][a-z]?", formula)) <= els
+        }
+        reference.update({CompTools(el).clean: 0.0 for el in els})
+        return reference
+
+    def competitors(self, i: int) -> list[dict]:
+        """
+        Args:
+            i (int)
+                position of the compound in the input list
+
+        Returns:
+            every entry (dict) made of a subset of the elements of compound i, except itself
+                [{'label', 'formula', 'Ef', 'input'}, ...]
+        """
+        els = self.amts[self.compounds[i][0]].keys()
+        return [
+            e
+            for e in self.entries
+            if e["input"] != i and self.amts[e["formula"]].keys() <= els
+        ]
+
+    def cmpd_hull_output_data(self, i: int) -> dict[str, Any]:
+        """
+        Args:
+            i (int)
+                position of the compound in the input list
+
+        Returns:
+            stability data for a single compound
+                {'formula' : formula (str),
+                 'Ef' : formation energy (float),
+                 'Ed' : decomposition energy (float),
+                 'rxn' : lowest-energy competitor at this composition (str, see class docstring),
+                 'stability' : stable (True) or unstable (False),
+                 'dE_polymorph' : Ef - lowest Ef of another polymorph (float or None)}
+        """
+        formula, Ef = self.compounds[i]
+        amts = self.amts[formula]
+        competitors = self.competitors(i)
+
+        # lowest-energy combination of competitors (formula units of each) that has
+        #   the same atoms as one formula unit of compound i
+        A = [[self.amts[c["formula"]].get(el, 0) for c in competitors] for el in amts]
+        b = list(amts.values())
+        E_per_fu = [
+            c["Ef"] * sum(self.amts[c["formula"]].values()) for c in competitors
+        ]
+        res = linprog(E_per_fu, A_eq=A, b_eq=b, bounds=(0, None), method="highs")
+        if not res.success:
+            raise RuntimeError(
+                f"hull solve failed for {formula} (input {i}): {res.message}"
+            )
+
+        Ed = Ef - res.fun / sum(amts.values())
+        # a reference polymorph of the formula being evaluated is labelled '(ref)'
+        products = {
+            (
+                f"{c['label']} (ref)"
+                if c["input"] is None and c["formula"] == formula
+                else c["label"]
+            ): x
+            for c, x in zip(competitors, res.x)
+            if x > 1e-4
+        }
+        rxn = " + ".join(
+            f"{np.round(x, 4)}_{label}" for label, x in sorted(products.items())
+        )
+        stability = bool(Ed <= 1e-6)
+        polymorphs = [c["Ef"] for c in competitors if c["formula"] == formula]
+        dE_polymorph = Ef - min(polymorphs) if polymorphs else None
+        return {
+            "formula": formula,
+            "Ef": Ef,
+            "Ed": Ed,
+            "rxn": rxn,
+            "stability": stability,
+            "dE_polymorph": dE_polymorph,
+        }
+
+    @property
+    def hull_output_data(self) -> list[dict[str, Any]]:
+        """
+        Returns:
+            stability data (list) for the compounds to evaluate, in input order
+                [{'formula', 'Ef', 'Ed', 'rxn', 'stability', 'dE_polymorph'}, ...]
+                    see cmpd_hull_output_data
+        """
+        return [self.cmpd_hull_output_data(i) for i in range(len(self.compounds))]
 
 
 def main():
