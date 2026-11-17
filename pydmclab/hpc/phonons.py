@@ -24,7 +24,8 @@ class AnalyzePhonons(object):
                  mesh: int|list|float=100.0,
                  dataset: dict = None,
                  E0: float = 0,
-                 init_kwargs: dict ={}
+                 init_kwargs: dict ={},
+                 is_gamma_center: bool = False
 ):
         """
         Class to analyze phonon data from a VASP calculation using Phonopy, Can return force constants, dynamical matrix, mesh data, thermal properties, band structure, and total density of states.
@@ -114,7 +115,7 @@ class AnalyzePhonons(object):
                 )
 
             # self.dynamical_matrix = phonon.dynamical_matrix # This is just a phonopy.dynamical_matrix.DynamicalMatrix object. Need it to run mesh.
-            _mesh_out = phonon.run_mesh(mesh,) #is_gamma_center=False) #Need to run this in order to run everything else downstream
+            _mesh_out = phonon.run_mesh(mesh, is_gamma_center=is_gamma_center) #Need to run this in order to run everything else downstream
             self.phonon = phonon
 
         self._band_structure = None
