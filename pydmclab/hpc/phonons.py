@@ -1,7 +1,6 @@
 import os
 import numpy as np
 from scipy.constants import physical_constants
-from scipy.integrate import trapezoid
 
 
 from pydmclab.utils.handy import read_json, write_json, convert_numpy_to_native
@@ -13,8 +12,6 @@ from pymatgen.io.phonopy import get_phonopy_structure, get_pmg_structure
 
 from phonopy import Phonopy
 
-from ase.thermochemistry import CrystalThermo
-
 
 class AnalyzePhonons(object):
     def __init__(self, unitcell: str|dict,
@@ -25,8 +22,7 @@ class AnalyzePhonons(object):
                  dataset: dict = None,
                  E0: float = 0,
                  init_kwargs: dict ={},
-                 is_gamma_center: bool = False
-):
+                 ):
         """
         Class to analyze phonon data from a VASP calculation using Phonopy, Can return force constants, dynamical matrix, mesh data, thermal properties, band structure, and total density of states.
         Args:
@@ -115,7 +111,7 @@ class AnalyzePhonons(object):
                 )
 
             # self.dynamical_matrix = phonon.dynamical_matrix # This is just a phonopy.dynamical_matrix.DynamicalMatrix object. Need it to run mesh.
-            _mesh_out = phonon.run_mesh(mesh, is_gamma_center=is_gamma_center) #Need to run this in order to run everything else downstream
+            _mesh_out = phonon.run_mesh(mesh) #Need to run this in order to run everything else downstream
             self.phonon = phonon
 
         self._band_structure = None
@@ -124,9 +120,22 @@ class AnalyzePhonons(object):
     @property
     def mesh_dict(self):
         """
-        Returns the mesh data for the phonon object in a dictionary
+        Returns phonopy's mesh dictionary with frequencies converted from THz to eV.
+
+        Returns:
+            {'qpoints': (n_qpoints, 3) reduced coordinates,
+             'weights': (n_qpoints,) integer q-point weights (sum = number of
+                        points in the full mesh),
+             'frequencies': (n_qpoints, 3N) phonon energies in eV
+                            (negative = imaginary),
+             'eigenvectors': None unless requested in run_mesh,
+             'group_velocities': None unless requested in run_mesh (THz*Angstrom),
+             'units': {'frequencies': 'eV'}}
         """
-        mesh_dict = self.phonon.get_mesh_dict()
+        mesh_dict = dict(self.phonon.get_mesh_dict())  # copy: don't touch phonopy's arrays
+        h = physical_constants['Planck constant in eV/Hz'][0]
+        mesh_dict['frequencies'] = np.asarray(mesh_dict['frequencies']) * 1e12 * h  # THz -> eV
+        mesh_dict['units'] = {'frequencies': 'eV'}
         return mesh_dict
     
     @property
@@ -247,37 +256,32 @@ class AnalyzePhonons(object):
 
         return self._total_dos
 
-    def thermal_properties(self, temperatures=np.linspace(0, 2000, 101), 
-                  include_heat_capacity: bool = True, 
-                  move_imaginary: bool = False):
+    def thermal_properties(self, temperatures=np.linspace(0, 2000, 101),
+                           cutoff_energy: float = 1e-5):
         """
-        Helmholtz free energy calculated using ASE's CrystalThermo module.
+        Harmonic thermal properties per atom, from a direct sum over the phonon
+        modes on the q-point mesh (see Helmholtz).
         Args:
             temperatures (array-like):
-                Array of temperatures in Kelvin at which to calculate the Helmholtz free energy.
-            include_heat_capacity (bool):
-                If True, includes heat capacity in the output.
-            move_imaginary (bool):
-                If True, moves imaginary frequencies to their absolute values.
-                If False, removes imaginary frequencies from the DOS.
-                In order to calculate thermodynamic properties, the phonon DOS must not contain imaginary frequencies, so it will always be cleaned.
+                Temperatures (K).
+            cutoff_energy (float):
+                Modes below this energy (eV) are dropped: the acoustic modes at
+                Gamma and small numerical imaginary modes. Default 1e-5 eV.
         Returns:
-            [{'T': 300, 
-            'F': float,
-            'S': float,
-            'Cv': float}, ...]
-            Units are eV/atom
+            {'thermal_properties': [{'T': K, 'S': eV/atom/K, 'F': eV/atom,
+                                     'Cv': eV/atom/K}, ...],
+             'E0': 0 K static energy (eV/atom),
+             'units': {..., 'per': 'atom'}}
+            F includes E0, so F(0 K) = E0 + ZPE.
         """
-        phonon_dos = self.total_dos
-        phonon_dos['E0'] = self.E0*self.natoms #Convert to eV/supercell for CrystalThermo
-        normalize=self.natoms
-        helmholtz = Helmholtz(phonon_dos=phonon_dos, temperatures=temperatures, normalize=normalize, move_imaginary=move_imaginary) #this will normalize to eV/atom not eV/formula unit
-        F = helmholtz.helmholtz()
-        if include_heat_capacity: 
-            Cv = helmholtz.heat_capacity()
-            for i in range(len(F['thermal_properties'])):
-                F['thermal_properties'][i]['Cv'] = Cv['thermal_properties'][i]['Cv']
-        return F
+        helmholtz = Helmholtz(self.mesh_dict,
+                              temperatures=temperatures,
+                              E0=self.E0 * self.natoms,  # eV/atom -> eV per primitive cell
+                              normalize=self.natoms,     # per primitive cell -> per atom
+                              cutoff_energy=cutoff_energy)
+        out = helmholtz.thermal_properties()
+        out['units']['per'] = 'atom'
+        return out
 
     def phonopy_thermal_properties(
         self,
@@ -399,7 +403,7 @@ class AnalyzePhonons(object):
             data["total_dos"] = total_dos
 
         if include_thermal_properties:
-            helmholtz = self.thermal_properties(temperatures=temperatures,include_heat_capacity=True)
+            helmholtz = self.thermal_properties(temperatures=temperatures)
             data["thermal_properties"] = helmholtz
 
         if include_phonopy_thermal_properties:
@@ -441,176 +445,154 @@ class AnalyzePhonons(object):
         self.phonon.plot_band_structure_and_dos()
 
 class Helmholtz():
+    """
+    Harmonic thermodynamic properties from a direct sum over the phonon modes on a q-point mesh.
+    Every mode (q, j) contributes with weight w_q / sum(w), so each cell has exactly 3N modes by
+    construction.
 
-    def __init__(self, phonon_dos, temperatures=np.linspace(0, 2000, 101), normalize = None, move_imaginary: bool = False):
+    For a mode of energy e and x = e / (kB T), per cell:
+        ZPE = sum_modes w * e / 2
+        S   = kB * sum_modes w * [x / (exp(x) - 1) - ln(1 - exp(-x))]
+        F   = E0 + ZPE + kB T * sum_modes w * ln(1 - exp(-x))
+        Cv  = kB * sum_modes w * x^2 exp(-x) / (1 - exp(-x))^2
+    """
+
+    KB_EV = physical_constants['Boltzmann constant in eV/K'][0] 
+
+    def __init__(self, mesh_dict, temperatures=np.linspace(0, 2000, 101),
+                 E0: float = 0.0, normalize: int | None = None, cutoff_energy: float = 1e-5):
         """
-            Args:
-                phonon_dos (Usually obtained from the phonon_dos method of the AnalyzePhonons class, 
-                which gets it from AnalyzePhonons.total_dos):
-                    {'E0' : 0 K internal energy (eV/cell),
-                    'total_dos' :
-                        [{'E' : energy level (eV),
-                        'total_dos' : phonon DOS at E (float)}]
-                        }
-
-                    E0 is optional, but if not given, the energy given is only from phonons, not including the static 0 K energy.
-                    ** Units should be in eV for frequencies, states/eV for DOS and eV/cell for E0 (where cell corresponds to the cell size used to calculate the DOS). 
-                    If E0 is in eV/atom, make sure to multiply by number of atoms in cell before feeding it here, otherwise it will be doubly normalized.**
-
-                temperatures (np.array)
-                    list of temperatures (K)
-
-                normalize (int)
-                    What you want to normalize by. If None is given, the energy will be in eV/cell. 
-                    If a number is given, the energy will be divided by that number.
-                    Could give number of formula units to get eV/formula unit, or number of atoms to get eV/atom.
-                move_imaginary (bool):
-                    If True, moves imaginary frequencies to their absolute values.
-                    If False, removes imaginary frequencies from the DOS.
-                    In order to calculate thermodynamic properties, the phonon DOS must not contain imaginary frequencies, so it will always be cleaned.
-        """
-
-
-        self.phonon_dos = phonon_dos
-        self.temperatures = temperatures
-        self.normalize = normalize
-        self.E0 = phonon_dos["E0"] if "E0" in phonon_dos else 0
-        self.move_imaginary = move_imaginary
-
-
-    def cleanup_dos(self, move_imaginary: bool = False):
-        """
-        Cleans up the phonon DOS by removing or adjusting imaginary frequencies.
         Args:
-            move_imaginary (bool):
-                If True, moves imaginary frequencies to their absolute values.
-                If False, removes imaginary frequencies from the DOS.
+            mesh_dict (dict):
+                Mesh dictionary from AnalyzePhonons.mesh_dict with frequencies in eV. 
+                Only two keys are used:
+                    'frequencies': (n_qpoints, 3N) phonon frequencies in eV
+                    'weights':     (n_qpoints,) q-point weights (integers for an irreducible
+                                   mesh, or all ones for a full mesh)
+            temperatures (array-like):
+                Temperatures (K).
+            E0 (float):
+                0 K static (DFT) energy in eV per cell, where cell is the cell the frequencies
+                belong to (the phonopy primitive cell).  E0 is optional, but if not given, the 
+                energy returned is only from phonons, not including the static 0 K energy.
+            normalize (int or None):
+                What you want to normalize by. If None is given, the energy will be in eV/cell. 
+                Could give e.g. number of formula units to get eV/formula unit, or number of 
+                atoms to get eV/atom.
+            cutoff_energy (float):
+                Modes with energy below this (eV) are dropped: the acoustic modes at Gamma and
+                small numerical imaginary modes. Default 1e-5 eV (0.01 meV).
         """
-        if hasattr(self, 'clean_dos') and self.clean_dos['move_imaginary']==move_imaginary:
-            return self.clean_dos
-        phonon_dos = self.phonon_dos
-        frequency_points = np.array([phonon_dos['total_dos'][i]['E'] for i in range(len(phonon_dos['total_dos']))])
-        total_dos = np.array([phonon_dos['total_dos'][i]['total_dos'] for i in range(len(phonon_dos['total_dos']))])
-        negative_freqs_with_0_dos = [i for i, freq in enumerate(frequency_points) if freq < 0 and total_dos[i] == 0]
+        self.mesh_dict = mesh_dict
+        self.temperatures = np.asarray(temperatures, dtype=float)
+        self.E0 = E0
+        self.normalize = 1 if normalize is None else normalize
+        self.cutoff_energy = cutoff_energy
 
-        if move_imaginary:
-            # Move imaginary frequencies to their absolute values
-            filtered_frequencies = np.abs(frequency_points)
-            filtered_dos = total_dos
-            print(f"Moved {np.sum(frequency_points < 0)} imaginary frequencies to their absolute values.")
-        else:
-            # Remove all DOS values and frequencies where there are imaginary frequencies
-            valid_indices = [
-                i for i, freq in enumerate(frequency_points)
-                if np.real(freq) > 0
-            ]
-            filtered_frequencies = frequency_points[valid_indices]
-            filtered_dos = total_dos[valid_indices]
-            print(f"Removed {len(frequency_points) - len(filtered_frequencies)} imaginary frequencies from the DOS. "
-                  f"{len(negative_freqs_with_0_dos)} of them had zero DOS.")
+    @property
+    def modes(self):
+        """
+        Returns:
+            (energies (eV), weights): 1D arrays over every kept mode, flattened over q-points and
+            branches. Weights sum to 3N (minus the dropped modes).
+        """
+        if not hasattr(self, '_modes'):
+            energies = np.asarray(self.mesh_dict['frequencies'], dtype=float)  # eV
+            weights = np.asarray(self.mesh_dict['weights'], dtype=float)
+            mode_weights = np.broadcast_to(weights[:, None] / weights.sum(), energies.shape)
+            keep = energies > self.cutoff_energy
+            self._modes = (energies[keep], mode_weights[keep])
+            self._dropped_modes = {'n_dropped': int(np.sum(~keep)),
+                                   'min_energy': float(energies.min())}
+        return self._modes
 
-        self.clean_dos = {
-            'E0': self.E0,
-            'total_dos': {'frequencies':filtered_frequencies, 'total_dos':filtered_dos},
-            'units': phonon_dos.get('units', 'eV'),
-            'move_imaginary':move_imaginary
-        }
-        return self.clean_dos
-
-
-    def thermo(self):
-        phonon_dos = self.cleanup_dos(move_imaginary=self.move_imaginary)
-        E0 = self.E0
-        normalize = self.normalize
-
-        return CrystalThermo(
-            phonon_energies=phonon_dos['total_dos']['frequencies'],
-            phonon_DOS=phonon_dos['total_dos']['total_dos'],
-            potentialenergy=E0,
-            formula_units=normalize,
-        )
+    @property
+    def dropped_modes(self):
+        """
+        Returns:
+            {'n_dropped': number of (q, branch) modes below cutoff_energy,
+             'min_energy': lowest mode energy on the mesh (eV); negative = imaginary}
+        """
+        self.modes
+        return self._dropped_modes
 
     def zero_point_energy(self):
-        phonon_dos = self.cleanup_dos(move_imaginary=self.move_imaginary)
-        normalize = self.normalize
-        E0 = self.E0
-        phonon_energies = phonon_dos['total_dos']['frequencies']
-        dos_values = phonon_dos['total_dos']['total_dos']
-        zpe_list = phonon_energies / 2.
-        zpe = trapezoid(zpe_list * dos_values, phonon_energies)
-        if normalize is None:
-            return (zpe + E0)
-        else:
-            return (zpe + E0)/normalize
-    
+        """
+        Returns:
+            float: vibrational zero-point energy (eV per normalize unit). Does NOT include E0.
+        """
+        energies, weights = self.modes
+        return float(np.sum(weights * energies / 2) / self.normalize)
+
+    def entropy(self):
+        """
+        Returns:
+            [{'T': K, 'S': eV/K per normalize unit}, ...]. S(0 K) = 0.
+        """
+        energies, weights = self.modes
+        out = []
+        for T in self.temperatures:
+            if T == 0:
+                S = 0.0
+            else:
+                x = energies / (self.KB_EV * T)
+                S = self.KB_EV * np.sum(weights * (x / np.expm1(x) - np.log(-np.expm1(-x))))
+            out.append({'T': float(T), 'S': float(S / self.normalize)})
+        return out
+
     def helmholtz(self):
         """
         Returns:
-            list
-                [{'T': temperature (K), 'F': Helmholtz free energy (eV/cell or eV/self.normalize), 'S': entropy (J/mol/K)}]
+            [{'T': K, 'F': eV per normalize unit}, ...]. F = E0 + F_vib, so F(0 K) = E0 + ZPE.
         """
-        thermo = self.thermo()
-        temperatures = self.temperatures
-
-        S = [0.0 if T == 0 
-             else thermo.get_entropy(temperature=T) 
-             for T in temperatures] #Entropy is zero at 0 K
-        
-        Fs = [self.zero_point_energy() if T == 0 
-              else thermo.get_helmholtz_energy(temperature=T) 
-              for T in temperatures] #Helmholtz free energy includes ZPE at 0 K
-
-        out = {
-            "thermal_properties": [
-                {"T": temperatures[i], "F": Fs[i], "S": S[i]} for i in range(len(temperatures))
-            ]
-        }
-        return out    
+        energies, weights = self.modes
+        zpe = np.sum(weights * energies / 2)
+        out = []
+        for T in self.temperatures:
+            if T == 0:
+                F_vib = zpe
+            else:
+                x = energies / (self.KB_EV * T)
+                F_vib = zpe + self.KB_EV * T * np.sum(weights * np.log(-np.expm1(-x)))
+            out.append({'T': float(T), 'F': float((self.E0 + F_vib) / self.normalize)})
+        return out
 
     def heat_capacity(self):
         """
-        Calculate heat capacity at constant volume from phonon DOS
+        Returns:
+            [{'T': K, 'Cv': eV/K per normalize unit}, ...]. Cv(0 K) = 0.
         """
-        phonon_dos = self.cleanup_dos(move_imaginary=self.move_imaginary)
-        temperatures = self.temperatures
-        normalize = self.normalize
-        
-        phonon_energies = phonon_dos['total_dos']['frequencies']
-        dos_values = phonon_dos['total_dos']['total_dos']
-        
-        kB = physical_constants['Boltzmann constant in eV/K'][0]
-        
-        Cv_list = []
-        for T in temperatures:
+        energies, weights = self.modes
+        out = []
+        for T in self.temperatures:
             if T == 0:
-                Cv_list.append(0.0)
+                Cv = 0.0
             else:
-                x = phonon_energies / (kB * T)
-                x = np.clip(x, -500, 500)
-                exp_x = np.exp(x)
-                
-                # Heat capacity formula: Cv = kB * (x²·exp(x)) / (exp(x)-1)²
-                numerator = x**2 * exp_x
-                denominator = (exp_x - 1)**2
-                
-                # Avoid division by zero
-                mask = denominator > 1e-10
-                integrand = np.zeros_like(x)
-                integrand[mask] = numerator[mask] / denominator[mask]
-                
-                Cv = kB * trapezoid(integrand * dos_values, phonon_energies)
-                
-                if normalize is not None:
-                    Cv = Cv / normalize
-                    
-                Cv_list.append(Cv)
-        
+                x = energies / (self.KB_EV * T)
+                Cv = self.KB_EV * np.sum(weights * x**2 * np.exp(-x) / np.expm1(-x)**2)
+            out.append({'T': float(T), 'Cv': float(Cv / self.normalize)})
+        return out
+
+    def thermal_properties(self):
+        """
+        Returns:
+            {'thermal_properties': [{'T', 'S', 'F', 'Cv'}, ...],
+             'E0': 0 K static energy (eV per normalize unit),
+             'units': {...}}
+            All energies are per normalize unit, e.g. per atom when normalize = natoms.
+            F includes E0.
+        """
+        S, F, Cv = self.entropy(), self.helmholtz(), self.heat_capacity()
         return {
-            "thermal_properties": [
-                {"T": temperatures[i], "Cv": Cv_list[i]} 
-                for i in range(len(temperatures))
-            ]
+            'thermal_properties': [
+                {'T': s['T'], 'S': s['S'], 'F': f['F'], 'Cv': c['Cv']}
+                for s, f, c in zip(S, F, Cv)
+            ],
+            'E0': float(self.E0 / self.normalize),
+            'units': {'T': 'K', 'S': 'eV/K', 'F': 'eV', 'Cv': 'eV/K', 'E0': 'eV',
+                      'per': f'cell / {self.normalize}'},
         }
+
 
 class Gibbs():
     def __init__(self, helmholtz_dict, 
@@ -712,12 +694,12 @@ class QHA(object):
                     'force_data': array of forces or force constants
                     'dataset': dataset generated by phonopy if using finite displacement 
                     'E0' : 0 K internal energy (eV/atom),
-                    'total_dos' (optional):
-                        [{'E' : energy level (eV),
-                        'total_dos' : phonon DOS at E (float)}]
+                    'mesh' (optional): mesh dict with frequencies in eV, e.g.
+                        AnalyzePhonons(...).summary(include_mesh=True)['mesh']
                         }
-                NOTE: if dos is given, then force_data and data_set are not needed. DOS needs to correspond to structure size given!
-                     if dos is not given, then force data and dataset will be needed to calculate dos and consequently thermal properties.
+                NOTE: if 'mesh' is given, force_data and dataset are not needed for helmholtz/gibbs
+                     (they still are for total_dos).
+                     if 'mesh' is not given, force_data (and dataset) are used to build AnalyzePhonons.
             temperatures (list):
                 list of temperatures (K)
             eos (str):
@@ -788,34 +770,46 @@ class QHA(object):
 
     @property
     def total_dos(self) -> dict:
+        """
+        Returns:
+            {volume: AnalyzePhonons.total_dos, or None for volumes
+             given only as a 'mesh' (no force_data to build the DOS)}
+        """
+        return {vol: (self._get_analyzer(vol).total_dos
+                      if self.data_dict[vol].get('force_data') is not None
+                      else None)
+                for vol in self.volumes}
+
+    def helmholtz(self, cutoff_energy: float = 1e-5) -> dict:
+        """
+        Returns:
+            {volume: {'thermal_properties': [{'T','S','F','Cv'}, ...],
+                      'E0': eV/atom, 'units': {..., 'per': 'atom'}}}
+            Per atom; F includes E0.
+        """
         result = {}
         for vol in self.volumes:
             entry = self.data_dict[vol]
-            if 'total_dos' in entry:
-                result[vol] = {'E0': entry['E0'], 'total_dos': entry['total_dos']}
+            if 'mesh' in entry:
+                mesh = entry['mesh']
+                if mesh.get('units', {}).get('frequencies') != 'eV':
+                    raise ValueError(f"mesh for volume {vol} is not "
+                                     "labelled 'eV' (old THz file?)")
+                natoms = np.shape(mesh['frequencies'])[1] // 3
+                out = Helmholtz(mesh, temperatures=self.temperatures,
+                                E0=entry['E0'] * natoms,
+                                normalize=natoms,
+                                cutoff_energy=cutoff_energy
+                                ).thermal_properties()
+                out['units']['per'] = 'atom'
             else:
-                result[vol] = self._get_summary(vol)['total_dos']
+                out = self._get_analyzer(vol).thermal_properties(
+                    temperatures=self.temperatures,
+                    cutoff_energy=cutoff_energy)
+            result[vol] = out
         return result
 
-    def helmholtz(self, move_imaginary: bool = False) -> dict:
-        result = {}
-        for vol in self.volumes:
-            entry = self.data_dict[vol]
-            if 'total_dos' in entry:
-                dos = self.total_dos[vol]
-                E0_per_cell = dos['E0'] * self.natoms
-                f = Helmholtz(
-                    phonon_dos={**dos, 'E0': E0_per_cell},
-                    temperatures=self.temperatures,
-                    normalize=self.natoms,
-                    move_imaginary=move_imaginary,
-                ).helmholtz()
-                result[vol] = {'thermal_properties': f['thermal_properties']}
-            else:
-                result[vol] = {'thermal_properties': self._get_summary(vol)['thermal_properties']}
-        return result
-    
-    def gibbs(self, eos="vinet", move_imaginary: bool = False):
+    def gibbs(self, eos="vinet", cutoff_energy: float = 1e-5):
             """
             Returns:
             {
@@ -826,14 +820,17 @@ class QHA(object):
             }
             """
 
-            G = Gibbs(self.helmholtz(move_imaginary=move_imaginary), eos=eos).gibbs()
+            G = Gibbs(self.helmholtz(cutoff_energy=cutoff_energy),
+                      eos=eos).gibbs()
             return G
 
     def qha_dict(self, write=False, data_dir=os.getcwd().replace("scripts", "data"), savename="qha.json", remake=False):
         """
         Returns:
-            A dictionary with QHA information for all structures.
-            e.g. {'Al1N1': {'mp-661': [list of QHA info dictionaries]}}
+            {'volume_resolved': {'total_dos': {volume: dos or None},
+                                 'helmholtz': {volume: {'thermal_properties',
+                                                        'E0', 'units'}}},
+             'gibbs': {'data': [{'T', 'G', 'V'}, ...], 'eos_curves': {...}}}
         """
         fjson = os.path.join(data_dir, savename)
         if not remake and os.path.exists(fjson) and write:
@@ -845,11 +842,12 @@ class QHA(object):
 
         qha_dict = {
                     "volume_resolved": {
-                        dos,
-                        helmholtz,
+                        "total_dos": dos,
+                        "helmholtz": helmholtz,
                     },
                     "gibbs": gibbs
-                }   
+                }
+        qha_dict = convert_numpy_to_native(qha_dict)
 
         if write:
             write_json(qha_dict, fjson)
